@@ -3489,6 +3489,9 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RoundTripTimeHasValue) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.refresh_rtt_after_request", "true"}});
+
   setup(false, "");
 
   // Set up the codec.
@@ -3505,6 +3508,9 @@ TEST_F(HttpConnectionManagerImplTest, RoundTripTimeHasValue) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RoundTripTimeHasNoValue) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.refresh_rtt_after_request", "true"}});
+
   setup(false, "");
 
   // Set up the codec.

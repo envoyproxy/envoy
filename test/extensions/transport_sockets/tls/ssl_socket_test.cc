@@ -85,6 +85,9 @@ public:
   const std::vector<std::string>& expectedClientCertUri() const {
     return expected_client_cert_uri_;
   }
+  const std::vector<std::string>& expectedClientCertIpSans() const {
+    return expected_client_cert_ip_sans_;
+  }
   const std::string& expectedServerStats() const { return expected_server_stats_; }
   bool expectSuccess() const { return expect_success_; }
   Network::Address::IpVersion version() const { return version_; }
@@ -97,6 +100,10 @@ protected:
     expected_client_cert_uri_ = {expected_client_cert_uri};
   }
 
+  void setExpectedClientIpSans(const std::vector<std::string>& expected_client_ip_sans) {
+    expected_client_cert_ip_sans_ = expected_client_ip_sans;
+  }
+
   void setExpectedServerStats(const std::string& expected_server_stats) {
     expected_server_stats_ = expected_server_stats;
   }
@@ -107,6 +114,7 @@ private:
 
   std::string expected_server_stats_;
   std::vector<std::string> expected_client_cert_uri_;
+  std::vector<std::string> expected_client_cert_ip_sans_;
 };
 
 /**
@@ -479,6 +487,9 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
+        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansPeerCertificate());
+        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansLocalCertificate());
+        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansLocalCertificate());
       }
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
@@ -586,6 +597,12 @@ public:
 
   TestUtilOptionsV2& setExpectedClientCertUri(const std::string& expected_client_cert_uri) {
     TestUtilOptionsBase::setExpectedClientCertUri(expected_client_cert_uri);
+    return *this;
+  }
+
+  TestUtilOptionsV2&
+  setExpectedClientCertIpSans(const std::vector<std::string>& expected_client_cert_ips) {
+    TestUtilOptionsBase::setExpectedClientIpSans(expected_client_cert_ips);
     return *this;
   }
 
@@ -769,6 +786,11 @@ void testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertIpSans(),
+                server_connection->ssl()->ipSansPeerCertificate());
+      // Assert twice to ensure a cached value is returned and still valid.
+      EXPECT_EQ(options.expectedClientCertIpSans(),
+                server_connection->ssl()->ipSansPeerCertificate());
       const SslHandshakerImpl* ssl_socket =
           dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
       SSL* client_ssl_socket = ssl_socket->ssl();
@@ -1070,6 +1092,53 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
 
   TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+                 .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_256_HASH));
+}
+
+TEST_P(SslSocketTest, GetCertDigestInlineWithIpSanClientCerts) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+
+  // From test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem.
+  server_cert->mutable_certificate_chain()->set_inline_bytes(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem")));
+
+  // From test/extensions/transport_sockets/tls/test_data/san_dns_key.pem.
+  server_cert->mutable_private_key()->set_inline_bytes(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem")));
+
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
+      server_validation_ctx =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+  // From test/extensions/transport_sockets/tls/test_data/ca_certificates.pem.
+  server_validation_ctx->mutable_trusted_ca()->set_inline_bytes(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir "
+          "}}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem")));
+
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
+      client_ctx.mutable_common_tls_context()->add_tls_certificates();
+
+  // From test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem.
+  client_cert->mutable_certificate_chain()->set_inline_bytes(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem")));
+
+  // From test/extensions/transport_sockets/tls/test_data/san_ip_key.pem.
+  client_cert->mutable_private_key()->set_inline_bytes(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_key.pem")));
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  testUtilV2(test_options.setExpectedClientCertIpSans({"1.1.1.1"})
                  .setExpectedServerCertDigest(TEST_SAN_DNS_CERT_256_HASH));
 }
 
