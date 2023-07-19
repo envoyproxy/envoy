@@ -19,7 +19,7 @@ class FilterFactoryCreator
     : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
           envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig> {
 public:
-  FilterFactoryCreator() : FactoryBase("envoy.filters.http.grpc_field_extraction") {}
+  FilterFactoryCreator();
 
 private:
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

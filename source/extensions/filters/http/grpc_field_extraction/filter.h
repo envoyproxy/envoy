@@ -17,6 +17,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
 
+inline constexpr const char kFilterName[] = "envoy.filters.http.grpc_field_extraction";
+
 class Filter : public Envoy::Http::PassThroughDecoderFilter,
                Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:

@@ -216,7 +216,7 @@ TEST_F(FilterConfigTestException, ErrorParsingDescriptorInline) {
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
                                      *api_),
-      EnvoyException, testing::HasSubstr("Unable to parse proto descriptor from inline bytes:"));
+      EnvoyException, testing::HasSubstr("unable to parse proto descriptor from inline bytes:"));
 }
 
 TEST_F(FilterConfigTestException, ErrorParsingDescriptorFromFile) {
@@ -226,7 +226,7 @@ TEST_F(FilterConfigTestException, ErrorParsingDescriptorFromFile) {
   EXPECT_THAT_THROWS_MESSAGE(std::make_unique<FilterConfig>(
                                  proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_),
                              EnvoyException,
-                             testing::HasSubstr("Unable to parse proto descriptor from file"));
+                             testing::HasSubstr("unable to parse proto descriptor from file"));
 }
 
 TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceTyep) {
@@ -238,7 +238,7 @@ TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceTyep) {
       std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
                                      *api_),
       EnvoyException,
-      testing::HasSubstr("Unsupported DataSource case `3` for configuring `descriptor_set`"));
+      testing::HasSubstr("unsupported DataSource case `3` for configuring `descriptor_set`"));
 }
 
 TEST_F(FilterConfigTestException, GrpcMethodNotFoundInProtoDescriptor) {

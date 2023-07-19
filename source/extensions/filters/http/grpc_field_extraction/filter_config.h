@@ -27,6 +27,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
 
+// The config for GrpcFieldExtraction filter. As a thread-safe class, it should be
+// constructed only once and shared among filters for better performance.
 class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   explicit FilterConfig(

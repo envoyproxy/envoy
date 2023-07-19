@@ -911,7 +911,7 @@ TEST_F(FilterTestExtractRejected, MisformedGrpcPath) {
       {":method", "POST"}, {":path", "/misformatted"}, {"content-type", "application/grpc"}};
   EXPECT_CALL(mock_decoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             ":path `/misformatted` should be in form of `/package.Service/method`",
+                             ":path `/misformatted` should be in form of `/package.service/method`",
                              Eq(nullptr), Eq(Envoy::Grpc::Status::InvalidArgument),
                              "grpc_field_extraction_INVALID_ARGUMENT{BAD_REQUEST}"));
 

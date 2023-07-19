@@ -38,7 +38,7 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
                                        extractor.status().message()));
     }
 
-    ENVOY_LOG_MISC(debug, "register field extraction for gRPC method `{}`", it.first);
+    ENVOY_LOG_MISC(debug, "registered field extraction for gRPC method `{}`", it.first);
     proto_path_to_extractor_.emplace(it.first, std::move(extractor.value()));
   }
 }
@@ -51,7 +51,7 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
     if (!descriptor_set.ParseFromString(
             api.fileSystem().fileReadToEnd(descriptor_config.filename()))) {
-      throw Envoy::EnvoyException(fmt::format("Unable to parse proto descriptor from file `{}`",
+      throw Envoy::EnvoyException(fmt::format("unable to parse proto descriptor from file `{}`",
                                               descriptor_config.filename()));
     }
     break;
@@ -59,14 +59,14 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
     if (!descriptor_set.ParseFromString(descriptor_config.inline_bytes())) {
       throw Envoy::EnvoyException(
-          fmt::format("Unable to parse proto descriptor from inline bytes: {}",
+          fmt::format("unable to parse proto descriptor from inline bytes: {}",
                       descriptor_config.inline_bytes()));
     }
     break;
   }
   default: {
     throw Envoy::EnvoyException(
-        fmt::format("Unsupported DataSource case `{}` for configuring `descriptor_set`",
+        fmt::format("unsupported DataSource case `{}` for configuring `descriptor_set`",
                     descriptor_config.specifier_case()));
   }
   }

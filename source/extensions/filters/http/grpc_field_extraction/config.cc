@@ -17,6 +17,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
 
+FilterFactoryCreator::FilterFactoryCreator() : FactoryBase(kFilterName) {}
+
 Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
         proto_config,

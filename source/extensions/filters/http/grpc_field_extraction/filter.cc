@@ -47,20 +47,18 @@ const char kRcDetailErrorRequestFieldExtractionFailed[] = "REQUEST_FIELD_EXTRACT
 
 const char kRcDetailErrorRequestOutOfData[] = "REQUEST_OUT_OF_DATA";
 
-const char kGrpcFieldExtractionDynamicMetadata[] = "envoy.filters.http.grpc_field_extraction";
-
 std::string generateRcDetails(absl::string_view filter_name, absl::string_view error_type,
                               absl::string_view error_detail) {
   return absl::StrCat(filter_name, "_", error_type, "{", error_detail, "}");
 }
 
-// Turns a '/package.Service/method' to 'package.Service.method' which is
+// Turns a '/package.service/method' to 'package.Service.method' which is
 // the form suitable for the proto db lookup.
 absl::StatusOr<std::string> grpcPathToProtoPath(absl::string_view grpc_path) {
   if (grpc_path.empty() || grpc_path.at(0) != '/' ||
       std::count(grpc_path.begin(), grpc_path.end(), '/') != 2) {
     return absl::InvalidArgumentError(
-        absl::StrFormat(":path `%s` should be in form of `/package.Service/method`", grpc_path));
+        absl::StrFormat(":path `%s` should be in form of `/package.service/method`", grpc_path));
   }
 
   std::string clean_input = std::string(grpc_path.substr(1));
@@ -111,10 +109,10 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
   }
 
   extractor_ = extractor;
+  auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
+      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
   request_msg_converter_ = std::make_unique<MessageConverter>(
-      std::make_unique<std::function<std::unique_ptr<Protobuf::field_extraction::MessageData>()>>(
-          []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); }),
-      decoder_callbacks_->decoderBufferLimit());
+      std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
 
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
@@ -135,7 +133,9 @@ Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, 
 
 Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
                                                         bool end_stream) {
-  ABSL_DCHECK(extractor_ && request_msg_converter_);
+  RELEASE_ASSERT(
+      extractor_ && request_msg_converter_,
+      "both `extractor_` abd `request_msg_converter_` should be inited when extracting fields");
 
   auto buffering = request_msg_converter_->accumulateMessages(data, end_stream);
   if (!buffering.ok()) {
@@ -158,11 +158,16 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
     std::unique_ptr<StreamMessage> message_data = std::move(buffering->at(msg_idx));
 
     // MessageConverter uses a empty StreamMessage to denote the end.
-    if (message_data->size() == -1) {
-      ABSL_DCHECK(end_stream);
-      ABSL_DCHECK(message_data->isFinalMessage());
+    if (message_data->message() == nullptr) {
+      RELEASE_ASSERT(end_stream,
+                     "expect end_stream=true as when the MessageConverter signals an stream end");
+      RELEASE_ASSERT(message_data->isFinalMessage(),
+                     "expect message_data->isFinalMessage()=true when the MessageConverter signals "
+                     "an stream end");
       // This is the last one in the vector.
-      ABSL_DCHECK(msg_idx == buffering->size() - 1);
+      RELEASE_ASSERT(msg_idx == buffering->size() - 1,
+                     "expect message_data is the last element in the vector when the "
+                     "MessageConverter signals an stream end");
       // Skip the empty message
       continue;
     }
@@ -204,10 +209,11 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
 }
 
 void Filter::handleExtractionResult(const ExtractionResult& result) {
-  ABSL_DCHECK(extractor_);
+  RELEASE_ASSERT(extractor_, "`extractor_ should be inited when extracting fields");
 
   ProtobufWkt::Struct dest_metadata;
   for (const auto& req_field : result) {
+    RELEASE_ASSERT(!req_field.path.empty(), "`req_field.path` shouldn't be empty");
     auto* list = (*dest_metadata.mutable_fields())[req_field.path].mutable_list_value();
     for (const auto& value : req_field.values) {
       list->add_values()->set_string_value(value);
@@ -215,9 +221,8 @@ void Filter::handleExtractionResult(const ExtractionResult& result) {
   }
   if (dest_metadata.fields_size() > 0) {
     ENVOY_STREAM_LOG(debug, "injected dynamic metadata `{}` with `{}`", *decoder_callbacks_,
-                     kGrpcFieldExtractionDynamicMetadata, dest_metadata.DebugString());
-    decoder_callbacks_->streamInfo().setDynamicMetadata(kGrpcFieldExtractionDynamicMetadata,
-                                                        dest_metadata);
+                     kFilterName, dest_metadata.DebugString());
+    decoder_callbacks_->streamInfo().setDynamicMetadata(kFilterName, dest_metadata);
   }
 }
 
