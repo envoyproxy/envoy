@@ -6,27 +6,30 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
+namespace {
+using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig;
+using ::google::grpc::transcoding::TypeHelper;
+} // namespace
 
-FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
-        proto_config,
-    std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api)
+FilterConfig::FilterConfig(const GrpcFieldExtractionConfig& proto_config,
+                           std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api)
     : proto_config_(proto_config) {
-  type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
-      Protobuf::util::NewTypeResolverForDescriptorPool(Envoy::Grpc::Common::typeUrlPrefix(),
-                                                       &descriptor_pool_));
-  type_finder_ =
-      std::make_unique<TypeFinder>([this](absl::string_view type_url) -> const Protobuf::Type* {
+  initDescriptorPool(api);
+
+  type_helper_ =
+      std::make_unique<const TypeHelper>(Protobuf::util::NewTypeResolverForDescriptorPool(
+          Grpc::Common::typeUrlPrefix(), descriptor_pool_.get()));
+  type_finder_ = std::make_unique<const TypeFinder>(
+      [this](absl::string_view type_url) -> const Protobuf::Type* {
         return type_helper_->Info()->GetTypeByTypeUrl(type_url);
       });
 
-  initDescriptorPool(api);
   initExtractors(*extractor_factory);
 }
 
 void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
   for (const auto& it : proto_config_.extractions_by_method()) {
-    auto* method = descriptor_pool_.FindMethodByName(it.first);
+    auto* method = descriptor_pool_->FindMethodByName(it.first);
     if (method == nullptr) {
       throw EnvoyException(fmt::format(
           "couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
@@ -46,8 +49,10 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
 }
 
 void FilterConfig::initDescriptorPool(Api::Api& api) {
-  Envoy::Protobuf::FileDescriptorSet descriptor_set;
+  Protobuf::FileDescriptorSet descriptor_set;
   auto& descriptor_config = proto_config_.descriptor_set();
+
+  auto pool = std::make_unique<Protobuf::DescriptorPool>();
 
   switch (descriptor_config.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
@@ -74,8 +79,9 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
   }
 
   for (const auto& file : descriptor_set.file()) {
-    descriptor_pool_.BuildFile(file);
+    pool->BuildFile(file);
   }
+  descriptor_pool_ = std::move(pool);
 }
 
 const Extractor* FilterConfig::findExtractor(absl::string_view proto_path) const {

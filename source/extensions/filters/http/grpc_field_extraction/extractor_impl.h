@@ -22,7 +22,7 @@ using FieldValueExtractorPtr =
 class ExtractorImpl : public Extractor {
 public:
   explicit ExtractorImpl(
-      TypeFinder& type_finder, absl::string_view request_type_url,
+      const TypeFinder& type_finder, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
           field_extractions)
       : type_finder_(type_finder), request_type_url_(request_type_url),
@@ -35,7 +35,7 @@ public:
   processRequest(Protobuf::field_extraction::MessageData& message) const override;
 
 private:
-  TypeFinder& type_finder_;
+  const TypeFinder& type_finder_;
 
   std::string request_type_url_;
 
@@ -48,7 +48,7 @@ private:
 class ExtractorFactoryImpl : public ExtractorFactory {
 public:
   absl::StatusOr<ExtractorPtr> createExtractor(
-      TypeFinder& type_finder, absl::string_view request_type_url,
+      const TypeFinder& type_finder, absl::string_view request_type_url,
       const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
           field_extractions) const override {
     auto extractor =
