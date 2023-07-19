@@ -2,5 +2,12 @@ syntax = "proto3";
 
 package test.integration.filters;
 
+import "validate/validate.proto";
+
 message TestNetworkFilterConfig {
+}
+
+message TestDrainerNetworkFilterConfig {
+  bool is_terminal_filter = 1;
+  uint32 bytes_to_drain = 2 [(validate.rules).uint32 = {gte: 2}];
 }
