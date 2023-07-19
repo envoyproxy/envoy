@@ -166,7 +166,7 @@ public:
     return std::chrono::milliseconds::zero();
   }
 
-  const std::vector<FilterFactoryCb>& networkFilterFactories() const override {
+  const NetworkFilterFactoriesList& networkFilterFactories() const override {
     return empty_network_filter_factory_;
   }
 
@@ -174,7 +174,7 @@ public:
 
 private:
   const DownstreamTransportSocketFactoryPtr transport_socket_factory_;
-  const std::vector<FilterFactoryCb> empty_network_filter_factory_{};
+  const NetworkFilterFactoriesList empty_network_filter_factory_{};
 };
 
 /**

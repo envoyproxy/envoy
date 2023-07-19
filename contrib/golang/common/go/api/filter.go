@@ -115,6 +115,8 @@ type StreamInfo interface {
 	UpstreamClusterName() (string, bool)
 	// FilterState return the filter state interface.
 	FilterState() FilterState
+	// VirtualClusterName returns the name of the virtual cluster which got matched
+	VirtualClusterName() (string, bool)
 }
 
 type StreamFilterCallbacks interface {

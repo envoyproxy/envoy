@@ -194,5 +194,17 @@ public:
   Common::CallbackManager<absl::string_view> update_cb_handler_;
 };
 
+template <class FactoryCallback>
+class TestExtensionConfigProvider : public Config::ExtensionConfigProvider<FactoryCallback> {
+public:
+  TestExtensionConfigProvider(FactoryCallback cb) : cb_(cb) {}
+  const std::string& name() override { return name_; }
+  OptRef<FactoryCallback> config() override { return {cb_}; }
+
+private:
+  const std::string name_ = "mock_config_provider";
+  FactoryCallback cb_;
+};
+
 } // namespace Config
 } // namespace Envoy
