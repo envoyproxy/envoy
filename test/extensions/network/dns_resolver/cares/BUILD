@@ -33,6 +33,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/network/dns_resolver/cares:config",
+        "//test/integration:base_integration_test_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
