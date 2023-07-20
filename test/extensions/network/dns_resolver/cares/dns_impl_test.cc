@@ -24,6 +24,7 @@
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/integration/base_integration_test.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -1116,6 +1117,9 @@ TEST_P(DnsImplTest, DestroyChannelOnResetNetworking) {
 // Validate that the c-ares channel is destroyed and re-initialized when c-ares returns
 // ARES_ECONNREFUSED as its callback status.
 TEST_P(DnsImplTest, DestroyChannelOnRefused) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   ASSERT_FALSE(peer_->isChannelDirty());
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   server_->setRefused(true);
