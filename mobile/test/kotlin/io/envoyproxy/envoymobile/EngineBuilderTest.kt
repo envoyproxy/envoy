@@ -209,7 +209,7 @@ class EngineBuilderTest {
     var xdsBuilder = XdsBuilder("fake_test_address", 0)
     xdsBuilder.setJwtAuthenticationToken("my_jwt_token")
     xdsBuilder.setSslRootCerts("my_root_certs")
-    xdsBuilder.setSNI("fake_test_address");
+    xdsBuilder.setSni("fake_test_address");
     xdsBuilder.addRuntimeDiscoveryService("some_rtds_resource")
     xdsBuilder.addClusterDiscoveryService("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")
     engineBuilder = EngineBuilder(Standard())

@@ -287,7 +287,7 @@ TEST(TestConfig, XdsConfig) {
   xds_builder.setJwtAuthenticationToken(/*token=*/"my_jwt_token",
                                         /*token_lifetime_in_seconds=*/500);
   xds_builder.setSslRootCerts(/*root_certs=*/"my_root_cert");
-  xds_builder.setSNI(/*sni=*/"fake-td.googleapis.com");
+  xds_builder.setSni(/*sni=*/"fake-td.googleapis.com");
   engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
   auto& ads_config_with_tokens = bootstrap->dynamic_resources().ads_config();

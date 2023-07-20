@@ -96,7 +96,7 @@ open class XdsBuilder (
    *
    * @return this builder.
    */
-  fun setSNI(sni: String): XdsBuilder {
+  fun setSni(sni: String): XdsBuilder {
     this.sni = sni
     return this
   }

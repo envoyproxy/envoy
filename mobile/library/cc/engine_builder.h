@@ -65,7 +65,7 @@ public:
   // Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake
   // and the authority HTTP header. If not set, the SNI is set by default to the xDS server address
   // and the authority HTTP header is not set.
-  XdsBuilder& setSNI(std::string sni);
+  XdsBuilder& setSni(std::string sni);
 
   // Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
   // to retrieve dynamic runtime configuration via the xDS management server.

@@ -77,7 +77,7 @@ open class XdsBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setSNI(sni: String) -> Self {
+  public func setSni(sni: String) -> Self {
     self.sni = sni
     return self
   }
@@ -927,7 +927,7 @@ private extension EngineBuilder {
         cxxXdsBuilder.setSslRootCerts(xdsSslRootCerts.toCXX())
       }
       if let xdsSni = xdsBuilder.sni {
-        cxxXdsBuilder.setSNI(xdsSni.toCXX())
+        cxxXdsBuilder.setSni(xdsSni.toCXX())
       }
       if let rtdsResourceName = xdsBuilder.rtdsResourceName {
         cxxXdsBuilder.addRuntimeDiscoveryService(rtdsResourceName.toCXX(),

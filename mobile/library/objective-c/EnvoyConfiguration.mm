@@ -270,7 +270,7 @@
       xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
     }
     if (self.xdsSni != nil) {
-      xdsBuilder.setSNI([self.xdsSni toCXXString]);
+      xdsBuilder.setSni([self.xdsSni toCXXString]);
     }
     if (self.rtdsResourceName != nil) {
       xdsBuilder.addRuntimeDiscoveryService([self.rtdsResourceName toCXXString],

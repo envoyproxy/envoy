@@ -1318,7 +1318,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     }
     std::string native_sni = getCppString(env, xds_sni);
     if (!native_sni.empty()) {
-      xds_builder.setSNI(std::move(native_sni));
+      xds_builder.setSni(std::move(native_sni));
     }
     std::string native_rtds_resource_name = getCppString(env, rtds_resource_name);
     if (!native_rtds_resource_name.empty()) {

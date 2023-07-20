@@ -58,7 +58,7 @@ XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
   return *this;
 }
 
-XdsBuilder& XdsBuilder::setSNI(std::string sni) {
+XdsBuilder& XdsBuilder::setSni(std::string sni) {
   sni_ = std::move(sni);
   return *this;
 }
