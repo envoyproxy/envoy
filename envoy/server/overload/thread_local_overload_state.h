@@ -86,8 +86,7 @@ public:
                                      int64_t decrement) PURE;
 
   /**
-   * TODO(nezdolik) remove this method once downstream connection tracking is fully moved to
-   * overload manager. Checks if resource monitor is registered and resource usage tracking is
+   * Checks if resource monitor is registered and resource usage tracking is
    * enabled in overload manager. Returns true if resource monitor is registered, false otherwise.
    * @param name of resource monitor to check.
    */
