@@ -12,9 +12,6 @@ parameters:
   default: true
 
 # Auth
-- name: authGithub
-  type: string
-  default: ""
 - name: authGCP
   type: string
   default: ""
