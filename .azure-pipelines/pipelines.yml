@@ -223,6 +223,7 @@ stages:
     variables:
       REPO_FETCH_DEPTH: 1
       REPO_FETCH_TAGS: false
+      DISKSPACE_HACK: false
     strategy:
       maxParallel: 3
       matrix:
@@ -233,6 +234,7 @@ stages:
         #  CI_TARGET: "bazel.api_compat"
         gcc:
           CI_TARGET: "bazel.gcc"
+          DISKSPACE_HACK: true
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
           REPO_FETCH_DEPTH: 0
@@ -252,6 +254,7 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: $(CI_TARGET)
+        diskspaceHack: $(DISKSPACE_HACK)
         repoFetchDepth: $(REPO_FETCH_DEPTH)
         repoFetchTags: $(REPO_FETCH_TAGS)
 
