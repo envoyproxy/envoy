@@ -9,6 +9,7 @@
 #include "source/common/network/socket_interface_impl.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
 
 using Envoy::Api::SysCallIntResult;
@@ -234,6 +235,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    ENVOY_BUG(result.return_value_ >= 0 || result.errno_ != SOCKET_ERROR_INVAL,
+              absl::StrFormat("EINVAL error. Socket is open: %v, IPv%d.", isOpen(),
+                              self_ip->version() == Address::IpVersion::v6 ? 6 : 4));
     return sysCallResultToIoCallResult(result);
   }
 }

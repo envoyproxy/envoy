@@ -498,7 +498,9 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   ON_CALL(os_sys_calls, sendmsg(_, _, _))
       .WillByDefault(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
   // EINVAL should cause RELEASE_ASSERT.
-  EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
+  EXPECT_DEATH(listener_->send(send_data),
+               absl::StrCat("EINVAL error. Socket is open: true, IPv",
+                            version_ == Address::IpVersion::v4 ? 4 : 6));
 }
 
 /**
