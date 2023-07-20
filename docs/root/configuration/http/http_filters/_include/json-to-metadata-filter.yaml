@@ -27,22 +27,23 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata
               request_rules:
-              - selectors:
-                - key: version
-                on_present:
-                  metadata_namespace: envoy.lb
-                  key: version
-                on_missing:
-                  metadata_namespace: envoy.lb
-                  key: default
-                  value: "true"
-                  preserve_existing_metadata_value: true
-                on_error:
-                  metadata_namespace: envoy.lb
-                  key: default
-                  value: "true"
-                  preserve_existing_metadata_value: true
-              request_buffer_limit_bytes: 16384
+              rules:
+                - selectors:
+                  - key: version
+                  on_present:
+                    metadata_namespace: envoy.lb
+                    key: version
+                  on_missing:
+                    metadata_namespace: envoy.lb
+                    key: default
+                    value: "true"
+                    preserve_existing_metadata_value: true
+                  on_error:
+                    metadata_namespace: envoy.lb
+                    key: default
+                    value: "true"
+                    preserve_existing_metadata_value: true
+                buffer_limit_bytes: 16384
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
