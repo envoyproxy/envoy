@@ -2400,6 +2400,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersWithBothAllowedAndDisa
                                    EXPECT_EQ(trailers.trailers().headers_size(), 0);
                                    return true;
                                  });
+  verifyDownstreamResponse(*response, 200);
 }
 
 // Test clear route cache in both upstream and downstream header and body processing.
