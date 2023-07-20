@@ -20,15 +20,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JsonToMetadata {
 
-// clang-format off
-#define ALL_JSON_TO_METADATA_FILTER_STATS(COUNTER)                \
-  COUNTER(rq_success)                                             \
-  COUNTER(rq_mismatched_content_type)                             \
-  COUNTER(rq_no_body)                                             \
-  COUNTER(rq_too_large_body)                                      \
+/**
+ * All stats for the Json to Metadata filter. @see stats_macros.h
+ */
+#define ALL_JSON_TO_METADATA_FILTER_STATS(COUNTER)                                                 \
+  COUNTER(rq_success)                                                                              \
+  COUNTER(rq_mismatched_content_type)                                                              \
+  COUNTER(rq_no_body)                                                                              \
+  COUNTER(rq_too_large_body)                                                                       \
   COUNTER(rq_invalid_json_body)
-// clang-format on
 
+/**
+ * Wrapper struct for Json to Metadata filter stats. @see stats_macros.h
+ */
 struct JsonToMetadataStats {
   ALL_JSON_TO_METADATA_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
@@ -38,6 +42,9 @@ using KeyValuePair =
     envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::KeyValuePair;
 using ValueType = envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::ValueType;
 
+/**
+ * Data structure to store one rule.
+ */
 struct Rule {
   Rule(const ProtoRule& rule);
   const ProtoRule rule_;
@@ -46,6 +53,9 @@ struct Rule {
 
 using Rules = std::vector<Rule>;
 
+/**
+ * Configuration for the Json to Metadata filter.
+ */
 class FilterConfig {
 public:
   FilterConfig(
@@ -54,6 +64,7 @@ public:
   ~FilterConfig() = default;
 
   JsonToMetadataStats& stats() { return stats_; }
+  // True if we have rules for requests
   bool doRequest() const { return !request_rules_.empty(); }
   const Rules& requestRules() const { return request_rules_; }
   uint32_t requestBufferLimitBytes() const { return request_buffer_limit_bytes_; }
@@ -74,6 +85,9 @@ private:
 
 const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
 
+/**
+ * HTTP Json to Metadata Filter.
+ */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(std::shared_ptr<FilterConfig> config) : config_(config){};
@@ -86,12 +100,18 @@ public:
 
 private:
   using StructMap = absl::flat_hash_map<std::string, ProtobufWkt::Struct>;
+  // Handle on_missing case of the `rule` and store in `struct_map`.
   void handleOnMissing(const Rule& rule, StructMap& struct_map);
+  // Handle on_present case of the `rule` and store in `struct_map`, which depends on
+  // the value of `parent_node->key`.
   absl::Status handleOnPresent(Json::ObjectSharedPtr parent_node, const std::string& key,
                                const Rule& rule, StructMap& struct_map);
 
+  // Process the case without body, i.e., on_missing is applied for all rules.
   void handleAllOnMissing(const Rules& rules, bool& reported_flag);
+  // Process the case with error, i.e., on_error is applied for all rules.
   void handleAllOnError(const Rules& rules, bool& reported_flag);
+  // Parse the body while we have the whole json.
   void processBody(const Buffer::Instance* body, const Rules& rules, bool& reported_flag,
                    Stats::Counter& success, Stats::Counter& no_body, Stats::Counter& non_json);
   void processRequestBody();
