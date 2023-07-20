@@ -291,6 +291,9 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
     return;
   }
 
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   requestWithBodyTest(R"EOF(
     typed_dns_resolver_config:
       name: envoy.network.dns_resolver.getaddrinfo
