@@ -134,12 +134,10 @@ def api_cc_py_proto_library(
         visibility = visibility,
     )
 
-    # This is to support Envoy Mobile using Protobuf-Lite in google3.
+    # This is to support Envoy Mobile using Protobuf-Lite.
     # Protobuf-Lite generated C++ code does not include reflection
     # capabilities but analogous functionality can be provided by
     # cc_proto_descriptor_library.
-    #
-    # go/envoy-mobile-protos
     cc_proto_descriptor_library(
         name = name + _CC_PROTO_DESCRIPTOR_SUFFIX,
         visibility = visibility,

@@ -11,7 +11,10 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
+
+
 #include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/compiler/retention.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 
@@ -106,13 +109,8 @@ bool generateSource(const google::protobuf::FileDescriptor* file,
   contents << R"text(#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 )text";
 
-  google::protobuf::FileDescriptorProto file_descriptor_proto;
-  file->CopyTo(&file_descriptor_proto);
-  // XXX
-  /*
-    google::protobuf::FileDescriptorProto file_descriptor_proto =
+  google::protobuf::FileDescriptorProto file_descriptor_proto =
       google::protobuf::compiler::StripSourceRetentionOptions(*file);
-  */
 
   contents << absl::StrFormat(
       R"text(
