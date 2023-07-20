@@ -156,7 +156,9 @@ jobs:
           DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
           DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
       stepsPost:
-      - script: sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
+      - script: |
+          sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
+          sudo rm -rf /var/lib/docker
         displayName: "Cache/save (publish_docker)"
 
 - job: package_x64
