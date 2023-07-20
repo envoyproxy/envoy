@@ -192,12 +192,8 @@ jobs:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
       - script: |
-          echo "saving cache ..."
-          free
           sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
-          echo "done ..."
-          free
-          df -h
+          rm -rf /var/lib/docker
         displayName: "Cache/save (publish_docker)"
 
 - job: package_x64
