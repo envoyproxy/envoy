@@ -168,9 +168,9 @@ public class EnvoyConfiguration {
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, boolean enablePlatformCertificatesValidation,
       String rtdsResourceName, Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
-      String xdsJwtToken, Integer xdsJwtTokenLifetime, String xdsRootCerts, String xdsSni, String nodeId,
-      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
-      Integer cdsTimeoutSeconds, boolean enableCds) {
+      String xdsJwtToken, Integer xdsJwtTokenLifetime, String xdsRootCerts, String xdsSni,
+      String nodeId, String nodeRegion, String nodeZone, String nodeSubZone,
+      String cdsResourcesLocator, Integer cdsTimeoutSeconds, boolean enableCds) {
     JniLibrary.load();
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -258,8 +258,8 @@ public class EnvoyConfiguration {
         streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
         enforceTrustChainVerification, filter_chain, stats_sinks,
         enablePlatformCertificatesValidation, runtime_guards, rtdsResourceName, rtdsTimeoutSeconds,
-        xdsAddress, xdsPort, xdsJwtToken, xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId, nodeRegion,
-        nodeZone, nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        xdsAddress, xdsPort, xdsJwtToken, xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId,
+        nodeRegion, nodeZone, nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {
