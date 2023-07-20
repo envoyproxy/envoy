@@ -28,7 +28,7 @@ parameters:
   default: false
 
 - name: diskspaceHack
-  type: boolean
+  type: string
   default: false
 
 steps:
