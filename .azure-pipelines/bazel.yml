@@ -27,6 +27,10 @@ parameters:
   type: string
   default: false
 
+- name: diskspaceHack
+  type: boolean
+  default: false
+
 steps:
 - checkout: self
   fetchDepth: ${{ parameters.repoFetchDepth }}
@@ -48,6 +52,9 @@ steps:
     done
   displayName: "Mount/tmpfs directories"
   condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false))
+
+- bash: ./.azure-pipelines/cleanup.sh
+  condition: eq('${{ parameters.diskspaceHack }}', true)
 
 - task: Cache@2
   inputs:
