@@ -154,6 +154,9 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, All) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
   setupFakeGai();
 
@@ -174,6 +177,9 @@ TEST_F(GetAddrInfoDnsImplTest, All) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, V4Only) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
   setupFakeGai();
 
@@ -194,6 +200,9 @@ TEST_F(GetAddrInfoDnsImplTest, V4Only) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, V6Only) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
   setupFakeGai();
 
@@ -214,6 +223,9 @@ TEST_F(GetAddrInfoDnsImplTest, V6Only) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, V4Preferred) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
   setupFakeGai();
 
@@ -234,6 +246,9 @@ TEST_F(GetAddrInfoDnsImplTest, V4Preferred) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, V4PreferredNoV4) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
   setupFakeGai({Utility::getIpv6LoopbackAddress()});
 
@@ -254,6 +269,9 @@ TEST_F(GetAddrInfoDnsImplTest, V4PreferredNoV4) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, Auto) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
   setupFakeGai();
 
@@ -274,6 +292,9 @@ TEST_F(GetAddrInfoDnsImplTest, Auto) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, AutoNoV6) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
   setupFakeGai({Utility::getCanonicalIpv4LoopbackAddress()});
 
