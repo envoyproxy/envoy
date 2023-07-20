@@ -103,6 +103,9 @@ public:
 };
 
 TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   resolver_->resolve(
       "localhost", DnsLookupFamily::All,
       [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
@@ -114,6 +117,9 @@ TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, Cancel) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   auto query =
       resolver_->resolve("localhost", DnsLookupFamily::All,
                          [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) { FAIL(); });
