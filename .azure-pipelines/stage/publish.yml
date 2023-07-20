@@ -193,7 +193,7 @@ jobs:
           ENVOY_RBE: "1"
       - script: |
           sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
-          rm -rf /var/lib/docker
+          sudo rm -rf /var/lib/docker
         displayName: "Cache/save (publish_docker)"
 
 - job: package_x64
