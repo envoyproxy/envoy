@@ -9,7 +9,6 @@
 #include "source/common/network/socket_interface_impl.h"
 
 #include "absl/container/fixed_array.h"
-#include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
 
 using Envoy::Api::SysCallIntResult;
