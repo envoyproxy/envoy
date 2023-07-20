@@ -191,7 +191,13 @@ jobs:
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-      - script: sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
+      - script: |
+          echo "saving cache ..."
+          free
+          sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
+          echo "done ..."
+          free
+          df -h
         displayName: "Cache/save (publish_docker)"
 
 - job: package_x64
