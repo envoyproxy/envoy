@@ -395,7 +395,7 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingXdsSecurityConfigurationWhenRunningEnvoy() {
     let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
       .setJwtAuthenticationToken(token: "fake_jwt_token", tokenLifetimeInSeconds: 12345)
-      .setSslRootCerts(sslRootCerts: "fake_ssl_root_certs")
+      .setSslRootCerts(rootCerts: "fake_ssl_root_certs")
       .setSNI(sni: "fake_sni_address")
       .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
     let bootstrapDebugDescription = EngineBuilder()
