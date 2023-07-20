@@ -84,7 +84,7 @@ TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
 TEST_F(RateLimitClientTest, BuildUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  std::string domain = "cloud_12345_67890_td_rlqs";
+  std::string domain = "cloud_12345_67890_rlqs";
 
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
   RateLimitQuotaUsageReports report = test_client.client_->buildUsageReport(domain, bucket_id);
@@ -97,7 +97,7 @@ TEST_F(RateLimitClientTest, BuildUsageReport) {
 TEST_F(RateLimitClientTest, BuildMultipleReports) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  std::string domain = "cloud_12345_67890_td_rlqs";
+  std::string domain = "cloud_12345_67890_rlqs";
 
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
   // Build the usage report with 2 entries with same domain and bucket id.

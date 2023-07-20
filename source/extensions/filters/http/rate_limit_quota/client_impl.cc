@@ -115,6 +115,7 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
             Http::AsyncClient::ParentContext{&stream_info}));
   }
 
+  // Returns error status if start failed (i.e., stream_ is nullptr).
   return stream_ == nullptr ? absl::InternalError("Failed to start the stream") : absl::OkStatus();
 }
 
