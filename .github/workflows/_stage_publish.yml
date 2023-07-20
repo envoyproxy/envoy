@@ -45,8 +45,7 @@ jobs:
           name: github
           run_pre: ./.github/actions/publish/release/setup
           run_pre_with: |
-            # ref: ${{ inputs.given_ref }}
-            ref: 5d58edacad73d5ac01edea989fd81c9d817987e8
+            ref: ${{ inputs.given_ref }}
           env: |
             export ENVOY_PUBLISH_DRY_RUN=1
     uses: ./.github/workflows/_ci.yml
@@ -74,8 +73,7 @@ jobs:
           name: github
           run_pre: ./.github/actions/publish/release/setup
           run_pre_with: |
-            # ref: ${{ inputs.given_ref }}
-            ref: 5d58edacad73d5ac01edea989fd81c9d817987e8
+            ref: ${{ inputs.given_ref }}
           env: |
             if [[ '${{ inputs.version_dev }}' != '' ]]; then
                 export ENVOY_PUBLISH_DRY_RUN=1
