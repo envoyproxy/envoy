@@ -39,6 +39,20 @@ jobs:
       contents: read
       statuses: write
 
+  publish:
+    needs:
+    - env
+    uses: ./.github/workflows/_stage_publish.yml
+    name: Publish ${{ needs.env.outputs.repo_ref_title }}
+    with:
+      build_image_ubuntu: ${{ needs.env.outputs.build_image_ubuntu }}
+      trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
+      version_dev: ${{ needs.env.outputs.version_dev }}
+      given_ref: ${{ inputs.ref }}
+      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
+    permissions:
+      contents: write
+
   verify:
     uses: ./.github/workflows/_stage_verify.yml
     name: Verify ${{ needs.env.outputs.repo_ref_title }}
