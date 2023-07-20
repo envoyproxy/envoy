@@ -87,8 +87,9 @@ public:
 
   std::pair<Upstream::ThreadAwareLoadBalancerPtr, Upstream::LoadBalancerPtr>
   createLoadBalancer(const Upstream::PrioritySet& child_priority_set, const Upstream::PrioritySet*,
-                     Upstream::ClusterLbStats&, Stats::Scope&, Runtime::Loader& runtime,
-                     Random::RandomGenerator& random, TimeSource& time_source) override {
+                     Upstream::DeferredCreationCompatibleClusterLbStats&, Stats::Scope&,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     TimeSource& time_source) override {
     return {subset_config_.createLoadBalancer(cluster_info_, child_priority_set, runtime, random,
                                               time_source),
             nullptr};

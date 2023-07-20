@@ -65,7 +65,8 @@ MockClusterInfo::MockClusterInfo()
       traffic_stats_(
           ClusterInfoImpl::generateStats(stats_store_.rootScope(), traffic_stat_names_, false)),
       config_update_stats_(config_update_stats_names_, *stats_store_.rootScope()),
-      lb_stats_(lb_stat_names_, *stats_store_.rootScope()),
+      lb_stats_(Stats::createDeferredCompatibleStats<ClusterLbStats>(stats_store_.rootScope(),
+                                                                     lb_stat_names_, false)),
       endpoint_stats_(endpoint_stat_names_, *stats_store_.rootScope()),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(

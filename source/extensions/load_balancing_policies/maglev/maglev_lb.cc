@@ -274,8 +274,8 @@ uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
 }
 
 MaglevLoadBalancer::MaglevLoadBalancer(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
+    const PrioritySet& priority_set, DeferredCreationCompatibleClusterLbStats& stats,
+    Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
     OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random,
@@ -300,8 +300,9 @@ MaglevLoadBalancer::MaglevLoadBalancer(
 }
 
 MaglevLoadBalancer::MaglevLoadBalancer(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+    const PrioritySet& priority_set, DeferredCreationCompatibleClusterLbStats& stats,
+    Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
+    uint32_t healthy_panic_threshold,
     const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold,
                                   config.has_locality_weighted_lb_config()),

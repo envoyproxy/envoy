@@ -9,6 +9,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -54,8 +55,8 @@ public:
 class TestZoneAwareLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   TestZoneAwareLoadBalancer(
-      const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
-      Random::RandomGenerator& random,
+      const PrioritySet& priority_set, DeferredCreationCompatibleClusterLbStats& lb_stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(
             priority_set, nullptr, lb_stats, runtime, random,
@@ -80,13 +81,15 @@ protected:
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   LoadBalancerTestBase()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {
+      : stat_names_(stats_store_.symbolTable()),
+        stats_(Stats::createDeferredCompatibleStats<ClusterLbStats>(stats_store_.rootScope(),
+                                                                    stat_names_, false)) {
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
-  ClusterLbStats stats_;
+  DeferredCreationCompatibleClusterLbStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<MockPrioritySet> priority_set_;
@@ -100,8 +103,8 @@ protected:
 
 class TestLb : public LoadBalancerBase {
 public:
-  TestLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
-         Random::RandomGenerator& random,
+  TestLb(const PrioritySet& priority_set, DeferredCreationCompatibleClusterLbStats& lb_stats,
+         Runtime::Loader& runtime, Random::RandomGenerator& random,
          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, lb_stats, runtime, random,
                          PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
@@ -650,8 +653,9 @@ TEST_P(LoadBalancerBaseTest, BoundaryConditions) {
 
 class TestZoneAwareLb : public ZoneAwareLoadBalancerBase {
 public:
-  TestZoneAwareLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
-                  Runtime::Loader& runtime, Random::RandomGenerator& random,
+  TestZoneAwareLb(const PrioritySet& priority_set,
+                  DeferredCreationCompatibleClusterLbStats& lb_stats, Runtime::Loader& runtime,
+                  Random::RandomGenerator& random,
                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(
             priority_set, nullptr, lb_stats, runtime, random,
@@ -1150,7 +1154,7 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
-  EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(3UL, stats_->lb_healthy_panic_.value());
 }
 
 // Test that no hosts are selected when fail_traffic_on_panic is enabled.
@@ -1179,7 +1183,7 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
-  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1UL, stats_->lb_healthy_panic_.value());
 }
 
 // Ensure if the panic threshold is 0%, panic mode is disabled.
@@ -1193,7 +1197,7 @@ TEST_P(RoundRobinLoadBalancerTest, DisablePanicMode) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(0));
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
-  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(0UL, stats_->lb_healthy_panic_.value());
 }
 
 // Test of host set selection with host filter
@@ -1273,9 +1277,9 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
 
   if (&hostSet() == &host_set_) {
     // Cluster size is computed once at zone aware struct regeneration point.
-    EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
+    EXPECT_EQ(1U, stats_->lb_zone_cluster_too_small_.value());
   } else {
-    EXPECT_EQ(0U, stats_.lb_zone_cluster_too_small_.value());
+    EXPECT_EQ(0U, stats_->lb_zone_cluster_too_small_.value());
     return;
   }
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 7))
@@ -1317,7 +1321,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
       .WillRepeatedly(Return(7));
 
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
+  EXPECT_EQ(1U, stats_->lb_zone_number_differs_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
@@ -1347,9 +1351,9 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
+  EXPECT_EQ(1U, stats_->lb_zone_routing_all_directly_.value());
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(2U, stats_.lb_zone_routing_all_directly_.value());
+  EXPECT_EQ(2U, stats_->lb_zone_routing_all_directly_.value());
 
   // Disable runtime global zone routing.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -1400,12 +1404,12 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
   // There is only one host in the given zone for zone aware routing.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
+  EXPECT_EQ(1U, stats_->lb_zone_routing_sampled_.value());
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_EQ(1U, stats_->lb_zone_routing_cross_zone_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
@@ -1471,7 +1475,7 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   // Force request out of small zone and to randomly select zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   lb_->chooseHost(nullptr);
-  EXPECT_EQ(1U, stats_.lb_zone_no_capacity_left_.value());
+  EXPECT_EQ(1U, stats_->lb_zone_no_capacity_left_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
@@ -1539,8 +1543,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
 
   // Local cluster is not OK, we'll do regular routing.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
-  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
+  EXPECT_EQ(0U, stats_->lb_healthy_panic_.value());
+  EXPECT_EQ(1U, stats_->lb_local_cluster_not_ok_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPanic) {
@@ -1576,8 +1580,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPani
   // Local cluster is not OK, we'll do regular routing (and select no host, since we're in global
   // panic).
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
-  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
-  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
+  EXPECT_EQ(0U, stats_->lb_healthy_panic_.value());
+  EXPECT_EQ(1U, stats_->lb_local_cluster_not_ok_.value());
 }
 
 // Validate that if we have healthy host lists >= 2, but there is no local
@@ -1605,8 +1609,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
 
   // Local cluster is not OK, we'll do regular routing.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
-  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
+  EXPECT_EQ(0U, stats_->lb_healthy_panic_.value());
+  EXPECT_EQ(1U, stats_->lb_local_cluster_not_ok_.value());
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,

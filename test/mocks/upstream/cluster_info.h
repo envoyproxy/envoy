@@ -17,6 +17,7 @@
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -153,7 +154,7 @@ public:
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
   MOCK_METHOD(DeferredCreationCompatibleClusterTrafficStats&, trafficStats, (), (const));
-  MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
+  MOCK_METHOD(DeferredCreationCompatibleClusterLbStats&, lbStats, (), (const));
   MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
   MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
   MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
@@ -215,7 +216,7 @@ public:
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
   mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
   ClusterConfigUpdateStats config_update_stats_;
-  ClusterLbStats lb_stats_;
+  DeferredCreationCompatibleClusterLbStats lb_stats_;
   ClusterEndpointStats endpoint_stats_;
   Upstream::TransportSocketMatcherPtr transport_socket_matcher_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;

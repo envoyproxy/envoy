@@ -916,7 +916,7 @@ public:
     return traffic_stats_;
   }
   ClusterConfigUpdateStats& configUpdateStats() const override { return config_update_stats_; }
-  ClusterLbStats& lbStats() const override { return lb_stats_; }
+  DeferredCreationCompatibleClusterLbStats& lbStats() const override { return lb_stats_; }
   ClusterEndpointStats& endpointStats() const override { return endpoint_stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
 
@@ -1061,7 +1061,7 @@ private:
   Stats::ScopeSharedPtr stats_scope_;
   mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
   mutable ClusterConfigUpdateStats config_update_stats_;
-  mutable ClusterLbStats lb_stats_;
+  mutable DeferredCreationCompatibleClusterLbStats lb_stats_;
   mutable ClusterEndpointStats endpoint_stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;

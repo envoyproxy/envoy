@@ -7,6 +7,7 @@
 #include "envoy/router/router.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
 
@@ -59,7 +60,9 @@ class RingHashLoadBalancerTest : public Event::TestUsingSimulatedTime,
                                  public testing::TestWithParam<bool> {
 public:
   RingHashLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
+      : stat_names_(stats_store_.symbolTable()),
+        stats_(Stats::createDeferredCompatibleStats<ClusterLbStats>(stats_store_.rootScope(),
+                                                                    stat_names_, false)) {}
 
   void init(bool locality_weighted_balancing = false) {
     if (locality_weighted_balancing) {
@@ -91,7 +94,7 @@ public:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
-  ClusterLbStats stats_;
+  DeferredCreationCompatibleClusterLbStats stats_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -210,7 +213,7 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
     EXPECT_CALL(random_, random()).WillOnce(Return(16117243373044804880UL));
     EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(nullptr));
   }
-  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(0UL, stats_->lb_healthy_panic_.value());
 
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
@@ -219,7 +222,7 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
   }
-  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1UL, stats_->lb_healthy_panic_.value());
 }
 
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
@@ -316,7 +319,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
     EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
     EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(nullptr));
   }
-  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(0UL, stats_->lb_healthy_panic_.value());
 }
 
 // Expect reasonable results with hostname.
@@ -379,7 +382,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
     EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context));
   }
   { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr)); }
-  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(0UL, stats_->lb_healthy_panic_.value());
 
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
@@ -388,7 +391,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
   }
-  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1UL, stats_->lb_healthy_panic_.value());
 }
 
 // Expect reasonable results with metadata hash_key.
@@ -451,7 +454,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
     EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context));
   }
   { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr)); }
-  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(0UL, stats_->lb_healthy_panic_.value());
 
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
@@ -460,7 +463,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
   }
-  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1UL, stats_->lb_healthy_panic_.value());
 }
 
 // Test the same ring as Basic but exercise retry host predicate behavior.

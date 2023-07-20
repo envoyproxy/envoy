@@ -123,8 +123,9 @@ protected:
    */
   void recalculateLoadInTotalPanic();
 
-  LoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
-                   Random::RandomGenerator& random, uint32_t healthy_panic_threshold);
+  LoadBalancerBase(const PrioritySet& priority_set, DeferredCreationCompatibleClusterLbStats& stats,
+                   Runtime::Loader& runtime, Random::RandomGenerator& random,
+                   uint32_t healthy_panic_threshold);
 
   // Choose host set randomly, based on the healthy_per_priority_load_ and
   // degraded_per_priority_load_. per_priority_load_ is consulted first, spilling over to
@@ -157,7 +158,7 @@ protected:
     }
   }
 
-  ClusterLbStats& stats_;
+  DeferredCreationCompatibleClusterLbStats& stats_;
   Runtime::Loader& runtime_;
   std::deque<uint64_t> stashed_random_;
   Random::RandomGenerator& random_;
@@ -257,8 +258,9 @@ public:
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
   ZoneAwareLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                            ClusterLbStats& stats, Runtime::Loader& runtime,
-                            Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+                            DeferredCreationCompatibleClusterLbStats& stats,
+                            Runtime::Loader& runtime, Random::RandomGenerator& random,
+                            uint32_t healthy_panic_threshold,
                             const absl::optional<LocalityLbConfig> locality_config);
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
@@ -472,7 +474,7 @@ public:
   using SlowStartConfig = envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig;
 
   EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                      ClusterLbStats& stats, Runtime::Loader& runtime,
+                      DeferredCreationCompatibleClusterLbStats& stats, Runtime::Loader& runtime,
                       Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
                       const absl::optional<LocalityLbConfig> locality_config,
                       const absl::optional<SlowStartConfig> slow_start_config,
@@ -540,8 +542,9 @@ protected:
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
 public:
   RoundRobinLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      DeferredCreationCompatibleClusterLbStats& stats, Runtime::Loader& runtime,
+      Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
       TimeSource& time_source)
@@ -558,8 +561,9 @@ public:
   }
 
   RoundRobinLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      DeferredCreationCompatibleClusterLbStats& stats, Runtime::Loader& runtime,
+      Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
       const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin&
           round_robin_config,
       TimeSource& time_source)
@@ -632,8 +636,9 @@ private:
 class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
   LeastRequestLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      DeferredCreationCompatibleClusterLbStats& stats, Runtime::Loader& runtime,
+      Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
       TimeSource& time_source)
@@ -660,8 +665,9 @@ public:
   }
 
   LeastRequestLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      DeferredCreationCompatibleClusterLbStats& stats, Runtime::Loader& runtime,
+      Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
       const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest&
           least_request_config,
       TimeSource& time_source)
@@ -718,7 +724,7 @@ private:
 class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                     ClusterLbStats& stats, Runtime::Loader& runtime,
+                     DeferredCreationCompatibleClusterLbStats& stats, Runtime::Loader& runtime,
                      Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(
@@ -728,8 +734,9 @@ public:
             LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
 
   RandomLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      DeferredCreationCompatibleClusterLbStats& stats, Runtime::Loader& runtime,
+      Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
       const envoy::extensions::load_balancing_policies::random::v3::Random& random_config)
       : ZoneAwareLoadBalancerBase(
             priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,

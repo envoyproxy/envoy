@@ -55,8 +55,9 @@ LegacyChildLoadBalancerCreatorImpl::LegacyChildLoadBalancerCreatorImpl(
 std::pair<Upstream::ThreadAwareLoadBalancerPtr, Upstream::LoadBalancerPtr>
 LegacyChildLoadBalancerCreatorImpl::createLoadBalancer(
     const Upstream::PrioritySet& child_priority_set,
-    const Upstream::PrioritySet* local_priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source) {
+    const Upstream::PrioritySet* local_priority_set,
+    DeferredCreationCompatibleClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, TimeSource& time_source) {
   switch (lb_type_) {
   case Upstream::LoadBalancerType::LeastRequest: {
     Upstream::LoadBalancerPtr lb = std::make_unique<Upstream::LeastRequestLoadBalancer>(
@@ -104,7 +105,8 @@ LegacyChildLoadBalancerCreatorImpl::createLoadBalancer(
 SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
                                        ChildLoadBalancerCreatorPtr child_lb,
                                        const PrioritySet& priority_set,
-                                       const PrioritySet* local_priority_set, ClusterLbStats& stats,
+                                       const PrioritySet* local_priority_set,
+                                       DeferredCreationCompatibleClusterLbStats& stats,
                                        Stats::Scope& scope, Runtime::Loader& runtime,
                                        Random::RandomGenerator& random, TimeSource& time_source)
     : stats_(stats), scope_(scope), runtime_(runtime), random_(random), time_source_(time_source),
@@ -153,8 +155,8 @@ SubsetLoadBalancer::~SubsetLoadBalancer() {
   // Ensure gauges reflect correct values.
   forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
     if (entry->active()) {
-      stats_.lb_subsets_removed_.inc();
-      stats_.lb_subsets_active_.dec();
+      stats_->lb_subsets_removed_.inc();
+      stats_->lb_subsets_active_.dec();
     }
   });
 }
@@ -327,14 +329,14 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* 
 
   HostConstSharedPtr host = fallback_subset_->lb_subset_->chooseHost(context);
   if (host != nullptr) {
-    stats_.lb_subsets_fallback_.inc();
+    stats_->lb_subsets_fallback_.inc();
     return host;
   }
 
   if (panic_mode_subset_ != nullptr) {
     HostConstSharedPtr host = panic_mode_subset_->lb_subset_->chooseHost(context);
     if (host != nullptr) {
-      stats_.lb_subsets_fallback_panic_.inc();
+      stats_->lb_subsets_fallback_panic_.inc();
       return host;
     }
   }
@@ -414,7 +416,7 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
   }
 
   host_chosen = true;
-  stats_.lb_subsets_selected_.inc();
+  stats_->lb_subsets_selected_.inc();
   return entry->lb_subset_->chooseHost(context);
 }
 
@@ -501,8 +503,8 @@ void SubsetLoadBalancer::initLbSubsetEntryOnce(LbSubsetEntryPtr& entry, bool sin
     entry->single_host_subset_ = false;
   }
 
-  stats_.lb_subsets_active_.inc();
-  stats_.lb_subsets_created_.inc();
+  stats_->lb_subsets_active_.inc();
+  stats_->lb_subsets_created_.inc();
 }
 
 // Iterates all the hosts of specified priority, looking up an LbSubsetEntryPtr for each and add
@@ -721,8 +723,8 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
 
       // If it wasn't initialized, it wasn't accounted for.
       if (entry->initialized()) {
-        stats_.lb_subsets_active_.dec();
-        stats_.lb_subsets_removed_.inc();
+        stats_->lb_subsets_active_.dec();
+        stats_->lb_subsets_removed_.inc();
       }
 
       auto next_it = std::next(it);

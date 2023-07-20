@@ -17,8 +17,8 @@ namespace Envoy {
 namespace Upstream {
 
 RingHashLoadBalancer::RingHashLoadBalancer(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
+    const PrioritySet& priority_set, DeferredCreationCompatibleClusterLbStats& stats,
+    Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
     OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random,
@@ -50,8 +50,9 @@ RingHashLoadBalancer::RingHashLoadBalancer(
 }
 
 RingHashLoadBalancer::RingHashLoadBalancer(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+    const PrioritySet& priority_set, DeferredCreationCompatibleClusterLbStats& stats,
+    Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
+    uint32_t healthy_panic_threshold,
     const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold,
                                   config.has_locality_weighted_lb_config()),

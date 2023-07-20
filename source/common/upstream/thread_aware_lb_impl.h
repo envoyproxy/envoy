@@ -106,7 +106,8 @@ public:
   }
 
 protected:
-  ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats,
+  ThreadAwareLoadBalancerBase(const PrioritySet& priority_set,
+                              DeferredCreationCompatibleClusterLbStats& stats,
                               Runtime::Loader& runtime, Random::RandomGenerator& random,
                               uint32_t healthy_panic_threshold, bool locality_weighted_balancing)
       : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
@@ -121,7 +122,8 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
+    LoadBalancerImpl(DeferredCreationCompatibleClusterLbStats& stats,
+                     Random::RandomGenerator& random)
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancer
@@ -138,7 +140,7 @@ private:
       return {};
     }
 
-    ClusterLbStats& stats_;
+    DeferredCreationCompatibleClusterLbStats& stats_;
     Random::RandomGenerator& random_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
@@ -146,14 +148,15 @@ private:
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
+    LoadBalancerFactoryImpl(DeferredCreationCompatibleClusterLbStats& stats,
+                            Random::RandomGenerator& random)
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
     // Ignore the params for the thread-aware LB.
     LoadBalancerPtr create(LoadBalancerParams) override;
 
-    ClusterLbStats& stats_;
+    DeferredCreationCompatibleClusterLbStats& stats_;
     Random::RandomGenerator& random_;
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);

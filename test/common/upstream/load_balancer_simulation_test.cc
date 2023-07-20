@@ -10,6 +10,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -71,7 +72,9 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterLbStatNames stat_names(stats_store.symbolTable());
-  ClusterLbStats lb_stats{stat_names, *stats_store.rootScope()};
+  DeferredCreationCompatibleClusterLbStats lb_stats{
+      Stats::createDeferredCompatibleStats<ClusterLbStats>(stats_store.rootScope(), stat_names,
+                                                           false)};
   NiceMock<Runtime::MockLoader> runtime;
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   Random::RandomGeneratorImpl random;
@@ -107,7 +110,9 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 class DISABLED_SimulationTest : public testing::Test { // NOLINT(readability-identifier-naming)
 public:
   DISABLED_SimulationTest()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {
+      : stat_names_(stats_store_.symbolTable()),
+        stats_(Stats::createDeferredCompatibleStats<ClusterLbStats>(stats_store_.rootScope(),
+                                                                    stat_names_, false)) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -246,7 +251,7 @@ public:
   Random::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
-  ClusterLbStats stats_;
+  DeferredCreationCompatibleClusterLbStats stats_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 

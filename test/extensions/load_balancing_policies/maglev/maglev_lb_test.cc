@@ -2,6 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "source/common/stats/deferred_creation.h"
 #include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
 
 #include "test/common/upstream/utility.h"
@@ -49,7 +50,9 @@ class MaglevLoadBalancerTest : public Event::TestUsingSimulatedTime,
                                public testing::TestWithParam<bool> {
 public:
   MaglevLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {
+      : stat_names_(stats_store_.symbolTable()),
+        stats_(Stats::createDeferredCompatibleStats<ClusterLbStats>(stats_store_.rootScope(),
+                                                                    stat_names_, false)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.allow_compact_maglev", GetParam() ? "true" : "false"}});
   }
@@ -85,7 +88,7 @@ public:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
-  ClusterLbStats stats_;
+  DeferredCreationCompatibleClusterLbStats stats_;
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;

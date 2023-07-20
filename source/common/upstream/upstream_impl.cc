@@ -1052,7 +1052,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                                    server_context.statsConfig().enableDeferredCreationStats())),
       config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
                            *stats_scope_),
-      lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
+      lb_stats_(Stats::createDeferredCompatibleStats<ClusterLbStats>(
+          stats_scope_, factory_context.clusterManager().clusterLbStatNames(),
+          server_context.statsConfig().enableDeferredCreationStats())),
       endpoint_stats_(factory_context.clusterManager().clusterEndpointStatNames(), *stats_scope_),
       load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(

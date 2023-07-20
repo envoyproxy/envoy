@@ -6,6 +6,7 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/memory/stats.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
 #include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
@@ -73,7 +74,9 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   ClusterLbStatNames stat_names_{stats_store_.symbolTable()};
-  ClusterLbStats stats_{stat_names_, stats_scope_};
+  DeferredCreationCompatibleClusterLbStats stats_{
+      Stats::createDeferredCompatibleStats<ClusterLbStats>(stats_store_.rootScope(), stat_names_,
+                                                           false)};
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;

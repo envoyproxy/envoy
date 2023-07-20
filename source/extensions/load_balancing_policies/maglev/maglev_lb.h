@@ -146,12 +146,14 @@ private:
  */
 class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
-  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+  MaglevLoadBalancer(const PrioritySet& priority_set,
+                     DeferredCreationCompatibleClusterLbStats& stats, Stats::Scope& scope,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
                      OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> config,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
-  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+  MaglevLoadBalancer(const PrioritySet& priority_set,
+                     DeferredCreationCompatibleClusterLbStats& stats, Stats::Scope& scope,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
                      uint32_t healthy_panic_threshold,
                      const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config);

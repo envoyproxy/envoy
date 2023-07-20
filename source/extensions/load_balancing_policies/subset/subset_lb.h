@@ -39,8 +39,9 @@ public:
 
   virtual std::pair<ThreadAwareLoadBalancerPtr, LoadBalancerPtr>
   createLoadBalancer(const PrioritySet& child_priority_set, const PrioritySet* local_priority_set,
-                     ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-                     Random::RandomGenerator& random, TimeSource& time_source) PURE;
+                     DeferredCreationCompatibleClusterLbStats& stats, Stats::Scope& scope,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     TimeSource& time_source) PURE;
 };
 using ChildLoadBalancerCreatorPtr = std::unique_ptr<ChildLoadBalancerCreator>;
 
@@ -56,8 +57,9 @@ public:
 
   std::pair<Upstream::ThreadAwareLoadBalancerPtr, Upstream::LoadBalancerPtr>
   createLoadBalancer(const Upstream::PrioritySet& child_priority_set,
-                     const Upstream::PrioritySet* local_priority_set, ClusterLbStats& stats,
-                     Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     const Upstream::PrioritySet* local_priority_set,
+                     DeferredCreationCompatibleClusterLbStats& stats, Stats::Scope& scope,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
                      TimeSource& time_source) override;
 
   OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
@@ -165,8 +167,9 @@ class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::ups
 public:
   SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets, ChildLoadBalancerCreatorPtr child_lb,
                      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                     ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-                     Random::RandomGenerator& random, TimeSource& time_source);
+                     DeferredCreationCompatibleClusterLbStats& stats, Stats::Scope& scope,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     TimeSource& time_source);
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
@@ -490,7 +493,7 @@ private:
   const ProtobufWkt::Value* getMetadataFallbackList(LoadBalancerContext* context) const;
   LoadBalancerContextWrapper removeMetadataFallbackList(LoadBalancerContext* context);
 
-  ClusterLbStats& stats_;
+  DeferredCreationCompatibleClusterLbStats& stats_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;

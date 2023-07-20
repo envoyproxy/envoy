@@ -41,14 +41,16 @@ struct RingHashLoadBalancerStats {
  */
 class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
-  RingHashLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+  RingHashLoadBalancer(const PrioritySet& priority_set,
+                       DeferredCreationCompatibleClusterLbStats& stats, Stats::Scope& scope,
                        Runtime::Loader& runtime, Random::RandomGenerator& random,
                        OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> config,
                        const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   RingHashLoadBalancer(
-      const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const PrioritySet& priority_set, DeferredCreationCompatibleClusterLbStats& stats,
+      Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
+      uint32_t healthy_panic_threshold,
       const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& config);
 
   const RingHashLoadBalancerStats& stats() const { return stats_; }

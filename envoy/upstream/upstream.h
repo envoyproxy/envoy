@@ -783,6 +783,8 @@ MAKE_STATS_STRUCT(ClusterEndpointStats, ClusterEndpointStatNames, ALL_CLUSTER_EN
  */
 MAKE_STAT_NAMES_STRUCT(ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
 MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
+using DeferredCreationCompatibleClusterLbStats =
+    Stats::DeferredCreationCompatibleStats<ClusterLbStats>;
 
 /**
  * Struct definition for all cluster traffic stats. @see stats_macros.h
@@ -1081,9 +1083,9 @@ public:
   virtual ClusterConfigUpdateStats& configUpdateStats() const PURE;
 
   /**
-   * @return ClusterLbStats& load-balancer-related stats for this cluster.
+   * @return DeferredCreationCompatibleClusterLbStats& load-balancer-related stats for this cluster.
    */
-  virtual ClusterLbStats& lbStats() const PURE;
+  virtual DeferredCreationCompatibleClusterLbStats& lbStats() const PURE;
 
   /**
    * @return ClusterEndpointStats& endpoint related stats for this cluster.
