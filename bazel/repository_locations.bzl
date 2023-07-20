@@ -1370,9 +1370,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        # v3.1.7 with Bazel fixes
-        version = "e8b64774ff1a3ddb6a013203ced27a34e70c2d8b",
-        sha256 = "3a234d13541ccbf47565e032c60605da9ae17e07d4eb5b50d635b38fb4bfc2f8",
+        version = "3.1.43",
+        sha256 = "78f3ebcbc984c6cf5aa59c69bcc5af87f570fbe6d2b92fc3e16f71e0c56413b3",
         strip_prefix = "emsdk-{version}/bazel",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["test_only"],
