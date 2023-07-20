@@ -113,7 +113,8 @@ public:
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
-        header_matchers_(initHeaderMatchers(config)) {}
+        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
+        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -135,7 +136,10 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
-  const std::vector<Matchers::StringMatcherPtr>& headerMatchers() const { return header_matchers_; }
+  const std::vector<Matchers::StringMatcherPtr>& allowedHeaders() const { return allowed_headers_; }
+  const std::vector<Matchers::StringMatcherPtr>& disallowedHeaders() const {
+    return disallowed_headers_;
+  }
 
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
@@ -145,10 +149,10 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
-  const std::vector<Matchers::StringMatcherPtr> initHeaderMatchers(
-      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+  const std::vector<Matchers::StringMatcherPtr>
+  initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list) {
     std::vector<Matchers::StringMatcherPtr> header_matchers;
-    for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {
+    for (const auto& matcher : header_list.patterns()) {
       header_matchers.push_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               matcher));
@@ -167,8 +171,10 @@ private:
   const Envoy::ProtobufWkt::Struct filter_metadata_;
   // If set to true, allow the processing mode to be modified by the ext_proc response.
   const bool allow_mode_override_;
-  // Empty header_matchers_ means allow all.
-  const std::vector<Matchers::StringMatcherPtr> header_matchers_;
+  // Empty allowed_header_ means allow all.
+  const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
+  // Empty disallowed_header_ means disallow nothing, i.e, allow all.
+  const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

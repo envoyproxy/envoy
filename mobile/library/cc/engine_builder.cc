@@ -54,7 +54,7 @@ XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
 }
 
 XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
-  ssl_root_certs_ = root_certs;
+  ssl_root_certs_ = std::move(root_certs);
   return *this;
 }
 

@@ -150,6 +150,11 @@ bug_fixes:
     Fix a bug where the ext_authz filter will ignore the request body when the
     :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` is set to true and
     HTTP authorization service is configured.
+- area: ext_authz
+  change: |
+    Fix a bug where the ext_authz filter will remove non UTF-8 characters from the body of a request when configured
+    to use :ref:`http_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.http_service>`, if configured
+    to send the body.
 - area: router
   change: |
     Fixed the bug that updating :ref:`scope_key_builder
