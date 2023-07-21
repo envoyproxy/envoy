@@ -525,7 +525,6 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
 
 // Invalid paths are rejected with 400.
 TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
-  InSequence s;
   setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;
@@ -540,7 +539,13 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
     data.drain(4);
     return Http::okStatus();
   }));
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
+#ifdef ENVOY_ENABLE_UHV
+  expectUhvHeaderCheck(
+      HeaderValidator::ValidationResult(HeaderValidator::ValidationResult::Action::Reject,
+                                        "path_normalization_failed"),
+      ServerHeaderValidator::RequestHeadersTransformationResult::success());
+#endif
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(true));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
   auto* filter = new MockStreamFilter();
@@ -575,6 +580,9 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
   normalize_path_ = true;
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
 
   auto* filter = new MockStreamFilter();
 
@@ -619,6 +627,9 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   normalize_path_ = true;
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -715,6 +726,10 @@ TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForward
       v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
   const std::string original_path = "/x/%2E%2e/z%2f%2Fabc%5C../def";
   const std::string normalized_path = "/z/def";
+
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
 
   auto* filter = new MockStreamFilter();
 
