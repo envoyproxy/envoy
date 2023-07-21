@@ -60,6 +60,8 @@ outputs:
     value: ${{ steps.should_run.outputs.mobile_tsan }}
   repo_ref_name:
     value: ${{ steps.context.outputs.repo_ref_name }}
+  repo_ref_pr_number:
+    value: ${{ steps.context.outputs.repo_ref_pr_number }}
   repo_ref_sha:
     value: ${{ steps.context.outputs.repo_ref_sha }}
   repo_ref_sha_short:
@@ -123,7 +125,11 @@ runs:
       REF_NAME=${{ inputs.repo_ref_name || github.ref_name }}
       if [[ "$REF_NAME" =~ ^refs/pull/ ]]; then
           REF_NAME="${REF_NAME:10}"
+          REF_PR_NUMBER="$(echo "${REF_NAME}" | cut -d/ -f1)"
+      elif [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+          REF_PR_NUMBER="$(echo "${REF_NAME}" | cut -d/ -f1)"
       fi
+      echo "SET PR NUMBER: ${REF_PR_NUMBER}"
 
       REF_SHA=${{ inputs.repo_ref_sha || github.event.pull_request.head.sha || github.sha }}
       REF_SHA_SHORT="${REF_SHA:0:7}"
@@ -134,6 +140,7 @@ runs:
       REF_TITLE="$(printf %s "${REF_TITLE[@]}" $'\n')"
       {
           echo "repo_ref_name=$REF_NAME"
+          echo "repo_ref_pr_number=$REF_PR_NUMBER"
           echo "repo_ref_sha=$REF_SHA"
           echo "repo_ref_title=$REF_TITLE"
           echo "repo_ref_sha_short=$REF_SHA_SHORT"

@@ -141,11 +141,16 @@ jobs:
         echo "version_patch=${{ steps.env.outputs.version_patch }}"
         echo "trusted=${{ steps.env.outputs.trusted }}"
         echo "repo_ref_name=${{ steps.env.outputs.repo_ref_name }}"
+        echo "repo_ref_pr_number=${{ steps.env.outputs.repo_ref_pr_number }}"
         echo "repo_ref_sha=${{ steps.env.outputs.repo_ref_sha }}"
         echo "repo_ref_sha_short=${{ steps.env.outputs.repo_ref_sha_short }}"
         echo "repo_ref_title=${{ steps.env.outputs.repo_ref_title }}"
         echo "build_image_ubuntu=${{ steps.env.outputs.build_image_ubuntu }}"
         echo "build_image_ubuntu_mobile=${{ steps.env.outputs.build_image_ubuntu_mobile }}"
+        echo
+        if [[ -n "${{ steps.env.outputs.repo_ref_pr_number }}" ]]; then
+            echo "PR: https://github.com/envoyproxy/envoy/pull/${{ steps.env.outputs.repo_ref_pr_number }}"
+        fi
 
   check:
     if: ${{ inputs.start_check_status && github.event_name != 'pull_request' }}
