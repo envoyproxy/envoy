@@ -12,6 +12,8 @@ inputs:
     type: string
     required: true
 
+  repo_ref:
+    type: string
   repo_ref_sha:
     type: string
   repo_ref_name:
@@ -58,6 +60,8 @@ outputs:
     value: ${{ steps.should_run.outputs.mobile_release_validation }}
   mobile_tsan:
     value: ${{ steps.should_run.outputs.mobile_tsan }}
+  repo_ref:
+    value: ${{ steps.context.outputs.repo_ref }}
   repo_ref_name:
     value: ${{ steps.context.outputs.repo_ref_name }}
   repo_ref_pr_number:
@@ -131,6 +135,7 @@ runs:
       fi
       echo "SET PR NUMBER: ${REF_PR_NUMBER}"
 
+      REF="${{ steps.trusted.outputs.trusted != 'true' && inputs.repo_ref || '' }}"
       REF_SHA=${{ inputs.repo_ref_sha || github.event.pull_request.head.sha || github.sha }}
       REF_SHA_SHORT="${REF_SHA:0:7}"
       REF_TITLE=(
@@ -139,6 +144,7 @@ runs:
           "@${REF_SHA_SHORT}")
       REF_TITLE="$(printf %s "${REF_TITLE[@]}" $'\n')"
       {
+          echo "repo_ref=$REF"
           echo "repo_ref_name=$REF_NAME"
           echo "repo_ref_pr_number=$REF_PR_NUMBER"
           echo "repo_ref_sha=$REF_SHA"
