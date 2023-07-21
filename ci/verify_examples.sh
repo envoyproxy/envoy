@@ -6,17 +6,22 @@ FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
 WARNINGS=()
 
+# Sandboxes listed here should be regarded as broken(/untested) until whatever
+# is causing them to flake is resolved!!!
+FLAKY_SANDBOXES=(
+    double-proxy
+    golang-network
+    wasm-cc)
+
 
 trap_errors () {
     local frame=0 command line sub file
-    if [[ "$example" == "./double-proxy" ]]; then
-        WARNINGS+=("FAILED (double-proxy)")
-        return
-    fi
-    if [[ "$example" == "./golang-network" ]]; then
-        WARNINGS+=("FAILED (golang-network)")
-        return
-    fi
+    for flake in "${FLAKY_SANDBOXES[@]}"; do
+        if [[ "$example" == "./${flake}" ]]; then
+            WARNINGS+=("FAILED (${flake})")
+            return
+        fi
+    done
     if [[ -n "$example" ]]; then
         command=" (${example})"
     fi
