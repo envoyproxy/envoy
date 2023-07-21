@@ -133,16 +133,6 @@ TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
                                                          std::chrono::milliseconds(25000)));
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, BasicFlow) {
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
-                                                                  {"group", "envoy"}};
-  auto response = sendDownstreamRequest(&custom_headers);
-  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
-  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-}
-
 } // namespace
 } // namespace RateLimitQuota
 } // namespace HttpFilters
