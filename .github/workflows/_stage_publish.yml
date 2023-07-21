@@ -46,6 +46,7 @@ jobs:
           run_pre: ./.github/actions/publish/release/setup
           run_pre_with: |
             ref: ${{ inputs.given_ref }}
+            bucket: envoy-pr
           env: |
             export ENVOY_PUBLISH_DRY_RUN=1
     uses: ./.github/workflows/_ci.yml
@@ -74,6 +75,7 @@ jobs:
           run_pre: ./.github/actions/publish/release/setup
           run_pre_with: |
             ref: ${{ inputs.given_ref }}
+            bucket: envoy-postsubmit
           env: |
             if [[ '${{ inputs.version_dev }}' != '' ]]; then
                 export ENVOY_PUBLISH_DRY_RUN=1
