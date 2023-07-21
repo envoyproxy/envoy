@@ -989,8 +989,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered)
 
   // Should get just one message with the body
   processResponseBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
         header_add->mutable_header()->set_key("x-testing-response-header");
@@ -1018,7 +1017,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersAndTrailersOnResponse) {
 
   // Should get just one message with the body
   processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
-    EXPECT_FALSE(body.end_of_stream());
+    EXPECT_TRUE(body.end_of_stream());
     return true;
   });
 
@@ -1434,8 +1433,7 @@ TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBody) {
   auto response = sendDownstreamRequestWithBody("Original body", absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   processRequestBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& response) {
-        EXPECT_TRUE(body.end_of_stream());
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& response) {
         auto* mut = response.mutable_response()->mutable_header_mutation()->add_set_headers();
         mut->mutable_header()->set_key(":scheme");
         mut->mutable_header()->set_value("tcp");
@@ -1456,8 +1454,7 @@ TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBodyPartialBuffer)
   auto response = sendDownstreamRequestWithBody("Original body", absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   processRequestBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& response) {
-        EXPECT_TRUE(body.end_of_stream());
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& response) {
         auto* mut = response.mutable_response()->mutable_header_mutation()->add_set_headers();
         mut->mutable_header()->set_key(":scheme");
         mut->mutable_header()->set_value("tcp");
@@ -2416,8 +2413,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
       });
   upstream_request_->encodeData(100, true);
   processResponseBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
         header_add->mutable_header()->set_key("x-testing-response-header");
@@ -2475,7 +2471,7 @@ TEST_P(ExtProcIntegrationTest, HeaderMutationCheckPassWithHcmSizeConfig) {
       });
   processRequestBodyMessage(
       *grpc_upstreams_[0], false, [this](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_FALSE(body.end_of_stream());
+        EXPECT_TRUE(body.end_of_stream());
         addMutationSetHeaders(20, *body_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
@@ -2493,7 +2489,7 @@ TEST_P(ExtProcIntegrationTest, HeaderMutationCheckPassWithHcmSizeConfig) {
       });
   processResponseBodyMessage(
       *grpc_upstreams_[0], false, [this](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_FALSE(body.end_of_stream());
+        EXPECT_TRUE(body.end_of_stream());
         addMutationSetHeaders(20, *body_resp.mutable_response()->mutable_header_mutation());
         return true;
       });
@@ -2598,8 +2594,7 @@ TEST_P(ExtProcIntegrationTest, RemoveHeaderMutationFailWithResponseBody) {
   handleUpstreamRequest();
   processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   processResponseBodyMessage(
-      *grpc_upstreams_[0], false, [this](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
+      *grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse& body_resp) {
         addMutationRemoveHeaders(60, *body_resp.mutable_response()->mutable_header_mutation());
         return true;
       });

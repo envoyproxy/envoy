@@ -218,10 +218,6 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  // Stores the end_stream flag, which will be used when sending body to the external
-  // processing server in later stages.
-  body_end_stream_ = end_stream;
-
   if (end_stream) {
     state.setCompleteBodyAvailable(true);
   }
@@ -472,8 +468,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     }
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
-    // has arrived. end_stream is false for data sending as there is trailer behind.
-    sendBufferedData(state, ProcessorState::CallbackState::BufferedBodyCallback, false);
+    // has arrived.
+    sendBufferedData(state, ProcessorState::CallbackState::BufferedBodyCallback, true);
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
@@ -558,7 +554,7 @@ void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackSta
   } else {
     // If there is no buffered data, sends an empty body.
     Buffer::OwnedImpl data("");
-    sendBodyChunk(state, data, new_state, true);
+    sendBodyChunk(state, data, new_state, end_stream);
   }
 }
 

@@ -221,11 +221,6 @@ message HttpHeaders {
 message HttpBody {
   bytes body = 1;
 
-  // This contains the end_stream flag when Envoy receives data from the client
-  // or upstream server. In normal cases, this flag imply this is the last data
-  // sent to the external processing server, and there will be no trailer after it.
-  // However, if processing mode is set to send trailers, there will be an empty
-  // trailer sent to the external server even this flag is set to true.
   bool end_of_stream = 2;
 }
 
