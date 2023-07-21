@@ -87,11 +87,6 @@ parameters:
   displayName: "Publish Github release"
   type: string
   default: false
-- name: publishGithubReleaseDryRun
-  displayName: "Publish (dry run) Github release"
-  type: string
-  default: true
-
 
 jobs:
 - job: docker
