@@ -4,9 +4,23 @@ TESTFILTER="${1:-*}"
 TESTEXCLUDES="${2}"
 FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
+WARNINGS=()
+
+# Sandboxes listed here should be regarded as broken(/untested) until whatever
+# is causing them to flake is resolved!!!
+FLAKY_SANDBOXES=(
+    # https://github.com/envoyproxy/envoy/issues/28541
+    wasm-cc)
+
 
 trap_errors () {
     local frame=0 command line sub file
+    for flake in "${FLAKY_SANDBOXES[@]}"; do
+        if [[ "$example" == "./${flake}" ]]; then
+            WARNINGS+=("FAILED (${flake})")
+            return
+        fi
+    done
     if [[ -n "$example" ]]; then
         command=" (${example})"
     fi
