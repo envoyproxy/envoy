@@ -33,8 +33,8 @@ static void BM_InlineMapFind(benchmark::State& state) {
 
   for (size_t i = 0; i < 200; ++i) {
     normal_map[normal_keys[i]] = "value_" + std::to_string(i);
-    inline_map_200->insert(normal_keys[i], "value_" + std::to_string(i));
-    inline_map_0->insert(normal_keys[i], "value_" + std::to_string(i));
+    inline_map_200->set(normal_keys[i], "value_" + std::to_string(i));
+    inline_map_0->set(normal_keys[i], "value_" + std::to_string(i));
   }
 
   if (map_type == 0) {
@@ -48,7 +48,7 @@ static void BM_InlineMapFind(benchmark::State& state) {
     // Inline map without any inline keys.
     for (auto _ : state) { // NOLINT
       for (size_t i = 0; i < 200; ++i) {
-        inline_map_0->lookup(normal_keys[i]);
+        inline_map_0->get(normal_keys[i]);
       }
     }
   } else {
@@ -56,13 +56,13 @@ static void BM_InlineMapFind(benchmark::State& state) {
     if (used_inline_handles == 0) {
       for (auto _ : state) { // NOLINT
         for (size_t i = 0; i < 200; ++i) {
-          inline_map_200->lookup(normal_keys[i]);
+          inline_map_200->get(normal_keys[i]);
         }
       }
     } else {
       for (auto _ : state) { // NOLINT
         for (size_t i = 0; i < 200; ++i) {
-          inline_map_200->lookup(inline_handles_200[i]);
+          inline_map_200->get(inline_handles_200[i]);
         }
       }
     }
