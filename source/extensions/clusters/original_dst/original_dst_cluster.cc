@@ -22,6 +22,11 @@
 namespace Envoy {
 namespace Upstream {
 
+OriginalDstClusterHandle::~OriginalDstClusterHandle() {
+  std::shared_ptr<OriginalDstCluster> cluster = std::move(cluster_);
+  cluster->dispatcher_.post([cluster]() mutable { cluster.reset(); });
+}
+
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     // Check if filter state override is present, if yes use it before anything else.
@@ -65,21 +70,21 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         Network::Address::InstanceConstSharedPtr host_ip_port(
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
         // Create a host we can use immediately.
-        auto info = parent_->info();
+        auto info = parent_->cluster_->info();
         HostSharedPtr host(std::make_shared<HostImpl>(
             info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, 1,
             envoy::config::core::v3::Locality().default_instance(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-            envoy::config::core::v3::UNKNOWN, parent_->time_source_));
+            envoy::config::core::v3::UNKNOWN, parent_->cluster_->time_source_));
         ENVOY_LOG(debug, "Created host {} {}.", *host, host->address()->asString());
 
         // Tell the cluster about the new host
         // lambda cannot capture a member by value.
-        std::weak_ptr<OriginalDstCluster> post_parent = parent_;
-        parent_->dispatcher_.post([post_parent, host]() mutable {
+        std::weak_ptr<OriginalDstClusterHandle> post_parent = parent_;
+        parent_->cluster_->dispatcher_.post([post_parent, host]() mutable {
           // The main cluster may have disappeared while this post was queued.
-          if (std::shared_ptr<OriginalDstCluster> parent = post_parent.lock()) {
-            parent->addHost(host);
+          if (std::shared_ptr<OriginalDstClusterHandle> parent = post_parent.lock()) {
+            parent->cluster_->addHost(host);
           }
         });
         return host;
@@ -133,7 +138,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   if (request_host == nullptr) {
     ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",
               request_override_host);
-    parent_->info()->trafficStats()->original_dst_host_invalid_.inc();
+    parent_->cluster_->info()->trafficStats()->original_dst_host_invalid_.inc();
     return nullptr;
   }
   ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
@@ -175,7 +180,7 @@ OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* cont
   if (metadata_host == nullptr) {
     ENVOY_LOG(debug, "original_dst_load_balancer: invalid override metadata value. {}",
               metadata_override_host);
-    parent_->info()->trafficStats()->original_dst_host_invalid_.inc();
+    parent_->cluster_->info()->trafficStats()->original_dst_host_invalid_.inc();
     return nullptr;
   }
   ENVOY_LOG(debug, "Using metadata override host {}.", metadata_override_host);
@@ -334,7 +339,8 @@ OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::C
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
   auto new_cluster = std::make_shared<OriginalDstCluster>(cluster, context);
-  auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(new_cluster);
+  auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(
+      std::make_shared<OriginalDstClusterHandle>(new_cluster));
   return std::make_pair(new_cluster, std::move(lb));
 }
 
