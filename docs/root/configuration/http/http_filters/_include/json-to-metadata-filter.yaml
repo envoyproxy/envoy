@@ -27,7 +27,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata
               request_rules:
-              rules:
+                rules:
                 - selectors:
                   - key: version
                   on_present:
