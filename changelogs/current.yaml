@@ -128,6 +128,10 @@ minor_behavior_changes:
   change: |
     Changed behavior of the unpausing connect with 2xx status codes. This change can be reverted temporarily by
     setting the runtime guard ``envoy.reloadable_features.upstream_allow_connect_with_2xx`` to false.
+- area: http
+  change: |
+    Round trip time will not be refreshed for every request by default. And if this is necessary, it can be
+    enabled by setting runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` to true.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -146,6 +150,11 @@ bug_fixes:
     Fix a bug where the ext_authz filter will ignore the request body when the
     :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` is set to true and
     HTTP authorization service is configured.
+- area: ext_authz
+  change: |
+    Fix a bug where the ext_authz filter will remove non UTF-8 characters from the body of a request when configured
+    to use :ref:`http_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.http_service>`, if configured
+    to send the body.
 - area: router
   change: |
     Fixed the bug that updating :ref:`scope_key_builder
@@ -201,6 +210,14 @@ bug_fixes:
     Fixes a bug where route properties such as key_formatter,
     prefix and remove_prefix do not take effect when configured for :ref:`catch_all_route
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`.
+- area: upstream
+  change: |
+    Fixes a bug where the healthStatus() method of host return incorrect health status
+    when the host status is updated by the EDS.
+- area: upstream
+  change: |
+    Fixes a bug where the healthStatus() method of host return unmatched health status
+    with the coarseHealth() method.
 - area: original_dst
   change: |
     Fixes an issue with the ORIGINAL_DST cluster cleanup timer lifetime, which
@@ -269,6 +286,11 @@ new_features:
 - area: access_log
   change: |
     (QUIC only) Added support for %BYTES_RETRANSMITTED% and %PACKETS_RETRANSMITTED%.
+- area: access_log
+  change: |
+    added :ref:`DisableBuiltinLables
+    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.disable_builtin_labels>`
+    to disable envoy builtin resource labels.
 - area: dynamic_forward_proxy
   change: |
     added :ref:`sub_clusters_config
@@ -499,3 +521,7 @@ deprecated:
     added :ref:`enable_deferred_creation_stats
     <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DeferredStatOptions.enable_deferred_creation_stats>`.
     support for ClusterTrafficStats.
+- area: access_log
+  change: |
+    Added %DOWNSTREAM_LOCAL_DNS_SAN%, %DOWNSTREAM_PEER_DNS_SAN%, %DOWNSTREAM_LOCAL_IP_SAN% and %DOWNSTREAM_PEER_IP_SAN% substitution
+    formatters.

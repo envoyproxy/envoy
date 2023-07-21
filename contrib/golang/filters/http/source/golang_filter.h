@@ -107,6 +107,7 @@ enum class EnvoyValue {
   DownstreamRemoteAddress,
   UpstreamHostAddress,
   UpstreamClusterName,
+  VirtualClusterName,
 };
 
 struct httpRequestInternal;

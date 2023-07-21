@@ -287,6 +287,7 @@ TEST(TestConfig, XdsConfig) {
   xds_builder.setJwtAuthenticationToken(/*token=*/"my_jwt_token",
                                         /*token_lifetime_in_seconds=*/500);
   xds_builder.setSslRootCerts(/*root_certs=*/"my_root_cert");
+  xds_builder.setSni(/*sni=*/"fake-td.googleapis.com");
   engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
   auto& ads_config_with_tokens = bootstrap->dynamic_resources().ads_config();
@@ -313,6 +314,13 @@ TEST(TestConfig, XdsConfig) {
                 .service_account_jwt_access()
                 .token_lifetime_seconds(),
             500);
+  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+                .google_grpc()
+                .channel_args()
+                .args()
+                .at("grpc.default_authority")
+                .string_value(),
+            "fake-td.googleapis.com");
 }
 
 TEST(TestConfig, CopyConstructor) {
