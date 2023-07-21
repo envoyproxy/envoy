@@ -130,7 +130,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // here then the whole body is in the buffer and we can proceed as if the
         // "buffered" processing mode was set.
         ENVOY_LOG(debug, "Sending buffered request body message");
-        filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback, true);
+        filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback,
+                                 filter_.bodyEndStream());
         clearWatermark();
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::BUFFERED) {
