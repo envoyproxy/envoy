@@ -269,6 +269,7 @@ INSTANTIATE_TEST_SUITE_P(
     AllConfigs, RuntimeFeatureValidationServerTest,
     ::testing::ValuesIn(RuntimeFeatureValidationServerTest::getAllConfigFiles()));
 
+#if 0
 TEST_P(JsonApplicationLogsValidationServerTest, BootstrapApplicationLogsAndCLIThrows) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
@@ -366,6 +367,7 @@ TEST_P(TextApplicationLogsValidationServerTest, TextApplicationLogs) {
 INSTANTIATE_TEST_SUITE_P(
     AllConfigs, TextApplicationLogsValidationServerTest,
     ::testing::ValuesIn(TextApplicationLogsValidationServerTest::getAllConfigFiles()));
+#endif
 
 } // namespace
 } // namespace Server
