@@ -32,18 +32,33 @@ jobs:
       check_mobile_run: false
       prime_build_image: true
       start_check_status: Verify/examples
-      repo_ref_sha: ${{ inputs.ref_sha }}
+      repo_ref_sha: ${{ inputs.sha }}
       repo_ref_name: ${{ inputs.head_ref }}
 
     permissions:
       contents: read
       statuses: write
 
+  publish:
+    needs:
+    - env
+    uses: ./.github/workflows/_stage_publish.yml
+    name: Publish ${{ needs.env.outputs.repo_ref_title }}
+    with:
+      build_image_ubuntu: ${{ needs.env.outputs.build_image_ubuntu }}
+      trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
+      version_dev: ${{ needs.env.outputs.version_dev }}
+      given_ref: ${{ inputs.ref }}
+      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
+    permissions:
+      contents: write
+
   verify:
     uses: ./.github/workflows/_stage_verify.yml
-    name: Verify (${{ inputs.trusted && 'postsubmit' || 'pr' }}:${{ needs.env.outputs.repo_ref_name }}@${{ needs.env.outputs.repo_ref_sha_short }})
+    name: Verify ${{ needs.env.outputs.repo_ref_title }}
     needs:
     - env
     with:
-      trusted: ${{ needs.env.outputs.trusted && true || false }}
-      repo_ref: ${{ needs.env.outputs.trusted == 'false' && inputs.ref || '' }}
+      trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
+      given_ref: ${{ inputs.ref }}
+      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
