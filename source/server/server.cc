@@ -805,18 +805,12 @@ void InstanceImpl::onRuntimeReady() {
     });
   }
 
-  // If there is no global limit to the number of active connections, warn on startup.
-  if (!overload_manager_->getThreadLocalOverloadState()->isResourceMonitorEnabled(Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
-    ENVOY_LOG(warn,
-              "there is no configured limit to the number of allowed active downstream connections. Configure a "
-              "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
-  }
-
   // TODO (nezdolik): Fully deprecate this runtime key in the next release.
   if (runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
-              "Usage of the deprecated runtime key {}, consider switching to `envoy.resource_monitors.downstream_connections` instead."
-              "This runtime key will be removed in the next release.",
+              "Usage of the deprecated runtime key {}, consider switching to "
+              "`envoy.resource_monitors.downstream_connections` instead."
+              "This runtime key will be removed in future.",
               Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
@@ -901,6 +895,14 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+
+  // If there is no global limit to the number of active connections, warn on startup.
+  if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
+    ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
+                    "connections. Configure a "
+                    "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
+  }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that

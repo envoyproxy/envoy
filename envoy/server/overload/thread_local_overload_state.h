@@ -91,6 +91,12 @@ public:
    * @param name of resource monitor to check.
    */
   virtual bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) PURE;
+  /**
+   * Returns current resource usage (most recent read) tracked by monitor.
+   * @param name of resource monitor to check.
+   */
+  // todo (nezdolik) add to coverage tests
+  virtual int64_t currentResourceUsage(OverloadProactiveResourceName resource_name) PURE;
 };
 
 using ThreadLocalOverloadStateOptRef = OptRef<ThreadLocalOverloadState>;

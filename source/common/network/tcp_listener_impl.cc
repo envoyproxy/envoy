@@ -30,11 +30,12 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     // Check if deprecated runtime flag `overload.global_downstream_max_connections` is configured
     // simultaneously with downstream connections monitor in overload manager.
     if (runtime_.threadsafeSnapshot()->get(GlobalMaxCxRuntimeKey)) {
-      ENVOY_LOG_ONCE_MISC(warn,
-                     "Global downstream connections limits is configured via deprecated runtime key {} and in "
-                     "{}. Using overload manager config.",
-                     GlobalMaxCxRuntimeKey,
-                     Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections);
+      ENVOY_LOG_ONCE_MISC(
+          warn,
+          "Global downstream connections limits is configured via deprecated runtime key {} and in "
+          "{}. Using overload manager config.",
+          GlobalMaxCxRuntimeKey,
+          Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections);
     }
     // Try to allocate resource within overload manager. We do it once here, instead of checking if
     // it is possible to allocate resource in this method and then actually allocating it later in

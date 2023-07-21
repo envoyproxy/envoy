@@ -19,6 +19,7 @@ MockThreadLocalOverloadState::MockThreadLocalOverloadState()
   ON_CALL(*this, tryAllocateResource).WillByDefault(Return(true));
   ON_CALL(*this, tryDeallocateResource).WillByDefault(Return(true));
   ON_CALL(*this, isResourceMonitorEnabled).WillByDefault(Return(false));
+  ON_CALL(*this, currentResourceUsage).WillByDefault(Return(0));
 }
 
 MockOverloadManager::MockOverloadManager() {

@@ -328,6 +328,7 @@ private:
       bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
       bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
       bool isResourceMonitorEnabled(OverloadProactiveResourceName) override { return false; }
+      int64_t currentResourceUsage(OverloadProactiveResourceName) override { return 0; }
       Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };

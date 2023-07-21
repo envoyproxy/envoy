@@ -218,6 +218,17 @@ public:
     return proactive_resource != proactive_resources_->end();
   }
 
+  int64_t currentResourceUsage(OverloadProactiveResourceName resource_name) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource == proactive_resources_->end()) {
+      // todo (nezdolik) add monitor name
+      ENVOY_LOG_MISC(warn,
+                     " {Failed to get resource usage for unknown proactive resource monitor }");
+      return false;
+    }
+    return proactive_resource->second.currentResourceUsage();
+  }
+
 private:
   static const OverloadActionState always_inactive_;
   const NamedOverloadActionSymbolTable& action_symbol_table_;
