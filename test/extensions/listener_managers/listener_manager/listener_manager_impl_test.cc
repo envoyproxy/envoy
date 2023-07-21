@@ -3717,6 +3717,84 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
   EXPECT_EQ(filter_chain, nullptr);
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       SingleFilterChainWithDestinationIPMatchWithIPSanCerts) {
+  std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
+    filter_chains:
+    - filter_chain_match:
+        prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
+      name: foo
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_key.pem" }
+  )EOF",
+                                                 Network::Address::IpVersion::v4);
+  if (use_matcher_) {
+    yaml = yaml + R"EOF(
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: ip
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
+        custom_match:
+          name: ip-matcher
+          typed_config:
+            "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+            range_matchers:
+            - ranges:
+              - address_prefix: 127.0.0.0
+                prefix_len: 8
+              on_match:
+                action:
+                  name: foo
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: foo
+    )EOF";
+  }
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // IPv4 client connects to unknown IP - no match.
+  auto filter_chain = findFilterChain(1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // IPv4 client connects to valid IP - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
+  auto ssl_socket =
+      dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  auto local_ip_sans = ssl_socket->ssl()->ipSansLocalCertificate();
+  EXPECT_EQ(local_ip_sans.size(), 1);
+  EXPECT_EQ(local_ip_sans.front(), "1.1.1.1");
+
+  // Assert twice to ensure a cached value is returned and still valid.
+  local_ip_sans = ssl_socket->ssl()->ipSansLocalCertificate();
+  EXPECT_EQ(local_ip_sans.size(), 1);
+  EXPECT_EQ(local_ip_sans.front(), "1.1.1.1");
+
+  // UDS client - no match.
+  filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesMatch) {
   std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -3780,6 +3858,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+
+  // Assert twice to ensure a cached value is returned and still valid.
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }

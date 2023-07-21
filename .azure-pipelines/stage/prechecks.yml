@@ -11,15 +11,7 @@ parameters:
   type: boolean
   default: true
 
-- name: checkDeps
-  displayName: "Run dependency checker"
-  type: string
-  default: false
-
 # Auth
-- name: authGithub
-  type: string
-  default: ""
 - name: authGCP
   type: string
   default: ""
@@ -161,27 +153,9 @@ jobs:
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
 
-- job: dependencies
-  displayName: Precheck dependencies
-  timeoutInMinutes: 20
-  pool:
-    vmImage: $(agentUbuntu)
-  condition: |
-    and(not(canceled()),
-        eq(${{ parameters.checkDeps }}, 'true'))
-  steps:
-  - template: ../bazel.yml
-    parameters:
-      ciTarget: deps
-      cacheTestResults: ${{ parameters.cacheTestResults }}
-      cacheVersion: $(cacheKeyBazel)
-      publishEnvoy: false
-      publishTestResults: false
-      authGithub: ${{ parameters.authGithub }}
-
 - job: prechecked
   displayName: Prechecked
-  dependsOn: ["prechecks", "dependencies"]
+  dependsOn: ["prechecks"]
   pool: x64-nano
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
@@ -190,7 +164,6 @@ jobs:
   condition: |
     and(
       eq(variables['Build.Reason'], 'PullRequest'),
-      in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
   - checkout: none

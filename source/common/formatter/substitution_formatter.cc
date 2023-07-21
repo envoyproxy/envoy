@@ -1425,12 +1425,48 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                                          ",");
                                   });
                             }}},
+                          {"DOWNSTREAM_PEER_DNS_SAN",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return absl::StrJoin(connection_info.dnsSansPeerCertificate(),
+                                                         ",");
+                                  });
+                            }}},
+                          {"DOWNSTREAM_PEER_IP_SAN",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return absl::StrJoin(connection_info.ipSansPeerCertificate(),
+                                                         ",");
+                                  });
+                            }}},
                           {"DOWNSTREAM_LOCAL_URI_SAN",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return absl::StrJoin(connection_info.uriSanLocalCertificate(),
+                                                         ",");
+                                  });
+                            }}},
+                          {"DOWNSTREAM_LOCAL_DNS_SAN",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return absl::StrJoin(connection_info.dnsSansLocalCertificate(),
+                                                         ",");
+                                  });
+                            }}},
+                          {"DOWNSTREAM_LOCAL_IP_SAN",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return absl::StrJoin(connection_info.ipSansLocalCertificate(),
                                                          ",");
                                   });
                             }}},
