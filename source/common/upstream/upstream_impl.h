@@ -349,7 +349,7 @@ public:
         disable_active_health_check_(health_check_config.disable_active_health_check()) {
     // This EDS flags setting is still necessary for stats, configuration dump, canonical
     // coarseHealth() etc.
-    setEdsHealthStatus(health_status);
+    HostImpl::setEdsHealthStatus(health_status);
     HostImpl::weight(initial_weight);
   }
 

@@ -464,8 +464,8 @@ Host::CreateConnectionData HostImpl::createConnection(
 
 void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
   // Clear all old EDS health flags first.
-  healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
-  healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+  HostImpl::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
+  HostImpl::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
 
   // Set the appropriate EDS health flag.
   switch (health_status) {
@@ -474,10 +474,10 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   case envoy::config::core::v3::DRAINING:
     FALLTHRU;
   case envoy::config::core::v3::TIMEOUT:
-    healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+    HostImpl::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DEGRADED:
-    healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+    HostImpl::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
     break;
   default:
     break;
