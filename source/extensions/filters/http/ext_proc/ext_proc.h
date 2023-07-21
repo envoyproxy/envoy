@@ -262,6 +262,8 @@ public:
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
+  bool bodyEndStream() { return body_end_stream_; }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
@@ -303,6 +305,11 @@ private:
 
   // Set to true then the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
+
+  // Stores the end_stream flag in onData() processing. It is used later on
+  // when sending the data to the external processing server during processing
+  // the header response, In that state, the end_stream flag is not availabe.
+  bool body_end_stream_ = false;
 };
 
 extern std::string responseCaseToString(
