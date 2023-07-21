@@ -10,7 +10,9 @@ WARNINGS=()
 # is causing them to flake is resolved!!!
 FLAKY_SANDBOXES=(
     # https://github.com/envoyproxy/envoy/issues/28541
-    wasm-cc)
+    wasm-cc
+    # https://github.com/envoyproxy/envoy/issues/28546
+    websocket)
 
 
 trap_errors () {
