@@ -1287,9 +1287,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean trust_chain_verification, jobjectArray filter_chain, jobjectArray stat_sinks,
     jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
     jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
-    jstring xds_jwt_token, jlong xds_jwt_token_lifetime, jstring xds_root_certs, jstring node_id,
-    jstring node_region, jstring node_zone, jstring node_sub_zone, jstring cds_resources_locator,
-    jlong cds_timeout_seconds, jboolean enable_cds) {
+    jstring xds_jwt_token, jlong xds_jwt_token_lifetime, jstring xds_root_certs, jstring xds_sni,
+    jstring node_id, jstring node_region, jstring node_zone, jstring node_sub_zone,
+    jstring cds_resources_locator, jlong cds_timeout_seconds, jboolean enable_cds) {
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
@@ -1315,6 +1315,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     std::string native_root_certs = getCppString(env, xds_root_certs);
     if (!native_root_certs.empty()) {
       xds_builder.setSslRootCerts(std::move(native_root_certs));
+    }
+    std::string native_sni = getCppString(env, xds_sni);
+    if (!native_sni.empty()) {
+      xds_builder.setSni(std::move(native_sni));
     }
     std::string native_rtds_resource_name = getCppString(env, rtds_resource_name);
     if (!native_rtds_resource_name.empty()) {
