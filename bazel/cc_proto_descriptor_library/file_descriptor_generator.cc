@@ -11,10 +11,8 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
-
-
-#include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/compiler/retention.h"
+#include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 
