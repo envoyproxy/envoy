@@ -13,8 +13,8 @@ using ::envoy::type::v3::RateLimitStrategy;
 
 Http::FilterHeadersStatus
 RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
-                                      const RateLimitOnMatchAction* match_action) {
-  auto bucket_settings = match_action->bucketSettings();
+                                      const RateLimitOnMatchAction& match_action) {
+  auto bucket_settings = match_action.bucketSettings();
   // The first matched request that doesn't have quota assignment from the RLQS server yet, so the
   // action is performed based on pre-configured strategy from no assignment behavior config.
   // TODO(tyxia) Implement no assignment logic with the allow/deny interface
@@ -86,16 +86,9 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 
   // Second, generate the bucket id for this request based on match action when the request matching
   // succeeds.
-  const RateLimitOnMatchAction* match_action =
-      dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
-
-  // TODO(tyxia) Handle dynamic cast failure!!
-  if (match_action == nullptr) {
-    ENVOY_LOG(debug, "Failed to retrieve match action.");
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
-
-  auto ret = match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
+  const RateLimitOnMatchAction& match_action =
+      match_result.value()->getTyped<RateLimitOnMatchAction>();
+  auto ret = match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
     // When it failed to generate the bucket id for this specific request, the request is ALLOWED by
     // default (i.e., fail-open).
@@ -104,7 +97,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   }
 
   BucketId bucket_id = ret.value();
-
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // The request has been matched to the quota bucket for the first time.
     return createNewBucket(bucket_id, match_action);
@@ -198,9 +190,6 @@ void RateLimitQuotaFilter::onQuotaResponse(RateLimitQuotaResponse&) {
   //               response.ShortDebugString());
   //     continue;
   //   }
-  //   // TODO(tyxia) Lifetime issue, here response is the reference but i need to store it in to
-  //   // cache. So we need to pass by reference??? or build it here.
-  //   // There is no update here!!!
   //   (*quota_buckets_)[action.bucket_id()].bucket_action = BucketAction(action);
   // }
 }

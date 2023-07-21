@@ -22,7 +22,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
     *usage->mutable_bucket_id() = bucket_id;
     // TODO(tyxia) 1) Keep track of the time
     usage->mutable_time_elapsed()->set_seconds(0);
-    // TODO(tyxia) How to set the value of requests allowed and denied.
+    // TODO(tyxia) 2) Set the value of requests allowed and denied.
     // This is requests allowed and denied for this bucket which contains many requests.
     // It seems that the lock is needed for this?? Because here is read from the map
     // update is write to map.
@@ -42,7 +42,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
         // TODO(tyxia) Update the logic of setting the second logic.
         usage->mutable_time_elapsed()->set_seconds(1000);
         updated = true;
-        // TODO(tyxia) Break the loop here since it should only one unique usage report for
+        // Break the loop here since it should only one unique usage report for
         // particular bucket in the report.
         break;
       }
@@ -78,10 +78,8 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
     //             response->ShortDebugString());
     //   continue;
     // }
-    // TODO(tyxia) Lifetime issue, here response is the reference but i need to store it in to
-    // cache. So we need to pass by reference??? or build it here.
-    // There is no update here!
-    quota_buckets_[action.bucket_id()].bucket_action = BucketAction(action);
+    // TODO(tyxia) Extend lifetime and store in the bucket.
+    quota_buckets_[action.bucket_id()].bucket_action = action;
   }
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
   callbacks_.onQuotaResponse(*response);
@@ -92,7 +90,6 @@ void RateLimitClientImpl::closeStream() {
   if (stream_ != nullptr && !stream_closed_) {
     stream_->closeStream();
     stream_closed_ = true;
-    // TODO(tyxia) Reset pointer
     stream_->resetStream();
   }
 }

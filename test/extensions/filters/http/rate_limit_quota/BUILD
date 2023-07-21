@@ -98,10 +98,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    # shard_count = 2,
-    # tags = [
-    #     "cpu:3",
-    # ],
+    shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":test_utils",
         "//source/common/http:message_lib",

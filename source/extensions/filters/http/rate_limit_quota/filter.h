@@ -83,7 +83,7 @@ private:
   void createMatcher();
   // Create new bucket element.
   Http::FilterHeadersStatus createNewBucket(const BucketId& bucket_id,
-                                            const RateLimitOnMatchAction* match_action);
+                                            const RateLimitOnMatchAction& match_action);
 
   FilterConfigConstSharedPtr config_;
   Server::Configuration::FactoryContext& factory_context_;

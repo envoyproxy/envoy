@@ -38,11 +38,11 @@ struct BucketIdEqual {
 
 // Single bucket entry
 struct Bucket {
-  // TODO(tyxia) This copy constructor is tricky
-  // the unique ptr inside of this class and can only be moveable.
-  // Bucket (const Bucket& elem) = default;
   // Default constructor
   Bucket() = default;
+  // Disable copy constructor and assignment.
+  Bucket(const Bucket& bucket) = delete;
+  Bucket& operator=(const Bucket& bucket) = delete;
   // Default move constructor and assignment.
   Bucket(Bucket&& bucket) = default;
   Bucket& operator=(Bucket&& bucket) = default;
