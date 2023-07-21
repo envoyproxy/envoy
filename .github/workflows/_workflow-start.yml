@@ -11,6 +11,9 @@ on:
       workflow_name:
         required: true
         type: string
+      sha:
+        required: true
+        type: string
 
 jobs:
   start:
@@ -40,7 +43,7 @@ jobs:
       run: |
         mkdir -p ./sha
         echo $STATE_SHA > ./sha/state_sha
-    - if: ${{ ! steps.env.outputs.trusted }}
+    - if: ${{ steps.env.outputs.trusted != 'true' }}
       uses: actions/upload-artifact@v3
       with:
         name: state_sha
