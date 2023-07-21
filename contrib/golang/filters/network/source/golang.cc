@@ -115,8 +115,8 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& data, bool end_stream) {
   return Network::FilterStatus(ret);
 }
 
-CAPIStatus Filter::setFilterState(absl::string_view key, absl::string_view value,
-                                        int state_type, int life_span, int stream_sharing) {
+CAPIStatus Filter::setFilterState(absl::string_view key, absl::string_view value, int state_type,
+                                  int life_span, int stream_sharing) {
   // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (closed_) {
