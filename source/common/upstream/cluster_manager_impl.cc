@@ -421,8 +421,6 @@ ClusterManagerImpl::ClusterManagerImpl(
           makeOptRefFromPtr(xds_config_tracker_.get()), {});
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      const std::string target_xds_authority =
-          Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or("");
       auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
       std::string name;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
