@@ -29,7 +29,6 @@ RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
   //   // We just use fail-open (i.e. ALLOW_ALL) here.
   //   return Envoy::Http::FilterHeadersStatus::Continue;
   // }
-
   Bucket new_bucket = {};
   // Create the gRPC client.
   new_bucket.rate_limit_client = createRateLimitClient(factory_context_, config_->rlqs_server(),
@@ -95,6 +94,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     ENVOY_LOG(debug, "Failed to retrieve match action.");
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
+
   auto ret = match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
     // When it failed to generate the bucket id for this specific request, the request is ALLOWED by
@@ -108,33 +108,35 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // The request has been matched to the quota bucket for the first time.
     return createNewBucket(bucket_id, match_action);
-  } else {
-    // Found the cached bucket entry.
-    // First, get the quota assignment (if exists) from the cached bucket action.
-    // TODO(tyxia) Uncomment this section and implement this logic here
-    // if (quota_buckets_[bucket_id].bucket_action.has_quota_assignment_action()) {
-    //   auto rate_limit_strategy =
-    //       quota_buckets_[bucket_id].bucket_action.quota_assignment_action().rate_limit_strategy();
-    //   // Set up the action based on strategy.
-    //   switch (rate_limit_strategy.strategy_case()) {
-    //   case RateLimitStrategy::StrategyCase::kBlanketRule: {
-    //   }
-    //   case RateLimitStrategy::StrategyCase::kRequestsPerTimeUnit: {
-    //     if (quota_buckets_[bucket_id].quota_usage.num_requests_allowed() <
-    //         rate_limit_strategy.requests_per_time_unit().requests_per_time_unit()) {
-    //     }
-    //   }
-
-    //   case RateLimitStrategy::StrategyCase::kTokenBucket: {
-    //   }
-    //   case RateLimitStrategy::StrategyCase::STRATEGY_NOT_SET: {
-    //     PANIC_DUE_TO_PROTO_UNSET;
-    //   }
-    //     PANIC_DUE_TO_CORRUPT_ENUM;
-    //   }
-    // } else {
-    // }
   }
+  // TODO(tyxia) Uncomment this section to finish the implementation and test.
+  // else {
+  // Found the cached bucket entry.
+  // First, get the quota assignment (if exists) from the cached bucket action.
+  // if (quota_buckets_[bucket_id].bucket_action.has_quota_assignment_action()) {
+  //   auto rate_limit_strategy =
+  //       quota_buckets_[bucket_id].bucket_action.quota_assignment_action().rate_limit_strategy();
+  //   // Set up the action based on strategy.
+  //   switch (rate_limit_strategy.strategy_case()) {
+  //   case RateLimitStrategy::StrategyCase::kBlanketRule: {
+  //   }
+  //   case RateLimitStrategy::StrategyCase::kRequestsPerTimeUnit: {
+  //     if (quota_buckets_[bucket_id].quota_usage.num_requests_allowed() <
+  //         rate_limit_strategy.requests_per_time_unit().requests_per_time_unit()) {
+  //     }
+  //   }
+
+  //   case RateLimitStrategy::StrategyCase::kTokenBucket: {
+  //   }
+  //   case RateLimitStrategy::StrategyCase::STRATEGY_NOT_SET: {
+  //     PANIC_DUE_TO_PROTO_UNSET;
+  //   }
+  //     PANIC_DUE_TO_CORRUPT_ENUM;
+  //   }
+  // } else {
+  // }
+  // }
+
   // Get the quota usage info.
   // quota_buckets_[bucket_id].quota_usage;
   return Envoy::Http::FilterHeadersStatus::Continue;

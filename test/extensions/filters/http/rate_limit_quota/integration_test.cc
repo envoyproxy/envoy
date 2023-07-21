@@ -89,11 +89,17 @@ protected:
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
-  IntegrationStreamDecoderPtr sendDownstreamRequest() {
+  IntegrationStreamDecoderPtr sendDownstreamRequest(
+      const absl::flat_hash_map<std::string, std::string>* custom_headers = nullptr) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
     HttpTestUtility::addDefaultHeaders(headers);
+    if (custom_headers != nullptr) {
+      for (auto const& pair : *custom_headers) {
+        headers.addCopy(pair.first, pair.second);
+      }
+    }
     return codec_client_->makeHeaderOnlyRequest(headers);
   }
 
@@ -120,9 +126,21 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
   initializeConfig(/*valid_rlqs_server=*/false);
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+  auto response = sendDownstreamRequest(&custom_headers);
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
                                                          std::chrono::milliseconds(25000)));
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlow) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+  auto response = sendDownstreamRequest(&custom_headers);
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
 }
 
 } // namespace

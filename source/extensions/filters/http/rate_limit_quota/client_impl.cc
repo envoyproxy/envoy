@@ -71,20 +71,18 @@ void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-  // ASSERT(callbacks_ != nullptr);
-  // callbacks_->onQuotaResponse(*response);
   for (auto action : response->bucket_action()) {
-    if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
-      ENVOY_LOG(error, "Received a Response whose bucket action is missing its bucket_id: ",
-                response->ShortDebugString());
-      continue;
-    }
+    // TODO(tyxia) Uncomment this section to finish the implementation and test.
+    // if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
+    //   ENVOY_LOG(error, "Received a Response whose bucket action is missing its bucket_id: ",
+    //             response->ShortDebugString());
+    //   continue;
+    // }
     // TODO(tyxia) Lifetime issue, here response is the reference but i need to store it in to
     // cache. So we need to pass by reference??? or build it here.
-    // There is no update here!!!
+    // There is no update here!
     quota_buckets_[action.bucket_id()].bucket_action = BucketAction(action);
   }
-
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
   callbacks_.onQuotaResponse(*response);
 }
@@ -117,13 +115,6 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
 
   // Returns error status if start failed (i.e., stream_ is nullptr).
   return stream_ == nullptr ? absl::InternalError("Failed to start the stream") : absl::OkStatus();
-}
-
-// TODO(tyxia) Remove??? sendUsageReport() did the work of rateLimit();
-void RateLimitClientImpl::rateLimit(RateLimitQuotaCallbacks&) {
-  // ASSERT(callbacks_ == nullptr);
-  // callbacks_ = &callbacks;
-  // ASSERT(stream_ != nullptr);
 }
 
 } // namespace RateLimitQuota

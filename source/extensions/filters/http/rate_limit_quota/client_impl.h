@@ -51,7 +51,8 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // RateLimitClient
-  void rateLimit(RateLimitQuotaCallbacks& callbacks) override;
+  // TODO(tyxia) remove. sendUsageReport() accomplish the work
+  void rateLimit(RateLimitQuotaCallbacks&) override{};
 
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
   void closeStream();
@@ -66,15 +67,15 @@ private:
   GrpcAsyncClient aync_client_;
   Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
 
+  // TODO(tyxia) Further look at the use of this flag later.
+  bool stream_closed_ = false;
+
   // TODO(tyxia) if the response is from periodical report, then the filter object is possible that
   // it is not the old filter anymore, how we do onQuotaResponse and update the treadLocal storage.
   // The TLS should be same but filter is different now how about storage it in the TLS then??? How
   // about the client and filter class have the pointer points to the same TLS object Then we don't
-  // even need the callback to update it then!!!s
+  // even need the callback to update it then!!!
   RateLimitQuotaCallbacks& callbacks_;
-  // TODO(tyxia) Further look at the use of this flag later.
-  bool stream_closed_ = false;
-
   // Don't take ownership here and these objects are stored in TLS.
   BucketsContainer& quota_buckets_;
   RateLimitQuotaUsageReports& reports_;
