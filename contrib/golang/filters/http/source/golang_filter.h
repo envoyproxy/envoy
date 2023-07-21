@@ -105,7 +105,8 @@ enum class EnvoyValue {
   AttemptCount,
   DownstreamLocalAddress,
   DownstreamRemoteAddress,
-  UpstreamHostAddress,
+  UpstreamLocalAddress,
+  UpstreamRemoteAddress,
   UpstreamClusterName,
   VirtualClusterName,
 };
