@@ -327,7 +327,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRedirectEncodedSlashes) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Redirect);
-  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
+  EXPECT_EQ(result.details(), "uhv.path_normalization_redirect");
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
 
