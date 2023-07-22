@@ -449,12 +449,11 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
     if (!config_.strip_fragment_from_path()) {
       return {HeaderValueValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().FragmentInUrlPath};
-    } else {
-      // Validate the fragment component of the URI
-      ++iter;
-      for (; iter != end && is_valid; ++iter) {
-        is_valid &= testCharInTable(::Envoy::Http::kUriQueryAndFragmentCharTable, *iter);
-      }
+    }
+    // Validate the fragment component of the URI
+    ++iter;
+    for (; iter != end && is_valid; ++iter) {
+      is_valid &= testCharInTable(::Envoy::Http::kUriQueryAndFragmentCharTable, *iter);
     }
   }
 
