@@ -272,16 +272,14 @@ public:
           upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}).empty());
     }
 
-    ENVOY_LOG(trace, "waiting for end stream");
     ASSERT_TRUE(response_->waitForEndStream());
-    ENVOY_LOG(trace, "done waiting. Checking that upstream request is complete.");
+
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());
-    ENVOY_LOG(trace, "done checking. Checking that downstream request is complete.");
+
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(expected_response_code, response_->headers().getStatusValue());
     EXPECT_EQ(response_size_, response_->body().size());
-    ENVOY_LOG(trace, "done checking.");
   }
 
   void sendExtAuthzResponse(const Headers& headers_to_add, const Headers& headers_to_append,
