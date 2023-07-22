@@ -290,10 +290,18 @@ TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersQuery) {
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersFragment) {
+TEST_F(BaseHeaderValidatorTest, PathWithFragmentRejectedByDefault) {
+  HeaderString invalid{"/root?x=1#fragment"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
+                             UhvResponseCodeDetail::get().FragmentInUrlPath);
+}
+
+TEST_F(BaseHeaderValidatorTest, PathWithFragmentAllowedWhenConfigured) {
   HeaderString valid{"/root?x=1#fragment"};
   HeaderString invalid{"/root#frag|ment"};
-  auto uhv = createBase(empty_config);
+  auto uhv = createBase(fragment_in_path_allowed);
 
   EXPECT_ACCEPT(uhv->validatePathHeaderCharacters(valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
