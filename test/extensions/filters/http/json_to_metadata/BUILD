@@ -32,3 +32,14 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    size = "large",
+    srcs = ["integration_test.cc"],
+    extension_names = ["envoy.filters.http.json_to_metadata"],
+    deps = [
+        "//source/extensions/filters/http/json_to_metadata:config",
+        "//test/integration:http_integration_lib",
+    ],
+)
