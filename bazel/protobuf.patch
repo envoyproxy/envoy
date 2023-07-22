@@ -146,3 +146,16 @@ diff --git a/src/google/protobuf/map_field.h b/src/google/protobuf/map_field.h
  
   public:
    // Returns reference to internal repeated field. Data written using
+diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
+--- a/src/google/protobuf/compiler/BUILD.bazel
++++ b/src/google/protobuf/compiler/BUILD.bazel
+@@ -306,7 +306,7 @@
+     srcs = ["retention.cc"],
+     hdrs = ["retention.h"],
+     include_prefix = "google/protobuf/compiler",
+-    visibility = ["//src/google/protobuf:__subpackages__"],
++    visibility = ["//visibility:public"],
+     deps = [
+         "//src/google/protobuf:protobuf_nowkt",
+         "@com_google_absl//absl/types:span",
+
