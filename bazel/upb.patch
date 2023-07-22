@@ -1,0 +1,30 @@
+diff --git a/upb/message/tagged_ptr.h b/upb/message/tagged_ptr.h
+index 64602923..ed2c17a2 100644
+--- a/upb/message/tagged_ptr.h
++++ b/upb/message/tagged_ptr.h
+@@ -37,7 +37,10 @@
+ extern "C" {
+ #endif
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wtypedef-redefinition"
+ typedef void upb_Message;
++#pragma GCC diagnostic pop
+ 
+ // When a upb_Message* is stored in a message, array, or map, it is stored in a
+ // tagged form.  If the tag bit is set, the referenced upb_Message is of type
+diff --git a/upb/mini_table/internal/message.h b/upb/mini_table/internal/message.h
+index 7e928d52..b0a39c77 100644
+--- a/upb/mini_table/internal/message.h
++++ b/upb/mini_table/internal/message.h
+@@ -33,7 +33,10 @@
+ // Must be last.
+ #include "upb/port/def.inc"
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wtypedef-redefinition"
+ typedef void upb_Message;
++#pragma GCC diagnostic pop
+ 
+ struct upb_Decoder;
+ typedef const char* _upb_FieldParser(struct upb_Decoder* d, const char* ptr,
