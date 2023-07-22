@@ -586,9 +586,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
-  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke([&](Buffer::Instance& data, bool) {
-    data_.add(data);
-  }));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -635,9 +634,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
-  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke([&](Buffer::Instance& data, bool) {
-    data_.add(data);
-  }));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -699,9 +697,8 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
-  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke([&](Buffer::Instance& data, bool) {
-    data_.add(data);
-  }));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -730,9 +727,8 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
-  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke([&](Buffer::Instance& data, bool) {
-    data_.add(data);
-  }));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
@@ -776,9 +772,8 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
-  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke([&](Buffer::Instance& data, bool) {
-    data_.add(data);
-  }));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
@@ -799,9 +794,10 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(raw_buffer, false));
   data_.add(raw_buffer);
 
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(raw_buffer, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark,
+            filter_->decodeData(raw_buffer, true));
   // data added by the previous decodeData call.
-  
+
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0, check_request.attributes().request().http().body().size());

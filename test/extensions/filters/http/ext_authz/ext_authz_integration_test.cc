@@ -1,3 +1,9 @@
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <cstdint>
+#include <string>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
@@ -13,10 +19,6 @@
 
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
-#include <cstdint>
-#include <string>
-#include <sys/types.h>
-#include <unistd.h>
 
 using testing::AssertionResult;
 using testing::Not;
@@ -380,7 +382,9 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  const std::string expectedCheckRequest(Http::CodecType downstream_protocol, absl::optional<uint64_t> override_expected_size = absl::nullopt) {
+  const std::string
+  expectedCheckRequest(Http::CodecType downstream_protocol,
+                       absl::optional<uint64_t> override_expected_size = absl::nullopt) {
     const std::string expected_downstream_protocol =
         downstream_protocol == Http::CodecType::HTTP1 ? "HTTP/1.1" : "HTTP/2";
     constexpr absl::string_view expected_format = R"EOF(
@@ -395,7 +399,8 @@ attributes:
       protocol: %s
 )EOF";
 
-    uint64_t expected_size = override_expected_size.has_value() ? override_expected_size.value() : request_body_.length();
+    uint64_t expected_size = override_expected_size.has_value() ? override_expected_size.value()
+                                                                : request_body_.length();
     return absl::StrFormat(expected_format, expected_size, expectedRequestBody(),
                            expected_downstream_protocol);
   }
@@ -779,7 +784,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
 TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   // Set up ext_authz filter.
   initializeConfig();
-  
+
   // Use h1, set up the test.
   setDownstreamProtocol(Http::CodecType::HTTP1);
   HttpIntegrationTest::initialize();
@@ -794,10 +799,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
       {"regex-food", "food"},        {"regex-fool", "fool"}};
 
   auto conn = makeClientConnection(lookupPort("http"));
-    codec_client_ = makeHttpConnection(std::move(conn));
+  codec_client_ = makeHttpConnection(std::move(conn));
 
-  auto encoder_decoder =
-    codec_client_->startRequest(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
   response_ = std::move(encoder_decoder.second);
 
   // Split the request body into two parts
@@ -811,10 +815,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   // Expect that since the buffer is full, the request is sent to the authorization server
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1, 2000));
 
-  sendExtAuthzResponse(
-      Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-      Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
-  
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
+
   // Send the rest of the data and end the stream
   codec_client_->sendData(encoder_decoder.first, final_body, true);
 
