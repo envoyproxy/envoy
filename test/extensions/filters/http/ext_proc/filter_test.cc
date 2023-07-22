@@ -96,10 +96,6 @@ protected:
             async_client_stream_info_.upstreamInfo());
     EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost());
 
-    // Pointing dispatcher_.time_system_ to a SimulatedTimeSystem object.
-    test_time_ = new Envoy::Event::SimulatedTimeSystem();
-    dispatcher_.time_system_.reset(test_time_);
-
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](Unused) {
@@ -127,21 +123,6 @@ protected:
     EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     HttpTestUtility::addDefaultHeaders(request_headers_);
     request_headers_.setMethod("POST");
-  }
-
-  void initializeTestSendAll() {
-    initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    request_header_mode: "SEND"
-    response_header_mode: "SEND"
-    request_body_mode: "STREAMED"
-    response_body_mode: "STREAMED"
-    request_trailer_mode: "SEND"
-    response_trailer_mode: "SEND"
-  )EOF");
   }
 
   void TearDown() override {
@@ -250,7 +231,6 @@ protected:
     if (!buffering_data) {
       EXPECT_CALL(decoder_callbacks_, continueDecoding());
     }
-    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
@@ -270,15 +250,13 @@ protected:
     if (!buffering_data) {
       EXPECT_CALL(encoder_callbacks_, continueEncoding());
     }
-    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
   // Expect a request_body request, and send back a valid response
   void processRequestBody(
       absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
-      bool should_continue = true,
-      const std::chrono::microseconds latency = std::chrono::microseconds(10)) {
+      bool should_continue = true) {
     EXPECT_FALSE(last_request_.async_mode());
     ASSERT_TRUE(last_request_.has_request_body());
     const auto& body = last_request_.request_body();
@@ -290,7 +268,6 @@ protected:
     if (should_continue) {
       EXPECT_CALL(decoder_callbacks_, continueDecoding());
     }
-    test_time_->advanceTimeWait(latency);
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
@@ -309,27 +286,6 @@ protected:
     if (should_continue) {
       EXPECT_CALL(encoder_callbacks_, continueEncoding());
     }
-    test_time_->advanceTimeWait(std::chrono::microseconds(10));
-    stream_callbacks_->onReceiveMessage(std::move(response));
-  }
-
-  void processRequestTrailers(
-      absl::optional<
-          std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
-          cb,
-      bool should_continue = true) {
-    EXPECT_FALSE(last_request_.async_mode());
-    ASSERT_TRUE(last_request_.has_request_trailers());
-    const auto& trailers = last_request_.request_trailers();
-    auto response = std::make_unique<ProcessingResponse>();
-    auto* trailers_response = response->mutable_request_trailers();
-    if (cb) {
-      (*cb)(trailers, *response, *trailers_response);
-    }
-    if (should_continue) {
-      EXPECT_CALL(decoder_callbacks_, continueDecoding());
-    }
-    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
@@ -349,103 +305,22 @@ protected:
     if (should_continue) {
       EXPECT_CALL(encoder_callbacks_, continueEncoding());
     }
-    test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
-  // Get the gRPC call stats data from the filter state.
-  const ExtProcLoggingInfo::GrpcCalls&
-  getGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction) {
-    // The number of processor grpc calls made in the encoding and decoding path.
+  // The number of processor grpc calls made in the encoding and decoding path.
+  void expectGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction,
+                       const Grpc::Status::GrpcStatus status, const int expected_calls_count) {
     const ExtProcLoggingInfo::GrpcCalls& grpc_calls =
         stream_info_.filterState()
             ->getDataReadOnly<
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
                 filter_config_name)
             ->grpcCalls(traffic_direction);
-    return grpc_calls;
-  }
-
-  // Check gRPC call stats for headers and trailers.
-  void checkGrpcCall(const ExtProcLoggingInfo::GrpcCall call,
-                     const std::chrono::microseconds latency,
-                     const Grpc::Status::GrpcStatus call_status) {
-    EXPECT_TRUE(call.latency_ == latency);
-    EXPECT_TRUE(call.call_status_ == call_status);
-  }
-
-  // Check gRPC call stats for body.
-  void checkGrpcCallBody(const ExtProcLoggingInfo::GrpcCallBody call, const uint32_t call_count,
-                         const Grpc::Status::GrpcStatus call_status,
-                         const std::chrono::microseconds total_latency,
-                         const std::chrono::microseconds max_latency,
-                         const std::chrono::microseconds min_latency) {
-    EXPECT_TRUE(call.call_count_ == call_count);
-    EXPECT_TRUE(call.last_call_status_ == call_status);
-    EXPECT_TRUE(call.total_latency_ == total_latency);
-    EXPECT_TRUE(call.max_latency_ == max_latency);
-    EXPECT_TRUE(call.min_latency_ == min_latency);
-  }
-
-  // Verify gRPC calls only happened on headers.
-  void
-  checkGrpcCallHeaderOnlyStats(const envoy::config::core::v3::TrafficDirection traffic_direction,
-                               const Grpc::Status::GrpcStatus call_status = Grpc::Status::Ok) {
-    auto& grpc_calls = getGrpcCalls(traffic_direction);
-    EXPECT_TRUE(grpc_calls.header_stats_ != nullptr);
-    checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), call_status);
-    EXPECT_TRUE(grpc_calls.trailer_stats_ == nullptr);
-    EXPECT_TRUE(grpc_calls.body_stats_ == nullptr);
-  }
-
-  // Verify gRPC calls for  headers, body, and trailer.
-  void checkGrpcCallStatsAll(const envoy::config::core::v3::TrafficDirection traffic_direction,
-                             const uint32_t body_chunk_number,
-                             const Grpc::Status::GrpcStatus body_call_status = Grpc::Status::Ok,
-                             const bool trailer_stats = true) {
-    auto& grpc_calls = getGrpcCalls(traffic_direction);
-    EXPECT_TRUE(grpc_calls.header_stats_ != nullptr);
-    checkGrpcCall(*grpc_calls.header_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-
-    if (trailer_stats) {
-      EXPECT_TRUE(grpc_calls.trailer_stats_ != nullptr);
-      checkGrpcCall(*grpc_calls.trailer_stats_, std::chrono::microseconds(10), Grpc::Status::Ok);
-    } else {
-      EXPECT_TRUE(grpc_calls.trailer_stats_ == nullptr);
-    }
-
-    EXPECT_TRUE(grpc_calls.body_stats_ != nullptr);
-    checkGrpcCallBody(*grpc_calls.body_stats_, body_chunk_number, body_call_status,
-                      std::chrono::microseconds(10) * body_chunk_number,
-                      std::chrono::microseconds(10), std::chrono::microseconds(10));
-  }
-
-  // Verify no gRPC call happened.
-  void expectNoGrpcCall(const envoy::config::core::v3::TrafficDirection traffic_direction) {
-    auto& grpc_calls = getGrpcCalls(traffic_direction);
-    EXPECT_TRUE(grpc_calls.header_stats_ == nullptr);
-    EXPECT_TRUE(grpc_calls.trailer_stats_ == nullptr);
-    EXPECT_TRUE(grpc_calls.body_stats_ == nullptr);
-  }
-
-  void sendChunkRequestData(const uint32_t chunk_number, const bool send_grpc) {
-    for (uint32_t i = 0; i < chunk_number; i++) {
-      Buffer::OwnedImpl req_data("foo");
-      EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-      if (send_grpc) {
-        processRequestBody(absl::nullopt, false);
-      }
-    }
-  }
-
-  void sendChunkResponseData(const uint32_t chunk_number, const bool send_grpc) {
-    for (uint32_t i = 0; i < chunk_number; i++) {
-      Buffer::OwnedImpl resp_data("bar");
-      EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
-      if (send_grpc) {
-        processResponseBody(absl::nullopt, false);
-      }
-    }
+    int calls_count = std::count_if(
+        grpc_calls.begin(), grpc_calls.end(),
+        [&](ExtProcLoggingInfo::GrpcCall grpc_call) { return grpc_call.status_ == status; });
+    EXPECT_EQ(calls_count, expected_calls_count);
   }
 
   // The metadata configured as part of ext_proc filter should be in the filter state.
@@ -482,7 +357,6 @@ protected:
   Http::TestResponseTrailerMapImpl response_trailers_;
   std::vector<Event::MockTimer*> timers_;
   TestScopedRuntime scoped_runtime_;
-  Envoy::Event::SimulatedTimeSystem* test_time_;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -505,6 +379,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
   processRequestHeaders(false,
                         [](const HttpHeaders& header_req, ProcessingResponse&, HeadersResponse&) {
                           EXPECT_FALSE(header_req.end_of_stream());
@@ -527,6 +402,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
   processResponseHeaders(
       false, [](const HttpHeaders& header_resp, ProcessingResponse&, HeadersResponse&) {
         EXPECT_FALSE(header_resp.end_of_stream());
@@ -546,9 +422,8 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-
-  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND);
-  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1);
 
   Envoy::ProtobufWkt::Struct filter_metadata;
   (*filter_metadata.mutable_fields())["scooby"].set_string_value("doo");
@@ -569,6 +444,7 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   request_headers_.addCopy(LowerCaseString("x-do-we-want-this"), "no");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
   processRequestHeaders(
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
         auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
@@ -648,7 +524,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
                                                  Eq(absl::nullopt), "Got_a_bad_request"))
@@ -682,6 +558,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   Buffer::OwnedImpl resp_data("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
@@ -694,10 +571,8 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-
-  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND);
-  expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0);
   expectFilterState(Envoy::ProtobufWkt::Struct());
 }
 
@@ -1332,253 +1207,6 @@ TEST_F(HttpFilterTest, PostFastAndBigRequestPartialBuffering) {
   filter_->onDestroy();
 }
 
-// Streaming sends body with small chunks.
-TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
-  initializeTestSendAll();
-
-  HttpTestUtility::addDefaultHeaders(request_headers_);
-  request_headers_.setMethod("POST");
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
-
-  const uint32_t chunk_number = 100;
-  sendChunkRequestData(chunk_number, true);
-  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  processRequestTrailers(absl::nullopt, true);
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(true, absl::nullopt);
-  sendChunkResponseData(chunk_number * 2, true);
-  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
-  processResponseTrailers(absl::nullopt, false);
-  filter_->onDestroy();
-
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  // Total gRPC messages include two headers and two trailers on top of the req/resp chunk data.
-  uint32_t total_msg = 3 * chunk_number + 4;
-  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(total_msg, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
-
-  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number);
-  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, 2 * chunk_number);
-}
-
-// gRPC call fails when streaming sends small chunk request data.
-TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
-  initializeTestSendAll();
-
-  HttpTestUtility::addDefaultHeaders(request_headers_);
-  request_headers_.setMethod("POST");
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
-
-  Buffer::OwnedImpl req_data("foo");
-  const uint32_t chunk_number = 20;
-  sendChunkRequestData(chunk_number, true);
-  // When sends one more chunk of data, gRPC call fails.
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
-  // Oh no! The remote server had a failure!
-  Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
-  server_closed_stream_ = true;
-  stream_callbacks_->onGrpcError(Grpc::Status::Internal);
-
-  // Sending another chunk of data. No more gRPC call.
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
-  sendChunkResponseData(chunk_number * 2, false);
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  filter_->onDestroy();
-  EXPECT_TRUE(immediate_response_headers.empty());
-
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  // Total gRPC messages include one header and 21 chunk of data.
-  uint32_t total_msg = chunk_number + 2;
-  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(total_msg - 1, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_failed_.value());
-
-  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number + 1,
-                        Grpc::Status::Internal, false);
-  expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-}
-
-// gRPC call fails when streaming sends small chunk response data.
-TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
-  initializeTestSendAll();
-
-  HttpTestUtility::addDefaultHeaders(request_headers_);
-  request_headers_.setMethod("POST");
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
-
-  const uint32_t chunk_number = 20;
-  sendChunkRequestData(chunk_number, true);
-  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  processRequestTrailers(absl::nullopt, true);
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(true, absl::nullopt);
-  sendChunkResponseData(chunk_number / 2, true);
-  // When sends one more chunk of data, gRPC call fails.
-  Buffer::OwnedImpl resp_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
-  Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
-  server_closed_stream_ = true;
-  stream_callbacks_->onGrpcError(Grpc::Status::Internal);
-  // Sending 40 more chunks of data. No more gRPC calls.
-  sendChunkRequestData(chunk_number * 2, false);
-
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  filter_->onDestroy();
-  EXPECT_TRUE(immediate_response_headers.empty());
-
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  // Total gRPC messages include two headers, one trailers and 20 request chunk and 11 response
-  // chunk data.
-  uint32_t total_msg = 3 + chunk_number + chunk_number / 2 + 1;
-  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(total_msg - 1, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_failed_.value());
-
-  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number);
-  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, chunk_number / 2 + 1,
-                        Grpc::Status::Internal, false);
-}
-
-// Grpc fails when sending request trailer message.
-TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    request_header_mode: "SKIP"
-    response_header_mode: "SKIP"
-    request_trailer_mode: "SEND"
-  )EOF");
-
-  EXPECT_FALSE(config_->failureModeAllow());
-
-  HttpTestUtility::addDefaultHeaders(request_headers_);
-  request_headers_.setMethod("POST");
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
-  Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
-  server_closed_stream_ = true;
-  stream_callbacks_->onGrpcError(Grpc::Status::Internal);
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
-
-  filter_->onDestroy();
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(0, config_->stats().streams_closed_.value());
-  EXPECT_EQ(1, config_->stats().streams_failed_.value());
-
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ != nullptr);
-  checkGrpcCall(*grpc_calls_in.trailer_stats_, std::chrono::microseconds(10),
-                Grpc::Status::Internal);
-  EXPECT_TRUE(grpc_calls_in.body_stats_ == nullptr);
-
-  expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-}
-
-// Sending gRPC calls with random latency To test max and min latency update logic.
-TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    request_header_mode: "SKIP"
-    response_header_mode: "SKIP"
-    request_body_mode: "STREAMED"
-  )EOF");
-
-  HttpTestUtility::addDefaultHeaders(request_headers_);
-  request_headers_.setMethod("POST");
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-
-  const uint32_t chunk_number = 5;
-  Buffer::OwnedImpl req_data("foo");
-  // Latency 50 80 60 30 100.
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  processRequestBody(absl::nullopt, false, std::chrono::microseconds(50));
-
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  processRequestBody(absl::nullopt, false, std::chrono::microseconds(80));
-
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  processRequestBody(absl::nullopt, false, std::chrono::microseconds(60));
-
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  processRequestBody(absl::nullopt, false, std::chrono::microseconds(30));
-
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-  processRequestBody(absl::nullopt, false, std::chrono::microseconds(100));
-
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
-  Buffer::OwnedImpl resp_data("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  filter_->onDestroy();
-
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  uint32_t total_msg = chunk_number;
-  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(total_msg, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(0, config_->stats().streams_failed_.value());
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
-
-  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
-  EXPECT_TRUE(grpc_calls_in.header_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
-  EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
-  checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number, Grpc::Status::Ok,
-                    std::chrono::microseconds(320), std::chrono::microseconds(100),
-                    std::chrono::microseconds(30));
-
-  expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-}
-
 // Using a configuration with streaming set for the request and
 // response bodies, ensure that the chunks are delivered to the processor and
 // that the processor gets them correctly.
@@ -1588,8 +1216,12 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
     request_body_mode: "STREAMED"
     response_body_mode: "STREAMED"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
   )EOF");
 
   // Create synthetic HTTP request
@@ -1661,11 +1293,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(9, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-
-  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, 1, Grpc::Status::Ok,
-                        false);
-  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, 6, Grpc::Status::Ok,
-                        false);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 2);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 7);
 }
 
 // Using a configuration with streaming set for the request and
@@ -2031,7 +1660,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
 
   // Create synthetic HTTP request
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
   // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
@@ -2046,6 +1675,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   Buffer::OwnedImpl resp_data("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
@@ -2058,10 +1688,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
-
-  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND,
-                               Grpc::Status::Internal);
-  expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Internal, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -2077,14 +1704,22 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
 
   // Create synthetic HTTP request
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+
+  EXPECT_FALSE(last_request_.async_mode());
+  ASSERT_TRUE(last_request_.has_request_headers());
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  resp1->mutable_request_headers();
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
 
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
                                                  Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
@@ -2108,10 +1743,8 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
-
-  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND);
-  checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::OUTBOUND,
-                               Grpc::Status::Internal);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Internal, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -2236,7 +1869,14 @@ TEST_F(HttpFilterTest, ProcessingModeRequestHeadersOnly) {
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+
+  EXPECT_FALSE(last_request_.async_mode());
+  ASSERT_TRUE(last_request_.has_request_headers());
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  resp1->mutable_request_headers();
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
 
   Buffer::OwnedImpl first_chunk("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));

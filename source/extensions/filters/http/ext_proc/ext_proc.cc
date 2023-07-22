@@ -61,40 +61,7 @@ void ExtProcLoggingInfo::recordGrpcCall(
     ProcessorState::CallbackState callback_state,
     envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
-
-  // Record the gRPC call stats for the header.
-  if (callback_state == ProcessorState::CallbackState::HeadersCallback) {
-    if (grpcCalls(traffic_direction).header_stats_ == nullptr) {
-      grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status);
-    }
-    return;
-  }
-
-  // Record the gRPC call stats for the trailer.
-  if (callback_state == ProcessorState::CallbackState::TrailersCallback) {
-    if (grpcCalls(traffic_direction).trailer_stats_ == nullptr) {
-      grpcCalls(traffic_direction).trailer_stats_ =
-          std::make_unique<GrpcCall>(latency, call_status);
-    }
-    return;
-  }
-
-  // Record the gRPC call stats for the bodies.
-  if (grpcCalls(traffic_direction).body_stats_ == nullptr) {
-    grpcCalls(traffic_direction).body_stats_ =
-        std::make_unique<GrpcCallBody>(1, call_status, latency, latency, latency);
-  } else {
-    auto& body_stats = grpcCalls(traffic_direction).body_stats_;
-    body_stats->call_count_++;
-    body_stats->total_latency_ += latency;
-    body_stats->last_call_status_ = call_status;
-    if (latency > body_stats->max_latency_) {
-      body_stats->max_latency_ = latency;
-    }
-    if (latency < body_stats->min_latency_) {
-      body_stats->min_latency_ = latency;
-    }
-  }
+  grpcCalls(traffic_direction).emplace_back(latency, call_status, callback_state);
 }
 
 ExtProcLoggingInfo::GrpcCalls&
