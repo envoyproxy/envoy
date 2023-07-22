@@ -128,9 +128,11 @@ jobs:
       version_patch: ${{ steps.env.outputs.version_patch }}
     steps:
     - uses: actions/checkout@v3
+      name: Checkout Envoy repository
       with:
         fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
     - uses: ./.github/actions/env
+      name: Generate environment variables
       id: env
       with:
         check_mobile_run: ${{ inputs.check_mobile_run }}
