@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/config_dump.pb.validate.h"
+#include "envoy/admin/v3/config_dump_shared.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -11,9 +11,12 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/router/config_impl.h"
 #include "source/common/router/rds_impl.h"
-#include "source/server/admin/admin.h"
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+#include "source/server/admin/admin.h"
+#endif
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/matcher/mocks.h"
@@ -23,6 +26,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,6 +35,7 @@ using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 
@@ -53,7 +58,7 @@ class RdsTestBase : public testing::Test {
 public:
   RdsTestBase() {
     // For server_factory_context
-    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(*scope_.rootScope()));
     ON_CALL(server_factory_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
     EXPECT_CALL(validation_context_, dynamicValidationVisitor())
@@ -171,10 +176,17 @@ http_filters:
       RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
                                       server_factory_context_, validation_visitor_,
                                       outer_init_manager_, "foo.", *route_config_provider_manager_),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
-TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
+TEST_F(RdsImplTest, RdsAndStaticWithHcmOptionalUnknownFilterPerVirtualHostConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string config_yaml = R"EOF(
 route_config:
   virtual_hosts:
@@ -187,6 +199,34 @@ route_config:
         "@type": type.googleapis.com/google.protobuf.Struct
         value:
           seconds: 123
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: filter.unknown
+  is_optional: true
+    )EOF";
+
+  RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
+                                  server_factory_context_, validation_visitor_, outer_init_manager_,
+                                  "foo.", *route_config_provider_manager_);
+}
+
+TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
+  const std::string config_yaml = R"EOF(
+route_config:
+  virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            seconds: 123
 codec_type: auto
 stat_prefix: foo
 http_filters:
@@ -346,11 +386,18 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // validate the optional unknown factory will be ignored for per virtualhost typed config.
-TEST_F(RdsImplTest, OptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+TEST_F(RdsImplTest, HcmOptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   InSequence s;
   const std::string config_yaml = R"EOF(
 rds:
@@ -396,6 +443,74 @@ http_filters:
           "typed_per_filter_config": {
             "filter.unknown": {
               "@type": "type.googleapis.com/google.protobuf.Struct"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
+
+  EXPECT_CALL(init_watcher_, ready());
+  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+}
+
+// Validate the optional unknown factory will be ignored for per virtualhost typed config.
+TEST_F(RdsImplTest, OptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+  InSequence s;
+  const std::string config_yaml = R"EOF(
+rds:
+  config_source:
+    api_config_source:
+      api_type: REST
+      cluster_names:
+      - foo_cluster
+      refresh_delay: 1s
+  route_config_name: foo_route_config
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: filter.unknown
+  is_optional: true
+    )EOF";
+
+  setup(config_yaml);
+
+  const std::string response1_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {
+          "name": "integration",
+          "domains": [
+            "*"
+          ],
+          "routes": [
+            {
+              "match": {
+                "prefix": "/foo"
+              },
+              "route": {
+                "cluster_header": ":authority"
+              }
+            }
+          ],
+          "typed_per_filter_config": {
+            "filter.unknown": {
+              "@type": "type.googleapis.com/envoy.config.route.v3.FilterConfig",
+              "is_optional": true,
+              "config": {
+                "@type": "type.googleapis.com/google.protobuf.Struct"
+              }
             }
           }
         }
@@ -461,11 +576,18 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // validate the optional unknown factory will be ignored for per route typed config.
 TEST_F(RdsImplTest, OptionalUnknownFacotryForPerRouteTypedConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   InSequence s;
   const std::string config_yaml = R"EOF(
 rds:
@@ -559,7 +681,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   // SubscriptionCallbacks, so we has to use reinterpret_cast here.
   RdsRouteConfigSubscription* rds_subscription =
       reinterpret_cast<RdsRouteConfigSubscription*>(rds_callbacks_);
-  auto config_impl_pointer = rds_subscription->routeConfigProvider().value()->config();
+  auto config_impl_pointer = rds_subscription->routeConfigProvider()->config();
   // Now send an invalid config update.
   const std::string invalid_json =
       R"EOF(
@@ -587,7 +709,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
       "INVALID_NAME_FOR_route_config");
 
   // Verify that the config is still the old value.
-  ASSERT_EQ(config_impl_pointer, rds_subscription->routeConfigProvider().value()->config());
+  ASSERT_EQ(config_impl_pointer, rds_subscription->routeConfigProvider()->config());
 }
 
 // rds and vhds configurations change together
@@ -686,7 +808,8 @@ rds:
         parseHttpConnectionManagerFromYaml(rds_config), server_factory_context_,
         validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
 
-    EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+    EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
+        .WillOnce([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); });
     rds->requestVirtualHostsUpdate(
         "testing", local_thread_dispatcher,
         std::make_shared<Http::RouteConfigUpdatedCallback>(
@@ -705,7 +828,7 @@ TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {
   EXPECT_CALL(init_watcher_, ready());
   RdsRouteConfigSubscription& subscription =
       dynamic_cast<RdsRouteConfigProviderImpl&>(*rds_).subscription();
-  EXPECT_EQ(rds_.get(), subscription.routeConfigProvider().value());
+  EXPECT_EQ(rds_.get(), subscription.routeConfigProvider());
 }
 
 class RdsRouteConfigSubscriptionTest : public RdsTestBase {

@@ -41,10 +41,7 @@ class Cluster : public Upstream::ClusterImplBase {
 public:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
-          Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
-          Random::RandomGenerator& random,
-          Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
+          Upstream::ClusterFactoryContext& context);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -90,11 +87,12 @@ private:
   // priority set could be empty, we cannot initialize LoadBalancerBase when priority set is empty.
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:
-    LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterStats& stats,
+    LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterLbStats& lb_stats,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-        : Upstream::LoadBalancerBase(priority_context.priority_set_, stats, runtime, random,
-                                     common_config),
+        : Upstream::LoadBalancerBase(priority_context.priority_set_, lb_stats, runtime, random,
+                                     PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                         common_config, healthy_panic_threshold, 100, 50)),
           priority_context_(priority_context) {}
 
     // Upstream::LoadBalancer
@@ -141,7 +139,7 @@ private:
 struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
   AggregateLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
   // Upstream::LoadBalancerFactory
-  Upstream::LoadBalancerPtr create() override {
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
     return std::make_unique<AggregateClusterLoadBalancer>(
         cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
         cluster_.clusters_);
@@ -172,9 +170,7 @@ private:
   createClusterWithConfig(
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
-      Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+      Upstream::ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(ClusterFactory);

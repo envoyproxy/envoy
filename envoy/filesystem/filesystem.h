@@ -8,15 +8,33 @@
 #include "envoy/api/io_error.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Filesystem {
 
-using FlagSet = std::bitset<4>;
+using FlagSet = std::bitset<5>;
 
-enum class DestinationType { File, Stderr, Stdout };
+enum class DestinationType { File, Stderr, Stdout, TmpFile };
+
+enum class FileType { Regular, Directory, Other };
+
+struct FileInfo {
+  const std::string name_;
+  // the size of the file in bytes, or `nullopt` if the size could not be determined
+  //         (e.g. for directories, or windows symlinks.)
+  const absl::optional<uint64_t> size_;
+  // Note that if the file represented by name_ is a symlink, type_ will be the file type of the
+  // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
+  // A broken symlink on posix will have `FileType::Regular`.
+  const FileType file_type_;
+  const absl::optional<SystemTime> time_created_;
+  const absl::optional<SystemTime> time_last_accessed_;
+  const absl::optional<SystemTime> time_last_modified_;
+};
 
 /**
  * Abstraction for a basic file on disk.
@@ -28,13 +46,19 @@ public:
   enum Operation {
     // Open a file for reading.
     Read,
-    // Open a file for writing. The file will be truncated if Append is not set.
+    // Open a file for writing. The file will be truncated if neither Append nor
+    // KeepExisting is set.
     Write,
     // Create the file if it does not already exist
     Create,
     // If writing, append to the file rather than writing to the beginning and
     // truncating after write.
     Append,
+    // To open for write, without appending, and without truncating, add the
+    // KeepExistingData flag. It is especially important to set this flag if
+    // using pwrite, as the Windows implementation of truncation will interact
+    // poorly with pwrite.
+    KeepExistingData,
   };
 
   /**
@@ -53,11 +77,38 @@ public:
   virtual Api::IoCallSizeResult write(absl::string_view buffer) PURE;
 
   /**
+   * Get additional details about the file. May or may not require a file system operation.
+   *
+   * @return FileInfo the file info.
+   */
+  virtual Api::IoCallResult<FileInfo> info() PURE;
+
+  /**
    * Close the file.
    *
    * @return bool whether the close succeeded
    */
   virtual Api::IoCallBoolResult close() PURE;
+
+  /**
+   * Read a chunk of data from the file to a buffer. The file must be explicitly opened
+   * before reading.
+   * @param buf The buffer to copy the data into.
+   * @param count The maximum number of bytes to read.
+   * @param offset The offset in the file at which to start reading.
+   * @return ssize_t number of bytes read, or -1 for failure.
+   */
+  virtual Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) PURE;
+
+  /**
+   * Write a chunk of data from a buffer to the file. The file must be explicitly opened
+   * before writing.
+   * @param buf The buffer to read the data from.
+   * @param count The maximum number of bytes to write.
+   * @param offset The offset in the file at which to start writing.
+   * @return ssize_t number of bytes written, or -1 for failure.
+   */
+  virtual Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) PURE;
 
   /**
    * @return bool is the file open
@@ -119,6 +170,19 @@ public:
   virtual bool fileExists(const std::string& path) PURE;
 
   /**
+   * @return FileInfo containing information about the file, or an error status.
+   */
+  virtual Api::IoCallResult<FileInfo> stat(absl::string_view path) PURE;
+
+  /**
+   * Attempts to create the given path, recursively if necessary.
+   * @return bool true if one or more directories was created and the path exists,
+   *         false if the path already existed, an error status if the path does
+   *         not exist after the call.
+   */
+  virtual Api::IoCallBoolResult createPath(absl::string_view path) PURE;
+
+  /**
    * @return bool whether a directory exists on disk and can be opened for read.
    */
   virtual bool directoryExists(const std::string& path) PURE;
@@ -158,8 +222,6 @@ public:
 
 using InstancePtr = std::unique_ptr<Instance>;
 
-enum class FileType { Regular, Directory, Other };
-
 struct DirectoryEntry {
   // name_ is the name of the file in the directory, not including the directory path itself
   // For example, if we have directory a/b containing file c, name_ will be c
@@ -169,15 +231,19 @@ struct DirectoryEntry {
   // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
   FileType type_;
 
+  // The file size in bytes for regular files. nullopt for FileType::Directory and FileType::Other,
+  // and, on Windows, also nullopt for symlinks, and on Linux nullopt for broken symlinks.
+  absl::optional<uint64_t> size_bytes_;
+
   bool operator==(const DirectoryEntry& rhs) const {
-    return name_ == rhs.name_ && type_ == rhs.type_;
+    return name_ == rhs.name_ && type_ == rhs.type_ && size_bytes_ == rhs.size_bytes_;
   }
 };
 
 class DirectoryIteratorImpl;
 class DirectoryIterator {
 public:
-  DirectoryIterator() : entry_({"", FileType::Other}) {}
+  DirectoryIterator() : entry_({"", FileType::Other, absl::nullopt}) {}
   virtual ~DirectoryIterator() = default;
 
   const DirectoryEntry& operator*() const { return entry_; }

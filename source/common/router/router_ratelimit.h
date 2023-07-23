@@ -13,6 +13,9 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_utility.h"
 
 #include "absl/types/optional.h"
 
@@ -94,6 +97,27 @@ public:
 };
 
 /**
+ * Action for masked remote address rate limiting.
+ */
+class MaskedRemoteAddressAction : public RateLimit::DescriptorProducer {
+public:
+  MaskedRemoteAddressAction(
+      const envoy::config::route::v3::RateLimit::Action::MaskedRemoteAddress& action)
+      : v4_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v4_prefix_mask_len, 32)),
+        v6_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v6_prefix_mask_len, 128)) {}
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const uint32_t v4_prefix_mask_len_;
+  const uint32_t v6_prefix_mask_len_;
+};
+
+/**
  * Action for generic key rate limiting.
  */
 class GenericKeyAction : public RateLimit::DescriptorProducer {
@@ -133,6 +157,7 @@ private:
   const std::string descriptor_key_;
   const std::string default_value_;
   const envoy::config::route::v3::RateLimit::Action::MetaData::Source source_;
+  const bool skip_if_absent_;
 };
 
 /**
@@ -156,13 +181,37 @@ private:
   const std::vector<Http::HeaderUtility::HeaderDataPtr> action_headers_;
 };
 
+/**
+ * Action for query parameter value match rate limiting.
+ */
+class QueryParameterValueMatchAction : public RateLimit::DescriptorProducer {
+public:
+  QueryParameterValueMatchAction(
+      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> buildQueryParameterMatcherVector(
+      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+
+private:
+  const std::string descriptor_value_;
+  const std::string descriptor_key_;
+  const bool expect_match_;
+  const std::vector<ConfigUtility::QueryParameterMatcherPtr> action_query_parameters_;
+};
+
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
   RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config,
-                           ProtobufMessage::ValidationVisitor& validator);
+                           Server::Configuration::CommonFactoryContext& context);
 
   // Router::RateLimitPolicyEntry
   uint64_t stage() const override { return stage_; }
@@ -187,9 +236,10 @@ private:
  */
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
+  RateLimitPolicyImpl();
   RateLimitPolicyImpl(
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
-      ProtobufMessage::ValidationVisitor& validator);
+      Server::Configuration::CommonFactoryContext& context);
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
@@ -205,6 +255,7 @@ private:
   // Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
   static const uint64_t MAX_STAGE_NUMBER;
 };
+using DefaultRateLimitPolicy = ConstSingleton<RateLimitPolicyImpl>;
 
 } // namespace Router
 } // namespace Envoy

@@ -48,6 +48,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "lua_integration_test",
+    size = "large",
     srcs = ["lua_integration_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
     deps = [

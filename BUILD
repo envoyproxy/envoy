@@ -13,6 +13,11 @@ alias(
     actual = "//source/exe:envoy",
 )
 
+alias(
+    name = "envoy.stripped",
+    actual = "//source/exe:envoy-static.stripped",
+)
+
 # These two definitions exist to help reduce Envoy upstream core code depending on extensions.
 # To avoid visibility problems, see notes in source/extensions/extensions_build_config.bzl
 #
@@ -27,7 +32,7 @@ package_group(
         "//test/extensions/...",
         "//test/server",
         "//test/server/config_validation",
-        "//test/tools/schema_validator/...",
+        "//test/tools/...",
         "//tools/extensions/...",
     ],
 )
@@ -51,5 +56,12 @@ package_group(
     name = "examples_library",
     packages = [
         "//examples/...",
+    ],
+)
+
+package_group(
+    name = "mobile_library",
+    packages = [
+        "//mobile/...",
     ],
 )

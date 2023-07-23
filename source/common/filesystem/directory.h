@@ -16,7 +16,7 @@ public:
 
   DirectoryIteratorImpl begin() { return DirectoryIteratorImpl(directory_path_); }
 
-  DirectoryIteratorImpl end() { return DirectoryIteratorImpl(); }
+  DirectoryIteratorImpl end() { return {}; }
 
 private:
   const std::string directory_path_;

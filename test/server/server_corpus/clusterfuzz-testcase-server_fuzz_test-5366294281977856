@@ -116,7 +116,6 @@ static_resources {
   }
 }
 admin {
-  access_log_path: "@\'"
   address {
     socket_address {
       address: "::"

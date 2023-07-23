@@ -29,20 +29,28 @@ protected:
   };
 
   ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'http.scoped_rds.foo-scoped-routes.grpc.srds_cluster.streams_closed_16' and stat_prefix
+    // 'srds_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
   }
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
-  void initialize() override {
-    // Setup two upstream hosts, one for each cluster.
-    setUpstreamCount(2);
+  void setupModifications() {
+    if (modifications_set_up_) {
+      return;
+    }
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add the static cluster to serve SRDS.
+      // Add another static cluster for sending HTTP requests.
       auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
       cluster_1->MergeFrom(bootstrap.static_resources().clusters()[0]);
       cluster_1->set_name("cluster_1");
@@ -123,14 +131,60 @@ fragments:
           grpc_service = srds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
         });
+
+    if (add_listener_) {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        // Copy from old listener and modify the scope key builder.
+        auto* old_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+        new_listener->CopyFrom(*old_listener);
+        new_listener->set_name("listener_1");
+        auto* filter_chain = new_listener->mutable_filter_chains(0);
+        envoy::config::listener::v3::Filter* filter_config = nullptr;
+        for (ssize_t i = 0; i < filter_chain->filters_size(); i++) {
+          if (filter_chain->mutable_filters(i)->name() == "http") {
+            filter_config = filter_chain->mutable_filters(i);
+          }
+        }
+        ASSERT(filter_config != nullptr);
+        auto* config = filter_config->mutable_typed_config();
+        auto filter =
+            MessageUtil::anyConvert<envoy::extensions::filters::network::http_connection_manager::
+                                        v3::HttpConnectionManager>(*config);
+        // changing separator to ,
+        const std::string& scope_key_builder_config_yaml = R"EOF(
+fragments:
+  - header_value_extractor:
+      name: Addr
+      element_separator: ;
+      element:
+        key: x-foo-key
+        separator: ","
+)EOF";
+        envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
+            ScopeKeyBuilder scope_key_builder;
+        TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
+        *filter.mutable_scoped_routes()->mutable_scope_key_builder() = scope_key_builder;
+        config->PackFrom(filter);
+      });
+    }
+    modifications_set_up_ = true;
+  }
+
+  void initialize() override {
+    // Setup two upstream hosts, one for each cluster.
+    setUpstreamCount(2);
+    setupModifications();
     HttpIntegrationTest::initialize();
   }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the SRDS upstream.
+    srds_upstream_idx_ = fake_upstreams_.size();
     addFakeUpstream(Http::CodecType::HTTP2);
     // Create the RDS upstream.
+    rds_upstream_idx_ = fake_upstreams_.size();
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
@@ -153,9 +207,15 @@ fragments:
     resetFakeUpstreamInfo(&scoped_rds_upstream_info_);
   }
 
-  FakeUpstream& getRdsFakeUpstream() const { return *fake_upstreams_[3]; }
+  FakeUpstream& getRdsFakeUpstream() const {
+    ASSERT(rds_upstream_idx_ < fake_upstreams_.size());
+    return *fake_upstreams_[rds_upstream_idx_];
+  }
 
-  FakeUpstream& getScopedRdsFakeUpstream() const { return *fake_upstreams_[2]; }
+  FakeUpstream& getScopedRdsFakeUpstream() const {
+    ASSERT(srds_upstream_idx_ < fake_upstreams_.size());
+    return *fake_upstreams_[srds_upstream_idx_];
+  }
 
   void createStream(FakeUpstreamInfo* upstream_info, FakeUpstream& upstream,
                     const std::string& resource_name) {
@@ -259,9 +319,13 @@ fragments:
   }
 
   const std::string srds_config_name_{"foo-scoped-routes"};
+  std::size_t rds_upstream_idx_ = -1;
+  std::size_t srds_upstream_idx_ = -1;
   FakeUpstreamInfo scoped_rds_upstream_info_;
   FakeUpstreamInfo rds_upstream_info_;
   std::string srds_resources_locator_;
+  bool modifications_set_up_ = false;
+  bool add_listener_ = false;
 };
 
 } // namespace Envoy

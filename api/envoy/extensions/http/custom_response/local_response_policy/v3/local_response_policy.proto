@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package envoy.extensions.http.custom_response.local_response_policy.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/substitution_format_string.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.custom_response.local_response_policy.v3";
+option java_outer_classname = "LocalResponsePolicyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/custom_response/local_response_policy/v3;local_response_policyv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Local Response Policy for Custom Response]
+// [#extension: envoy.http.custom_response.local_response_policy]
+
+// Custom response policy to serve a locally stored response to the
+// downstream.
+message LocalResponsePolicy {
+  // Optional new local reply body text. It will be used
+  // in the `%LOCAL_REPLY_BODY%` command operator in the `body_format`.
+  config.core.v3.DataSource body = 1;
+
+  // Optional body format to be used for this response. If `body_format` is  not
+  // provided, and `body` is, the contents of `body` will be used to populate
+  // the body of the local reply without formatting.
+  config.core.v3.SubstitutionFormatString body_format = 2;
+
+  // The new response status code if specified.
+  google.protobuf.UInt32Value status_code = 3 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+
+  // HTTP headers to add to the response. This allows the
+  // response policy to append, to add or to override headers of
+  // the original response for local body, or the custom response from the
+  // remote body, before it is sent to a downstream client.
+  repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
+      [(validate.rules).repeated = {max_items: 1000}];
+}

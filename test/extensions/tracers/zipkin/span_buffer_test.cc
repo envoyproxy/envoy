@@ -138,7 +138,7 @@ template <typename Type> std::string serializedMessageToJson(const std::string& 
   Type message;
   message.ParseFromString(serialized);
   std::string json;
-  Protobuf::util::MessageToJsonString(message, &json);
+  Protobuf::util::MessageToJsonString(message, &json).IgnoreError();
   return json;
 }
 
@@ -428,7 +428,7 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
   (*objectWithScientificNotationFields)["timestamp"] = ValueUtil::numberValue(
       DEFAULT_TEST_TIMESTAMP); // the value of DEFAULT_TEST_TIMESTAMP is 1584324295476870.
   const auto objectWithScientificNotationJson =
-      MessageUtil::getJsonStringFromMessageOrDie(objectWithScientificNotation, false, true);
+      MessageUtil::getJsonStringFromMessageOrError(objectWithScientificNotation, false, true);
   // Since we use ValueUtil::numberValue to set the timestamp, we expect to
   // see the value is rendered with scientific notation (1.58432429547687e+15).
   EXPECT_EQ(R"({"timestamp":1.58432429547687e+15})", objectWithScientificNotationJson);
@@ -438,8 +438,8 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
   Util::Replacements replacements;
   (*objectFields)["timestamp"] =
       Util::uint64Value(DEFAULT_TEST_TIMESTAMP, "timestamp", replacements);
-  const auto objectJson = MessageUtil::getJsonStringFromMessageOrDie(object, false, true);
-  // We still have "1584324295476870" from MessageUtil::getJsonStringFromMessageOrDie here.
+  const auto objectJson = MessageUtil::getJsonStringFromMessageOrError(object, false, true);
+  // We still have "1584324295476870" from MessageUtil::getJsonStringFromMessageOrError here.
   EXPECT_EQ(R"({"timestamp":"1584324295476870"})", objectJson);
   // However, then the replacement correctly replaces "1584324295476870" with 1584324295476870
   // (without quotes).

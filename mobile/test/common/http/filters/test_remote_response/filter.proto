@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+package envoymobile.extensions.filters.http.test_remote_response;
+
+message TestRemoteResponse {
+}

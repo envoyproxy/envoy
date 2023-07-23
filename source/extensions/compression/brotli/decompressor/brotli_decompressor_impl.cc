@@ -2,11 +2,23 @@
 
 #include <memory>
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
 namespace Brotli {
 namespace Decompressor {
+
+namespace {
+
+// How many times the output buffer is allowed to be bigger than the input
+// buffer. This value is used to detect compression bombs.
+// TODO(rojkov): Re-design the Decompressor interface to handle compression
+// bombs gracefully instead of this quick solution.
+constexpr uint32_t MaxInflateRatio = 100;
+
+} // namespace
 
 BrotliDecompressorImpl::BrotliDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
                                                const uint32_t chunk_size,
@@ -22,7 +34,7 @@ BrotliDecompressorImpl::BrotliDecompressorImpl(Stats::Scope& scope, const std::s
 
 void BrotliDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                         Buffer::Instance& output_buffer) {
-  Common::BrotliContext ctx(chunk_size_);
+  Common::BrotliContext ctx(chunk_size_, MaxInflateRatio * input_buffer.length());
 
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     ctx.avail_in_ = input_slice.len_;
@@ -54,6 +66,13 @@ bool BrotliDecompressorImpl::process(Common::BrotliContext& ctx, Buffer::Instanc
   if (result == BROTLI_DECODER_RESULT_ERROR) {
     // TODO(rojkov): currently the Brotli library doesn't specify possible errors in its API. Add
     // more detailed stats when they are documented.
+    stats_.brotli_error_.inc();
+    return false;
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_compression_bomb_protection") &&
+      (output_buffer.length() > ctx.max_output_size_)) {
     stats_.brotli_error_.inc();
     return false;
   }

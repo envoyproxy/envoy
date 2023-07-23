@@ -43,7 +43,8 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
       if (sds_secret_config.has_sds_config()) {
         // Fetch dynamic secret.
         providers.push_back(factory_context.secretManager().findOrCreateTlsCertificateProvider(
-            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context));
+            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+            factory_context.initManager()));
       } else {
         // Load static secret.
         auto secret_provider = factory_context.secretManager().findStaticTlsCertificateProvider(
@@ -65,7 +66,8 @@ Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
   if (sds_secret_config.has_sds_config()) {
     // Fetch dynamic secret.
     return factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
-        sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+        sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+        factory_context.initManager());
   } else {
     // Load static secret.
     auto secret_provider =
@@ -88,17 +90,12 @@ getCertificateValidationContextConfigProvider(
         default_cvc) {
   switch (config.validation_context_type_case()) {
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
-      kValidationContext: {
-    auto secret_provider =
-        factory_context.secretManager().createInlineCertificateValidationContextProvider(
-            config.validation_context());
-    return secret_provider;
-  }
+      kValidationContext:
+    return factory_context.secretManager().createInlineCertificateValidationContextProvider(
+        config.validation_context());
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
-      kValidationContextSdsSecretConfig: {
-    const auto& sds_secret_config = config.validation_context_sds_secret_config();
-    return getProviderFromSds(factory_context, sds_secret_config);
-  }
+      kValidationContextSdsSecretConfig:
+    return getProviderFromSds(factory_context, config.validation_context_sds_secret_config());
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kCombinedValidationContext: {
     *default_cvc = std::make_unique<
@@ -128,7 +125,8 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
     if (sds_secret_config.has_sds_config()) {
       // Fetch dynamic secret.
       return factory_context.secretManager().findOrCreateTlsSessionTicketKeysContextProvider(
-          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+          factory_context.initManager());
     } else {
       // Load static secret.
       auto secret_provider =
@@ -170,12 +168,15 @@ ContextConfigImpl::ContextConfigImpl(
     const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
     const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : api_(factory_context.api()), options_(factory_context.options()),
+    : api_(factory_context.serverFactoryContext().api()),
+      options_(factory_context.serverFactoryContext().options()),
+      singleton_manager_(factory_context.serverFactoryContext().singletonManager()),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
+      signature_algorithms_(RepeatedPtrUtil::join(config.tls_params().signature_algorithms(), ":")),
       tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
       certificate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
@@ -207,8 +208,12 @@ ContextConfigImpl::ContextConfigImpl(
         validation_context_config_ =
             getCombinedValidationContextConfig(*certificate_validation_context_provider_->secret());
       } else {
-        validation_context_config_ = std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
+        auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
             *certificate_validation_context_provider_->secret(), api_);
+        if (!config_or_status.status().ok()) {
+          throw EnvoyException(std::string(config_or_status.status().message()));
+        }
+        validation_context_config_ = std::move(config_or_status.value());
       }
     }
   }
@@ -221,7 +226,8 @@ ContextConfigImpl::ContextConfigImpl(
     }
   }
 
-  HandshakerFactoryContextImpl handshaker_factory_context(api_, options_, alpn_protocols_);
+  HandshakerFactoryContextImpl handshaker_factory_context(api_, options_, alpn_protocols_,
+                                                          singleton_manager_);
   Ssl::HandshakerFactory* handshaker_factory;
   if (config.has_custom_handshaker()) {
     // If a custom handshaker is configured, derive the factory from the config.
@@ -248,7 +254,12 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext combined_cvc =
       *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
-  return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc, api_);
+  auto config_or_status =
+      Envoy::Ssl::CertificateValidationContextConfigImpl::create(combined_cvc, api_);
+  if (!config_or_status.status().ok()) {
+    throw EnvoyException(std::string(config_or_status.status().message()));
+  }
+  return std::move(config_or_status.value());
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
@@ -284,9 +295,12 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
       // ContextConfigImpl::validation_context_config_ with new secret.
       cvc_update_callback_handle_ =
           certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
-            validation_context_config_ =
-                std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
-                    *certificate_validation_context_provider_->secret(), api_);
+            auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
+                *certificate_validation_context_provider_->secret(), api_);
+            if (!config_or_status.status().ok()) {
+              throw EnvoyException(std::string(config_or_status.status().message()));
+            }
+            validation_context_config_ = std::move(config_or_status.value());
             callback();
           });
     }
@@ -339,13 +353,12 @@ const std::string ClientContextConfigImpl::DEFAULT_CURVES =
 
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-    absl::string_view sigalgs,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       server_name_indication_(config.sni()), allow_renegotiation_(config.allow_renegotiation()),
-      max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)),
-      sigalgs_(sigalgs) {
+      enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, false)),
+      max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {
@@ -369,10 +382,8 @@ const std::string ServerContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "ECDHE-ECDSA-AES128-GCM-SHA256:"
     "ECDHE-RSA-AES128-GCM-SHA256:"
 #endif
-    "AES128-GCM-SHA256:"
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
-    "ECDHE-RSA-AES256-GCM-SHA384:"
-    "AES256-GCM-SHA384:";
+    "ECDHE-RSA-AES256-GCM-SHA384:";
 
 const std::string ServerContextConfigImpl::DEFAULT_CURVES =
 #ifndef BORINGSSL_FIPS
@@ -389,7 +400,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
-      disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
+      disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
+      full_scan_certs_on_sni_mismatch_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, full_scan_certs_on_sni_mismatch,
+          !Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch"))) {
 
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.

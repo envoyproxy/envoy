@@ -75,7 +75,7 @@ public:
                                   const absl::optional<std::string>& provider, bool, bool) {
           return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
         }));
-    verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
+    verifier_ = Verifier::create(proto_config_.rules(0).requires_(), proto_config_.providers(),
                                  mock_factory_);
   }
   void createSyncMockAuthsAndVerifier(const StatusMap& statuses) {
@@ -150,6 +150,9 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     forward_payload_header: sec-istio-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-aud
+      claim_name: aud
     from_params:
     - jwta
     - jwtb
@@ -177,10 +180,12 @@ rules:
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{
       {"sec-istio-auth-userinfo", ""},
+      {"x-jwt-claim-aud", ""},
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-aud"));
 }
 
 // require alls that just ends
@@ -560,7 +565,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllAreOk) {
 TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowFailed) {
   TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   proto_config_.mutable_rules(0)
-      ->mutable_requires()
+      ->mutable_requires_()
       ->mutable_requires_any()
       ->add_requirements()
       ->mutable_allow_missing_or_failed();
@@ -579,7 +584,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowFailed) {
 TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowMissingButFailed) {
   TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   proto_config_.mutable_rules(0)
-      ->mutable_requires()
+      ->mutable_requires_()
       ->mutable_requires_any()
       ->add_requirements()
       ->mutable_allow_missing();
@@ -598,7 +603,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowMissingButFailed) {
 TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowMissingButUnknownIssuer) {
   TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   proto_config_.mutable_rules(0)
-      ->mutable_requires()
+      ->mutable_requires_()
       ->mutable_requires_any()
       ->add_requirements()
       ->mutable_allow_missing();

@@ -3,6 +3,8 @@
 #include <memory>
 
 #include "envoy/common/matchers.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Regex {
@@ -23,6 +25,37 @@ public:
 };
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;
+
+/**
+ * A regular expression engine which turns regular expressions into compiled matchers.
+ */
+class Engine {
+public:
+  virtual ~Engine() = default;
+
+  /**
+   * Create a @ref CompiledMatcher with the given regex expression.
+   * @param regex the regex expression match string
+   */
+  virtual CompiledMatcherPtr matcher(const std::string& regex) const PURE;
+};
+
+using EnginePtr = std::shared_ptr<Engine>;
+
+/**
+ * Factory for Engine.
+ */
+class EngineFactory : public Config::TypedFactory {
+public:
+  /**
+   * Creates an Engine from the provided config.
+   */
+  virtual EnginePtr
+  createEngine(const Protobuf::Message& config,
+               Server::Configuration::ServerFactoryContext& server_factory_context) PURE;
+
+  std::string category() const override { return "envoy.regex_engines"; }
+};
 
 } // namespace Regex
 } // namespace Envoy

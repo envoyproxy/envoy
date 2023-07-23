@@ -251,6 +251,15 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
   return parameters;
 }
 
+std::vector<spdlog::logger*> TestEnvironment::getSpdLoggersForTest() {
+  std::vector<spdlog::logger*> logger_parameters;
+  logger_parameters.push_back(&Logger::Registry::loggers()[0].getLogger());
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);
+  logger_parameters.push_back(flogger.load(std::memory_order_relaxed));
+  return logger_parameters;
+}
+
 Server::Options& TestEnvironment::getOptions() {
   static OptionsImpl* options = new OptionsImpl(
       argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
@@ -392,6 +401,8 @@ Json::ObjectSharedPtr TestEnvironment::jsonLoadFromString(const std::string& jso
   return Json::Factory::loadFromString(substitute(json, version));
 }
 
+// This function is not used for Envoy Mobile tests, and ::system() is not supported on iOS.
+#ifndef TARGET_OS_IOS
 void TestEnvironment::exec(const std::vector<std::string>& args) {
   std::stringstream cmd;
   // Symlinked args[0] can confuse Python when importing module relative, so we let Python know
@@ -406,6 +417,7 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false, "");
   }
 }
+#endif
 
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                       const std::string& contents,

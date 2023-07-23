@@ -35,6 +35,7 @@ ENVOY_RULE_REGEX = re.compile(r'envoy[_\w]+\(')
 PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_package".*?\)\n)', re.DOTALL)
 EXTENSION_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_extension_package".*?\)\n)', re.DOTALL)
 CONTRIB_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_contrib_package".*?\)\n)', re.DOTALL)
+MOBILE_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_mobile_package".*?\)\n)', re.DOTALL)
 
 # Match Buildozer 'print' output. Example of Buildozer print output:
 # cc_library json_transcoder_filter_lib [json_transcoder_filter.cc] (missing) (missing)
@@ -84,6 +85,10 @@ def fix_package_and_license(path, contents):
         regex_to_use = CONTRIB_PACKAGE_LOAD_BLOCK_REGEX
         package_string = 'envoy_contrib_package'
 
+    if 'mobile/' in path:
+        regex_to_use = MOBILE_PACKAGE_LOAD_BLOCK_REGEX
+        package_string = 'envoy_mobile_package'
+
     # Ensure we have an envoy_package import load if this is a real Envoy package. We also allow
     # the prefix to be overridden if envoy is included in a larger workspace.
     if re.search(ENVOY_RULE_REGEX, contents):
@@ -114,7 +119,7 @@ def buildifier_lint(contents):
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE)
     if r.returncode != 0:
-        raise EnvoyBuildFixerError('buildozer execution failed: %s' % r)
+        raise EnvoyBuildFixerError('buildifier execution failed: %s' % r)
     return r.stdout.decode('utf-8')
 
 

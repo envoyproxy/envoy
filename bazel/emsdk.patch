@@ -1,0 +1,48 @@
+diff --git a/bazel/emscripten_deps.bzl b/bazel/emscripten_deps.bzl
+index 95801ba..95fdabd 100644
+--- a/bazel/emscripten_deps.bzl
++++ b/bazel/emscripten_deps.bzl
+@@ -69,31 +69,3 @@ def emscripten_deps(emscripten_version = "latest"):
+             build_file = "@emsdk//emscripten_toolchain:emscripten.BUILD",
+             type = "zip",
+         )
+-
+-    if "emscripten_npm_linux" not in excludes:
+-        npm_install(
+-            name = "emscripten_npm_linux",
+-            package_json = "@emscripten_bin_linux//:emscripten/package.json",
+-            package_lock_json = "@emscripten_bin_linux//:emscripten/package-lock.json",
+-        )
+-
+-    if "emscripten_npm_mac" not in excludes:
+-        npm_install(
+-            name = "emscripten_npm_mac",
+-            package_json = "@emscripten_bin_mac//:emscripten/package.json",
+-            package_lock_json = "@emscripten_bin_mac//:emscripten/package-lock.json",
+-        )
+-
+-    if "emscripten_npm_mac_arm64" not in excludes:
+-        npm_install(
+-            name = "emscripten_npm_mac",
+-            package_json = "@emscripten_bin_mac_arm64//:emscripten/package.json",
+-            package_lock_json = "@emscripten_bin_mac_arm64//:emscripten/package-lock.json",
+-        )
+-
+-    if "emscripten_npm_win" not in excludes:
+-        npm_install(
+-            name = "emscripten_npm_win",
+-            package_json = "@emscripten_bin_win//:emscripten/package.json",
+-            package_lock_json = "@emscripten_bin_win//:emscripten/package-lock.json",
+-        )
+diff --git a/bazel/emscripten_toolchain/BUILD.bazel b/bazel/emscripten_toolchain/BUILD.bazel
+index eb36959..12dba37 100644
+--- a/bazel/emscripten_toolchain/BUILD.bazel
++++ b/bazel/emscripten_toolchain/BUILD.bazel
+@@ -13,7 +13,6 @@ filegroup(
+         "env.sh",
+         "env.bat",
+         "@emsdk//:binaries",
+-        "@emsdk//:node_modules",
+         "@nodejs//:node_files",
+     ],
+ )

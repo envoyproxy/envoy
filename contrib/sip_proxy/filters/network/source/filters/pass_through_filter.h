@@ -1,6 +1,5 @@
 #pragma once
 
-#include "absl/strings/string_view.h"
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
 
 namespace Envoy {

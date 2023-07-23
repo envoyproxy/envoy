@@ -18,9 +18,10 @@ won't affect the normal progress of client and server.
 
 .. warning::
 
-   The mysql_proxy filter was tested with MySQL v5.7. The filter may not work
-   with other versions of MySQL due to differences in the protocol implementation.
-   The filter won't work when client turns on ssl communication.
+   The mysql_proxy filter was originally tested with MySQL v5.7, although the filter may work
+   with other versions of MySQL also.
+
+   The filter won't work when client turns on SSL/TLS communication.
 
 .. _config_network_filters_mysql_proxy_config:
 

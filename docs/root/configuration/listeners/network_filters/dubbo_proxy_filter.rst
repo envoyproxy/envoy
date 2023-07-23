@@ -9,8 +9,8 @@ the metadata includes the basic request ID, request type, serialization type,
 and the required service name, method name, parameter name,
 and parameter value for routing.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.dubbo_proxy.v3.DubboProxy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.DubboProxy>`
-* This filter should be configured with the name *envoy.filters.network.dubbo_proxy*.
 
 .. _config_network_filters_dubbo_proxy_stats:
 
@@ -64,16 +64,17 @@ the second step is to add your configuration, configuration method refer to the 
         stat_prefix: dubbo_incomming_stats
         protocol_type: Dubbo
         serialization_type: Hessian2
-        route_config:
+        multiple_route_config:
           name: local_route
-          interface: org.apache.dubbo.demo.DemoService
-          routes:
-          - match:
-              method:
-                name:
-                  exact: sayHello
-            route:
-              cluster: user_service_dubbo_server
+          route_config:
+          - interface: org.apache.dubbo.demo.DemoService
+            routes:
+            - match:
+                method:
+                  name:
+                    exact: sayHello
+              route:
+                cluster: user_service_dubbo_server
         dubbo_filters:
         - name: envoy.filters.dubbo.testFilter
           typed_config:

@@ -12,6 +12,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 
 #include "gmock/gmock.h"
@@ -109,16 +110,17 @@ TEST(OpenCensusTracerTest, Span) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const std::string operation_name{"my_operation_1"};
-  SystemTime start_time;
+  SystemTime fake_system_time;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   {
-    Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
+    Tracing::SpanPtr span = driver->startSpan(config, request_headers, stream_info, operation_name,
                                               {Tracing::Reason::Sampling, true});
     span->setOperation("different_name");
     span->setTag("my_key", "my_value");
-    span->log(start_time, "my annotation");
+    span->log(fake_system_time, "my annotation");
     // injectContext is tested in another unit test.
-    Tracing::SpanPtr child = span->spawnChild(config, "child_span", start_time);
+    Tracing::SpanPtr child = span->spawnChild(config, "child_span", fake_system_time);
     child->finishSpan();
     span->setSampled(false); // Abandon tracer.
     span->finishSpan();
@@ -148,10 +150,9 @@ TEST(OpenCensusTracerTest, Span) {
     EXPECT_EQ(zeros, sd.parent_span_id());
     parent_span_id = sd.context().span_id();
 
-    ASSERT_EQ(3, sd.annotations().events().size());
+    ASSERT_EQ(2, sd.annotations().events().size());
     EXPECT_EQ("my annotation", sd.annotations().events()[0].event().description());
-    EXPECT_EQ("spawnChild", sd.annotations().events()[1].event().description());
-    EXPECT_EQ("setSampled", sd.annotations().events()[2].event().description());
+    EXPECT_EQ("setSampled", sd.annotations().events()[1].event().description());
     EXPECT_TRUE(sd.has_ended());
   }
 
@@ -212,12 +213,12 @@ void testIncomingHeaders(
   }
 
   const std::string operation_name{"my_operation_2"};
-  SystemTime start_time;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl injected_headers;
   {
-    Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
+    Tracing::SpanPtr span = driver->startSpan(config, request_headers, stream_info, operation_name,
                                               {Tracing::Reason::Sampling, false});
-    span->injectContext(injected_headers);
+    span->injectContext(injected_headers, nullptr);
     span->finishSpan();
 
     // Check contents via public API.

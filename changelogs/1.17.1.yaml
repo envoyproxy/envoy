@@ -1,0 +1,10 @@
+date: February 25, 2021
+
+bug_fixes:
+- area: jwt_authn
+  change: |
+    reject requests with a proper error if JWT has the wrong issuer when allow_missing is used. Before this change, the
+    requests are accepted.
+- area: overload
+  change: |
+    fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.

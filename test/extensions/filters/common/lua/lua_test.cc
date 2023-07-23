@@ -86,6 +86,24 @@ TEST_F(LuaTest, CoroutineRefCounting) {
   lua_gc(cr2->luaState(), LUA_GCCOLLECT, 0);
 }
 
+// Test that we don't crash when empty errors are used (see PR #15471)
+TEST_F(LuaTest, EmptyError) {
+  const std::string SCRIPT{R"EOF(
+    function callMe()
+      error()
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  const int callMeRef = state_->getGlobalRef(state_->registerGlobal("callMe", initializers_));
+  EXPECT_NE(LUA_REFNIL, callMeRef);
+  CoroutinePtr cr1(state_->createCoroutine());
+  EXPECT_THROW_WITH_REGEX(cr1->start(callMeRef, 0, yield_callback_), EnvoyException,
+                          "unspecified lua error");
+}
+
 // Basic yield/resume functionality.
 TEST_F(LuaTest, YieldAndResume) {
   const std::string SCRIPT{R"EOF(

@@ -62,8 +62,11 @@ envoy_cc_library(
         ":socket_interface",
         "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -102,6 +105,7 @@ envoy_cc_library(
         ":listener_filter_buffer_interface",
         ":transport_socket_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/config:extension_config_provider_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:host_description_interface",
         "//source/common/protobuf",
@@ -179,6 +183,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/ssl:connection_interface",
+        "//envoy/ssl:context_interface",
         "//envoy/stream_info:filter_state_interface",
     ],
 )
@@ -209,6 +214,7 @@ envoy_cc_library(
         "//envoy/common:resource_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/init:manager_interface",
+        "//envoy/server/overload:load_shed_point_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:interval_value",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

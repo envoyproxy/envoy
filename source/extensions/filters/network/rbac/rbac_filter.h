@@ -21,6 +21,13 @@ struct Result {
   std::string connection_termination_details_;
 };
 
+class ActionValidationVisitor : public Filters::Common::RBAC::ActionValidationVisitor {
+public:
+  absl::Status performDataInputValidation(
+      const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>& data_input,
+      absl::string_view type_url) override;
+};
+
 /**
  * Configuration for the RBAC network filter.
  */
@@ -28,6 +35,7 @@ class RoleBasedAccessControlFilterConfig {
 public:
   RoleBasedAccessControlFilterConfig(
       const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope,
+      Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
@@ -40,7 +48,7 @@ public:
            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
   }
 
-  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+  const Filters::Common::RBAC::RoleBasedAccessControlEngine*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
@@ -54,8 +62,9 @@ private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
   const std::string shadow_rules_stat_prefix_;
 
-  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
-  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  ActionValidationVisitor action_validation_visitor_;
+  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
+  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
   const envoy::extensions::filters::network::rbac::v3::RBAC::EnforcementType enforcement_type_;
 };
 

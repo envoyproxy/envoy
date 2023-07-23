@@ -45,8 +45,9 @@ public:
       response_timer_cb_ = timer_cb;
       return response_timer_;
     }));
-    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
+    load_stats_reporter_ =
+        std::make_unique<LoadStatsReporter>(local_info_, cm_, *stats_store_.rootScope(),
+                                            Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
   }
 
   void expectSendMessage(

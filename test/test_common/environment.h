@@ -63,6 +63,13 @@ public:
   static std::vector<Network::Address::IpVersion> getIpVersionsForTest();
 
   /**
+   * Return a vector of spdlog loggers as parameters to test. Tests are mainly
+   * for the behavior consistency between default loggers and fine-grained loggers.
+   * @return std::vector<spdlog::logger*>
+   */
+  static std::vector<spdlog::logger*> getSpdLoggersForTest();
+
+  /**
    * Tests can be run with Envoy Grpc and Google Grpc or Envoy Grpc alone by setting compiler option
    * `--define google_grpc=disabled`.
    * @return a vector of Grpc versions to test.
@@ -188,11 +195,14 @@ public:
   jsonLoadFromString(const std::string& json,
                      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
+#ifndef TARGET_OS_IOS
   /**
    * Execute a program under ::system. Any failure is fatal.
    * @param args program path and arguments.
    */
+
   static void exec(const std::vector<std::string>& args);
+#endif
 
   /**
    * Dumps the contents of the string into a temporary file from temporaryDirectory() + filename.

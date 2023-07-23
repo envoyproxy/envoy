@@ -21,28 +21,11 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // traffic.
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
-    const auto factories = Registry::FactoryRegistry<
-        Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
-    const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
-        NetworkFilterNames::get().EnvoyMobileHttpConnectionManager,
-        // A dedicated http_connection_manager fuzzer can be found in
-        // test/common/http/conn_manager_impl_fuzz_test.cc
-        NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
-        // TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
-        // NetworkFilterNames::get().TcpProxy,
-    };
-    // Check whether each filter is loaded into Envoy.
-    // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
-    // that does not exist will cause fatal errors.
-    for (auto& filter_name : supported_filter_names) {
-      if (factories.contains(filter_name)) {
-        filter_names.push_back(filter_name);
-      } else {
-        ENVOY_LOG_MISC(debug, "Filter name not found in the factory: {}", filter_name);
-      }
-    }
+    // Only use the names of the filters that are compiled into envoy. The build system takes care
+    // about reducing these to the allowed set.
+    // See test/extensions/filters/network/common/fuzz/BUILD for more information.
+    filter_names = Registry::FactoryRegistry<
+        Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
   }
   return filter_names;
 }
@@ -72,9 +55,9 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         })));
 
     ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
-            getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                                  Grpc::CacheOption) { return async_client_; }));
+            getOrCreateRawAsyncClient(_, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                                  bool) { return async_client_; }));
 
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(pipe_addr_);
@@ -102,9 +85,9 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         })));
 
     ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
-            getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                                  Grpc::CacheOption) { return async_client_; }));
+            getOrCreateRawAsyncClient(_, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                                  bool) { return async_client_; }));
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_

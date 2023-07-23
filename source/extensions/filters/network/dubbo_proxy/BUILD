@@ -46,6 +46,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/singleton:const_singleton",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -77,6 +78,7 @@ envoy_cc_library(
         ":serializer_interface",
         "//source/common/singleton:const_singleton",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -107,6 +109,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:config",
+        "//source/extensions/filters/network/dubbo_proxy/router:rds_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
         "//source/extensions/filters/network/dubbo_proxy/router:router_lib",
         "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",

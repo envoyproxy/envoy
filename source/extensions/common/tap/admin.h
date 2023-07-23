@@ -36,14 +36,14 @@ class AdminHandler : public Singleton::Instance,
                      public Extensions::Common::Tap::Sink,
                      Logger::Loggable<Logger::Id::tap> {
 public:
-  AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_dispatcher);
+  AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher);
   ~AdminHandler() override;
 
   /**
    * Get the singleton admin handler. The handler will be created if it doesn't already exist,
    * otherwise the existing handler will be returned.
    */
-  static AdminHandlerSharedPtr getSingleton(Server::Admin& admin,
+  static AdminHandlerSharedPtr getSingleton(OptRef<Server::Admin> admin,
                                             Singleton::Manager& singleton_manager,
                                             Event::Dispatcher& main_thread_dispatcher);
 
@@ -204,8 +204,8 @@ private:
     AdminHandler& parent_;
   };
 
-  Http::Code handler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                     Buffer::Instance& response, Server::AdminStream& admin_stream);
+  Http::Code handler(Http::HeaderMap& response_headers, Buffer::Instance& response,
+                     Server::AdminStream& admin_stream);
   Http::Code badRequest(Buffer::Instance& response, absl::string_view error);
 
   Server::Admin& admin_;

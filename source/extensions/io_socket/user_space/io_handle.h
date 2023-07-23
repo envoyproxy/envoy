@@ -1,12 +1,37 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
+
+// Shared state between peering user space IO handles.
+class PassthroughState {
+public:
+  virtual ~PassthroughState() = default;
+
+  /**
+   * Initialize the passthrough state from the downstream. This should be
+   * called at most once before `mergeInto`.
+   */
+  virtual void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                          const StreamInfo::FilterState::Objects& filter_state_objects) PURE;
+
+  /**
+   * Merge the passthrough state into a recipient stream metadata and its
+   * filter state. This should be called at most once after `initialize`.
+   */
+  virtual void mergeInto(envoy::config::core::v3::Metadata& metadata,
+                         StreamInfo::FilterState& filter_state) PURE;
+};
+
+using PassthroughStateSharedPtr = std::shared_ptr<PassthroughState>;
 
 /**
  * The interface for the peer as a writer and supplied read status query.
@@ -60,6 +85,11 @@ public:
    * @return true if the pending receive buffer is not empty or read_end is set.
    */
   virtual bool isReadable() const PURE;
+
+  /**
+   * @return shared state between peering user space IO handles.
+   */
+  virtual PassthroughStateSharedPtr passthroughState() PURE;
 };
 } // namespace UserSpace
 } // namespace IoSocket

@@ -24,6 +24,7 @@ namespace ThriftProxy {
   COUNTER(request_invalid_type)                                                                    \
   COUNTER(request_oneway)                                                                          \
   COUNTER(request_passthrough)                                                                     \
+  COUNTER(request_internal_error)                                                                  \
   COUNTER(response)                                                                                \
   COUNTER(response_decoding_error)                                                                 \
   COUNTER(response_error)                                                                          \

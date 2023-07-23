@@ -14,14 +14,12 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/logical_dns_cluster.h"
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/common.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
@@ -65,7 +63,29 @@ const std::string BasicConfig = R"EOF(
         cluster_refresh_rate: 4s
         cluster_refresh_timeout: 0.25s
   )EOF";
-}
+
+const std::string NoWarmupConfig = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  dns_lookup_family: V4_ONLY
+  wait_for_warm_on_init: false
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 22120
+  cluster_type:
+    name: envoy.clusters.redis
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        cluster_refresh_rate: 4s
+        cluster_refresh_timeout: 0.25s
+  )EOF";
+} // namespace
 
 static const int ResponseFlagSize = 11;
 static const int ResponseReplicaFlagSize = 4;
@@ -77,7 +97,7 @@ public:
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::Config&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
-         Stats::Scope&, const std::string&, const std::string&) override {
+         Stats::Scope&, const std::string&, const std::string&, bool) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};
@@ -86,7 +106,9 @@ public:
   MOCK_METHOD(Extensions::NetworkFilters::Common::Redis::Client::Client*, create_, (std::string));
 
 protected:
-  RedisClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {}
+  RedisClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {
+    ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+  }
 
   std::list<std::string> hostListToAddresses(const Upstream::HostVector& hosts) {
     std::list<std::string> addresses;
@@ -99,14 +121,13 @@ protected:
 
   void setupFromV3Yaml(const std::string& yaml) {
     expectRedisSessionCreated();
-    NiceMock<Upstream::MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
-    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
-        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                              : cluster_config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
+
+    Upstream::ClusterFactoryContextImpl cluster_factory_context(
+        server_context_, server_context_.cluster_manager_,
+        [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
+        ssl_context_manager_, std::move(outlier_event_logger), false);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
@@ -116,8 +137,7 @@ protected:
         cluster_config,
         TestUtility::downcastAndValidate<
             const envoy::extensions::clusters::redis::v3::RedisClusterConfig&>(config),
-        *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
-        cluster_callback_);
+        cluster_factory_context, *this, dns_resolver_, cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
@@ -128,14 +148,7 @@ protected:
   }
 
   void setupFactoryFromV3Yaml(const std::string& yaml) {
-    NiceMock<Upstream::MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
-    Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
-        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                              : cluster_config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
@@ -145,13 +158,12 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
     NiceMock<Envoy::Api::MockApi> api;
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_,
-        dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
-        std::move(outlier_event_logger), false, validation_visitor_, api, options_);
+        server_context_, server_context_.cluster_manager_,
+        [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
+        ssl_context_manager_, std::move(outlier_event_logger), false);
 
     RedisClusterFactory factory = RedisClusterFactory();
-    factory.createClusterWithConfig(cluster_config, config, cluster_factory_context,
-                                    factory_context, std::move(scope));
+    factory.createClusterWithConfig(cluster_config, config, cluster_factory_context);
   }
 
   void expectResolveDiscovery(Network::DnsLookupFamily dns_lookup_family,
@@ -169,7 +181,7 @@ protected:
   }
 
   void expectRedisSessionCreated() {
-    resolve_timer_ = new Event::MockTimer(&dispatcher_);
+    resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
     EXPECT_CALL(*resolve_timer_, disableTimer());
     ON_CALL(random_, random()).WillByDefault(Return(0));
   }
@@ -633,7 +645,7 @@ protected:
   }
 
   void exerciseStubs() {
-    EXPECT_CALL(dispatcher_, createTimer_(_));
+    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_));
     RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
     EXPECT_FALSE(discovery_session.enableHashtagging());
     EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));
@@ -643,7 +655,7 @@ protected:
         new NetworkFilters::Common::Redis::RespValue()};
     dummy_value->type(NetworkFilters::Common::Redis::RespType::Error);
     dummy_value->asString() = "dummy text";
-    EXPECT_TRUE(discovery_session.onRedirection(std::move(dummy_value), "dummy ip", false));
+    discovery_session.onRedirection(std::move(dummy_value), "dummy ip", false);
 
     RedisCluster::RedisDiscoveryClient discovery_client(discovery_session);
     EXPECT_NO_THROW(discovery_client.onAboveWriteBufferHighWatermark());
@@ -662,23 +674,18 @@ protected:
     EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   }
 
-  Stats::TestUtil::TestStore stats_store_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  Api::ApiPtr api_;
+
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
-  NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
-  Server::MockOptions options_;
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> hosts_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Event::MockTimer* interval_timer_{};
@@ -800,7 +807,7 @@ TEST_F(RedisClusterTest, AddressAsHostname) {
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
-  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(0U, cluster_->info()->configUpdateStats().update_failure_.value());
 
   // 2. Single slot with just the primary hostname
   expectRedisResolve(true);
@@ -811,7 +818,7 @@ TEST_F(RedisClusterTest, AddressAsHostname) {
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
   expectClusterSlotResponse(singleSlotPrimary("primary.com", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
-  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(0U, cluster_->info()->configUpdateStats().update_failure_.value());
 
   // 2. Single slot with just the primary IP address and replica hostname
   expectRedisResolve();
@@ -822,7 +829,7 @@ TEST_F(RedisClusterTest, AddressAsHostname) {
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.1.1", "replica.org", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
-  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(0U, cluster_->info()->configUpdateStats().update_failure_.value());
 }
 
 TEST_F(RedisClusterTest, AddressAsHostnameParallelResolution) {
@@ -854,7 +861,7 @@ TEST_F(RedisClusterTest, AddressAsHostnameParallelResolution) {
       "127.0.1.1:22120",
       "127.0.1.2:22120",
   }));
-  EXPECT_EQ(0U, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(0U, cluster_->info()->configUpdateStats().update_failure_.value());
 }
 
 TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
@@ -884,7 +891,7 @@ TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
-  EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(1UL, cluster_->info()->configUpdateStats().update_failure_.value());
 
   // 2. Primary resolution fails, so replica resolution is not even called.
   // Expect cluster slot update to be successful, with just one healthy host, and failure counter to
@@ -903,7 +910,23 @@ TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
   // healthy hosts is same as before, but failure count increases by 1
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2UL, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(2UL, cluster_->info()->configUpdateStats().update_failure_.value());
+}
+
+TEST_F(RedisClusterTest, DontWaitForDNSOnInit) {
+  setupFromV3Yaml(NoWarmupConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  // We should see cluster is initialized, even though redis cluster slot request fails.
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  expectClusterSlotFailure();
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_attempt_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
 }
 
 TEST_F(RedisClusterTest, AddressAsHostnamePartialReplicaFailure) {
@@ -938,7 +961,7 @@ TEST_F(RedisClusterTest, AddressAsHostnamePartialReplicaFailure) {
 }
 
 TEST_F(RedisClusterTest, EmptyDnsResponse) {
-  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&server_context_.dispatcher_);
   setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
@@ -949,7 +972,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_empty_.value());
 
   // Does not recreate the timer on subsequent DNS resolve calls.
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
@@ -958,11 +981,11 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2U, cluster_->info()->stats().update_empty_.value());
+  EXPECT_EQ(2U, cluster_->info()->configUpdateStats().update_empty_.value());
 }
 
 TEST_F(RedisClusterTest, FailedDnsResponse) {
-  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&server_context_.dispatcher_);
   setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
@@ -974,7 +997,7 @@ TEST_F(RedisClusterTest, FailedDnsResponse) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0U, cluster_->info()->stats().update_empty_.value());
+  EXPECT_EQ(0U, cluster_->info()->configUpdateStats().update_empty_.value());
 
   // Does not recreate the timer on subsequent DNS resolve calls.
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
@@ -983,7 +1006,7 @@ TEST_F(RedisClusterTest, FailedDnsResponse) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_empty_.value());
 }
 
 TEST_F(RedisClusterTest, Basic) {
@@ -1029,8 +1052,8 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
 
   // Initialization will wait til the redis cluster succeed.
   expectClusterSlotFailure();
-  EXPECT_EQ(1U, cluster_->info()->stats().update_attempt_.value());
-  EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_attempt_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
 
   expectRedisResolve(true);
   resolve_timer_->invokeCallback();
@@ -1045,8 +1068,8 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   resolve_timer_->invokeCallback();
   expectClusterSlotFailure();
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
-  EXPECT_EQ(3U, cluster_->info()->stats().update_attempt_.value());
-  EXPECT_EQ(2U, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(3U, cluster_->info()->configUpdateStats().update_attempt_.value());
+  EXPECT_EQ(2U, cluster_->info()->configUpdateStats().update_failure_.value());
 }
 
 TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
@@ -1101,8 +1124,8 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
 
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
   expectClusterSlotResponse(std::move(hello_world_response));
-  EXPECT_EQ(1U, cluster_->info()->stats().update_attempt_.value());
-  EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_attempt_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
 
   expectRedisResolve();
   resolve_timer_->invokeCallback();
@@ -1127,9 +1150,9 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
     }
     expectClusterSlotResponse(createResponse(flags, no_replica));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
-    EXPECT_EQ(++update_attempt, cluster_->info()->stats().update_attempt_.value());
+    EXPECT_EQ(++update_attempt, cluster_->info()->configUpdateStats().update_attempt_.value());
     if (!flags.all()) {
-      EXPECT_EQ(++update_failure, cluster_->info()->stats().update_failure_.value());
+      EXPECT_EQ(++update_failure, cluster_->info()->configUpdateStats().update_failure_.value());
     }
   }
 }
@@ -1164,9 +1187,9 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
     }
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
     expectClusterSlotResponse(createResponse(single_slot_primary, replica_flags));
-    EXPECT_EQ(++update_attempt, cluster_->info()->stats().update_attempt_.value());
+    EXPECT_EQ(++update_attempt, cluster_->info()->configUpdateStats().update_attempt_.value());
     if (!(replica_flags.all() || replica_flags.none())) {
-      EXPECT_EQ(++update_failure, cluster_->info()->stats().update_failure_.value());
+      EXPECT_EQ(++update_failure, cluster_->info()->configUpdateStats().update_failure_.value());
     }
   }
 }

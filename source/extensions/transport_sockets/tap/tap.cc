@@ -48,18 +48,35 @@ Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
 
 TapSocketFactory::TapSocketFactory(
     const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
-    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+    Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher,
-    Network::TransportSocketFactoryPtr&& transport_socket_factory)
+    Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
       PassthroughFactory(std::move(transport_socket_factory)) {}
 
-Network::TransportSocketPtr TapSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr options) const {
+Network::TransportSocketPtr
+TapSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                                        Upstream::HostDescriptionConstSharedPtr host) const {
+  return std::make_unique<TapSocket>(
+      currentConfigHelper<SocketTapConfig>(),
+      transport_socket_factory_->createTransportSocket(options, host));
+}
+
+DownstreamTapSocketFactory::DownstreamTapSocketFactory(
+    const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
+    Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
+    Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+    Event::Dispatcher& main_thread_dispatcher,
+    Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
+    : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
+                          singleton_manager, tls, main_thread_dispatcher),
+      DownstreamPassthroughFactory(std::move(transport_socket_factory)) {}
+
+Network::TransportSocketPtr DownstreamTapSocketFactory::createDownstreamTransportSocket() const {
   return std::make_unique<TapSocket>(currentConfigHelper<SocketTapConfig>(),
-                                     transport_socket_factory_->createTransportSocket(options));
+                                     transport_socket_factory_->createDownstreamTransportSocket());
 }
 
 } // namespace Tap

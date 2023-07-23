@@ -8,6 +8,10 @@ load(
     "envoy_package",
     "envoy_pch_library",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -20,6 +24,8 @@ envoy_cc_library(
     external_deps = [
         "abseil_base",
         "abseil_synchronization",
+        "abseil_stacktrace",
+        "abseil_symbolize",
     ],
     deps = [":minimal_logger_lib"],
 )
@@ -123,7 +129,10 @@ envoy_basic_cc_library(
         "abseil_strings",
         "fmtlib",
     ],
-    deps = ["//envoy/common:base_includes"],
+    deps = [
+        "//envoy/common:base_includes",
+        "@com_google_absl//absl/status",
+    ],
 )
 
 envoy_cc_library(
@@ -161,6 +170,7 @@ envoy_cc_library(
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
+        "//source/common/config:ttl_lib",
         "@com_github_google_quiche//:quiche_common_lib",
     ],
 )
@@ -187,11 +197,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "minimal_logger_lib",
     srcs = [
-        "fancy_logger.cc",
+        "fine_grain_logger.cc",
         "logger.cc",
     ],
     hdrs = [
-        "fancy_logger.h",
+        "fine_grain_logger.h",
         "json_escape_string.h",
         "logger.h",
     ],
@@ -201,6 +211,7 @@ envoy_cc_library(
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
+        "//source/common/protobuf:protobuf",
     ] + select({
         "//bazel:android_logger": ["logger_impl_lib_android"],
         "//conditions:default": ["logger_impl_lib_standard"],
@@ -211,6 +222,9 @@ envoy_cc_library(
     name = "base_logger_lib",
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
+    external_deps = [
+        "spdlog",
+    ],
 )
 
 envoy_cc_library(
@@ -327,12 +341,15 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//envoy/common:regex_interface",
+        "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
         "@com_googlesource_code_re2//:re2",
+        "@envoy_api//envoy/extensions/regex_engines/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -443,6 +460,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "packed_struct_lib",
+    hdrs = ["packed_struct.h"],
+    deps = [
+        ":assert_lib",
+        ":utility_lib",
+        "//source/common/protobuf:utility_lib_header",
+    ],
+)
+
+envoy_cc_library(
     name = "callback_impl_lib",
     srcs = ["callback_impl.cc"],
     hdrs = ["callback_impl.h"],
@@ -482,6 +509,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "scalar_to_byte_vector_lib",
     hdrs = ["scalar_to_byte_vector.h"],
+)
+
+envoy_cc_library(
+    name = "bit_array_lib",
+    hdrs = ["bit_array.h"],
+    deps = [
+        ":safe_memcpy_lib",
+    ],
 )
 
 envoy_cc_library(

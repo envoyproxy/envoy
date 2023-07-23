@@ -54,29 +54,30 @@ public:
 class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD(GrpcAccessLoggerSharedPtr, getOrCreateLogger,
-              (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type));
+  MOCK_METHOD(
+      GrpcAccessLoggerSharedPtr, getOrCreateLogger,
+      (const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+           config,
+       Common::GrpcAccessLoggerType logger_type));
 };
 
 class AccessLogTest : public testing::Test {
 public:
   AccessLogPtr makeAccessLog(const AnyValue& body_config, const KeyValueList& attributes_config) {
-    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _, _)).WillByDefault(Return(true));
     *config_.mutable_body() = body_config;
     *config_.mutable_attributes() = attributes_config;
     config_.mutable_common_config()->set_log_name("test_log");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
     EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
-        .WillOnce(
-            [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
-                       config,
-                   Common::GrpcAccessLoggerType logger_type) {
-              EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
-              EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
-              return logger_;
-            });
+        .WillOnce([this](const envoy::extensions::access_loggers::open_telemetry::v3::
+                             OpenTelemetryAccessLogConfig& config,
+                         Common::GrpcAccessLoggerType logger_type) {
+          EXPECT_EQ(config.DebugString(), config_.DebugString());
+          EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
+          return logger_;
+        });
     return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_);
   }
 
@@ -144,7 +145,8 @@ TEST_F(AccessLogTest, Marshalling) {
           value:
             string_value: "10"
     )EOF");
-  access_log->log(&request_headers, &response_headers, nullptr, stream_info);
+  access_log->log(&request_headers, &response_headers, nullptr, stream_info,
+                  Envoy::AccessLog::AccessLogType::NotSet);
 }
 
 // Test log with empty config.
@@ -158,7 +160,8 @@ TEST_F(AccessLogTest, EmptyConfig) {
   expectLog(R"EOF(
       time_unix_nano: 3600000000000
     )EOF");
-  access_log->log(&request_headers, &response_headers, nullptr, stream_info);
+  access_log->log(&request_headers, &response_headers, nullptr, stream_info,
+                  Envoy::AccessLog::AccessLogType::NotSet);
 }
 
 } // namespace

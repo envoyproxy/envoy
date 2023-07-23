@@ -18,6 +18,35 @@ correctly.
 Note that it is recommended to disable VSCode Microsoft C/C++ extension and use `vscode-clangd` instead for
 C/C++ code completion.
 
+For developers in China, you might need to set `http_proxy`, `https_proxy`, `all_proxy` in advance.
+
+### Tips for proxmox users
+
+If you see the following error message:
+```
+ERROR: /workspaces/envoy/contrib/hyperscan/matching/input_matchers/source/BUILD:21:12: Foreign Cc - CMake: Building hyperscan failed: (Exit 1): bash failed: error executing command /bin/bash -c bazel-out/k8-fastbuild/bin/contrib/hyperscan/matching/input_matchers/source/hyperscan_foreign_cc/wrapper_build_script.sh
+
+......
+
+-- Performing Test HAVE_SSSE3
+-- Performing Test HAVE_SSSE3 - Failed
+-- Performing Test HAVE_AVX2
+-- Performing Test HAVE_AVX2 - Failed
+-- Performing Test HAVE_AVX512
+-- Performing Test HAVE_AVX512 - Failed
+-- Building without AVX2 support
+-- Building without AVX512 support
+CMake Error at cmake/arch.cmake:108 (message):
+  A minimum of SSSE3 compiler support is required
+
+......
+```
+Please check the cpu info of your virtual machine (e.g., ssse3):
+
+`cat /proc/cpuinfo | grep ssse3`
+
+If there is no output from this command, change the default cpu type `kvm64` to `max`.
+
 ## Generate debug config
 
 `tools/vscode/generate_debug_config.py` is a script to generate VSCode debug config in `.vscode/launch.json`.

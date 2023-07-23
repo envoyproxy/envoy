@@ -40,6 +40,8 @@ default_socket_interface: "envoy.extensions.network.socket_interface.default_soc
           descriptors: [{"key": "foo", "value": "bar"}]
       filters:
         name: envoy.filters.network.echo
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
       )EOF");
   }
 };
@@ -77,8 +79,9 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
           Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v4),
           lookupPort("listener_0"), sock_interface);
 
-  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr);
+  client_ =
+      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                          Network::Test::createRawBufferSocket(), nullptr, nullptr);
 
   client_->addConnectionCallbacks(connect_callbacks_);
   client_->connect();
@@ -99,11 +102,12 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   const Network::SocketInterface* sock_interface = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
-      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", "endpoint_id_0",
+                                                                sock_interface);
 
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
-                   Network::Test::createRawBufferSocket(), nullptr),
+                   Network::Test::createRawBufferSocket(), nullptr, nullptr),
                "" /* Nullptr dereference */);
 }
 
@@ -115,7 +119,8 @@ TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInter
   const Network::SocketInterface* sock_interface = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
-      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", "endpoint_id_0",
+                                                                sock_interface);
 
   ASSERT_DEATH(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address,
                                                      nullptr, Network::SocketCreationOptions{}),
@@ -129,7 +134,8 @@ TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterfa
   const Network::SocketInterface* sock_interface = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr peer_internal_address =
-      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", "endpoint_id_0",
+                                                                sock_interface);
   Network::Address::InstanceConstSharedPtr local_valid_address =
       Network::Test::getCanonicalLoopbackAddress(version_);
 

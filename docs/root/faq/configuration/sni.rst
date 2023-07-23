@@ -69,11 +69,11 @@ The following is a YAML example of the above requirement.
 How do I configure SNI for clusters?
 ====================================
 
-For clusters, a fixed SNI can be set in :ref:`UpstreamTlsContext <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>`.
+For clusters, a fixed SNI can be set in :ref:`sni <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>`.
 To derive SNI from a downstream HTTP header like, ``host`` or ``:authority``, turn on
 :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>` to override the fixed SNI in
-`UpstreamTlsContext`. A custom header other than the ``host`` or ``:authority`` can also be supplied using the optional
+:ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`. A custom header other than the ``host`` or ``:authority`` can also be supplied using the optional
 :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>` field.
 If upstream will present certificates with the hostname in SAN, turn on
 :ref:`auto_san_validation <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_san_validation>` too.
-It still needs a trust CA in validation context in ``UpstreamTlsContext`` for trust anchor.
+It still needs a trust CA in validation context in :ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>` for trust anchor.

@@ -237,7 +237,6 @@ static_resources {
   }
 }
 admin {
-  access_log_path: "/tmp/admin_access.lss"
   address {
     pipe {
       path: "*"

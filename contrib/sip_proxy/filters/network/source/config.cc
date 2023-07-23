@@ -1,12 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/config.h"
 
-#include <string>
-
-#include "envoy/network/connection.h"
-#include "envoy/registry/registry.h"
-
-#include "source/common/config/utility.h"
-
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.validate.h"

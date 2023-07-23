@@ -67,6 +67,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "access_log_integration_test",
+    size = "large",
     srcs = ["access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [

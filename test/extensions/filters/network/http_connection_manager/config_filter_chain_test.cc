@@ -47,13 +47,13 @@ http_filters:
 TEST_F(FilterChainTest, CreateFilterChain) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(basic_config_), context_,
                                      date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
 
-  Http::MockFilterChainFactoryCallbacks callbacks;
-  EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-  config.createFilterChain(callbacks);
+  NiceMock<Http::MockFilterChainManager> manager;
+  EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
+  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
+  config.createFilterChain(manager);
 }
 
 TEST_F(FilterChainTest, CreateDynamicFilterChain) {
@@ -85,20 +85,21 @@ http_filters:
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
+  // Force a simulated time system.
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
 
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainManager> manager;
   Http::StreamDecoderFilterSharedPtr missing_config_filter;
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(_))
+  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_))
       .Times(2)
       .WillOnce(testing::SaveArg<0>(&missing_config_filter))
       .WillOnce(Return()); // MissingConfigFilter (only once) and router
-  config.createFilterChain(callbacks);
+  config.createFilterChain(manager);
 
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
   EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _))
@@ -114,27 +115,27 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(
+      hcm_config, context_, date_provider_, route_config_provider_manager_,
+      scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_);
 
-  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  NiceMock<Http::MockFilterChainManager> manager;
+  ;
   // Check the case where WebSockets are configured in the HCM, and no router
   // config is present. We should create an upgrade filter chain for
   // WebSockets.
   {
-    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks));
+    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager));
   }
 
   // Check the case where WebSockets are configured in the HCM, and no router
   // config is present. We should not create an upgrade filter chain for Foo
   {
-    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(0);
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(0);
-    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, callbacks));
+    EXPECT_CALL(manager.callbacks_, addStreamFilter(_)).Times(0);
+    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)).Times(0);
+    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, manager));
   }
 
   // Now override the HCM with a route-specific disabling of WebSocket to
@@ -142,17 +143,17 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", false));
-    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager));
   }
 
   // For paranoia's sake make sure route-specific enabling doesn't break
   // anything.
   {
-    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager));
   }
 }
 
@@ -162,27 +163,27 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
   hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(
+      hcm_config, context_, date_provider_, route_config_provider_manager_,
+      scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_);
 
-  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  NiceMock<Http::MockFilterChainManager> manager;
+  ;
   // Check the case where WebSockets are off in the HCM, and no router config is present.
-  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks)); }
+  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager)); }
 
   // Check the case where WebSockets are off in the HCM and in router config.
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", false));
-    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager));
   }
 
   // With a route-specific enabling for WebSocket, WebSocket should work.
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager));
   }
 
   // With only a route-config we should do what the route config says.
@@ -190,9 +191,9 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("foo", true));
     upgrade_map.emplace(std::make_pair("bar", false));
-    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, callbacks));
-    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, callbacks));
-    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, manager));
+    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, manager));
+    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, manager));
   }
 }
 
@@ -217,29 +218,28 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
                                              "\x19"
                                              "envoy.filters.http.router");
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
+  HttpConnectionManagerConfig config(
+      hcm_config, context_, date_provider_, route_config_provider_manager_,
+      scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_);
 
   {
-    Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-    config.createFilterChain(callbacks);
+    NiceMock<Http::MockFilterChainManager> manager;
+    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
+    config.createFilterChain(manager);
   }
 
   {
-    Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
-    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, callbacks));
+    NiceMock<Http::MockFilterChainManager> manager;
+    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_));
+    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, manager));
   }
 
   {
-    Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
-    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Buffer
-    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
+    NiceMock<Http::MockFilterChainManager> manager;
+    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_));
+    EXPECT_CALL(manager.callbacks_, addStreamFilter(_)).Times(2); // Buffer
+    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, manager));
   }
 }
 
@@ -262,10 +262,9 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
                                              "encoder-decoder-buffer-filter");
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
       EnvoyException,
       "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
       "must be the last filter in a http upgrade filter chain.");
@@ -277,10 +276,9 @@ TEST_F(FilterChainTest, InvalidConfig) {
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
       EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
 }
 

@@ -14,7 +14,9 @@ static_resources {
     lb_policy: RING_HASH
     alt_stat_name: "t"
     close_connections_on_host_health_failure: true
-    track_timeout_budgets: true
+    track_cluster_stats {
+      timeout_budgets: true
+    }
   }
   clusters {
     name: "servi|e_gogole"

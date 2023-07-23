@@ -44,6 +44,9 @@ void Coroutine::resume(int num_args, const std::function<void()>& yield_callback
   } else {
     state_ = State::Finished;
     const char* error = lua_tostring(coroutine_state_.get(), -1);
+    if (!error) {
+      error = "unspecified lua error";
+    }
     throw LuaException(error);
   }
 }

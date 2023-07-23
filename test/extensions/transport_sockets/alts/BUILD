@@ -72,6 +72,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "alts_integration_test",
+    size = "large",
     srcs = envoy_select_google_grpc(["alts_integration_test.cc"]),
     extension_names = ["envoy.transport_sockets.alts"],
     external_deps = [

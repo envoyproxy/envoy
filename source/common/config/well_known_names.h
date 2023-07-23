@@ -47,6 +47,8 @@ public:
   const std::string CANARY = "canary";
   // Key in envoy.lb filter namespace for the key to use to hash an endpoint.
   const std::string HASH_KEY = "hash_key";
+  // Key in envoy.lb filter namespace for providing fallback metadata
+  const std::string FALLBACK_LIST = "fallback_list";
 };
 
 using MetadataEnvoyLbKeys = ConstSingleton<MetadataEnvoyLbKeyValues>;
@@ -70,6 +72,7 @@ public:
     const std::string name_;
     const std::string regex_;
     const std::string substr_;
+    const std::string negative_match_; // A value that will not match as the extracted tag value.
     const Regex::Type re_type_;
   };
 
@@ -88,6 +91,12 @@ public:
   const std::string HTTP_USER_AGENT = "envoy.http_user_agent";
   // SSL cipher for a connection
   const std::string SSL_CIPHER = "envoy.ssl_cipher";
+  // SSL curve for a connection
+  const std::string SSL_CURVE = "envoy.ssl_curve";
+  // SSL signature algorithm for a connection
+  const std::string SSL_SIGALG = "envoy.ssl_sigalg";
+  // SSL version for a connection
+  const std::string SSL_VERSION = "envoy.ssl_version";
   // SSL cipher suite
   const std::string SSL_CIPHER_SUITE = "cipher_suite";
   // Stats prefix for the Client SSL Auth network filter
@@ -102,6 +111,12 @@ public:
   const std::string MONGO_CALLSITE = "envoy.mongo_callsite";
   // Stats prefix for the Ratelimit network filter
   const std::string RATELIMIT_PREFIX = "envoy.ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit network filter
+  const std::string LOCAL_HTTP_RATELIMIT_PREFIX = "envoy.local_http_ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit network filter
+  const std::string LOCAL_NETWORK_RATELIMIT_PREFIX = "envoy.local_network_ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit listener filter
+  const std::string LOCAL_LISTENER_RATELIMIT_PREFIX = "envoy.local_listener_ratelimit_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
   // Stats prefix for the UDP Proxy network filter
@@ -128,8 +143,16 @@ public:
   const std::string RESPONSE_CODE_CLASS = "envoy.response_code_class";
   // Route config name for RDS updates
   const std::string RDS_ROUTE_CONFIG = "envoy.rds_route_config";
+  // Request route given by the Router http filter
+  const std::string ROUTE = "envoy.route";
+  // Stats prefix for the ext_authz HTTP filter
+  const std::string EXT_AUTHZ_PREFIX = "envoy.ext_authz_prefix";
   // Listener manager worker id
   const std::string WORKER_ID = "envoy.worker_id";
+  // Stats prefix for the Thrift Proxy network filter
+  const std::string THRIFT_PREFIX = "envoy.thrift_prefix";
+  // Stats prefix for the Redis Proxy network filter
+  const std::string REDIS_PREFIX = "envoy.redis_prefix";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;
@@ -143,7 +166,8 @@ public:
   }
 
 private:
-  void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "");
+  void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "",
+              const std::string& negative_matching_value = "");
 
   // See class doc for TagExtractorTokensImpl in
   // source/common/stats/tag_extractor_impl.h for details on the format of
@@ -158,6 +182,18 @@ private:
 };
 
 using TagNames = ConstSingleton<TagNameValues>;
+
+// This class holds extension points which will always be built into Envoy in
+// server mode, but may be excluded from Envoy Mobile.
+class ServerBuiltInExtensionValues {
+public:
+  // Extension point for the default listener.
+  const std::string DEFAULT_LISTENER = "envoy.listener_manager_impl.default";
+  // Extension point for the validation listener
+  const std::string VALIDATION_LISTENER = "envoy.listener_manager_impl.validation";
+};
+
+using ServerExtensionValues = ConstSingleton<ServerBuiltInExtensionValues>;
 
 } // namespace Config
 } // namespace Envoy

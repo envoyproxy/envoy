@@ -43,5 +43,9 @@ configured via the :ref:`stateful_formatter
 <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.HeaderKeyFormat.stateful_formatter>` field.
 The following is an example configuration which will preserve HTTP/1 header case across the proxy.
 
+.. note::
+
+   When Stateful formatters are used, headers added internally by Envoy or by filters (e.g. the Lua filter) will still be lowercased.
+
 .. literalinclude:: _include/preserve-case.yaml
     :language: yaml

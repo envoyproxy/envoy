@@ -35,12 +35,12 @@ public:
       bootstrap.mutable_dynamic_resources()
           ->mutable_cds_config()
           ->mutable_path_config_source()
-          ->set_path(cds_helper_.cds_path());
+          ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
 
       const std::string filter =
           fmt::format(R"EOF(
-name: envoy.filters.http.dynamic_forward_proxy
+name: envoy.filters.network.sni_dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
@@ -88,7 +88,7 @@ typed_config:
   void createUpstreams() override {
     addFakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        Http::CodecType::HTTP1);
+        Http::CodecType::HTTP1, /*autonomous_upstream=*/false);
   }
 
   Network::ClientConnectionPtr
@@ -100,7 +100,7 @@ typed_config:
         Ssl::createClientSslTransportSocketFactory(options, context_manager_, *api_);
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
-        client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+        client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
   }
 
   std::string upstream_cert_name_{"server"};

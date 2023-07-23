@@ -23,7 +23,7 @@ public:
 
 protected:
   // Queue up an action with the AsyncFileManager.
-  std::function<void()> enqueue(std::shared_ptr<AsyncFileAction> action);
+  CancelFunction enqueue(std::shared_ptr<AsyncFileAction> action);
 
   explicit AsyncFileContextBase(AsyncFileManager& manager);
 

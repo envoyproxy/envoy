@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
@@ -55,11 +56,15 @@ public:
   bool flushOnAdmin() const override { return flush_on_admin_; }
 
   void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
+  bool enableDeferredCreationStats() const override {
+    return deferred_stat_options_.enable_deferred_creation_stats();
+  }
 
 private:
   std::list<Stats::SinkPtr> sinks_;
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
+  const envoy::config::bootstrap::v3::Bootstrap::DeferredStatOptions deferred_stat_options_;
 };
 
 /**
@@ -72,7 +77,7 @@ public:
    * exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::FilterManager& filter_manager,
-                               const std::vector<Network::FilterFactoryCb>& factories);
+                               const Filter::NetworkFilterFactoriesList& factories);
 
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
@@ -81,7 +86,7 @@ public:
    * TODO(sumukhs): Coalesce with the above as they are very similar
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                               const std::vector<Network::ListenerFilterFactoryCb>& factories);
+                               const Filter::ListenerFilterFactoriesList& factories);
 
   /**
    * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain

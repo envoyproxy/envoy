@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/network/listener.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/thread_local/thread_local_object.h"
 
 namespace Envoy {
@@ -24,10 +24,15 @@ public:
     if (manager_ == nullptr) {
       // The internal listener manager is published to this registry when the first internal
       // listener is added through LDS. Return null prior to this moment.
-      return Network::InternalListenerManagerOptRef();
+      return {};
     }
-    return Network::InternalListenerManagerOptRef(*manager_);
+    return {*manager_};
   }
+
+  Network::InternalListenerPtr
+  createActiveInternalListener(Network::ConnectionHandler& conn_handler,
+                               Network::ListenerConfig& config,
+                               Event::Dispatcher& dispatcher) override;
 
 private:
   // The typical instance is the ``ConnectionHandlerImpl`` on the same thread.

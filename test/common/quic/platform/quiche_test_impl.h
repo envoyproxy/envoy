@@ -10,12 +10,13 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/flags/reflection.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/common/platform/api/quiche_flags.h"
 
-// TODO(mpwarres): implement once QUICHE flag mechanism is defined.
-class QuicheFlagSaverImpl {};
+using QuicheFlagSaverImpl = absl::FlagSaver;
 
 // No special setup needed for tests to use threads.
 class ScopedEnvironmentForThreadsImpl {};
@@ -27,8 +28,8 @@ inline std::string QuicheGetTestMemoryCachePathImpl() { // NOLINT(readability-id
 namespace quiche {
 namespace test {
 
-using QuicheTest = ::testing::Test;
-using QuicTestImpl = QuicheTest;
+using QuicheTestImpl = ::testing::Test;
+using QuicTestImpl = QuicheTestImpl;
 
 template <class T> using QuicheTestWithParamImpl = ::testing::TestWithParam<T>;
 template <class T> using QuicTestWithParamImpl = QuicheTestWithParamImpl<T>;

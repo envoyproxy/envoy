@@ -205,6 +205,72 @@ class IntegrationTest(unittest.TestCase):
         self.assertTrue(other_partition.topic not in consumer.topics())
         consumer.close(False)
 
+    def test_consumer_stateful_proxy(self):
+        """
+        This test verifies that consumer can receive messages through the mesh filter.
+        We are going to have messages in two topics: 'aaaconsumer' and 'bbbconsumer'.
+        The mesh filter is configured to process fetch requests for topics starting with 'a' (like 'aaaconsumer')
+        by consuming from the first cluster, and the ones starting with 'b' (so 'bbbconsumer') from the second one.
+        So in the end our consumers that point at Envoy should receive records from matching upstream Kafka clusters.
+        """
+
+        # Put the messages into upstream Kafka clusters.
+        partition1 = TopicPartition('aaaconsumer', 0)
+        count1 = 20
+        partition2 = TopicPartition('bbbconsumer', 0)
+        count2 = 30
+        self.__put_messages_into_upstream_kafka(
+            IntegrationTest.kafka_cluster1_address(), partition1, count1)
+        self.__put_messages_into_upstream_kafka(
+            IntegrationTest.kafka_cluster2_address(), partition2, count2)
+
+        # Create Kafka consumers that point at Envoy.
+        consumer1 = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_envoy_address())
+        consumer1.assign([partition1])
+        consumer2 = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_envoy_address())
+        consumer2.assign([partition2])
+
+        # Have the consumers receive the messages from Kafka clusters through Envoy.
+        received1 = []
+        received2 = []
+        while (len(received1) < count1):
+            poll_result = consumer1.poll(timeout_ms=5000)
+            for records in poll_result.values():
+                received1 += records
+        while (len(received2) < count2):
+            poll_result = consumer2.poll(timeout_ms=5000)
+            for records in poll_result.values():
+                received2 += records
+
+        # Verify that the messages sent have been received.
+        self.assertTrue(len(received1) == count1)
+        self.assertTrue(len(received2) == count2)
+
+        # Cleanup
+        consumer1.close(False)
+        consumer2.close(False)
+
+    def __put_messages_into_upstream_kafka(self, bootstrap_servers, partition, count):
+        """
+        Helper method for putting messages into Kafka directly.
+        """
+        producer = KafkaProducer(bootstrap_servers=bootstrap_servers)
+
+        futures = []
+        for _ in range(count):
+            message = Message()
+            future = producer.send(
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition.topic,
+                partition=partition.partition)
+            futures.append(future)
+        for future in futures:
+            offset = future.get().offset
+            print('Saved message at offset %s' % (offset))
+        producer.close(True)
+
 
 class MetricsHolder:
     """

@@ -23,7 +23,7 @@ public:
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void removeConnectionCallbacks(ConnectionCallbacks& cb) override;
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   uint64_t id() const override { return id_; }
   void hashKey(std::vector<uint8_t>& hash) const override;
   void setConnectionStats(const ConnectionStats& stats) override;
@@ -37,6 +37,16 @@ protected:
   void raiseConnectionEvent(ConnectionEvent event);
 
   virtual void closeConnectionImmediately() PURE;
+
+  void closeConnectionImmediatelyWithDetails(absl::string_view local_close_details) {
+    setLocalCloseReason(local_close_details);
+    closeConnectionImmediately();
+  }
+
+  absl::string_view localCloseReason() const override { return local_close_reason_; }
+  void setLocalCloseReason(absl::string_view local_close_reason) {
+    local_close_reason_ = std::string(local_close_reason);
+  }
 
   // States associated with delayed closing of the connection (i.e., when the underlying socket is
   // not immediately close()d as a result of a ConnectionImpl::close()).
@@ -55,6 +65,8 @@ protected:
 
   Event::TimerPtr delayed_close_timer_;
   std::chrono::milliseconds delayed_close_timeout_{0};
+  // Should be set with setLocalCloseReason.
+  std::string local_close_reason_;
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;

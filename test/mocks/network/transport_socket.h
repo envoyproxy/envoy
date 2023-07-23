@@ -7,6 +7,8 @@
 
 #include "envoy/network/transport_socket.h"
 
+#include "source/common/network/listen_socket_impl.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -21,6 +23,7 @@ public:
   MOCK_METHOD(std::string, protocol, (), (const));
   MOCK_METHOD(absl::string_view, failureReason, (), (const));
   MOCK_METHOD(bool, canFlushClose, ());
+  MOCK_METHOD(Api::SysCallIntResult, connect, (Network::ConnectionSocket & socket));
   MOCK_METHOD(void, closeSocket, (Network::ConnectionEvent event));
   MOCK_METHOD(IoResult, doRead, (Buffer::Instance & buffer));
   MOCK_METHOD(IoResult, doWrite, (Buffer::Instance & buffer, bool end_stream));
@@ -33,7 +36,7 @@ public:
   TransportSocketCallbacks* callbacks_{};
 };
 
-class MockTransportSocketFactory : public TransportSocketFactory {
+class MockTransportSocketFactory : public UpstreamTransportSocketFactory {
 public:
   MockTransportSocketFactory();
   ~MockTransportSocketFactory() override;
@@ -41,10 +44,25 @@ public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, supportsAlpn, (), (const));
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
-  MOCK_METHOD(TransportSocketPtr, createTransportSocket, (TransportSocketOptionsConstSharedPtr),
+  MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
+  MOCK_METHOD(OptRef<const Ssl::ClientContextConfig>, clientContextConfig, (), (const));
+  MOCK_METHOD(std::shared_ptr<quic::QuicCryptoClientConfig>, getCryptoConfig, ());
+
+  MOCK_METHOD(TransportSocketPtr, createTransportSocket,
+              (TransportSocketOptionsConstSharedPtr,
+               std::shared_ptr<const Upstream::HostDescription>),
               (const));
   MOCK_METHOD(void, hashKey,
               (std::vector<uint8_t> & key, TransportSocketOptionsConstSharedPtr options), (const));
+};
+
+class MockDownstreamTransportSocketFactory : public DownstreamTransportSocketFactory {
+public:
+  MockDownstreamTransportSocketFactory();
+  ~MockDownstreamTransportSocketFactory() override;
+
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(TransportSocketPtr, createDownstreamTransportSocket, (), (const));
 };
 
 } // namespace Network

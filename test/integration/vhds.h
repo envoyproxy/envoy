@@ -96,7 +96,7 @@ static_resources:
                                                   Platform::null_device_path));
 }
 
-const char VhostTemplate[] = R"EOF(
+constexpr absl::string_view VhostTemplate = R"EOF(
 name: {}
 domains: [{}]
 routes:
@@ -143,9 +143,8 @@ class VhdsIntegrationTest : public HttpIntegrationTest,
 public:
   VhdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
-    if (isUnified()) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      isUnified() ? "true" : "false");
   }
 
   void TearDown() override { cleanUpXdsConnection(); }

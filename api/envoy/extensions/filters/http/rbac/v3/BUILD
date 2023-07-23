@@ -8,5 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/config/rbac/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_udpa//xds/annotations/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
     ],
 )

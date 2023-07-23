@@ -52,8 +52,8 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
-        dispatcher_(api_->allocateDispatcher("test_thread")), scope_(stats_store_),
+      : api_(Api::createApiForTest(stats_store_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), scope_(stats_store_.rootScope()),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         stat_names_(scope_->symbolTable()) {
 
@@ -75,7 +75,7 @@ public:
 
   envoy::config::core::v3::GrpcService config_;
   DangerousDeprecatedTestTime test_time_;
-  Stats::IsolatedStoreImpl* stats_store_; // Ownership transferred to scope_.
+  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Stats::ScopeSharedPtr scope_;
@@ -169,7 +169,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
-  EXPECT_CALL(*child_span, injectContext(_));
+  EXPECT_CALL(*child_span, injectContext(_, _));
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
                                           active_span, Http::AsyncClient::RequestOptions());

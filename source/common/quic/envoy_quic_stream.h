@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -78,16 +80,18 @@ public:
     removeCallbacksHelper(callbacks);
   }
   uint32_t bufferLimit() const override { return send_buffer_simulation_.highWatermark(); }
-  const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-    return connection()->connectionInfoProvider().localAddress();
+  const Network::ConnectionInfoProvider& connectionInfoProvider() override {
+    return connection()->connectionInfoProvider();
   }
+
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
     buffer_memory_account_ = account;
   }
 
   // SendBufferMonitor
-  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override {
+  void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) override {
     if (new_buffered_bytes == old_buffered_bytes) {
       return;
     }
@@ -118,6 +122,14 @@ public:
               close_connection_upon_invalid_header_, content_length);
       content_length_ = content_length;
       return result;
+    }
+    ASSERT(!header_name.empty());
+    if (Http::HeaderUtility::isPseudoHeader(header_name) && saw_regular_headers_) {
+      // If any regular header appears before pseudo headers, the request or response is malformed.
+      return Http::HeaderUtility::HeaderValidationResult::REJECT;
+    }
+    if (!Http::HeaderUtility::isPseudoHeader(header_name)) {
+      saw_regular_headers_ = true;
     }
     return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
   }
@@ -175,6 +187,8 @@ protected:
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_ = nullptr;
   bool got_304_response_{false};
   bool sent_head_request_{false};
+  // True if a regular (non-pseudo) HTTP header has been seen before.
+  bool saw_regular_headers_{false};
 
 private:
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts

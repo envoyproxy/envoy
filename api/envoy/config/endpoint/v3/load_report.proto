@@ -161,8 +161,8 @@ message ClusterStats {
   repeated DroppedRequests dropped_requests = 5;
 
   // Period over which the actual load report occurred. This will be guaranteed to include every
-  // request reported. Due to system load and delays between the *LoadStatsRequest* sent from Envoy
-  // and the *LoadStatsResponse* message sent from the management server, this may be longer than
-  // the requested load reporting interval in the *LoadStatsResponse*.
+  // request reported. Due to system load and delays between the ``LoadStatsRequest`` sent from Envoy
+  // and the ``LoadStatsResponse`` message sent from the management server, this may be longer than
+  // the requested load reporting interval in the ``LoadStatsResponse``.
   google.protobuf.Duration load_report_interval = 4;
 }

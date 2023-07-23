@@ -4,7 +4,7 @@
 import asyncio
 import unittest
 
-import validate
+from tools.dependency import validate
 
 
 class FakeDependencyInfo(object):

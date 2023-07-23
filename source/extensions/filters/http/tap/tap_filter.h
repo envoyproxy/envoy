@@ -59,8 +59,9 @@ public:
   FilterConfigImpl(const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
                    const std::string& stats_prefix,
                    Extensions::Common::Tap::TapConfigFactoryPtr&& config_factory,
-                   Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
-                   ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher);
+                   Stats::Scope& scope, OptRef<Server::Admin> admin,
+                   Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                   Event::Dispatcher& main_thread_dispatcher);
 
   // FilterConfig
   HttpTapConfigSharedPtr currentConfig() override;
@@ -93,8 +94,8 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
-    return Http::FilterHeadersStatus::Continue;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
@@ -109,7 +110,8 @@ public:
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override;
+           const StreamInfo::StreamInfo& stream_info,
+           AccessLog::AccessLogType access_log_type) override;
 
 private:
   FilterConfigSharedPtr config_;

@@ -20,3 +20,8 @@ envoy_cc_test_library(
     name = "hashes",
     hdrs = glob(["*hash.h"]),
 )
+
+envoy_cc_test_library(
+    name = "certs_info",
+    hdrs = glob(["*info.h"]),
+)

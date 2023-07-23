@@ -32,14 +32,14 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                       envoy::service::metrics::v3::StreamMetricsResponse>>
       grpc_metrics_streamer = std::make_shared<GrpcMetricsStreamerImpl>(
           server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-              grpc_service, server.scope(), false, Grpc::CacheOption::CacheWhenRuntimeEnabled),
+              grpc_service, server.scope(), false),
           server.localInfo());
 
   return std::make_unique<MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                                              envoy::service::metrics::v3::StreamMetricsResponse>>(
       grpc_metrics_streamer,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false),
-      sink_config.emit_tags_as_labels());
+      sink_config.emit_tags_as_labels(), sink_config.histogram_emit_mode());
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
@@ -52,8 +52,8 @@ std::string MetricsServiceSinkFactory::name() const { return MetricsServiceName;
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(MetricsServiceSinkFactory,
-                 Server::Configuration::StatsSinkFactory){"envoy.metrics_service"};
+LEGACY_REGISTER_FACTORY(MetricsServiceSinkFactory, Server::Configuration::StatsSinkFactory,
+                        "envoy.metrics_service");
 
 } // namespace MetricsService
 } // namespace StatSinks

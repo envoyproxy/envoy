@@ -126,9 +126,8 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& head
 }
 
 void CsrfFilter::determinePolicy() {
-  const std::string& name = "envoy.filters.http.csrf";
   const CsrfPolicy* policy =
-      Http::Utility::resolveMostSpecificPerFilterConfig<CsrfPolicy>(name, callbacks_->route());
+      Http::Utility::resolveMostSpecificPerFilterConfig<CsrfPolicy>(callbacks_);
   if (policy != nullptr) {
     policy_ = policy;
   } else {

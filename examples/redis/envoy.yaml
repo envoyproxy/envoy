@@ -27,7 +27,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: redis_server
+                address: redis
                 port_value: 6379
 admin:
   address:

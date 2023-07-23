@@ -23,15 +23,16 @@ public:
    * @param source_address Optional source address.
    * @param transport_socket The transport socket which supports this client connection.
    * @param options The optional socket options.
+   * @param transport socket options used to create the transport socket.
    * @return Network::ClientConnectionPtr The created connection. It's never nullptr but the return
    * connection may be closed upon return.
    */
-  virtual Network::ClientConnectionPtr
-  createClientConnection(Event::Dispatcher& dispatcher,
-                         Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+  virtual Network::ClientConnectionPtr createClientConnection(
+      Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
+      Network::Address::InstanceConstSharedPtr source_address,
+      Network::TransportSocketPtr&& transport_socket,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options) PURE;
 };
 
 } // namespace Network

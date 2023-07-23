@@ -48,8 +48,9 @@ public:
   }
 
   void accessCounters() {
+    Stats::Scope& scope = *store_.rootScope();
     for (auto& stat_name_storage : stat_names_) {
-      store_.counterFromStatName(stat_name_storage->statName());
+      scope.counterFromStatName(stat_name_storage->statName());
     }
   }
 

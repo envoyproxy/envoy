@@ -29,7 +29,7 @@ Sample Envoy configuration
 Here's a sample Envoy configuration that makes use of the composite filter to inject a different
 latency via the :ref:`fault filter <config_http_filters_fault_injection>`. It uses the header
 ``x-fault-category`` to determine which fault configuration to use: if the header is equal to the
-string ``huge fault``, a 10s latency is injected while if the header contains ``tiny string`` a 1s
+string ``huge fault``, a 10s latency is injected while if the header contains ``tiny fault`` a 1s
 latency is injected. If the header is absent or contains a different value, no filter is
 instantiated.
 

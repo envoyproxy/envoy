@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.header_mutation.v3;
+
+import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_mutation.v3";
+option java_outer_classname = "HeaderMutationProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/header_mutation/v3;header_mutationv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Header mutation filter configuration]
+// [#extension: envoy.filters.http.header_mutation]
+
+message Mutations {
+  // The request mutations are applied before the request is forwarded to the upstream cluster.
+  repeated config.common.mutation_rules.v3.HeaderMutation request_mutations = 1;
+
+  // The response mutations are applied before the response is sent to the downstream client.
+  repeated config.common.mutation_rules.v3.HeaderMutation response_mutations = 2;
+}
+
+// Per route configuration for the header mutation filter. If this is configured at multiple levels
+// (route level, virtual host level, and route table level), only the most specific one will be used.
+message HeaderMutationPerRoute {
+  Mutations mutations = 1;
+}
+
+// Configuration for the header mutation filter. The mutation rules in the filter configuration will
+// always be applied first and then the per-route mutation rules, if both are specified.
+message HeaderMutation {
+  Mutations mutations = 1;
+}

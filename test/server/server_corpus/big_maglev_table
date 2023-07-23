@@ -8,8 +8,13 @@ static_resources {
     lb_policy: MAGLEV
     circuit_breakers {
     }
-    http_protocol_options {
-      default_host_for_http_10: "\005"
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options {
+	  default_host_for_http_10: "\005"
+        }
+      }
     }
     dns_lookup_family: V6_ONLY
     metadata {
@@ -73,9 +78,14 @@ static_resources {
         priority: 16
       }
     }
-    upstream_http_protocol_options {
-      auto_sni: true
-      auto_san_validation: true
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        upstream_http_protocol_options {
+          auto_sni: true
+          auto_san_validation: true
+        }
+      }
     }
     maglev_lb_config {
       table_size {

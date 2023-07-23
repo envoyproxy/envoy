@@ -5,14 +5,14 @@ Kafka Broker filter
 
 The Apache Kafka broker filter decodes the client protocol for
 `Apache Kafka <https://kafka.apache.org/>`_, both the requests and responses in the payload.
-The message versions in `Kafka 3.1.0 <http://kafka.apache.org/31/protocol.html#protocol_api_keys>`_
+The message versions in `Kafka 3.4.0 <http://kafka.apache.org/34/protocol.html#protocol_api_keys>`_
 are supported.
 The filter attempts not to influence the communication between client and brokers, so the messages
 that could not be decoded (due to Kafka client or broker running a newer version than supported by
 this filter) are forwarded as-is.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.KafkaBroker>`
-* This filter should be configured with the name *envoy.filters.network.kafka_broker*.
 
 .. attention::
 

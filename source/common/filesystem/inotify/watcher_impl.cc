@@ -17,16 +17,17 @@ namespace Envoy {
 namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system)
-    : file_system_(file_system), inotify_fd_(inotify_init1(IN_NONBLOCK)),
-      inotify_event_(dispatcher.createFileEvent(
-          inotify_fd_,
-          [this](uint32_t events) -> void {
-            ASSERT(events == Event::FileReadyType::Read);
-            onInotifyEvent();
-          },
-          Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {
+    : file_system_(file_system) {
+  inotify_fd_ = inotify_init1(IN_NONBLOCK);
   RELEASE_ASSERT(inotify_fd_ >= 0,
                  "Consider increasing value of user.max_inotify_watches via sysctl");
+  inotify_event_ = dispatcher.createFileEvent(
+      inotify_fd_,
+      [this](uint32_t events) -> void {
+        ASSERT(events == Event::FileReadyType::Read);
+        onInotifyEvent();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }

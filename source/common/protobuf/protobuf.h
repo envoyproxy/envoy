@@ -20,8 +20,6 @@
 #include "google/protobuf/repeated_field.h"
 #include "google/protobuf/service.h"
 #include "google/protobuf/struct.pb.h"
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/stubs/statusor.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/util/field_mask_util.h"
 #include "google/protobuf/util/json_util.h"

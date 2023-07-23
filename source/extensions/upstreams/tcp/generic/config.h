@@ -17,15 +17,20 @@ class GenericConnPoolFactory : public TcpProxy::GenericConnPoolFactory {
 public:
   std::string name() const override { return "envoy.filters.connection_pools.tcp.generic"; }
   std::string category() const override { return "envoy.upstreams"; }
-  TcpProxy::GenericConnPoolPtr createGenericConnPool(
-      Upstream::ThreadLocalCluster& thread_local_cluster,
-      TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
-      Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const override;
+  TcpProxy::GenericConnPoolPtr
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                        TcpProxy::TunnelingConfigHelperOptConstRef config,
+                        Upstream::LoadBalancerContext* context,
+                        Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                        StreamInfo::StreamInfo& downstream_info) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto>();
   }
+
+private:
+  bool disableTunnelingByFilterState(StreamInfo::StreamInfo& downstream_info) const;
 };
 
 DECLARE_FACTORY(GenericConnPoolFactory);

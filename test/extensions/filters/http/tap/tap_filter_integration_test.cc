@@ -25,6 +25,9 @@ public:
 
     // Also use HTTP/2 for upstream so that we can fully test trailers.
     setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();
+    sink_ptr->setShouldEscape(false);
   }
 
   void initializeFilter(const std::string& filter_config) {
@@ -113,13 +116,16 @@ public:
   }
 
   void startAdminRequest(const std::string& admin_request_yaml) {
-    admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
     const Http::TestRequestHeaderMapImpl admin_request_headers{
         {":method", "POST"}, {":path", "/tap"}, {":scheme", "http"}, {":authority", "host"}};
-    admin_response_ = admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
-    admin_response_->waitForHeaders();
-    EXPECT_EQ("200", admin_response_->headers().getStatusValue());
-    EXPECT_FALSE(admin_response_->complete());
+    WAIT_FOR_LOG_CONTAINS("debug", "New tap installed on all workers.", {
+      admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
+      admin_response_ =
+          admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
+      admin_response_->waitForHeaders();
+      EXPECT_EQ("200", admin_response_->headers().getStatusValue());
+      EXPECT_FALSE(admin_response_->complete());
+    });
   }
 
   std::string getTempPathPrefix() {
@@ -131,7 +137,7 @@ public:
 
   void verifyStaticFilePerTap(const std::string& filter_config) {
     const std::string path_prefix = getTempPathPrefix();
-    initializeFilter(fmt::format(filter_config, path_prefix));
+    initializeFilter(fmt::format(fmt::runtime(filter_config), path_prefix));
 
     // Initial request/response with tap.
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -422,8 +428,7 @@ tap_config:
 
   startAdminRequest(admin_request_yaml);
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.prependFilter(admin_filter_config_);
   new_config_helper.renameListener("foo");
   new_config_helper.setLds("1");
@@ -455,7 +460,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapContent) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -504,7 +509,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapConcurrent) {
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -586,7 +591,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapTimeout) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -640,7 +645,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapLongTimeout) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -685,7 +690,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapConsecutive) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -767,7 +772,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapBuffering) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -814,7 +819,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapEmptyResponse) {
   // Initial request / response with no tap
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -854,7 +859,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapOverBuffering) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -1029,7 +1034,7 @@ tap_config:
 // Verify a static configuration with a request header matcher, writing to a streamed file per tap
 // sink.
 TEST_P(TapIntegrationTest, StaticFilePerTapStreaming) {
-  const std::string filter_config =
+  constexpr absl::string_view filter_config =
       R"EOF(
 name: tap
 typed_config:
@@ -1076,7 +1081,7 @@ typed_config:
 // Verify a static configuration with a response header matcher, writing to a streamed file per tap
 // sink. This verifies request buffering.
 TEST_P(TapIntegrationTest, StaticFilePerTapStreamingWithRequestBuffering) {
-  const std::string filter_config =
+  constexpr absl::string_view filter_config =
       R"EOF(
 name: tap
 typed_config:

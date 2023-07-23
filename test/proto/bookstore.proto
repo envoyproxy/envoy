@@ -86,6 +86,12 @@ service Bookstore {
       get: "/authors/{author}"
     };
   }
+  // Echo an Author to test enum encode/decode.
+  rpc EchoAuthor(Author) returns (Author) {
+    option (google.api.http) = {
+      post: "/echoAuthor"
+    };
+  }
   rpc GetIndex(google.protobuf.Empty) returns (google.api.HttpBody) {
     option (google.api.http) = {
       get: "/index"
@@ -163,6 +169,13 @@ service Bookstore {
       post: "/foo/bar:verb"
     };
   }
+
+  rpc CreateShelfBodyWildcard(CreateShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      post: "/shelf/{shelf.id}"
+      body: "*"
+    };
+  }
 }
 
 service ServiceWithResponseBody {
@@ -198,6 +211,12 @@ message Shelf {
   int64 id = 1;
   // A theme of the shelf (fiction, poetry, etc).
   string theme = 2;
+
+  // To test json name is percentage decoded
+  string search_decoded = 3 [json_name = "search[decoded]"];
+
+  // To test json name is percentage encoded
+  string search_encoded = 4 [json_name = "search%5Bencoded%5D"];
 }
 
 // A book resource.

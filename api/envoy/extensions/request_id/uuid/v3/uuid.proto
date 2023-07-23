@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    <https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)>`_.
 //
 // 3. Tracing decision (sampled, forced, etc) is set in 14th nibble of the UUID. By default this will
-//    overwrite existing UUIDs received in the *x-request-id* header if the trace sampling decision
+//    overwrite existing UUIDs received in the ``x-request-id`` header if the trace sampling decision
 //    is changed. The 14th nibble of the UUID4 has been chosen because it is fixed to '4' by the
 //    standard. Thus, '4' indicates a default UUID and no trace status. This nibble is swapped to:
 //
@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    more information.
 message UuidRequestIdConfig {
   // Whether the implementation alters the UUID to contain the trace sampling decision as per the
-  // `UuidRequestIdConfig` message documentation. This defaults to true. If disabled no
+  // ``UuidRequestIdConfig`` message documentation. This defaults to true. If disabled no
   // modification to the UUID will be performed. It is important to note that if disabled,
   // stable sampling of traces, access logs, etc. will no longer work and only random sampling will
   // be possible.

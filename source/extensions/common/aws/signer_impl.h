@@ -63,21 +63,27 @@ public:
     }
   }
 
-  void sign(Http::RequestMessage& message, bool sign_body = false) override;
-  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash) override;
-  void signEmptyPayload(Http::RequestHeaderMap& headers) override;
-  void signUnsignedPayload(Http::RequestHeaderMap& headers) override;
+  void sign(Http::RequestMessage& message, bool sign_body = false,
+            const absl::string_view override_region = "") override;
+  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+            const absl::string_view override_region = "") override;
+  void signEmptyPayload(Http::RequestHeaderMap& headers,
+                        const absl::string_view override_region = "") override;
+  void signUnsignedPayload(Http::RequestHeaderMap& headers,
+                           const absl::string_view override_region = "") override;
 
 private:
   std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
 
-  std::string createCredentialScope(absl::string_view short_date) const;
+  std::string createCredentialScope(absl::string_view short_date,
+                                    const absl::string_view override_region) const;
 
   std::string createStringToSign(absl::string_view canonical_request, absl::string_view long_date,
                                  absl::string_view credential_scope) const;
 
   std::string createSignature(absl::string_view secret_access_key, absl::string_view short_date,
-                              absl::string_view string_to_sign) const;
+                              absl::string_view string_to_sign,
+                              const absl::string_view override_region) const;
 
   std::string createAuthorizationHeader(absl::string_view access_key_id,
                                         absl::string_view credential_scope,

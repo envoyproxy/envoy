@@ -1,0 +1,59 @@
+parameters:
+- name: cacheTestResults
+  displayName: "Cache test results"
+  type: boolean
+  default: true
+- name: pool
+  displayName: "Agent pool"
+  type: string
+  default: envoy-x64-large
+- name: artifactSuffix
+  displayName: "Artifact suffix"
+  type: string
+  default:
+- name: rbe
+  displayName: "Use RBE"
+  type: boolean
+  default: true
+- name: timeoutBuild
+  displayName: "Build timeout"
+  type: number
+  default: 120
+
+- name: runBuild
+  displayName: "Run build"
+  type: string
+  default: true
+
+jobs:
+- job: release
+  displayName: Build and test
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runBuild }}, 'true'))
+  timeoutInMinutes: ${{ parameters.timeoutBuild }}
+  pool: ${{ parameters.pool }}
+  steps:
+  - template: ../bazel.yml
+    parameters:
+      managedAgent: false
+      ciTarget: bazel.release
+      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      cacheVersion: $(cacheKeyBazel)
+      artifactSuffix: ${{ parameters.artifactSuffix }}
+      rbe: ${{ parameters.rbe }}
+
+- job: released
+  displayName: Complete
+  dependsOn: ["release"]
+  pool: x64-nano
+  # This condition ensures that this (required) job passes if all of
+  # the preceeding jobs either pass or are skipped
+  # adapted from:
+  #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+  condition: and(eq(variables['Build.Reason'], 'PullRequest'), in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+  steps:
+  - checkout: none
+  - bash: |
+      echo "linux_x64 released"

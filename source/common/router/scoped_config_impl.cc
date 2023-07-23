@@ -3,6 +3,8 @@
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -77,7 +79,8 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
 
 ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration config_proto,
                                  ConfigConstSharedPtr route_config)
-    : config_proto_(config_proto), route_config_(route_config) {
+    : config_proto_(config_proto), route_config_(route_config),
+      config_hash_(MessageUtil::hash(config_proto)) {
   // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
   // Fragment.
   for (const auto& fragment : config_proto_.key().fragments()) {
@@ -142,24 +145,13 @@ void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope
   }
 }
 
-Router::ConfigConstSharedPtr
-ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
-  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
+Router::ConfigConstSharedPtr ScopedConfigImpl::getRouteConfig(const ScopeKeyPtr& scope_key) const {
   if (scope_key == nullptr) {
     return nullptr;
   }
   auto iter = scoped_route_info_by_key_.find(scope_key->hash());
   if (iter != scoped_route_info_by_key_.end()) {
     return iter->second->routeConfig();
-  }
-  return nullptr;
-}
-
-ScopeKeyPtr ScopedConfigImpl::computeScopeKey(const Http::HeaderMap& headers) const {
-  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
-  if (scope_key &&
-      scoped_route_info_by_key_.find(scope_key->hash()) != scoped_route_info_by_key_.end()) {
-    return scope_key;
   }
   return nullptr;
 }

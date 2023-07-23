@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_config.h"
 
 namespace Envoy {
@@ -50,8 +51,10 @@ public:
    * Mutate the provided headers with the context necessary to propagate this
    * (implementation-specific) trace.
    * @param request_headers the headers to which propagation context will be added
+   * @param upstream connecting host description
    */
-  virtual void injectContext(TraceContext& trace_conext) PURE;
+  virtual void injectContext(TraceContext& trace_conext,
+                             const Upstream::HostDescriptionConstSharedPtr& upstream) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.
@@ -105,8 +108,9 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, TraceContext& trace_conext,
-                            const std::string& operation_name, SystemTime start_time,
+  virtual SpanPtr startSpan(const Config& config, TraceContext& trace_context,
+                            const StreamInfo::StreamInfo& stream_info,
+                            const std::string& operation_name,
                             const Tracing::Decision tracing_decision) PURE;
 };
 

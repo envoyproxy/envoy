@@ -106,7 +106,7 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
-    cluster_->info_->stats().upstream_cx_total_.inc();
+    cluster_->info_->trafficStats()->upstream_cx_total_.inc();
   }
   expectSessionCreate();
   expectStreamCreate(0);
@@ -144,19 +144,18 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   response_headers->setStatus(status);
 
   // Responding with http can cause client to close, if so create a new one.
-  bool client_will_close = false;
-  if (response_headers->Connection()) {
-    client_will_close =
-        absl::EqualsIgnoreCase(response_headers->Connection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close);
-  } else if (response_headers->ProxyConnection()) {
-    client_will_close =
-        absl::EqualsIgnoreCase(response_headers->ProxyConnection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close);
-  }
+  const bool client_will_close =
+      Http::HeaderUtility::shouldCloseConnection(health_checker_->protocol(), *response_headers);
 
-  ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
-  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+  // Check if there is a response body.
+  bool has_response_body = !respond.http_respond().body().empty();
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
+                                                               !has_response_body);
+  if (has_response_body) {
+    Buffer::OwnedImpl response_data(respond.http_respond().body());
+    test_sessions_[0]->stream_response_callbacks_->decodeData(response_data, true);
+    ENVOY_LOG_MISC(trace, "Responded body {}", respond.http_respond().body());
+  }
 
   // Interval timer gets turned on from decodeHeaders()
   if ((!reuse_connection_ || client_will_close) && !last_action) {
@@ -173,6 +172,10 @@ void HttpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   }
   if (expect_client_create) {
     expectClientCreate(0);
+  } else if (test_sessions_[0]->client_connection_->state() != Network::Connection::State::Open) {
+    // No client connection to reuse.
+    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
+    return;
   }
   expectStreamCreate(0);
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
@@ -218,7 +221,7 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
-    cluster_->info_->stats().upstream_cx_total_.inc();
+    cluster_->info_->trafficStats()->upstream_cx_total_.inc();
   }
   expectSessionCreate();
   expectClientCreate();
@@ -270,6 +273,10 @@ void TcpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   if (expect_client_create) {
     ENVOY_LOG_MISC(trace, "Creating client");
     expectClientCreate();
+  } else if (connection_->state() != Network::Connection::State::Open) {
+    // Without a client no interval timer possible.
+    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
+    return;
   }
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
   interval_timer_->invokeCallback();
@@ -294,7 +301,12 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
   // set by multiple code paths. handleFailure() turns on interval and turns off timeout. However,
   // other action of the fuzzer account for this by explicitly invoking a client after
   // expect_close_ gets set to true, turning expect_close_ back to false.
-  connection_->raiseEvent(event_type);
+  if (event_type == Network::ConnectionEvent::Connected &&
+      connection_->state() != Network::Connection::State::Open) {
+    ENVOY_LOG_MISC(trace, "Event CONNECTED on closed connection; ignoring");
+  } else {
+    connection_->raiseEvent(event_type);
+  }
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
     if (!interval_timer_->enabled_) {
       return;
@@ -327,7 +339,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
-    cluster_->info_->stats().upstream_cx_total_.inc();
+    cluster_->info_->trafficStats()->upstream_cx_total_.inc();
   }
   expectSessionCreate();
   ON_CALL(dispatcher_, createClientConnection_(_, _, _, _))
@@ -448,6 +460,10 @@ void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   if (expect_client_create) {
     expectClientCreate();
     ENVOY_LOG_MISC(trace, "Created client");
+  } else if (test_session_->client_connection_->state() != Network::Connection::State::Open) {
+    // No client connection to reuse.
+    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
+    return;
   }
   expectStreamCreate();
   ENVOY_LOG_MISC(trace, "Created stream");
@@ -512,8 +528,8 @@ void GrpcHealthCheckFuzz::expectClientCreate() {
 void GrpcHealthCheckFuzz::expectStreamCreate() {
   test_session_->request_encoder_.stream_.callbacks_.clear();
   EXPECT_CALL(*test_session_->codec_, newStream(_))
-      .WillOnce(DoAll(SaveArgAddress(&test_session_->stream_response_callbacks_),
-                      ReturnRef(test_session_->request_encoder_)));
+      .WillRepeatedly(DoAll(SaveArgAddress(&test_session_->stream_response_callbacks_),
+                            ReturnRef(test_session_->request_encoder_)));
 }
 
 Network::ConnectionEvent

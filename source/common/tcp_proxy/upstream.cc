@@ -43,23 +43,40 @@ void TcpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb cb) {
   upstream_conn_data_->connection().addBytesSentCallback(cb);
 }
 
+bool TcpUpstream::startUpstreamSecureTransport() {
+  return (upstream_conn_data_ == nullptr)
+             ? false
+             : upstream_conn_data_->connection().startSecureTransport();
+}
+
+Ssl::ConnectionInfoConstSharedPtr TcpUpstream::getUpstreamConnectionSslInfo() {
+  if (upstream_conn_data_ != nullptr) {
+    return upstream_conn_data_->connection().ssl();
+  }
+  return nullptr;
+}
+
 Tcp::ConnectionPool::ConnectionData*
 TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
     // The close call may result in this object being deleted. Latch the
     // connection locally so it can be returned for potential draining.
     auto* conn_data = upstream_conn_data_.release();
-    conn_data->connection().close(Network::ConnectionCloseType::FlushWrite);
+    conn_data->connection().close(
+        Network::ConnectionCloseType::FlushWrite,
+        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose);
     return conn_data;
   } else if (event == Network::ConnectionEvent::LocalClose) {
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    upstream_conn_data_->connection().close(
+        Network::ConnectionCloseType::NoFlush,
+        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose);
   }
   return nullptr;
 }
 
 HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const TunnelingConfigHelper& config,
-                           const StreamInfo::StreamInfo& downstream_info)
+                           StreamInfo::StreamInfo& downstream_info)
     : config_(config), downstream_info_(downstream_info), response_decoder_(*this),
       upstream_callbacks_(callbacks) {}
 
@@ -149,8 +166,9 @@ void HttpUpstream::doneWriting() {
 
 TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
-                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
-    : upstream_callbacks_(upstream_callbacks) {
+                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                         StreamInfo::StreamInfo& downstream_info)
+    : upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info) {
   conn_pool_data_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
 }
 
@@ -173,14 +191,21 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                absl::string_view failure_reason,
                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onGenericPoolFailure(reason, host);
+  callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                               Upstream::HostDescriptionConstSharedPtr host) {
+  if (downstream_info_.downstreamAddressProvider().connectionID()) {
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              conn_data->connection().id(),
+              downstream_info_.downstreamAddressProvider().connectionID().value());
+  }
+
   upstream_handle_ = nullptr;
   Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
   Network::Connection& connection = conn_data->connection();
@@ -188,7 +213,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
   auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
   callbacks_->onGenericPoolReady(
       &connection.streamInfo(), std::move(upstream), host,
-      latched_data->connection().connectionInfoProvider().localAddress(),
+      latched_data->connection().connectionInfoProvider(),
       latched_data->connection().streamInfo().downstreamAddressProvider().sslConnection());
 }
 
@@ -196,9 +221,9 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context,
                            const TunnelingConfigHelper& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                           Http::CodecType type)
+                           Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks),
-      downstream_info_(context->downstreamConnection()->streamInfo()) {
+      downstream_info_(downstream_info) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;
@@ -233,15 +258,25 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                 absl::string_view failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onGenericPoolFailure(reason, host);
+  callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
+                               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
+  if (info.downstreamAddressProvider().connectionID() &&
+      downstream_info_.downstreamAddressProvider().connectionID()) {
+    // info.downstreamAddressProvider() is being called to get the upstream connection ID,
+    // because the StreamInfo object here is of the upstream connection.
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              info.downstreamAddressProvider().connectionID().value(),
+              downstream_info_.downstreamAddressProvider().connectionID().value());
+  }
+
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
@@ -250,14 +285,14 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
-                                      const Network::Address::InstanceConstSharedPtr& local_address,
+                                      const Network::ConnectionInfoProvider& address_provider,
                                       Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, local_address, ssl_info);
+  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, address_provider, ssl_info);
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                              const TunnelingConfigHelper& config,
-                             const StreamInfo::StreamInfo& downstream_info)
+                             StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(callbacks, config, downstream_info) {}
 
 bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
@@ -275,17 +310,20 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.hostname()},
-      {Http::Headers::get().Path, "/"},
-      {Http::Headers::get().Scheme, scheme},
+      {Http::Headers::get().Host, config_.host(downstream_info_)},
   });
 
-  if (!config_.usePost()) {
-    headers->addReference(Http::Headers::get().Protocol,
-                          Http::Headers::get().ProtocolValues.Bytestream);
+  if (config_.usePost()) {
+    headers->addReference(Http::Headers::get().Path, config_.postPath());
+    headers->addReference(Http::Headers::get().Scheme, scheme);
   }
 
-  config_.headerEvaluator().evaluateHeaders(*headers, downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(*headers,
+                                            downstream_info_.getRequestHeaders() == nullptr
+                                                ? *Http::StaticEmptyHeaders::get().request_headers
+                                                : *downstream_info_.getRequestHeaders(),
+                                            *Http::StaticEmptyHeaders::get().response_headers,
+                                            downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());
@@ -293,7 +331,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
 Http1Upstream::Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                              const TunnelingConfigHelper& config,
-                             const StreamInfo::StreamInfo& downstream_info)
+                             StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(callbacks, config, downstream_info) {}
 
 void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {
@@ -304,15 +342,20 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.hostname()},
+      {Http::Headers::get().Host, config_.host(downstream_info_)},
   });
 
   if (config_.usePost()) {
     // Path is required for POST requests.
-    headers->addReference(Http::Headers::get().Path, "/");
+    headers->addReference(Http::Headers::get().Path, config_.postPath());
   }
 
-  config_.headerEvaluator().evaluateHeaders(*headers, downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(*headers,
+                                            downstream_info_.getRequestHeaders() == nullptr
+                                                ? *Http::StaticEmptyHeaders::get().request_headers
+                                                : *downstream_info_.getRequestHeaders(),
+                                            *Http::StaticEmptyHeaders::get().response_headers,
+                                            downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());

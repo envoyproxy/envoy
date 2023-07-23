@@ -40,7 +40,8 @@ private:
 
 class RocketmqConnectionManagerTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  RocketmqConnectionManagerTest() : stats_(RocketmqFilterStats::generateStats("test.", store_)) {}
+  RocketmqConnectionManagerTest()
+      : stats_(RocketmqFilterStats::generateStats("test.", *store_.rootScope())) {}
 
   ~RocketmqConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();

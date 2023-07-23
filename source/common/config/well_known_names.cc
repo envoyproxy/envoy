@@ -19,11 +19,15 @@ std::string expandRegex(const std::string& regex) {
               // Cipher names can contain alphanumerics with dashes and
               // underscores.
               {"<CIPHER>", R"([\w-]+)"},
+              // TLS version strings are always of the form "TLSv1.3".
+              {"<TLS_VERSION>", R"(TLSv\d\.\d)"},
               // A generic name can contain any character except dots.
               {"<TAG_VALUE>", TAG_VALUE_REGEX},
               // Route names may contain dots in addition to alphanumerics and
               // dashes with underscores.
-              {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"}});
+              {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"},
+              // Match a prefix that is either a listener plus name or cluster plus name
+              {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"}});
 }
 
 const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
@@ -102,8 +106,22 @@ TagNameValues::TagNameValues() {
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)*
   addTokenized(FAULT_DOWNSTREAM_CLUSTER, "http.*.fault.$.**");
 
-  // listener.[<address>.]ssl.cipher.(<cipher>)
-  addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.cipher(\.(<CIPHER>))$)");
+  // listener.[<address>.]ssl.ciphers.(<cipher>)
+  addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
+
+  // Curves and ciphers have the same pattern so they use the same regex.
+  // listener.[<address>.]ssl.curves.(<curve>)
+  addRe2(SSL_CURVE, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.curves(\.(<CIPHER>))$)",
+         ".ssl.curves.");
+
+  // Signing algorithms and ciphers have the same pattern so they use the same regex.
+  // listener.[<address>.]ssl.sigalgs.(<algorithm>)
+  addRe2(SSL_SIGALG, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.sigalgs(\.(<CIPHER>))$)",
+         ".ssl.sigalgs.");
+
+  // listener.[<address>.]ssl.versions.(<version>)
+  addRe2(SSL_VERSION, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.versions(\.(<TLS_VERSION>))$)",
+         ".ssl.versions.");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
   addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<TAG_VALUE>\.ssl\.ciphers(\.(<CIPHER>))$)",
@@ -132,11 +150,25 @@ TagNameValues::TagNameValues() {
   // internal state of the regex which performs better.
   addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<TAG_VALUE>)\.))", ".http.");
 
+  // Extract ext_authz stat_prefix field
+  // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
+  addTokenized(EXT_AUTHZ_PREFIX, "cluster.*.ext_authz.$.**");
+  // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
+  addTokenized(EXT_AUTHZ_PREFIX, "http.*.ext_authz.$.**");
+
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
-  // listener.(<address>.)*
-  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>)\.))");
+  // listener.<address|stat_prefix>.(worker_<id>.)*
+  // listener_manager.(worker_<id>.)*
+  // server.(worker_<id>.)*
+  addRe2(
+      WORKER_ID,
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)worker_((\d+)\.))",
+      "");
+
+  // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
+  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>|<TAG_VALUE>)\.))", "", "admin");
 
   // vhost.(<virtual host name>.)*
   addTokenized(VIRTUAL_HOST, "vhost.$.**");
@@ -149,13 +181,29 @@ TagNameValues::TagNameValues() {
   // match.
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
-  // listener_manager.(worker_<id>.)*
-  addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
+  // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
+  addTokenized(ROUTE, "vhost.*.route.$.**");
+
+  // thrift.(<stat_prefix>.)*
+  addTokenized(THRIFT_PREFIX, "thrift.$.**");
+
+  // redis.(<stat_prefix>.)*
+  addTokenized(REDIS_PREFIX, "redis.$.**");
+
+  // (<stat_prefix>.).http_local_rate_limit.**
+  addTokenized(LOCAL_HTTP_RATELIMIT_PREFIX, "$.http_local_rate_limit.**");
+
+  // local_rate_limit.(<stat_prefix>.)
+  addTokenized(LOCAL_NETWORK_RATELIMIT_PREFIX, "local_rate_limit.$.**");
+
+  // listener_local_rate_limit.(<stat_prefix>.)
+  addTokenized(LOCAL_LISTENER_RATELIMIT_PREFIX, "listener_local_ratelimit.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
-                           const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
+                           const std::string& substr, const std::string& negative_matching_value) {
+  descriptor_vec_.emplace_back(
+      Descriptor{name, expandRegex(regex), substr, negative_matching_value, Regex::Type::Re2});
 }
 
 void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {

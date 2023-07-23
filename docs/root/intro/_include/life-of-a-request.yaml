@@ -1,4 +1,3 @@
-
 static_resources:
   listeners:
   # There is a single listener bound to port 443.

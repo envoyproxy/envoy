@@ -107,6 +107,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "metadata_lib",
+    srcs = ["metadata.cc"],
     hdrs = [
         "metadata.h",
         "operation.h",
@@ -158,6 +159,7 @@ envoy_cc_library(
     name = "stats_lib",
     hdrs = ["stats.h"],
     deps = [
+        ":sip_lib",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
     ],

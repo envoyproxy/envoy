@@ -24,7 +24,6 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
     ],
@@ -32,6 +31,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "decompressor_filter_integration_test",
+    size = "large",
     srcs = [
         "decompressor_filter_integration_test.cc",
     ],

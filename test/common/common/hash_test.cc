@@ -17,10 +17,10 @@ TEST(Hash, xxHashWithVector) {
 }
 
 TEST(Hash, djb2CaseInsensitiveHash) {
-  EXPECT_EQ(211616621U, HashUtil::djb2CaseInsensitiveHash("foo"));
-  EXPECT_EQ(211611524U, HashUtil::djb2CaseInsensitiveHash("bar"));
-  EXPECT_EQ(282790909350396U, HashUtil::djb2CaseInsensitiveHash("foo\nbar"));
-  EXPECT_EQ(7195212308U, HashUtil::djb2CaseInsensitiveHash("lyft"));
+  EXPECT_EQ(193491849U, HashUtil::djb2CaseInsensitiveHash("foo"));
+  EXPECT_EQ(193487034U, HashUtil::djb2CaseInsensitiveHash("bar"));
+  EXPECT_EQ(229466047527336U, HashUtil::djb2CaseInsensitiveHash("foo\nbar"));
+  EXPECT_EQ(6385457348U, HashUtil::djb2CaseInsensitiveHash("lyft"));
   EXPECT_EQ(5381U, HashUtil::djb2CaseInsensitiveHash(""));
 }
 

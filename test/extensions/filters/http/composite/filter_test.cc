@@ -101,7 +101,9 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   doAllDecodingCallbacks();
   expectDelegatedEncoding(*stream_filter);
   doAllEncodingCallbacks();
+  EXPECT_CALL(*stream_filter, onStreamComplete());
   EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onStreamComplete();
   filter_.onDestroy();
 }
 
@@ -120,7 +122,9 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   expectDelegatedDecoding(*stream_filter);
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
+  EXPECT_CALL(*stream_filter, onStreamComplete());
   EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onStreamComplete();
   filter_.onDestroy();
 }
 
@@ -199,82 +203,6 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   filter_.onDestroy();
 }
 
-// Adding a stream filter with a match tree should not cause delegation.
-TEST_F(FilterTest, StreamFilterDelegationStreamFilterWithMatchTree) {
-  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
-
-  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamFilter(stream_filter, nullptr);
-  };
-
-  ExecuteFilterAction action(factory_callback);
-  EXPECT_CALL(error_counter_, inc());
-  filter_.onMatchCallback(action);
-
-  doAllDecodingCallbacks();
-  doAllEncodingCallbacks();
-  filter_.onDestroy();
-}
-
-// Adding a decoder filter with a match tree should not cause delegation.
-TEST_F(FilterTest, StreamFilterDelegationDecodeFilterWithMatchTree) {
-  auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
-
-  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamDecoderFilter(decoder_filter, nullptr);
-  };
-
-  ExecuteFilterAction action(factory_callback);
-  EXPECT_CALL(error_counter_, inc());
-  filter_.onMatchCallback(action);
-
-  doAllDecodingCallbacks();
-  doAllEncodingCallbacks();
-  filter_.onDestroy();
-}
-
-// Adding a encoder filter with a match tree should not cause delegation.
-TEST_F(FilterTest, StreamFilterDelegationEncodeFilterWithMatchTree) {
-  auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-
-  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamEncoderFilter(encode_filter, nullptr);
-  };
-
-  ExecuteFilterAction action(factory_callback);
-  EXPECT_CALL(error_counter_, inc());
-  filter_.onMatchCallback(action);
-
-  doAllDecodingCallbacks();
-  doAllEncodingCallbacks();
-  filter_.onDestroy();
-}
-
-// Adding a encoder filter with a match tree twice should not cause delegation.
-TEST_F(FilterTest, StreamFilterDelegationMultipleEncodeFilterWithMatchTree) {
-  auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
-
-  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
-    cb.addStreamEncoderFilter(encode_filter, nullptr);
-    cb.addStreamEncoderFilter(encode_filter, nullptr);
-  };
-
-  ExecuteFilterAction action(factory_callback);
-
-  EXPECT_CALL(error_counter_, inc());
-  // Verify that the log output looks right.
-  EXPECT_LOG_CONTAINS(
-      "debug",
-      "failed to create delegated filter [INVALID_ARGUMENT: cannot delegate to encoder "
-      "filter that instantiates a match tree, INVALID_ARGUMENT: cannot delegate to "
-      "encoder filter that instantiates a match tree]",
-      filter_.onMatchCallback(action));
-
-  doAllDecodingCallbacks();
-  doAllEncodingCallbacks();
-  filter_.onDestroy();
-}
-
 // Adding a encoder filter and an access loggers should be permitted and delegate to the access
 // logger.
 TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
@@ -300,9 +228,10 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   EXPECT_CALL(*encode_filter, onDestroy());
   filter_.onDestroy();
 
-  EXPECT_CALL(*access_log_1, log(_, _, _, _));
-  EXPECT_CALL(*access_log_2, log(_, _, _, _));
-  filter_.log(nullptr, nullptr, nullptr, StreamInfo::MockStreamInfo());
+  EXPECT_CALL(*access_log_1, log(_, _, _, _, _));
+  EXPECT_CALL(*access_log_2, log(_, _, _, _, _));
+  filter_.log(nullptr, nullptr, nullptr, StreamInfo::MockStreamInfo(),
+              AccessLog::AccessLogType::NotSet);
 }
 
 } // namespace

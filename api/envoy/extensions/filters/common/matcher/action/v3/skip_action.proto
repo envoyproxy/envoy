@@ -10,10 +10,10 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/common/matcher/action/v3;actionv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Common Match Actions]
+// [#protodoc-title: Common match actions]
 
 // Configuration for the SkipFilter match action. When matching results in this action, the
-// associated filter will be ignored for all filter callbacks (e.g. `encodeHeaders`, `encodeData`,
+// associated filter will be ignored for all filter callbacks (e.g. ``encodeHeaders``, ``encodeData``,
 // etc. for HTTP filters) after the matcher arrives at the match, including the callback that
 // caused the match result. For example, when used with a HTTP filter and the match result was
 // resolved after receiving the HTTP response headers, the HTTP filter will *not* receive the

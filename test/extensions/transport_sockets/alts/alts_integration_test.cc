@@ -133,7 +133,7 @@ public:
         capturing_handshaker_service_ = nullptr;
         // If max_expected_concurrent_rpcs is zero, the fake handshaker service will not track
         // concurrent RPCs and abort if it exceeds the value.
-        service = grpc::gcp::CreateFakeHandshakerService(/* max_expected_concurrent_rpcs */ 0);
+        service = grpc::gcp::CreateFakeHandshakerService("peer_identity");
       }
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
@@ -160,7 +160,7 @@ public:
       }
     };
     FakeSingletonManager fsm;
-    ON_CALL(mock_factory_ctx, singletonManager()).WillByDefault(ReturnRef(fsm));
+    ON_CALL(mock_factory_ctx.server_context_, singletonManager()).WillByDefault(ReturnRef(fsm));
     UpstreamAltsTransportSocketConfigFactory factory;
 
     envoy::extensions::transport_sockets::alts::v3::Alts alts_config;
@@ -185,7 +185,7 @@ public:
   }
 
   Network::TransportSocketPtr makeAltsTransportSocket() {
-    auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
+    auto client_transport_socket = client_alts_->createTransportSocket(nullptr, nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
     client_tsi_socket_->setActualFrameSizeToUse(16384);
     client_tsi_socket_->setFrameOverheadSize(4);
@@ -196,7 +196,8 @@ public:
     auto client_transport_socket = makeAltsTransportSocket();
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               std::move(client_transport_socket), nullptr);
+                                               std::move(client_transport_socket), nullptr,
+                                               nullptr);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {
@@ -240,7 +241,7 @@ public:
   std::unique_ptr<grpc::Server> fake_handshaker_server_;
   ConditionalInitializer fake_handshaker_server_ci_;
   int fake_handshaker_server_port_{};
-  Network::TransportSocketFactoryPtr client_alts_;
+  Network::UpstreamTransportSocketFactoryPtr client_alts_;
   TsiSocket* client_tsi_socket_{nullptr};
   bool capturing_handshaker_;
   CapturingHandshakerService* capturing_handshaker_service_;

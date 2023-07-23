@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary")
@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "test_context_cpp_plugin",
     srcs = [
         "test_context_cpp.cc",

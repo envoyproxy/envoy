@@ -21,7 +21,7 @@ namespace Rds {
 
 class RouteConfigProviderManager {
 public:
-  RouteConfigProviderManager(Server::Admin& admin, const std::string& config_tracker_key,
+  RouteConfigProviderManager(OptRef<Server::Admin> admin, const std::string& config_tracker_key,
                              ProtoTraits& proto_traits);
 
   void eraseStaticProvider(RouteConfigProvider* provider);

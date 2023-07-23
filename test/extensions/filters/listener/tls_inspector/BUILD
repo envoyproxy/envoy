@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
@@ -91,6 +92,7 @@ envoy_cc_library(
 
 envoy_cc_test(
     name = "tls_inspector_integration_test",
+    size = "large",
     srcs = [
         "tls_inspector_integration_test.cc",
     ],

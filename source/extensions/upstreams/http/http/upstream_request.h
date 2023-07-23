@@ -21,11 +21,10 @@ namespace Http {
 class HttpConnPool : public Router::GenericConnPool, public Envoy::Http::ConnectionPool::Callbacks {
 public:
   // GenericConnPool
-  HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
+  HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                const Router::RouteEntry& route_entry,
                absl::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
-    ASSERT(!is_connect);
     pool_data_ =
         thread_local_cluster.httpConnPool(route_entry.priority(), downstream_protocol, ctx);
   }
@@ -40,7 +39,7 @@ public:
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+                   Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
                    absl::optional<Envoy::Http::Protocol> protocol) override;
   Upstream::HostDescriptionConstSharedPtr host() const override {
     return pool_data_.value().host();

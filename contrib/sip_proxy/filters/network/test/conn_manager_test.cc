@@ -45,7 +45,7 @@ public:
 class SipConnectionManagerTest : public testing::Test {
 public:
   SipConnectionManagerTest()
-      : stats_(SipFilterStats::generateStats("test.", store_)),
+      : stats_(SipFilterStats::generateStats("test.", *store_.rootScope())),
         transaction_infos_(std::make_shared<Router::TransactionInfos>()) {}
   ~SipConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -80,7 +80,8 @@ public:
 
     EXPECT_CALL(context_, getTransportSocketFactoryContext())
         .WillRepeatedly(testing::ReturnRef(factory_context_));
-    EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
+    EXPECT_CALL(factory_context_.server_context_, localInfo())
+        .WillRepeatedly(testing::ReturnRef(local_info_));
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
         *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
@@ -270,6 +271,9 @@ settings:
     }
 
     // transportEnd throw envoyException
+    filter_->decoder_->reassemble(buffer_);
+    filter_->decoder_->metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
+    filter_->decoder_->decode();
     filter_->read_callbacks_->connection().setDelayedCloseTimeout(std::chrono::milliseconds(1));
     filter_->read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     ConnectionManager::ActiveTransPtr trans1 =

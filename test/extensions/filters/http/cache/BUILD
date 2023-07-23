@@ -16,7 +16,6 @@ envoy_cc_test_library(
     deps = [
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
-        "//source/extensions/filters/http/cache/simple_http_cache:config",
     ],
 )
 
@@ -31,6 +30,15 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "cache_filter_logging_info_test",
+    srcs = ["cache_filter_logging_info_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    deps = [
+        "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
     ],
 )
 
@@ -50,7 +58,7 @@ envoy_extension_cc_test(
     deps = [
         ":common",
         "//source/extensions/filters/http/cache:http_cache_lib",
-        "//source/extensions/filters/http/cache/simple_http_cache:config",
+        "//source/extensions/http/cache/simple_http_cache:config",
         "//test/mocks/http:http_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
@@ -75,10 +83,14 @@ envoy_extension_cc_test(
     deps = [
         ":common",
         "//source/extensions/filters/http/cache:cache_filter_lib",
-        "//source/extensions/filters/http/cache/simple_http_cache:config",
+        "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
+        "//source/extensions/http/cache/simple_http_cache:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -98,16 +110,17 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:config",
-        "//source/extensions/filters/http/cache/simple_http_cache:config",
+        "//source/extensions/http/cache/simple_http_cache:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/cache/simple_http_cache/v3:pkg_cc_proto",
     ],
 )
 
 envoy_extension_cc_test(
     name = "cache_filter_integration_test",
+    size = "large",
     srcs = [
         "cache_filter_integration_test.cc",
     ],
@@ -116,7 +129,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/filters/http/cache:http_cache_lib",
-        "//source/extensions/filters/http/cache/simple_http_cache:config",
+        "//source/extensions/http/cache/simple_http_cache:config",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
@@ -147,6 +160,5 @@ envoy_extension_cc_test_library(
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/synchronization",
-        "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
     ],
 )

@@ -43,7 +43,7 @@ Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClien
       createClientSslTransportSocketFactory(modified_options, *context_manager_, *api_);
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
-      client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+      client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
 }
 
 void SslSPIFFECertValidatorIntegrationTest::checkVerifyErrorCouter(uint64_t value) {
@@ -183,7 +183,10 @@ typed_config:
     ASSERT_TRUE(codec->waitForDisconnect());
     codec->close();
   }
-  checkVerifyErrorCouter(1);
+  Stats::CounterSharedPtr counter =
+      test_server_->counter(listenerStatPrefix("ssl.fail_verify_san"));
+  EXPECT_EQ(1u, counter->value());
+  counter->reset();
 }
 
 // Client certificate has expired and the config does NOT allow expired certificates, so this case

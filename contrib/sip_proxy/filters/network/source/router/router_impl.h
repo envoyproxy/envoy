@@ -1,9 +1,5 @@
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "envoy/router/router.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -18,8 +14,6 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
-#include "absl/types/any.h"
-#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.pb.h"
 #include "contrib/sip_proxy/filters/network/source/conn_state.h"
@@ -88,16 +82,6 @@ public:
 
 private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
-};
-
-#define ALL_SIP_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                            \
-  COUNTER(route_missing)                                                                           \
-  COUNTER(unknown_cluster)                                                                         \
-  COUNTER(upstream_rq_maintenance_mode)                                                            \
-  COUNTER(no_healthy_upstream)
-
-struct RouterStats {
-  ALL_SIP_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 class UpstreamRequest;
@@ -201,14 +185,26 @@ public:
   void insertTransaction(std::string&& transaction_id,
                          SipFilters::DecoderFilterCallbacks* active_trans,
                          std::shared_ptr<UpstreamRequest> upstream_request) {
+    if (hasTransaction(transaction_id)) {
+      return;
+    }
+
     tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.emplace(std::make_pair(
         transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_request)));
   }
 
   void deleteTransaction(std::string&& transaction_id) {
-    tls_->getTyped<ThreadLocalTransactionInfo>()
-        .transaction_info_map_.at(transaction_id)
-        ->toDelete();
+    if (hasTransaction(transaction_id)) {
+      tls_->getTyped<ThreadLocalTransactionInfo>()
+          .transaction_info_map_.at(transaction_id)
+          ->toDelete();
+    }
+  }
+
+  bool hasTransaction(std::string& transaction_id) {
+    return tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.find(
+               transaction_id) !=
+           tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.end();
   }
 
   TransactionInfoItem& getTransaction(std::string&& transaction_id) {
@@ -222,9 +218,10 @@ public:
   }
 
   std::shared_ptr<UpstreamRequest> getUpstreamRequest(const std::string& host) {
-    try {
-      return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
-    } catch (std::out_of_range const&) {
+    auto ret = tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.find(host);
+    if (ret != tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.end()) {
+      return ret->second;
+    } else {
       return nullptr;
     }
   }
@@ -244,12 +241,9 @@ class Router : public Upstream::LoadBalancerContextBase,
                public SipFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::connection> {
 public:
-  Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-         Stats::Scope& scope, Server::Configuration::FactoryContext& context)
-      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
-        context_(context) {
-    UNREFERENCED_PARAMETER(context_);
-  }
+  Router(std::shared_ptr<RouterFilterConfig> config, Upstream::ClusterManager& cluster_manager,
+         Server::Configuration::FactoryContext& context)
+      : cluster_manager_(cluster_manager), stats_(config->stats()), context_(context) {}
 
   // SipFilters::DecoderFilter
   void onDestroy() override;
@@ -279,22 +273,16 @@ public:
 
 private:
   void cleanup();
-  RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return RouterStats{ALL_SIP_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                            POOL_GAUGE_PREFIX(scope, prefix),
-                                            POOL_HISTOGRAM_PREFIX(scope, prefix))};
-  }
-
   FilterStatus handleAffinity();
   FilterStatus messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transaction_info,
                                               MessageMetadataSharedPtr metadata, std::string dest,
                                               bool& lb_ret);
 
-  QueryStatus handleCustomizedAffinity(std::string type, std::string key,
-                                       MessageMetadataSharedPtr metadata);
+  QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type,
+                                       const std::string& key, MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
-  RouterStats stats_;
+  RouterStats& stats_;
 
   RouteConstSharedPtr route_{};
   const RouteEntry* route_entry_{};
@@ -307,7 +295,6 @@ private:
   std::shared_ptr<TransactionInfos> transaction_infos_{};
   std::shared_ptr<SipSettings> settings_;
   Server::Configuration::FactoryContext& context_;
-  // bool continue_handling_;
 };
 
 class ResponseDecoder : public DecoderCallbacks,
@@ -329,10 +316,7 @@ public:
   FilterStatus transportEnd() override { return FilterStatus::Continue; }
 
   // DecoderCallbacks
-  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-    return *this;
-  }
+  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
@@ -374,6 +358,7 @@ public:
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
   void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
+  SipFilters::DecoderFilterCallbacks& decoderFilterCallbacks() { return *callbacks_; }
 
   ConnectionState connectionState() { return conn_state_; }
   void setConnectionState(ConnectionState state) { conn_state_ = state; }

@@ -14,7 +14,7 @@ namespace Envoy {
 class ClearRouteCacheFilter : public Http::PassThroughFilter {
 public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    callbacks.clearRouteCache();
+    callbacks.downstreamCallbacks()->clearRouteCache();
     Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   }
 };

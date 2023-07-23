@@ -74,18 +74,18 @@ public:
 
   void createVerifier() {
     filter_config_ = std::make_shared<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
-    verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
+    verifier_ = Verifier::create(proto_config_.rules(0).requires_(), proto_config_.providers(),
                                  *filter_config_);
   }
 
   void modifyRequirement(const std::string& yaml) {
-    TestUtility::loadFromYaml(yaml, *proto_config_.mutable_rules(0)->mutable_requires());
+    TestUtility::loadFromYaml(yaml, *proto_config_.mutable_rules(0)->mutable_requires_());
   }
 
   JwtAuthentication proto_config_;
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   std::shared_ptr<FilterConfigImpl> filter_config_;
   VerifierConstPtr verifier_;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;
   NiceMock<Tracing::MockSpan> parent_span_;
@@ -110,7 +110,7 @@ class AllowFailedInSingleRequirementTest : public AllVerifierTest {
 protected:
   void SetUp() override {
     AllVerifierTest::SetUp();
-    proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed();
+    proto_config_.mutable_rules(0)->mutable_requires_()->mutable_allow_missing_or_failed();
     createVerifier();
   }
 };

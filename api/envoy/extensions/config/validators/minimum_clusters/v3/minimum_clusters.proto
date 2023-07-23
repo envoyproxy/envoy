@@ -11,7 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/con
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Minimum Clusters]
-// [#extension: envoy.config.validators.minimum_clusters]
+// [#extension: envoy.config.validators.minimum_clusters_validator]
 
 // Validates a CDS config, and ensures that the number of clusters is above the
 // set threshold.

@@ -54,14 +54,19 @@ bool TestRootContext::onStart(size_t configuration_size) {
   return true;
 }
 
-bool TestRootContext::onConfigure(size_t) {
+bool TestRootContext::onConfigure(size_t size) {
+  if (size > 0 &&
+      getBufferBytes(WasmBufferType::PluginConfiguration, 0, size)->toString() == "invalid") {
+    return false;
+  }
   if (test_ == "property") {
     {
       // Many properties are not available in the root context.
       const std::vector<std::string> properties = {
           "string_state",     "metadata",   "request",        "response",    "connection",
           "connection_id",    "upstream",   "source",         "destination", "cluster_name",
-          "cluster_metadata", "route_name", "route_metadata",
+          "cluster_metadata", "route_name", "route_metadata", "upstream_host_metadata",
+          "filter_state",
       };
       for (const auto& property : properties) {
         if (getProperty({property}).has_value()) {
@@ -363,6 +368,10 @@ void TestContext::onLog() {
     auto response_trailer = getResponseTrailer("bogus-trailer");
     if (response_trailer && response_trailer->view() != "") {
       logWarn("response bogus-trailer found");
+    }
+    auto request_trailer = getRequestTrailer("error-details");
+    if (request_trailer && request_trailer->view() != "") {
+      logWarn("request bogus-trailer found");
     }
   } else if (test == "cluster_metadata") {
     std::string cluster_metadata;

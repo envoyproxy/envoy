@@ -13,6 +13,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "ssl_socket_test",
+    size = "large",
     srcs = [
         "ssl_certs_test.h",
         "ssl_socket_test.cc",
@@ -45,6 +46,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/extensions/transport_sockets/tls:utility_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
+        "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         "//test/extensions/transport_sockets/tls/test_data:cert_infos",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/init:init_mocks",
@@ -94,7 +96,6 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -201,6 +202,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 

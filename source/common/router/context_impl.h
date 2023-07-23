@@ -40,6 +40,7 @@ public:
   const VirtualClusterStatNames& virtualClusterStatNames() const override {
     return virtual_cluster_stat_names_;
   }
+  const RouteStatNames& routeStatNames() const override { return route_stat_names_; }
   GenericConnPoolFactory& genericConnPoolFactory() override {
     ASSERT(generic_conn_pool_factory_ != nullptr);
     return *generic_conn_pool_factory_;
@@ -47,8 +48,26 @@ public:
 
 private:
   const StatNames stat_names_;
+  const RouteStatNames route_stat_names_;
   const VirtualClusterStatNames virtual_cluster_stat_names_;
   GenericConnPoolFactory* generic_conn_pool_factory_;
+};
+
+class RouteStatsContextImpl : public RouteStatsContext {
+public:
+  RouteStatsContextImpl(Stats::Scope& scope, const RouteStatNames& route_stat_names,
+                        const Stats::StatName& vhost_stat_name, const std::string& stat_prefix);
+
+  ~RouteStatsContextImpl() override = default;
+
+  Stats::StatName statName() const override { return route_stat_name_; }
+  const RouteStats& stats() const override { return route_stats_; }
+
+private:
+  const Stats::StatNameManagedStorage route_stat_name_storage_;
+  Stats::ScopeSharedPtr route_stats_scope_;
+  Stats::StatName route_stat_name_;
+  RouteStats route_stats_;
 };
 
 } // namespace Router

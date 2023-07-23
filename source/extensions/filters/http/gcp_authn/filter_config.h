@@ -13,7 +13,8 @@ namespace GcpAuthn {
 
 class GcpAuthnFilterFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig> {
+          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>,
+      public Logger::Loggable<Logger::Id::filter> {
 public:
   GcpAuthnFilterFactory() : FactoryBase(std::string(FilterName)) {}
 

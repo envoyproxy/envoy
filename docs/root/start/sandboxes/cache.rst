@@ -43,15 +43,15 @@ Change to the ``examples/cache`` directory.
 
     $ pwd
     envoy/examples/cache
-    $ docker-compose build --pull
-    $ docker-compose up -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
-           Name                      Command            State           Ports
-    ----------------------------------------------------------------------------------------------
-    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
-    cache_service1_1      python3 /code/service.py       Up
-    cache_service2_1      python3 /code/service.py       Up
+           Name                      Command            State                   Ports
+    ---------------------------------------------------------------------------------------------------
+    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up           10000/tcp, 0.0.0.0:8000->8000/tcp
+    cache_service1_1      python3 /code/service.py       Up (healthy)
+    cache_service2_1      python3 /code/service.py       Up (healthy)
 
 Step 2: Test Envoy's HTTP caching capabilities
 **********************************************
@@ -237,6 +237,9 @@ The new response will be cached for subsequent requests.
 You can also add new responses to the yaml file with different ``cache-control`` headers and start experimenting!
 
 .. seealso::
+
+   :ref:`Envoy Cache filter configuration <config_http_filters_cache>`
+      Learn more about configuring the Envoy Cache filter.
 
    `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
       Learn more about caching and ``cache-control`` on the web.

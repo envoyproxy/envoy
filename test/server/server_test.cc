@@ -20,6 +20,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
+#include "test/mocks/common.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -92,7 +93,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   NiceMock<Stats::MockStore> mock_store;
   Stats::ParentHistogramSharedPtr parent_histogram(new Stats::MockParentHistogram());
   std::vector<Stats::ParentHistogramSharedPtr> parent_histograms = {parent_histogram};
-  ON_CALL(mock_store, forEachHistogram)
+  ON_CALL(mock_store, forEachSinkedHistogram)
       .WillByDefault([&](std::function<void(std::size_t)> f_size,
                          std::function<void(Stats::ParentHistogram&)> f_stat) {
         if (f_size != nullptr) {
@@ -439,9 +440,6 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -554,7 +552,7 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
                                                // Block till we're told to complete
                                                completion_block.WaitForNotification();
                                                shutdown_with_completion = true;
-                                               server_->dispatcher().post(completion_cb);
+                                               server_->dispatcher().post(std::move(completion_cb));
                                                completion_done.Notify();
                                              });
     auto handle5 =
@@ -789,9 +787,6 @@ TEST_P(ServerStatsTest, FlushStats) {
 }
 
 TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
   auto server_thread =
@@ -807,7 +802,7 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   // Flush via admin.
   Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
-  EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
+  EXPECT_EQ(Http::Code::OK, server_->admin()->request("/stats", "GET", response_headers, body));
   EXPECT_EQ(1L, counter->value());
 
   time_system_.advanceTimeWait(std::chrono::seconds(6));
@@ -818,9 +813,6 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
 }
 
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -1052,11 +1044,11 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   Http::TestResponseHeaderMapImpl response_headers;
   std::string response_body;
   EXPECT_EQ(Http::Code::OK,
-            server_->admin().request("/runtime", "GET", response_headers, response_body));
+            server_->admin()->request("/runtime", "GET", response_headers, response_body));
   EXPECT_THAT(response_body, HasSubstr("fozz"));
-  EXPECT_EQ(
-      Http::Code::ServiceUnavailable,
-      server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            server_->admin()->request("/runtime_modify?foo=bar", "POST", response_headers,
+                                      response_body));
   EXPECT_EQ("No admin layer specified", response_body);
 }
 
@@ -1157,7 +1149,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
   // Admin::addListenerToHandler() calls one of handler's methods after checking that the Admin
   // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
   // that there is no listener.
-  server_->admin().addListenerToHandler(/*handler=*/nullptr);
+  server_->admin()->addListenerToHandler(/*handler=*/nullptr);
 }
 
 namespace {
@@ -1179,7 +1171,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // Start Envoy instance with admin port with SO_REUSEPORT option.
   ASSERT_NO_THROW(
       initialize("test/server/test_data/server/node_bootstrap_with_admin_socket_options.yaml"));
-  const auto address = server_->admin().socket().connectionInfoProvider().localAddress();
+  const auto address = server_->admin()->socket().connectionInfoProvider().localAddress();
 
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.
@@ -1443,7 +1435,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
   // Inject Unsafe Factory
   NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
   EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
-    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+    return std::make_unique<ProtobufWkt::Struct>();
   }));
   EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
 
@@ -1579,9 +1571,6 @@ public:
 // lifecycle callback is also used to ensure that the cluster update callback is freed during
 // Server::Instance's destruction. See issue #9292 for more details.
 TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   CallbacksStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -1622,6 +1611,54 @@ TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
+  EXPECT_CALL(options_, logFormatSet()).WillRepeatedly(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log.yaml"), EnvoyException,
+      "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagv) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flagv.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flag_.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats");
+}
+
+TEST_P(ServerInstanceImplTest, TextApplicationLog) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/text_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
 }
 
 } // namespace

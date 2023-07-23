@@ -50,8 +50,9 @@ public:
                     std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb,
-                    std::function<void(uint64_t, bool)> write_stats_cb, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
+                    std::function<void(uint64_t, bool, std::chrono::milliseconds)> write_stats_cb,
+                    TimeSource& time_source, Event::Dispatcher& dispatcher,
+                    const ScopeTrackedObject& scope,
                     std::shared_ptr<TokenBucket> token_bucket = nullptr,
                     std::chrono::milliseconds fill_interval = DefaultFillInterval);
 
@@ -83,7 +84,7 @@ private:
   const std::chrono::milliseconds fill_interval_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
-  const std::function<void(uint64_t, bool)> write_stats_cb_;
+  const std::function<void(uint64_t, bool, std::chrono::milliseconds)> write_stats_cb_;
   const ScopeTrackedObject& scope_;
   std::shared_ptr<TokenBucket> token_bucket_;
   Event::TimerPtr token_timer_;

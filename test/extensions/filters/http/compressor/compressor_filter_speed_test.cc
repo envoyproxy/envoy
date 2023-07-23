@@ -1,6 +1,9 @@
 #include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
+#include "source/extensions/compression/brotli/compressor/brotli_compressor_impl.h"
+#include "source/extensions/compression/brotli/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
 #include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "source/extensions/compression/zstd/compressor/zstd_compressor_impl.h"
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
@@ -18,7 +21,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Compressor {
-
 class MockGzipCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
   MockGzipCompressorFactory(
@@ -29,8 +31,8 @@ public:
   }
 
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
-    auto compressor =
-        std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(chunk_size_);
+    auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(
+        Compression::Gzip::Compressor::DefaultChunkSize);
     compressor->init(level_, strategy_, window_bits_, memory_level_);
     return compressor;
   }
@@ -45,7 +47,6 @@ private:
   const Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy_;
   const int64_t window_bits_;
   const uint64_t memory_level_;
-  const uint64_t chunk_size_{4096};
 };
 
 class MockZstdCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
@@ -71,42 +72,87 @@ private:
   const uint64_t chunk_size_{4096};
 };
 
-using CompressionParams = std::tuple<int64_t, uint64_t, int64_t, uint64_t>;
+class MockBrotliCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
+public:
+  explicit MockBrotliCompressorFactory(uint32_t quality) : quality_(quality) {}
+
+  Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
+    return std::make_unique<Compression::Brotli::Compressor::BrotliCompressorImpl>(
+        quality_, Compression::Brotli::Compressor::DefaultWindowBits,
+        Compression::Brotli::Compressor::DefaultInputBlockBits, disable_literal_context_modeling_,
+        mode_, Compression::Brotli::Compressor::DefaultChunkSize);
+  }
+
+  const std::string& statsPrefix() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "brotli.");
+  }
+  const std::string& contentEncoding() const override {
+    return Http::CustomHeaders::get().ContentEncodingValues.Brotli;
+  }
+
+private:
+  const Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode mode_{
+      Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode::Generic};
+  const uint32_t quality_;
+  const bool disable_literal_context_modeling_{false};
+};
+
+struct CompressionParams {
+  int64_t level;
+  uint64_t strategy;
+  int64_t window_bits;
+  uint64_t memory_level;
+};
 
 CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
                                                testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               CompressionParams params) {
+                                               const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
   const auto level =
       static_cast<Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel>(
-          std::get<0>(params));
+          params.level);
   const auto strategy =
       static_cast<Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy>(
-          std::get<1>(params));
-  const auto window_bits = std::get<2>(params);
-  const auto memory_level = std::get<3>(params);
+          params.strategy);
+  const auto window_bits = params.window_bits;
+  const auto memory_level = params.memory_level;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockGzipCompressorFactory>(level, strategy, window_bits, memory_level);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", stats, runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
 
   return config;
 }
 
 CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
                                                testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               CompressionParams params) {
+                                               const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
-  const auto level = std::get<0>(params);
-  const auto strategy = std::get<1>(params);
+  const auto level = params.level;
+  const auto strategy = params.strategy;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockZstdCompressorFactory>(level, strategy);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", stats, runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
+
+  return config;
+}
+
+CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats,
+                                                 testing::NiceMock<Runtime::MockLoader>& runtime,
+                                                 const CompressionParams& params) {
+
+  envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+
+  const auto quality = params.level;
+  Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
+      std::make_unique<MockBrotliCompressorFactory>(quality);
+  CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
 
   return config;
 }
@@ -150,8 +196,11 @@ struct Result {
   uint64_t total_compressed_bytes = 0;
 };
 
-enum class CompressorLibs { Gzip, Zstd };
+enum class CompressorLibs { Brotli, Gzip, Zstd };
 
+// Ignore the gmock overhead due to it has been measured with flame graphs to be pretty low.
+// And you should build with `--compilation_mode=opt --cxxopt=-g --cxxopt=-ggdb3` to get code
+// optimizations.
 static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImpl>&& chunks,
                            CompressionParams params,
                            NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks,
@@ -161,12 +210,17 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
   testing::NiceMock<Runtime::MockLoader> runtime;
   CompressorFilterConfigSharedPtr config;
   std::string compressor = "";
-  if (lib == CompressorLibs::Gzip) {
+  std::string encoding = "";
+  if (lib == CompressorLibs::Brotli) {
+    config = makeBrotliConfig(stats, runtime, params);
+    encoding = "br";
+    compressor = "brotli";
+  } else if (lib == CompressorLibs::Gzip) {
     config = makeGzipConfig(stats, runtime, params);
-    compressor = "gzip";
+    encoding = compressor = "gzip";
   } else if (lib == CompressorLibs::Zstd) {
     config = makeZstdConfig(stats, runtime, params);
-    compressor = "zstd";
+    encoding = compressor = "zstd";
   }
 
   ON_CALL(runtime.snapshot_, featureEnabled("test.filter_enabled", 100))
@@ -176,7 +230,7 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
   filter->setDecoderFilterCallbacks(decoder_callbacks);
 
   Http::TestRequestHeaderMapImpl headers = {
-      {":method", "get"}, {"accept-encoding", compressor}, {"content-encoding", compressor}};
+      {":method", "get"}, {"accept-encoding", encoding}, {"content-encoding", encoding}};
   filter->decodeHeaders(headers, false);
 
   Http::TestResponseHeaderMapImpl response_headers = {
@@ -223,48 +277,49 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
 
 // SPELLCHECKER(off)
 /*
-Running ./bazel-bin/test/extensions/filters/http/common/compressor/compressor_filter_speed_test
-Run on (8 X 2300 MHz CPU s)
+You can sepcify "--benchmark_filter=Gzip" to select compressor to benchmark.
+Running ./bazel-bin/test/extensions/filters/http/compressor/compressor_filter_speed_test
+Run on (112 X 1784.9 MHz CPU s)
 CPU Caches:
-L1 Data 32K (x4)
-L1 Instruction 32K (x4)
-L2 Unified 262K (x4)
-L3 Unified 6291K (x1)
-Load Average: 1.82, 1.72, 1.74
+  L1 Data 48 KiB (x56)
+  L1 Instruction 32 KiB (x56)
+  L2 Unified 1280 KiB (x56)
+  L3 Unified 43008 KiB (x2)
+Load Average: 0.32, 0.52, 0.70
 ***WARNING*** Library was built as DEBUG. Timings may be affected.
-------------------------------------------------------------
-Benchmark                  Time             CPU   Iterations
-------------------------------------------------------------
-....
-compressFull/0/manual_time              14.1 ms         14.3 ms           48
-compressFull/1/manual_time              7.06 ms         7.22 ms          104
-compressFull/2/manual_time              5.17 ms         5.33 ms          123
-compressFull/3/manual_time              15.4 ms         15.5 ms           45
-compressFull/4/manual_time              10.1 ms         10.3 ms           69
-compressFull/5/manual_time              15.8 ms         16.0 ms           40
-compressFull/6/manual_time              15.3 ms         15.5 ms           42
-compressFull/7/manual_time              9.91 ms         10.1 ms           71
-compressFull/8/manual_time              15.8 ms         16.0 ms           45
-compressChunks16384/0/manual_time       13.4 ms         13.5 ms           52
-compressChunks16384/1/manual_time       6.33 ms         6.48 ms          111
-compressChunks16384/2/manual_time       5.09 ms         5.27 ms          147
-compressChunks16384/3/manual_time       15.1 ms         15.3 ms           46
-compressChunks16384/4/manual_time       9.61 ms         9.78 ms           71
-compressChunks16384/5/manual_time       14.5 ms         14.6 ms           47
-compressChunks16384/6/manual_time       14.0 ms         14.1 ms           48
-compressChunks16384/7/manual_time       9.20 ms         9.36 ms           76
-compressChunks16384/8/manual_time       14.5 ms         14.6 ms           48
-compressChunks8192/0/manual_time        14.3 ms         14.5 ms           50
-compressChunks8192/1/manual_time        6.80 ms         6.96 ms          100
-compressChunks8192/2/manual_time        5.21 ms         5.36 ms          135
-compressChunks8192/3/manual_time        14.9 ms         15.0 ms           47
-compressChunks8192/4/manual_time        9.71 ms         9.87 ms           68
-compressChunks8192/5/manual_time        15.9 ms         16.1 ms           45
+------------------------------------------------------------------------------------
+Benchmark                                          Time             CPU   Iterations
+------------------------------------------------------------------------------------
+compressFullWithGzip/0/manual_time              15.6 ms         16.2 ms           45
+compressFullWithGzip/1/manual_time              7.46 ms         8.01 ms           94
+compressFullWithGzip/2/manual_time              5.67 ms         6.22 ms          124
+compressFullWithGzip/3/manual_time              16.7 ms         17.3 ms           42
+compressFullWithGzip/4/manual_time              10.9 ms         11.4 ms           64
+compressFullWithGzip/5/manual_time              17.9 ms         18.5 ms           39
+compressFullWithGzip/6/manual_time              16.7 ms         17.2 ms           42
+compressFullWithGzip/7/manual_time              10.9 ms         11.4 ms           64
+compressFullWithGzip/8/manual_time              18.0 ms         18.5 ms           39
+compressChunks16384WithGzip/0/manual_time       14.6 ms         15.2 ms           47
+compressChunks16384WithGzip/1/manual_time       7.08 ms         7.65 ms           99
+compressChunks16384WithGzip/2/manual_time       5.49 ms         6.06 ms          127
+compressChunks16384WithGzip/3/manual_time       15.7 ms         16.3 ms           45
+compressChunks16384WithGzip/4/manual_time       10.3 ms         10.9 ms           68
+compressChunks16384WithGzip/5/manual_time       16.9 ms         17.4 ms           41
+compressChunks16384WithGzip/6/manual_time       15.7 ms         16.3 ms           44
+compressChunks16384WithGzip/7/manual_time       10.3 ms         10.9 ms           68
+compressChunks16384WithGzip/8/manual_time       16.8 ms         17.4 ms           41
+compressChunks8192WithGzip/0/manual_time        15.7 ms         16.3 ms           45
+compressChunks8192WithGzip/1/manual_time        7.56 ms         8.16 ms           93
+compressChunks8192WithGzip/2/manual_time        5.90 ms         6.51 ms          118
+compressChunks8192WithGzip/3/manual_time        16.9 ms         17.4 ms           42
+compressChunks8192WithGzip/4/manual_time        11.0 ms         11.6 ms           64
+compressChunks8192WithGzip/5/manual_time        18.2 ms         18.8 ms           38
+compressChunks8192WithGzip/6/manual_time        16.9 ms         17.5 ms           42
 ....
 */
 // SPELLCHECKER(on)
 
-static std::vector<CompressionParams> gzip_compression_params = {
+static constexpr CompressionParams gzip_compression_params[] = {
     // Speed + Standard + Small Window + Low mem level
     {Z_BEST_SPEED, Z_DEFAULT_STRATEGY, 9, 1},
 
@@ -372,7 +427,7 @@ BENCHMARK(compressChunks1024WithGzip)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
-static std::vector<CompressionParams> zstd_compression_params = {
+static constexpr CompressionParams zstd_compression_params[] = {
     // level1 + default
     {1, 0, 0, 0},
 
@@ -516,6 +571,120 @@ static void compressChunks1024WithZstd(benchmark::State& state) {
 }
 BENCHMARK(compressChunks1024WithZstd)
     ->DenseRange(0, 21, 1)
+    ->UseManualTime()
+    ->Unit(benchmark::kMillisecond);
+
+static constexpr CompressionParams brotli_compression_params[] = {
+    // level1 + default
+    {1, 0, 0, 0},
+
+    // level2 + default
+    {2, 0, 0, 0},
+
+    // level3 + default
+    {3, 0, 0, 0},
+
+    // level4 + default
+    {4, 0, 0, 0},
+
+    // level5 + default
+    {5, 0, 0, 0},
+
+    // level6 + default
+    {6, 0, 0, 0},
+
+    // level7 + default
+    {7, 0, 0, 0},
+
+    // level8 + default
+    {8, 0, 0, 0},
+
+    // level9 + default
+    {9, 0, 0, 0},
+
+    // level10 + default
+    {10, 0, 0, 0},
+
+    // level11 + default
+    {11, 0, 0, 0}};
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void compressFullWithBrotli(benchmark::State& state) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  const auto idx = state.range(0);
+  const auto& params = brotli_compression_params[idx];
+
+  for (auto _ : state) { // NOLINT
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
+    compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
+  }
+}
+BENCHMARK(compressFullWithBrotli)
+    ->DenseRange(0, 10, 1)
+    ->UseManualTime()
+    ->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void compressChunks16384WithBrotli(benchmark::State& state) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  const auto idx = state.range(0);
+  const auto& params = brotli_compression_params[idx];
+
+  for (auto _ : state) { // NOLINT
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
+    compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
+  }
+}
+BENCHMARK(compressChunks16384WithBrotli)
+    ->DenseRange(0, 10, 1)
+    ->UseManualTime()
+    ->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void compressChunks8192WithBrotli(benchmark::State& state) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  const auto idx = state.range(0);
+  const auto& params = brotli_compression_params[idx];
+
+  for (auto _ : state) { // NOLINT
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(15, 8192);
+    compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
+  }
+}
+BENCHMARK(compressChunks8192WithBrotli)
+    ->DenseRange(0, 10, 1)
+    ->UseManualTime()
+    ->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void compressChunks4096WithBrotli(benchmark::State& state) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  const auto idx = state.range(0);
+  const auto& params = brotli_compression_params[idx];
+
+  for (auto _ : state) { // NOLINT
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(30, 4096);
+    compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
+  }
+}
+BENCHMARK(compressChunks4096WithBrotli)
+    ->DenseRange(0, 10, 1)
+    ->UseManualTime()
+    ->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void compressChunks1024WithBrotli(benchmark::State& state) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  const auto idx = state.range(0);
+  const auto& params = brotli_compression_params[idx];
+
+  for (auto _ : state) { // NOLINT
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(120, 1024);
+    compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
+  }
+}
+BENCHMARK(compressChunks1024WithBrotli)
+    ->DenseRange(0, 10, 1)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 

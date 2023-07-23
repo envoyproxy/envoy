@@ -43,7 +43,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:context_interface",
-        "//envoy/ratelimit:ratelimit_interface",
         "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -96,6 +95,7 @@ envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = [
+        ":factory_context_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/upstream:health_checker_interface",
@@ -109,7 +109,6 @@ envoy_cc_library(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/thread:thread_interface",
-        "//source/server:hot_restart_cc_proto",
     ],
 )
 
@@ -137,7 +136,7 @@ envoy_cc_library(
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/thread_local:thread_local_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
@@ -198,7 +197,7 @@ envoy_cc_library(
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
@@ -223,7 +222,7 @@ envoy_cc_library(
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
@@ -248,6 +247,7 @@ envoy_cc_library(
         ":drain_manager_interface",
         ":filter_config_interface",
         ":guarddog_interface",
+        "//envoy/filter:config_provider_manager_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:socket_interface_interface",

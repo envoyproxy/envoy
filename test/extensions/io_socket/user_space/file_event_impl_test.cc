@@ -8,7 +8,6 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -51,6 +50,7 @@ public:
   MOCK_METHOD(bool, isPeerWritable, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
+  MOCK_METHOD(PassthroughStateSharedPtr, passthroughState, ());
 };
 
 class FileEventImplTest : public testing::Test {

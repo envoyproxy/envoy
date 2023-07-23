@@ -20,8 +20,13 @@ class DnsFilterIntegrationTest : public testing::TestWithParam<Network::Address:
 public:
   DnsFilterIntegrationTest()
       : BaseIntegrationTest(GetParam(), configToUse()), api_(Api::createApiForTest()),
-        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_,
-                  query_parsing_failure_) {
+        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_, query_parsing_failure_,
+                  queries_with_additional_rrs_, queries_with_ans_or_authority_rrs_) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat 'dns_filter.my_prefix.local_a_record_answers' and
+    // stat_prefix 'my_prefix'.
+    skip_tag_extraction_rule_check_ = true;
+
     setupResponseParser();
   }
 
@@ -214,6 +219,8 @@ listener_filters:
   NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
   NiceMock<Stats::MockCounter> mock_record_name_overflow_;
   NiceMock<Stats::MockCounter> query_parsing_failure_;
+  NiceMock<Stats::MockCounter> queries_with_additional_rrs_;
+  NiceMock<Stats::MockCounter> queries_with_ans_or_authority_rrs_;
   DnsParserCounters counters_;
   DnsQueryContextPtr response_ctx_;
 };

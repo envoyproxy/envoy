@@ -1,4 +1,4 @@
-#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
+#include "envoy/extensions/http/cache/simple_http_cache/v3/config.pb.h"
 
 #include "source/extensions/filters/http/cache/cache_filter.h"
 #include "source/extensions/filters/http/cache/config.h"
@@ -24,7 +24,17 @@ protected:
 
 TEST_F(CacheFilterFactoryTest, Basic) {
   config_.mutable_typed_config()->PackFrom(
-      envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig());
+      envoy::extensions::http::cache::simple_http_cache::v3::SimpleHttpCacheConfig());
+  Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
+  Http::StreamFilterSharedPtr filter;
+  EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
+  cb(filter_callback_);
+  ASSERT(filter);
+  ASSERT(dynamic_cast<CacheFilter*>(filter.get()));
+}
+
+TEST_F(CacheFilterFactoryTest, Disabled) {
+  config_.mutable_disabled()->set_value(true);
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));

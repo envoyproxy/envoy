@@ -4,6 +4,10 @@ load(
     "envoy_cc_test_library",
     "envoy_contrib_package",
 )
+load(
+    "//contrib:all_contrib_extensions.bzl",
+    "envoy_contrib_linux_x86_64_constraints",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -18,6 +22,9 @@ envoy_cc_test_library(
         "fake_factory.h",
     ],
     external_deps = ["ssl"],
+    # This makes the test targets dependent on this target only run on the desired platform.
+    # The actual feature is dependent on hardware but this mock library can run on other platforms.
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     deps = [
         "//contrib/cryptomb/private_key_providers/source:cryptomb_private_key_provider_lib",
         "//contrib/cryptomb/private_key_providers/source:ipp_crypto_wrapper_lib",

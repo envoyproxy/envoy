@@ -2,6 +2,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
@@ -40,8 +41,7 @@ public:
     cm.initializeThreadLocalClusters({"fake_cluster"});
     EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, true, route_entry,
-                                               Envoy::Http::Protocol::Http11, nullptr);
+    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, route_entry, nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;
@@ -93,6 +93,20 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
+    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _, _))
+        .WillByDefault(
+            Invoke([&](Envoy::Http::FilterChainManager& manager, bool only_create_if_configured,
+                       const Envoy::Http::FilterChainOptions&) -> bool {
+              if (only_create_if_configured) {
+                return false;
+              }
+              Envoy ::Http::FilterFactoryCb factory_cb =
+                  [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+                callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
+              };
+              manager.applyFilterFactoryCb({}, factory_cb);
+              return true;
+            }));
     EXPECT_CALL(mock_router_filter_, downstreamHeaders())
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));
@@ -148,7 +162,7 @@ TEST_F(TcpUpstreamTest, Basic) {
 
 TEST_F(TcpUpstreamTest, V1Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
-      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+      mock_router_filter_.route_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
   mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
@@ -171,7 +185,7 @@ TEST_F(TcpUpstreamTest, V1Header) {
 
 TEST_F(TcpUpstreamTest, V2Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
-      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+      mock_router_filter_.route_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
   mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));

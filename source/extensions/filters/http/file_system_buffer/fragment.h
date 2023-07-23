@@ -102,6 +102,11 @@ public:
 private:
   size_t size_;
   absl::variant<MemoryFragment, StorageFragment, ReadingFragment, WritingFragment> data_;
+
+  // Disabling copy and move constructors for safety because long-lived fragment pointers
+  // are used.
+  Fragment(const Fragment&) = delete;
+  Fragment(Fragment&&) = delete;
 };
 
 } // namespace FileSystemBuffer

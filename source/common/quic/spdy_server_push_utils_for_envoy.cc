@@ -7,26 +7,26 @@
 // Since Envoy doesn't support server push, these functions shouldn't be
 // executed at all.
 
-using spdy::SpdyHeaderBlock;
+using spdy::Http2HeaderBlock;
 
 namespace quic {
 
 // static
 // NOLINTNEXTLINE(readability-identifier-naming)
-std::string SpdyServerPushUtils::GetPromisedUrlFromHeaders(const SpdyHeaderBlock& /*headers*/) {
+std::string SpdyServerPushUtils::GetPromisedUrlFromHeaders(const Http2HeaderBlock& /*headers*/) {
   return "";
 }
 
 // static
 std::string
 // NOLINTNEXTLINE(readability-identifier-naming)
-SpdyServerPushUtils::GetPromisedHostNameFromHeaders(const SpdyHeaderBlock& /*headers*/) {
+SpdyServerPushUtils::GetPromisedHostNameFromHeaders(const Http2HeaderBlock& /*headers*/) {
   return "";
 }
 
 // static
 // NOLINTNEXTLINE(readability-identifier-naming)
-bool SpdyServerPushUtils::PromisedUrlIsValid(const SpdyHeaderBlock& /*headers*/) { return false; }
+bool SpdyServerPushUtils::PromisedUrlIsValid(const Http2HeaderBlock& /*headers*/) { return false; }
 
 // static
 // NOLINTNEXTLINE(readability-identifier-naming)

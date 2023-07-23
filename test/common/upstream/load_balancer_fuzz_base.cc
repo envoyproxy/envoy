@@ -42,7 +42,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   while (hosts_made < std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel) &&
          port < 60000) {
     // Make sure no health flags persisted from previous fuzz iterations
-    ASSERT(initialized_hosts_[port]->health() == Host::Health::Healthy);
+    ASSERT(initialized_hosts_[port]->coarseHealth() == Host::Health::Healthy);
     host_set.hosts_.push_back(initialized_hosts_[port]);
     ++port;
     ++hosts_made;

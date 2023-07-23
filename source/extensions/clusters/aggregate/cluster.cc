@@ -14,13 +14,10 @@ namespace Aggregate {
 
 Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
-                 Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
-                 Random::RandomGenerator& random,
-                 Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                 Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api, factory_context.mainThreadDispatcher().timeSource()),
-      cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
+                 Upstream::ClusterFactoryContext& context)
+    : Upstream::ClusterImplBase(cluster, context), cluster_manager_(context.clusterManager()),
+      runtime_(context.serverFactoryContext().runtime()),
+      random_(context.serverFactoryContext().api().randomGenerator()),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
 
 AggregateClusterLoadBalancer::AggregateClusterLoadBalancer(
@@ -89,7 +86,8 @@ AggregateClusterLoadBalancer::linearizePrioritySet(OptRef<const std::string> exc
       if (!host_set->hosts().empty()) {
         priority_context->priority_set_.updateHosts(
             next_priority_after_linearizing, Upstream::HostSetImpl::updateHostsParams(*host_set),
-            host_set->localityWeights(), host_set->hosts(), {}, host_set->overprovisioningFactor());
+            host_set->localityWeights(), host_set->hosts(), {}, host_set->weightedPriorityHealth(),
+            host_set->overprovisioningFactor());
         priority_context->priority_to_cluster_.emplace_back(
             std::make_pair(priority_in_current_cluster, tlc));
 
@@ -108,7 +106,7 @@ void AggregateClusterLoadBalancer::refresh(OptRef<const std::string> excluded_cl
   PriorityContextPtr priority_context = linearizePrioritySet(excluded_cluster);
   if (!priority_context->priority_set_.hostSetsPerPriority().empty()) {
     load_balancer_ = std::make_unique<LoadBalancerImpl>(
-        *priority_context, parent_info_->stats(), runtime_, random_, parent_info_->lbConfig());
+        *priority_context, parent_info_->lbStats(), runtime_, random_, parent_info_->lbConfig());
   } else {
     load_balancer_ = nullptr;
   }
@@ -210,13 +208,8 @@ std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerP
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
-    Upstream::ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopeSharedPtr&& stats_scope) {
-  auto new_cluster =
-      std::make_shared<Cluster>(cluster, proto_config, context.clusterManager(), context.runtime(),
-                                context.api().randomGenerator(), socket_factory_context,
-                                std::move(stats_scope), context.addedViaApi());
+    Upstream::ClusterFactoryContext& context) {
+  auto new_cluster = std::make_shared<Cluster>(cluster, proto_config, context);
   auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

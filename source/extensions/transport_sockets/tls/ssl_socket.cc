@@ -52,9 +52,8 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      Ssl::HandshakerFactoryCb handshaker_factory_cb)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
-          handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
-                                ctx_->sslExtendedSocketInfoIndex(), this))) {
+      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(handshaker_factory_cb(
+          ctx_->newSsl(transport_socket_options_), ctx_->sslExtendedSocketInfoIndex(), this))) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
@@ -166,7 +165,9 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   return {action, bytes_read, end_stream};
 }
 
-void SslSocket::onPrivateKeyMethodComplete() {
+void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
+
+void SslSocket::resumeHandshake() {
   ASSERT(callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe());
   ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgress);
 
@@ -174,7 +175,8 @@ void SslSocket::onPrivateKeyMethodComplete() {
   PostIoAction action = doHandshake();
   if (action == PostIoAction::Close) {
     ENVOY_CONN_LOG(debug, "async handshake completion error", callbacks_->connection());
-    callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite,
+                                   "failed_resuming_async_handshake");
   }
 }
 
@@ -188,15 +190,18 @@ void SslSocket::onSuccess(SSL* ssl) {
         .upstreamInfo()
         ->upstreamTiming()
         .onUpstreamHandshakeComplete(callbacks_->connection().dispatcher().timeSource());
+  } else {
+    callbacks_->connection().streamInfo().downstreamTiming().onDownstreamHandshakeComplete(
+        callbacks_->connection().dispatcher().timeSource());
   }
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
-void SslSocket::onFailure() { drainErrorQueue(); }
+void SslSocket::onFailure(bool syscall_error_occurred) { drainErrorQueue(syscall_error_occurred); }
 
 PostIoAction SslSocket::doHandshake() { return info_->doHandshake(); }
 
-void SslSocket::drainErrorQueue() {
+void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
   bool saw_error = false;
   bool saw_counted_error = false;
   while (uint64_t err = ERR_get_error()) {
@@ -223,8 +228,23 @@ void SslSocket::drainErrorQueue() {
                                         absl::NullSafeStringView(ERR_func_error_string(err)), ":",
                                         absl::NullSafeStringView(ERR_reason_error_string(err))));
   }
+
+  if (syscall_error_occurred) {
+    if (failure_reason_.empty()) {
+      failure_reason_ = "TLS error:";
+    }
+    failure_reason_.append(
+        "SSL_ERROR_SYSCALL error has occured, which indicates the operation failed externally to "
+        "the library. This is typically |errno| but may be something custom if using a custom "
+        "|BIO|. It may also be signaled if the transport returned EOF, in which case the "
+        "operation's return value will be zero.");
+    saw_error = true;
+  }
+
   if (!failure_reason_.empty()) {
-    ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+    ENVOY_CONN_LOG(debug, "remote address:{},{}", callbacks_->connection(),
+                   callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
+                   failure_reason_);
   }
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
@@ -349,6 +369,13 @@ std::string SslSocket::protocol() const { return ssl()->alpn(); }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
+void SslSocket::onAsynchronousCertValidationComplete() {
+  ENVOY_CONN_LOG(debug, "Async cert validation completed", callbacks_->connection());
+  if (info_->state() == Ssl::SocketState::HandshakeInProgress) {
+    resumeHandshake();
+  }
+}
+
 namespace {
 SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {
   return {
@@ -368,7 +395,8 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
 ClientSslSocketFactory::~ClientSslSocketFactory() { manager_.removeContext(ssl_ctx_); }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    Upstream::HostDescriptionConstSharedPtr) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -417,8 +445,7 @@ Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
   return ssl_ctx_;
 }
 
-Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+Network::TransportSocketPtr ServerSslSocketFactory::createDownstreamTransportSocket() const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -428,8 +455,8 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
-                                       transport_socket_options, config_->createHandshaker());
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
+                                       config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

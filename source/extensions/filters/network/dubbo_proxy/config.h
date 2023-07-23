@@ -9,6 +9,7 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/rds.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -40,7 +41,8 @@ public:
   using DubboProxyConfig = envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy;
   using DubboFilterConfig = envoy::extensions::filters::network::dubbo_proxy::v3::DubboFilter;
 
-  ConfigImpl(const DubboProxyConfig& config, Server::Configuration::FactoryContext& context);
+  ConfigImpl(const DubboProxyConfig& config, Server::Configuration::FactoryContext& context,
+             Router::RouteConfigProviderManager& route_config_provider_manager);
   ~ConfigImpl() override = default;
 
   // DubboFilters::FilterChainFactory
@@ -65,6 +67,7 @@ private:
   const SerializationType serialization_type_;
   const ProtocolType protocol_type_;
   Router::RouteConfigImplPtr route_matcher_;
+  Rds::RouteConfigProviderSharedPtr route_config_provider_;
 
   std::list<DubboFilters::FilterFactoryCb> filter_factories_;
 };

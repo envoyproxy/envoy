@@ -133,8 +133,12 @@ using InsertCallback = std::function<void(bool success_ready_for_more)>;
 class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
+  //
+  // Implementations must call insert_complete(true) on success, or
+  // insert_complete(false) to attempt to abort the insertion.
   virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
-                             const ResponseMetadata& metadata, bool end_stream) PURE;
+                             const ResponseMetadata& metadata, InsertCallback insert_complete,
+                             bool end_stream) PURE;
 
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
@@ -148,7 +152,8 @@ public:
                           bool end_stream) PURE;
 
   // Inserts trailers into the cache.
-  virtual void insertTrailers(const Http::ResponseTrailerMap& trailers) PURE;
+  virtual void insertTrailers(const Http::ResponseTrailerMap& trailers,
+                              InsertCallback insert_complete) PURE;
 
   // This routine is called prior to an InsertContext being destroyed. InsertContext is responsible
   // for making sure that any async activities are cleaned up before returning from onDestroy().
@@ -247,9 +252,13 @@ public:
   //
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
+  //
+  // The on_complete callback is called with true if the update is successful,
+  // false if the update was not performed.
   virtual void updateHeaders(const LookupContext& lookup_context,
                              const Http::ResponseHeaderMap& response_headers,
-                             const ResponseMetadata& metadata) PURE;
+                             const ResponseMetadata& metadata,
+                             std::function<void(bool)> on_complete) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;
@@ -268,7 +277,7 @@ public:
   //
   // Pass factory context to allow HttpCache to use async client, stats scope
   // etc.
-  virtual HttpCache&
+  virtual std::shared_ptr<HttpCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
            Server::Configuration::FactoryContext& context) PURE;
   ~HttpCacheFactory() override = default;

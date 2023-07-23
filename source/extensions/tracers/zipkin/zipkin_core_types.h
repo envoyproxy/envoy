@@ -48,10 +48,10 @@ public:
    */
   const std::string toJson() const {
     Util::Replacements replacements;
-    return absl::StrReplaceAll(
-        MessageUtil::getJsonStringFromMessageOrDie(toStruct(replacements), /* pretty_print */ false,
-                                                   /* always_print_primitive_fields */ true),
-        replacements);
+    return absl::StrReplaceAll(MessageUtil::getJsonStringFromMessageOrError(
+                                   toStruct(replacements), /* pretty_print */ false,
+                                   /* always_print_primitive_fields */ true),
+                               replacements);
   };
 };
 
@@ -314,9 +314,7 @@ public:
   /**
    * Default constructor. Creates an empty span.
    */
-  explicit Span(TimeSource& time_source)
-      : trace_id_(0), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
-        tracer_(nullptr), time_source_(time_source) {}
+  explicit Span(TimeSource& time_source) : time_source_(time_source) {}
 
   /**
    * Sets the span's trace id attribute.
@@ -590,19 +588,19 @@ public:
 
 private:
   static const std::string EMPTY_HEX_STRING_;
-  uint64_t trace_id_;
+  uint64_t trace_id_{0};
   std::string name_;
-  uint64_t id_;
+  uint64_t id_{0};
   absl::optional<uint64_t> parent_id_;
-  bool debug_;
-  bool sampled_;
+  bool debug_{false};
+  bool sampled_{false};
   std::vector<Annotation> annotations_;
   std::vector<BinaryAnnotation> binary_annotations_;
   absl::optional<int64_t> timestamp_;
   absl::optional<int64_t> duration_;
   absl::optional<uint64_t> trace_id_high_;
-  int64_t monotonic_start_time_;
-  TracerInterface* tracer_;
+  int64_t monotonic_start_time_{0};
+  TracerInterface* tracer_{nullptr};
   TimeSource& time_source_;
 };
 

@@ -108,7 +108,7 @@ RST_CODE_BLOCK = '.. code-block::'
 
 # Path names.
 ABSPATH = re.compile(r'(?:\s|^)((/[A-Za-z0-9_.*-]+)+)(?:\s|$)')
-FILEREF = re.compile(r'(?:\s|^)([A-Za-z0-9_./-]+\.(cc|h|py|sh))(?:\s|$)')
+FILEREF = re.compile(r'(?:\s|^)([A-Za-z0-9_./-]+\.(cc|js|h|py|sh))(?:\s|$)')
 
 # Ordinals (1st, 2nd, 3rd, 4th, ...)
 ORDINALS = re.compile(r'([0-9]*1st|[0-9]*2nd|[0-9]*3rd|[0-9]+th)')
@@ -812,12 +812,9 @@ if __name__ == "__main__":
 
     # Exclude ./third_party/ directory from spell checking, even when requested through arguments.
     # Otherwise git pre-push hook checks it for merged commits.
-    paths = [
-        path for path in paths
-        if not path.startswith('./third_party/') and not path.startswith('./third_party/')
-    ]
+    paths = [path for path in paths if not path.startswith('./third_party/')]
 
-    exts = ['.cc', '.h', '.proto']
+    exts = ['.cc', '.js', '.h', '.proto']
     if args.test_ignore_exts:
         exts = None
     target_paths = []

@@ -22,8 +22,6 @@ envoy_py_test(
         "@kafka_server_binary//:all",
     ] + glob(["*.j2"]),
     flaky = True,
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         requirement("Jinja2"),
         requirement("MarkupSafe"),

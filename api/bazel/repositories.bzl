@@ -18,6 +18,8 @@ def api_dependencies():
     )
     external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:pgv.patch"],
     )
     external_http_archive(
         name = "com_google_googleapis",
@@ -42,12 +44,15 @@ def api_dependencies():
     )
     external_http_archive(
         name = "opentelemetry_proto",
-        build_file_content = OPENTELEMETRY_LOGS_BUILD_CONTENT,
+        build_file_content = OPENTELEMETRY_BUILD_CONTENT,
     )
     external_http_archive(
         name = "com_github_bufbuild_buf",
         build_file_content = BUF_BUILD_CONTENT,
-        tags = ["manual"],
+    )
+
+    external_http_archive(
+        name = "com_github_chrusty_protoc_gen_jsonschema",
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
@@ -111,7 +116,7 @@ go_proto_library(
 )
 """
 
-OPENTELEMETRY_LOGS_BUILD_CONTENT = """
+OPENTELEMETRY_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
@@ -119,6 +124,17 @@ api_cc_py_proto_library(
     name = "common",
     srcs = [
         "opentelemetry/proto/common/v1/common.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+api_cc_py_proto_library(
+    name = "resource",
+    srcs = [
+        "opentelemetry/proto/resource/v1/resource.proto",
+    ],
+    deps = [
+        "//:common",
     ],
     visibility = ["//visibility:public"],
 )
@@ -137,10 +153,10 @@ api_cc_py_proto_library(
     srcs = [
         "opentelemetry/proto/collector/logs/v1/logs_service.proto",
         "opentelemetry/proto/logs/v1/logs.proto",
-        "opentelemetry/proto/resource/v1/resource.proto",
     ],
     deps = [
         "//:common",
+        "//:resource",
     ],
     visibility = ["//visibility:public"],
 )
@@ -149,6 +165,39 @@ go_proto_library(
     name = "logs_go_proto",
     importpath = "go.opentelemetry.io/proto/otlp/logs/v1",
     proto = ":logs",
+    visibility = ["//visibility:public"],
+)
+
+api_cc_py_proto_library(
+    name = "metrics",
+    srcs = [
+        "opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
+        "opentelemetry/proto/metrics/v1/metrics.proto",
+    ],
+    deps = [
+        "//:common",
+        "//:resource",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "metrics_go_proto",
+    importpath = "go.opentelemetry.io/proto/otlp/metrics/v1",
+    proto = ":metrics",
+    visibility = ["//visibility:public"],
+)
+
+api_cc_py_proto_library(
+    name = "trace",
+    srcs = [
+        "opentelemetry/proto/collector/trace/v1/trace_service.proto",
+        "opentelemetry/proto/trace/v1/trace.proto",
+    ],
+    deps = [
+        "//:common",
+        "//:resource",
+    ],
     visibility = ["//visibility:public"],
 )
 """

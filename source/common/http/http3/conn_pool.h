@@ -14,6 +14,7 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #else
 #error "http3 conn pool should not be built with QUIC disabled"
 #endif
@@ -37,6 +38,7 @@ public:
 
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
     ASSERT(quiche_capacity_ != 0);
+    has_created_stream_ = true;
     // Each time a quic stream is allocated the quic capacity needs to get
     // decremented. See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
@@ -58,6 +60,11 @@ public:
   // early data streams.
   bool hasHandshakeCompleted() const override { return has_handshake_completed_; }
 
+  // Overridden to include ReadyForEarlyData state.
+  bool readyForStream() const override {
+    return state() == State::Ready || state() == State::ReadyForEarlyData;
+  }
+
   void updateCapacity(uint64_t new_quiche_capacity) {
     // Each time we update the capacity make sure to reflect the update in the
     // connection pool.
@@ -77,6 +84,11 @@ public:
       parent_.incrConnectingAndConnectedStreamCapacity(new_capacity - old_capacity, *this);
     }
   }
+
+  bool hasCreatedStream() const { return has_created_stream_; }
+
+protected:
+  bool supportsEarlyData() const override { return true; }
 
 private:
   // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
@@ -104,6 +116,8 @@ private:
   // do 0-RTT during connect(), deferring it to avoid handling network events during CodecClient
   // construction.
   Event::SchedulableCallbackPtr async_connect_callback_;
+  // True if newStream() is ever called.
+  bool has_created_stream_{false};
 };
 
 // An interface to propagate H3 handshake result.
@@ -149,6 +163,7 @@ public:
 
 protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
+  void onConnectFailed(Envoy::ConnectionPool::ActiveClient&) override;
 
 private:
   friend class Http3ConnPoolImplPeer;
@@ -160,6 +175,9 @@ private:
   quic::QuicServerId server_id_;
   // If not nullopt, called when the handshake state changes.
   OptRef<PoolConnectResultCallback> connect_callback_;
+
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
 };
 
 std::unique_ptr<Http3ConnPoolImpl>

@@ -18,6 +18,14 @@ using Common::Wasm::PluginHandleSharedPtrThreadLocal;
 
 AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return createAccessLogInstance(
+      proto_config, std::move(filter),
+      static_cast<Server::Configuration::CommonFactoryContext&>(context));
+}
+
+AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
     Server::Configuration::CommonFactoryContext& context) {
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
@@ -63,8 +71,8 @@ std::string WasmAccessLogFactory::name() const { return "envoy.access_loggers.wa
 /**
  * Static registration for the wasm access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(WasmAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.wasm_access_log"};
+LEGACY_REGISTER_FACTORY(WasmAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+                        "envoy.wasm_access_log");
 
 } // namespace Wasm
 } // namespace AccessLoggers

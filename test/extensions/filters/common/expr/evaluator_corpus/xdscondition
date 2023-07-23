@@ -1,0 +1,48 @@
+expression {
+  call_expr {
+    function: "_==_"
+    args {
+      call_expr {
+        function: "_[_]"
+        args {
+          select_expr {
+            operand {
+              select_expr {
+                operand {
+                  ident_expr {
+                    name: "xds"
+                  }
+                }
+                field: "upstream_host_metadata"
+              }
+            }
+            field: "filter_metadata"
+          }
+          const_expr {
+            string_value: "other"
+          }
+              }
+        const_expr {
+          string_value: "label"
+        }
+      }
+      const_expr {
+        string_value: "prod"
+      }
+    }
+  }
+}
+stream_info {
+  start_time: 1522796769123
+  upstream_metadata {
+    filter_metadata {
+      key: "other"
+      value: {
+        fields {
+          key: "label"
+          value: { string_value: "prod" }
+        }
+      }
+    }
+  }
+}

@@ -1,11 +1,14 @@
 #include "source/common/grpc/google_async_client_impl.h"
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/http/protocol.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
 #include "source/common/config/datasource.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/google_grpc_creds_impl.h"
@@ -84,8 +87,9 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
       target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
-      metadata_parser_(
-          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {
+      metadata_parser_(Router::HeaderParser::configure(
+          config.initial_metadata(),
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
@@ -160,7 +164,8 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
                                              const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
-      options_(options) {}
+      options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
+                                             Network::ConnectionInfoProviderSharedPtr{}) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -181,6 +186,9 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
   auto initial_metadata = Http::RequestHeaderMapImpl::create();
+  // TODO(cpakulski): Find a better way to access requestHeaders
+  // request headers should not be stored in stream_info.
+  // Maybe put it to parent_context?
   parent_.metadata_parser_->evaluateHeaders(*initial_metadata, options_.parent_context.stream_info);
   callbacks_.onCreateInitialMetadata(*initial_metadata);
   initial_metadata->iterate([this](const Http::HeaderEntry& header) {
@@ -455,7 +463,7 @@ void GoogleAsyncRequestImpl::cancel() {
 }
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata);
+  current_span_->injectContext(metadata, nullptr);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

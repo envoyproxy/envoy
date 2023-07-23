@@ -26,8 +26,8 @@ public:
     envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheCircuitBreakers cb_config;
     TestUtility::loadFromYaml(config_yaml, cb_config);
 
-    resource_manager_ =
-        std::make_unique<DnsCacheResourceManagerImpl>(store_, loader_, "dummy", cb_config);
+    resource_manager_ = std::make_unique<DnsCacheResourceManagerImpl>(*store_.rootScope(), loader_,
+                                                                      "dummy", cb_config);
   }
 
   void cleanup() {

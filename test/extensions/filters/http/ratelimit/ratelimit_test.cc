@@ -53,8 +53,8 @@ public:
     envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
-    config_ = std::make_shared<FilterConfig>(proto_config, local_info_, stats_store_, runtime_,
-                                             http_context_);
+    config_ = std::make_shared<FilterConfig>(proto_config, local_info_, *stats_store_.rootScope(),
+                                             runtime_, http_context_);
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
@@ -137,7 +137,7 @@ TEST_F(HttpRateLimitFilterTest, NoRoute) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
@@ -153,7 +153,7 @@ TEST_F(HttpRateLimitFilterTest, NoCluster) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -167,7 +167,7 @@ TEST_F(HttpRateLimitFilterTest, NoApplicableRateLimit) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -182,7 +182,7 @@ TEST_F(HttpRateLimitFilterTest, NoDescriptor) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -196,7 +196,7 @@ TEST_F(HttpRateLimitFilterTest, RuntimeDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -230,7 +230,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -272,7 +272,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -328,7 +328,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -380,7 +380,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -410,7 +410,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateErrorResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -598,7 +598,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -650,7 +650,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithBody) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -713,7 +713,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithBodyAndContentType) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -785,7 +785,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithFilterHeaders) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -883,7 +883,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1014,7 +1014,7 @@ TEST_F(HttpRateLimitFilterTest, RouteRateLimitDisabledForRouteKey) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1033,7 +1033,7 @@ TEST_F(HttpRateLimitFilterTest, VirtualHostRateLimitDisabledForRouteKey) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1054,7 +1054,7 @@ TEST_F(HttpRateLimitFilterTest, IncorrectRequestType) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1074,7 +1074,7 @@ TEST_F(HttpRateLimitFilterTest, IncorrectRequestType) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1113,7 +1113,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1156,7 +1156,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1175,7 +1175,6 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute vh_settings;
   vh_settings.clear_vh_rate_limits();
   FilterConfigPerRoute per_route_config_(vh_settings);
-  InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1184,9 +1183,9 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
@@ -1209,7 +1208,7 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1234,9 +1233,9 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
@@ -1259,7 +1258,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1282,9 +1281,9 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(true));
@@ -1309,7 +1308,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1332,9 +1331,9 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -1356,7 +1355,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1381,9 +1380,9 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -1405,7 +1404,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1430,9 +1429,9 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
@@ -1452,7 +1451,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
@@ -1475,8 +1474,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
@@ -1487,13 +1485,55 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
   EXPECT_EQ(
       0, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// Tests that the domain is properly overridden when set at the per-route level
+TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
+  SetUpTest(filter_config_);
+  const std::string per_route_domain = "bar";
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
+  settings.set_domain(per_route_domain);
+  FilterConfigPerRoute per_route_config_(settings);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .Times(2)
+      .WillRepeatedly(Return(&per_route_config_));
+
+  EXPECT_CALL(*client_, limit(_, per_route_domain,
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
+                              _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ConfigValueTest) {

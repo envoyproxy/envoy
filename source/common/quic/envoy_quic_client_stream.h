@@ -3,7 +3,9 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/quic/envoy_quic_stream.h"
+#include "source/common/quic/http_datagram_handler.h"
 
+#include "quiche/common/simple_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
 
 namespace Envoy {
@@ -38,6 +40,7 @@ public:
 
   // quic::QuicStream
   void OnStreamFrame(const quic::QuicStreamFrame& frame) override;
+  bool OnStopSending(quic::QuicResetStreamError error) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
@@ -74,9 +77,23 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
-  Http::ResponseDecoder* response_decoder_{nullptr};
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
+  // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
+  // starts to receive HTTP/3 Datagrams and decode into Capsules.
+  void useCapsuleProtocol();
+#endif
 
+  Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Setting |http_datagram_handler_| enables HTTP Datagram support.
+  std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
+#endif
+
+  // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".
+  // It will be empty, when no such request is active.
+  std::string upgrade_protocol_;
 };
 
 } // namespace Quic

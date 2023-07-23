@@ -25,14 +25,6 @@ public:
                     StatNameTagVectorOptConstRef stat_name_tags, SymbolTable& symbol_table);
 
   /**
-   * Combines a stat name and tags into a single stat name.
-   * @param name StaName the stat name to use.
-   * @param stat_name_tags StatNameTagVector the stat name tags to optionally add to the stat name.
-   */
-  TagStatNameJoiner(StatName stat_name, StatNameTagVectorOptConstRef stat_name_tags,
-                    SymbolTable& symbol_table);
-
-  /**
    * @return StatName the full stat name, including the tag suffix.
    */
   StatName nameWithTags() const { return name_with_tags_; }

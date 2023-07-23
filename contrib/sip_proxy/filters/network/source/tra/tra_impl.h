@@ -1,16 +1,11 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <string>
-#include <vector>
-
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/linked_object.h"
@@ -49,16 +44,20 @@ public:
   void setRequestCallbacks(RequestCallbacks& callbacks) override;
   void createTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
+                                     const absl::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void updateTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
+                                     const absl::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                       const absl::optional<TraContextMap> context,
                                        Tracing::Span& parent_span,
                                        const StreamInfo::StreamInfo& stream_info) override;
   void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                     const absl::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void subscribeTrafficRoutingAssistant(const std::string& type, Tracing::Span& parent_span,
@@ -89,6 +88,12 @@ public:
     UNREFERENCED_PARAMETER(status);
     UNREFERENCED_PARAMETER(message);
   };
+
+private:
+  void sendRequest(
+      const std::string& method,
+      envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest& request,
+      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info);
 
 private:
   class AsyncRequestCallbacks

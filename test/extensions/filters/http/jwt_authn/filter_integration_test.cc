@@ -3,10 +3,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/string_accessor_impl.h"
-#include "source/extensions/filters/http/common/pass_through_filter.h"
 
-#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/integration/filters/header_to_filter_state.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 
@@ -19,44 +18,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
-
-const char HeaderToFilterStateFilterName[] = "envoy.filters.http.header_to_filter_state_for_test";
-// This filter extracts a string header from "header" and
-// save it into FilterState as name "state" as read-only Router::StringAccessor.
-class HeaderToFilterStateFilter : public Http::PassThroughDecoderFilter {
-public:
-  HeaderToFilterStateFilter(const std::string& header, const std::string& state)
-      : header_(header), state_(state) {}
-
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    const auto entry = headers.get(header_);
-    if (!entry.empty()) {
-      decoder_callbacks_->streamInfo().filterState()->setData(
-          state_, std::make_unique<Router::StringAccessorImpl>(entry[0]->value().getStringView()),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::FilterChain);
-    }
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-private:
-  Http::LowerCaseString header_;
-  std::string state_;
-};
-
-class HeaderToFilterStateFilterConfig : public Common::EmptyHttpFilterConfig {
-public:
-  HeaderToFilterStateFilterConfig()
-      : Common::EmptyHttpFilterConfig(HeaderToFilterStateFilterName) {}
-
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
-    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(
-          std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
-    };
-  }
-};
 
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
@@ -72,7 +33,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
   filter.mutable_typed_config()->PackFrom(proto_config);
-  return MessageUtil::getJsonStringFromMessageOrDie(filter);
+  return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
 std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_listener) {
@@ -82,28 +43,27 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
   auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
   auto* async_fetch = provider0.mutable_remote_jwks()->mutable_async_fetch();
   async_fetch->set_fast_listener(fast_listener);
+  // Set failed_refetch_duration to a big value to disable failed refetch.
+  // as it interferes the two FailedAsyncFetch integration tests.
+  async_fetch->mutable_failed_refetch_duration()->set_seconds(600);
 
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
   filter.mutable_typed_config()->PackFrom(proto_config);
-  return MessageUtil::getJsonStringFromMessageOrDie(filter);
+  return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
 std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {
-public:
-  LocalJwksIntegrationTest() : registration_(factory_) {}
+class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {};
 
-  HeaderToFilterStateFilterConfig factory_;
-  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
-};
-
-INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, LocalJwksIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // With local Jwks, this test verifies a request is passed with a good Jwt token.
 TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
@@ -265,7 +225,14 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 )";
 
   config_helper_.prependFilter(getAuthFilterConfig(auth_filter_conf, true));
-  config_helper_.prependFilter(absl::StrCat("name: ", HeaderToFilterStateFilterName));
+  config_helper_.prependFilter(R"(
+  name: header-to-filter-state
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
+    header_name: jwt_selector
+    state_name: jwt_selector
+    read_only: true
+)");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -341,16 +308,11 @@ TEST_P(LocalJwksIntegrationTest, ConnectRequestWithRegExMatch) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    // Because CONNECT requests for HTTP/1 do not include a path, they will fail
-    // to find a route match and return a 404.
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("404", response->headers().getStatusValue());
-  } else {
-    ASSERT_TRUE(response->waitForReset());
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  }
+  // Because CONNECT requests do not include a path, they will fail
+  // to find a route match and return a 404.
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 }
 
 // The test case with a fake upstream for remote Jwks server.
@@ -425,9 +387,10 @@ public:
   FakeStreamPtr jwks_request_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, RemoteJwksIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, RemoteJwksIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // With remote Jwks, this test verifies a request is passed with a good Jwt token
 // and a good public key fetched from a remote server.
@@ -649,9 +612,10 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, PerRouteIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, PerRouteIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // This test verifies per-route config disabled.
 TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabled) {

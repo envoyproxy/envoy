@@ -4,6 +4,7 @@
 
 #include "source/common/upstream/load_balancer_factory_base.h"
 
+#include "test/integration/load_balancers/config.pb.h"
 #include "test/test_common/registry.h"
 
 namespace Envoy {
@@ -45,7 +46,9 @@ private:
   public:
     LbFactory(const Upstream::HostSharedPtr& host) : host_(host) {}
 
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(host_); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      return std::make_unique<LbImpl>(host_);
+    }
 
     const Upstream::HostSharedPtr host_;
   };
@@ -53,14 +56,15 @@ private:
   const Upstream::HostSharedPtr host_;
 };
 
-class CustomLbFactory : public Upstream::TypedLoadBalancerFactoryBase {
+class CustomLbFactory : public Upstream::TypedLoadBalancerFactoryBase<
+                            ::test::integration::custom_lb::CustomLbConfig> {
 public:
   CustomLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancers.custom_lb") {}
 
-  Upstream::ThreadAwareLoadBalancerPtr
-  create(const Upstream::PrioritySet&, Upstream::ClusterStats&, Stats::Scope&, Runtime::Loader&,
-         Random::RandomGenerator&,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy&) override {
+  Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig>,
+                                              const Upstream::ClusterInfo&,
+                                              const Upstream::PrioritySet&, Runtime::Loader&,
+                                              Random::RandomGenerator&, TimeSource&) override {
     return std::make_unique<ThreadAwareLbImpl>();
   }
 };

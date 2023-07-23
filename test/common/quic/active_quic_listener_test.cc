@@ -14,6 +14,7 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/server/configuration_impl.h"
@@ -45,6 +46,39 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
+// A test quic listener that exits after processing one round of packets.
+class TestActiveQuicListener : public ActiveQuicListener {
+  using ActiveQuicListener::ActiveQuicListener;
+
+  void onReadReady() override {
+    ActiveQuicListener::onReadReady();
+    dispatcher().post([this] { dispatcher().exit(); });
+  }
+};
+
+class TestActiveQuicListenerFactory : public ActiveQuicListenerFactory {
+public:
+  using ActiveQuicListenerFactory::ActiveQuicListenerFactory;
+
+protected:
+  Network::ConnectionHandler::ActiveUdpListenerPtr createActiveQuicListener(
+      Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+      Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
+      const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+      uint32_t packets_to_read_to_connection_count_ratio,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+      QuicConnectionIdGeneratorPtr&& cid_generator) override {
+    return std::make_unique<TestActiveQuicListener>(
+        runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
+        listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
+        packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
+        proof_source_factory, std::move(cid_generator));
+  }
+};
+
 class ActiveQuicListenerPeer {
 public:
   static EnvoyQuicDispatcher* quicDispatcher(ActiveQuicListener& listener) {
@@ -73,7 +107,7 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
         connection_handler_(*dispatcher_, absl::nullopt),
-        transport_socket_factory_(true, store_,
+        transport_socket_factory_(true, *store_.rootScope(),
                                   std::make_unique<NiceMock<Ssl::MockServerContextConfig>>()),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
@@ -92,9 +126,10 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
     ASSERT_TRUE(Network::Socket::applyOptions(listen_socket_->options(), *listen_socket_,
                                               envoy::config::core::v3::SocketOption::STATE_BOUND));
-
-    ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
-    ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(listen_socket_));
+    EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                    listener_config_.socket_factories_[0].get()),
+                getListenSocket(_))
+        .WillRepeatedly(Return(listen_socket_));
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
     // supported.
@@ -120,7 +155,9 @@ protected:
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
-            scoped_runtime_.loader(), 0, connection_handler_, *dispatcher_, listener_config_));
+            scoped_runtime_.loader(), 0, connection_handler_,
+            listener_config_.socket_factories_[0]->getListenSocket(0), *dispatcher_,
+            listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
         ActiveQuicListenerPeer::cryptoConfig(*quic_listener_);
@@ -136,25 +173,26 @@ protected:
     // to get it into a consistent state.
     dispatcher_->post([this]() { quic_listener_->onReadReady(); });
 
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    // Run until one read has been processed: the fake listener handles loop exit.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1,
-                                                       quic_stat_names_);
+    return std::make_unique<TestActiveQuicListenerFactory>(
+        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, absl::nullopt);
   }
 
   void maybeConfigureMocks(int connection_count) {
-    EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Return(filter_chain_));
     EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Invoke([](Network::Connection& connection,
-                                  const std::vector<Network::FilterFactoryCb>& filter_factories) {
+                                  const Filter::NetworkFilterFactoriesList& filter_factories) {
           EXPECT_EQ(1u, filter_factories.size());
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
@@ -169,12 +207,16 @@ protected:
     testing::Sequence seq;
     for (int i = 0; i < connection_count; ++i) {
       auto read_filter = std::make_shared<Network::MockReadFilter>();
-      filter_factories_.push_back(
-          {Network::FilterFactoryCb([read_filter, this](Network::FilterManager& filter_manager) {
-            filter_manager.addReadFilter(read_filter);
-            read_filter->callbacks_->connection().addConnectionCallbacks(
-                network_connection_callbacks_);
-          })});
+      Filter::NetworkFilterFactoriesList factories;
+      factories.push_back(
+          std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+              [read_filter, this](Network::FilterManager& filter_manager) {
+                filter_manager.addReadFilter(read_filter);
+                read_filter->callbacks_->connection().addConnectionCallbacks(
+                    network_connection_callbacks_);
+              }));
+
+      filter_factories_.push_back(std::move(factories));
       // Stop iteration to avoid calling getRead/WriteBuffer().
       EXPECT_CALL(*read_filter, onNewConnection())
           .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -203,14 +245,6 @@ protected:
         client_sockets_.back()->ioHandle(), slice.data(), 1, nullptr,
         *listen_socket_->connectionInfoProvider().localAddress());
     ASSERT_EQ(slice[0].len_, send_rc.return_value_);
-
-#if defined(__APPLE__)
-    // This sleep makes the tests pass more reliably. Some debugging showed that without this,
-    // no packet is received when the event loop is running.
-    // TODO(ggreenway): make tests more reliable, and handle packet loss during the tests, possibly
-    // by retransmitting on a timer.
-    ::usleep(1000); // NO_CHECK_FORMAT(real_time)
-#endif
   }
 
   void readFromClientSockets() {
@@ -307,7 +341,7 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   // The following two containers must guarantee pointer stability as addresses
   // of elements are saved in expectations before new elements are added.
-  std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
+  std::list<Filter::NetworkFilterFactoriesList> filter_factories_;
   const Network::MockFilterChain* filter_chain_;
   QuicServerTransportSocketFactory transport_socket_factory_;
   quic::ParsedQuicVersion quic_version_;
@@ -329,7 +363,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
@@ -350,6 +384,10 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
                                            ->config()
                                            ->max_time_before_crypto_handshake()
                                            .ToMilliseconds());
+#ifndef WIN32
+  EXPECT_TRUE(
+      static_cast<const EnvoyQuicServerConnection*>(session->connection())->actuallyDeferSend());
+#endif
   readFromClientSockets();
 }
 
@@ -363,7 +401,7 @@ TEST_P(ActiveQuicListenerTest, NormalizeTimeouts) {
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
@@ -394,7 +432,7 @@ TEST_P(ActiveQuicListenerTest, ConfigureReasonableInitialFlowControlWindow) {
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   const quic::QuicSession* session =
       quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
   ASSERT(session != nullptr);
@@ -415,13 +453,15 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   maybeConfigureMocks(count + 1);
   // Create 1 session to increase number of packet to read in the next read event.
   sendCHLO(quic::test::TestConnectionId());
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= count; ++i) {
     sendCHLO(quic::test::TestConnectionId(i));
   }
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // The first kNumSessionsToCreatePerLoop were processed immediately, the next
@@ -444,19 +484,19 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   maybeConfigureMocks(/* connection_count = */ 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
   sendCHLO(quic::test::TestConnectionId(1));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
 
   scoped_runtime_.mergeValues({{"quic.enabled", " false"}});
   sendCHLO(quic::test::TestConnectionId(2));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   // If listener was enabled, there should have been session created for active connection.
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 
   scoped_runtime_.mergeValues({{"quic.enabled", " true"}});
   sendCHLO(quic::test::TestConnectionId(2));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
@@ -485,7 +525,7 @@ TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));

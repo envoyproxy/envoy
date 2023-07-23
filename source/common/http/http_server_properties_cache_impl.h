@@ -30,6 +30,7 @@ class HttpServerPropertiesCacheImpl : public HttpServerPropertiesCache,
                                       Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
   HttpServerPropertiesCacheImpl(Event::Dispatcher& dispatcher,
+                                std::vector<std::string>&& canonical_suffixes,
                                 std::unique_ptr<KeyValueStore>&& store, size_t max_entries);
   ~HttpServerPropertiesCacheImpl() override;
 
@@ -38,7 +39,7 @@ public:
     OriginData() = default;
     OriginData(OptRef<std::vector<AlternateProtocol>> protocols, std::chrono::microseconds srtt,
                Http3StatusTrackerPtr&& tracker, uint32_t concurrent_streams)
-        : protocols(protocols), srtt(srtt), h3_status_tracker(std::move(tracker)),
+        : protocols(protocols.copy()), srtt(srtt), h3_status_tracker(std::move(tracker)),
           concurrent_streams(concurrent_streams) {}
 
     // The alternate protocols supported if available.
@@ -132,8 +133,26 @@ private:
 
   ProtocolsMap::iterator addOriginData(const Origin& origin, OriginData&& origin_data);
 
+  // Returns the canonical suffix, if any, associated with `hostname`.
+  absl::string_view getCanonicalSuffix(absl::string_view hostname);
+
+  // Returns the canonical origin, if any, associated with `hostname`.
+  absl::optional<Origin> getCanonicalOrigin(absl::string_view hostname);
+
+  // If `origin` matches a canonical suffix then updates canonical_alt_svc_map_ accordingly.
+  void maybeSetCanonicalOrigin(const Origin& origin);
+
   // The key value store, if flushing to persistent storage.
   std::unique_ptr<KeyValueStore> key_value_store_;
+
+  // Contains a map of servers which could share the same alternate protocol.
+  // Map from a Canonical suffix to an actual origin, which has a plausible alternate
+  // protocol mapping.
+  std::map<std::string, Origin> canonical_alt_svc_map_;
+
+  // Contains list of suffixes (for example ".c.youtube.com",
+  // ".googlevideo.com", ".googleusercontent.com") of canonical hostnames.
+  std::vector<std::string> canonical_suffixes_;
 
   const size_t max_entries_;
 };

@@ -1,0 +1,26 @@
+diff --git a/BUILD b/BUILD
+index 06b69411a8..05cd878ae8 100644
+--- a/BUILD
++++ b/BUILD
+@@ -29,7 +29,7 @@ licenses(["reciprocal"])
+ package(
+     default_visibility = ["//visibility:public"],
+     features = [
+-        "layering_check",
++        "-layering_check",
+         "-parse_headers",
+     ],
+ )
+diff --git a/src/core/BUILD b/src/core/BUILD
+index 1bb970e049..81265483e9 100644
+--- a/src/core/BUILD
++++ b/src/core/BUILD
+@@ -24,7 +24,7 @@ licenses(["reciprocal"])
+ package(
+     default_visibility = ["//:__subpackages__"],
+     features = [
+-        "layering_check",
++        "-layering_check",
+     ],
+ )
+

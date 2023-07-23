@@ -10,6 +10,7 @@
 #include "envoy/server/options.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
 
 #include "spdlog/spdlog.h"
 
@@ -49,6 +50,9 @@ public:
   OptionsImpl(const std::string& service_cluster, const std::string& service_node,
               const std::string& service_zone, spdlog::level::level_enum log_level);
 
+  // Constructor for mobile
+  OptionsImpl() = default;
+
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setUseDynamicBaseId(bool use_dynamic_base_id) { use_dynamic_base_id_ = use_dynamic_base_id; }
@@ -56,7 +60,10 @@ public:
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigProto(const envoy::config::bootstrap::v3::Bootstrap& config_proto) {
-    config_proto_ = config_proto;
+    *config_proto_ = config_proto;
+  }
+  void setConfigProto(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto) {
+    config_proto_ = std::move(config_proto);
   }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setAdminAddressPath(const std::string& admin_address_path) {
@@ -71,7 +78,10 @@ public:
   }
   void setDrainStrategy(Server::DrainStrategy drain_strategy) { drain_strategy_ = drain_strategy; }
   void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
-  void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
+  void setLogFormat(const std::string& log_format) {
+    log_format_ = log_format;
+    log_format_set_ = true;
+  }
   void setLogPath(const std::string& log_path) { log_path_ = log_path; }
   void setRestartEpoch(uint64_t restart_epoch) { restart_epoch_ = restart_epoch; }
   void setMode(Server::Mode mode) { mode_ = mode; }
@@ -113,7 +123,7 @@ public:
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
-    return config_proto_;
+    return *config_proto_;
   }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
@@ -133,6 +143,7 @@ public:
     return component_log_levels_;
   }
   const std::string& logFormat() const override { return log_format_; }
+  bool logFormatSet() const override { return log_format_set_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
   bool enableFineGrainLogging() const override { return enable_fine_grain_logging_; }
   const std::string& logPath() const override { return log_path_; }
@@ -182,7 +193,8 @@ private:
   std::string base_id_path_;
   uint32_t concurrency_{1};
   std::string config_path_;
-  envoy::config::bootstrap::v3::Bootstrap config_proto_;
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_proto_{
+      new envoy::config::bootstrap::v3::Bootstrap()};
   std::string config_yaml_;
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
@@ -193,6 +205,7 @@ private:
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
   std::string log_format_{Logger::Logger::DEFAULT_LOG_FORMAT};
+  bool log_format_set_{false};
   bool log_format_escaped_{false};
   std::string log_path_;
   uint64_t restart_epoch_{0};

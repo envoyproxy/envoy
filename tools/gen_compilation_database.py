@@ -12,18 +12,24 @@ from pathlib import Path
 def generate_compilation_database(args):
     # We need to download all remote outputs for generated source code. This option lives here to override those
     # specified in bazelrc.
-    bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
+    bazel_startup_options = shlex.split(os.environ.get("BAZEL_STARTUP_OPTION_LIST", ""))
+    bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTION_LIST", "")) + [
         "--config=compdb",
         "--remote_download_outputs=all",
     ]
 
-    subprocess.check_call([args.bazel, "build"] + bazel_options + [
+    source_dir_targets = args.bazel_targets
+    if args.exclude_contrib:
+        source_dir_targets.remove("//contrib/...")
+
+    subprocess.check_call([args.bazel, *bazel_startup_options, "build"] + bazel_options + [
         "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
         "--output_groups=compdb_files,header_files"
-    ] + args.bazel_targets)
+    ] + source_dir_targets)
 
-    execroot = subprocess.check_output([args.bazel, "info", "execution_root"]
-                                       + bazel_options).decode().strip()
+    execroot = subprocess.check_output([
+        args.bazel, *bazel_startup_options, "info", *bazel_options, "execution_root", *bazel_options
+    ]).decode().strip()
 
     db_entries = []
     for db in Path(execroot).glob('**/*.compile_commands.json'):
@@ -111,14 +117,12 @@ if __name__ == "__main__":
     parser.add_argument('--include_headers', action='store_true')
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
+    parser.add_argument('--exclude_contrib', action='store_true')
     parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
-        'bazel_targets',
-        nargs='*',
-        default=[
+        'bazel_targets', nargs='*', default=[
             "//source/...",
             "//test/...",
-            "//tools/...",
             "//contrib/...",
         ])
     args = parser.parse_args()

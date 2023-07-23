@@ -316,10 +316,14 @@ public:
   virtual void shutdown() PURE;
 
   /**
-   * @return const envoy::config::core::v3::BindConfig& cluster manager wide bind configuration for
-   * new upstream connections.
+   * @return whether the shutdown method has been called.
    */
-  virtual const envoy::config::core::v3::BindConfig& bindConfig() const PURE;
+  virtual bool isShutdown() PURE;
+
+  /**
+   * @return cluster manager wide bind configuration for new upstream connections.
+   */
+  virtual const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
 
   /**
    * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
@@ -378,7 +382,10 @@ public:
    *
    * @return the stat names.
    */
-  virtual const ClusterStatNames& clusterStatNames() const PURE;
+  virtual const ClusterTrafficStatNames& clusterStatNames() const PURE;
+  virtual const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const PURE;
+  virtual const ClusterLbStatNames& clusterLbStatNames() const PURE;
+  virtual const ClusterEndpointStatNames& clusterEndpointStatNames() const PURE;
   virtual const ClusterLoadReportStatNames& clusterLoadReportStatNames() const PURE;
   virtual const ClusterCircuitBreakersStatNames& clusterCircuitBreakersStatNames() const PURE;
   virtual const ClusterRequestResponseSizeStatNames&
@@ -429,6 +436,14 @@ public:
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+
+  /**
+   * @param common_lb_config The config field to be stored
+   * @return shared_ptr to the CommonLbConfig
+   */
+  virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
+  getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -495,12 +510,13 @@ public:
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-                      ClusterConnectivityState& state) PURE;
+                      ClusterConnectivityState& state,
+                      absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
 
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
@@ -533,22 +549,13 @@ public:
    * Parameters for createClusterInfo().
    */
   struct CreateClusterInfoParams {
-    Server::Admin& admin_;
-    Runtime::Loader& runtime_;
+    Server::Configuration::ServerFactoryContext& server_context_;
     const envoy::config::cluster::v3::Cluster& cluster_;
     const envoy::config::core::v3::BindConfig& bind_config_;
     Stats::Store& stats_;
     Ssl::ContextManager& ssl_context_manager_;
     const bool added_via_api_;
-    ClusterManager& cm_;
-    const LocalInfo::LocalInfo& local_info_;
-    Event::Dispatcher& dispatcher_;
-    Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
-    ProtobufMessage::ValidationVisitor& validation_visitor_;
-    Api::Api& api_;
-    const Server::Options& options_;
-    AccessLog::AccessLogManager& access_log_manager_;
   };
 
   /**

@@ -10,7 +10,7 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
     quic::QuicCryptoServerStreamBase::Helper* helper,
     // Though this extension doesn't use the two parameters below, they might be used by
     // downstreams. Do not remove them.
-    OptRef<const Network::TransportSocketFactory> /*transport_socket_factory*/,
+    OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
     Envoy::Event::Dispatcher& /*dispatcher*/) {
   return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
 }

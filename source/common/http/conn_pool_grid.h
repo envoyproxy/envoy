@@ -55,7 +55,7 @@ public:
                          absl::string_view transport_failure_reason,
                          Upstream::HostDescriptionConstSharedPtr host) override;
       void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                       const StreamInfo::StreamInfo& info,
+                       StreamInfo::StreamInfo& info,
                        absl::optional<Http::Protocol> protocol) override;
 
       ConnectionPool::Instance& pool() { return **pool_it_; }
@@ -93,7 +93,7 @@ public:
     // Called by a ConnectionAttempt when the underlying pool is ready.
     void onConnectionAttemptReady(ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
                                   Upstream::HostDescriptionConstSharedPtr host,
-                                  const StreamInfo::StreamInfo& info,
+                                  StreamInfo::StreamInfo& info,
                                   absl::optional<Http::Protocol> protocol);
 
   private:

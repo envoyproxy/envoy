@@ -3,8 +3,8 @@
 Thrift proxy
 ============
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`
-* This filter should be configured with the name *envoy.filters.network.thrift_proxy*.
 
 Statistics
 ----------
@@ -25,6 +25,7 @@ Every configured Thrift proxy filter emits the following statistics:
   request_invalid_type, Counter, Total number of requests with an invalid type
   request_oneway, Counter, Total number of requests of type oneway
   request_passthrough, Counter, Total number of requests with payload passthrough enabled
+  request_internal_error, Counter, Total number of requests that caused an internal error
   response, Counter, Total number of responses
   response_decoding_error, Counter, Total number of responses with a decoding error
   response_error, Counter, Total number of responses with an error

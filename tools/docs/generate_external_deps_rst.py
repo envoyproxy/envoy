@@ -78,7 +78,7 @@ def render_version(version):
 
 
 def render_title(title):
-    underline = '~' * len(title)
+    underline = '-' * len(title)
     return f'\n{title}\n{underline}\n\n'
 
 
@@ -101,7 +101,7 @@ def get_version_url(metadata):
 
 
 def csv_row(dep):
-    return [dep.name, dep.version, dep.release_date, dep.cpe]
+    return [dep.name, dep.version, dep.release_date, dep.cpe, dep.license]
 
 
 def main():
@@ -112,7 +112,7 @@ def main():
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
 
-    Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date'])
+    Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date', 'license'])
     use_categories = defaultdict(lambda: defaultdict(list))
     # Bin rendered dependencies into per-use category lists.
     for k, v in repository_locations.items():
@@ -126,23 +126,32 @@ def main():
         name = rst_link(project_name, project_url)
         version = rst_link(render_version(v['version']), get_version_url(v))
         release_date = v['release_date']
-        dep = Dep(name, project_name.lower(), version, cpe, release_date)
+        license = v.get('license', '')
+        if license:
+            license_url = v.get('license_url', '')
+            if license_url:
+                license = rst_link(license, license_url)
+        dep = Dep(name, project_name.lower(), version, cpe, release_date, license)
         for category in v['use_category']:
             for ext in v.get('extensions', ['core']):
                 use_categories[category][ext].append(dep)
 
     # Generate per-use category RST with CSV tables.
     for category, exts in use_categories.items():
-        content = ''
+        content = f"External dependencies: ``{category or 'core'}``"
+        content += f"\n{'=' * len(content)}\n\n"
         for ext_name, deps in sorted(exts.items()):
+            if not deps:
+                continue
             if ext_name != 'core':
                 content += render_title(ext_name)
             output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
-            content += csv_table(['Name', 'Version', 'Release date', 'CPE'], [2, 1, 1, 2],
+            content += csv_table(['Name', 'Version', 'Release date', 'CPE', 'License'],
+                                 [2, 1, 1, 2, 1],
                                  [csv_row(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
         output_path.write_text(content)
 
-    with tarfile.open(output_filename, "w") as tar:
+    with tarfile.open(output_filename, "w:gz") as tar:
         tar.add(generated_rst_dir, arcname=".")
 
 

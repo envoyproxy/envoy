@@ -11,7 +11,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/v3;typev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Semantic Version]
+// [#protodoc-title: Semantic version]
 
 // Envoy uses SemVer (https://semver.org/). Major/minor versions indicate
 // expected behaviors and APIs, the patch version field is used only

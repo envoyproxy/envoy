@@ -43,6 +43,9 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return base_route_->typedMetadata();
   }
+  bool filterDisabled(absl::string_view name) const override {
+    return base_route_->filterDisabled(name);
+  }
 
 private:
   const Router::RouteConstSharedPtr base_route_;
@@ -84,6 +87,8 @@ public:
   Upstream::ResourcePriority priority() const override;
   const RateLimitPolicy& rateLimitPolicy() const override;
   const RetryPolicy& retryPolicy() const override;
+  const Router::PathMatcherSharedPtr& pathMatcher() const override;
+  const Router::PathRewriterSharedPtr& pathRewriter() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
   uint32_t retryShadowBufferLimit() const override;
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;
@@ -107,8 +112,10 @@ public:
   bool includeAttemptCountInRequest() const override;
   bool includeAttemptCountInResponse() const override;
   const UpgradeMap& upgradeMap() const override;
-  const absl::optional<ConnectConfig>& connectConfig() const override;
+  const ConnectConfigOptRef connectConfig() const override;
   const std::string& routeName() const override;
+  const EarlyDataPolicy& earlyDataPolicy() const override;
+  const RouteStatsContextOptRef routeStatsContext() const override;
 
 private:
   const Router::RouteConstSharedPtr base_route_;

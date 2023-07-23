@@ -69,7 +69,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan(),
+    client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
                    callbacks_->streamInfo());
     initiating_call_ = false;
   }
@@ -106,8 +106,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) {
-  return Http::FilterHeadersStatus::Continue;
+Http::Filter1xxHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) {
+  return Http::Filter1xxHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
@@ -172,6 +172,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            empty_stat_name,
                                            empty_stat_name,
+                                           empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info, false);
     if (config_->enableXEnvoyRateLimitedHeader()) {
@@ -203,6 +204,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
         config_->rateLimitedStatus(), response_body,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
+          config_->responseHeadersParser().evaluateHeaders(
+              headers, *request_headers_, dynamic_cast<const Http::ResponseHeaderMap&>(headers),
+              callbacks_->streamInfo());
         },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
@@ -269,8 +273,7 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
     vh_rate_limits_ = VhRateLimitOptions::Include;
   } else {
     const auto* specific_per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-            "envoy.filters.http.ratelimit", route);
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
     if (specific_per_route_config != nullptr) {
       switch (specific_per_route_config->virtualHostRateLimits()) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:
@@ -288,6 +291,15 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
     }
   }
   return vh_rate_limits_;
+}
+
+std::string Filter::getDomain() {
+  const auto* specific_per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
+  if (specific_per_route_config != nullptr && !specific_per_route_config->domain().empty()) {
+    return specific_per_route_config->domain();
+  }
+  return config_->domain();
 }
 
 } // namespace RateLimitFilter

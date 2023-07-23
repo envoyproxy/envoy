@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.extensions.private_key_providers.qat.v3alpha;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/sensitive.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.private_key_providers.qat.v3alpha";
+option java_outer_classname = "QatProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/private_key_providers/qat/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: `QAT` private key provider]
+// [#extension: envoy.tls.key_providers.qat]
+
+// This message specifies how the private key provider is configured.
+// The private key provider provides RSA sign and decrypt operation
+// hardware acceleration.
+
+message QatPrivateKeyMethodConfig {
+  // Private key to use in the private key provider. If set to inline_bytes or
+  // inline_string, the value needs to be the private key in PEM format.
+  config.core.v3.DataSource private_key = 1 [(udpa.annotations.sensitive) = true];
+
+  // How long to wait before polling the hardware accelerator after a
+  // request has been submitted there. Having a small value leads to
+  // quicker answers from the hardware but causes more polling loop
+  // spins, leading to potentially larger CPU usage. The duration needs
+  // to be set to a value greater than or equal to 1 millisecond.
+  google.protobuf.Duration poll_delay = 2 [(validate.rules).duration = {
+    required: true
+    gte {nanos: 1000000}
+  }];
+}

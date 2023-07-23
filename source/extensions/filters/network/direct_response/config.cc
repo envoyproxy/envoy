@@ -33,7 +33,7 @@ private:
 
   bool isTerminalFilterByProtoTyped(
       const envoy::extensions::filters::network::direct_response::v3::Config&,
-      Server::Configuration::FactoryContext&) override {
+      Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 };

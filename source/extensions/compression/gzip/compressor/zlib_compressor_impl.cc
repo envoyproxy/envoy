@@ -17,7 +17,7 @@ namespace Compressor {
 ZlibCompressorImpl::ZlibCompressorImpl() : ZlibCompressorImpl(4096) {}
 
 ZlibCompressorImpl::ZlibCompressorImpl(uint64_t chunk_size)
-    : Zlib::Base(chunk_size, [](z_stream* z) {
+    : Common::Base(chunk_size, [](z_stream* z) {
         deflateEnd(z);
         delete z;
       }) {

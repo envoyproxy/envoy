@@ -1,3 +1,4 @@
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
 #include "test/mocks/buffer/mocks.h"
@@ -43,6 +44,16 @@ TEST_F(PassthroughTest, ProtocolDefersToInnerSocket) {
 TEST_F(PassthroughTest, FailureReasonDefersToInnerSocket) {
   EXPECT_CALL(*inner_socket_, failureReason());
   passthrough_socket_->failureReason();
+}
+
+// Test connect method defers to inner socket
+TEST_F(PassthroughTest, ConnectDefersToInnerSocket) {
+  auto io_handle = std::make_unique<Network::IoSocketHandleImpl>();
+  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
+  ON_CALL(*inner_socket_, connect(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
+
+  EXPECT_CALL(*inner_socket_, connect(testing::Ref(socket)));
+  passthrough_socket_->connect(socket);
 }
 
 // Test canFlushClose method defers to inner socket
@@ -95,10 +106,22 @@ TEST_F(PassthroughTest, ConfigureInitialCongestionWindowDefersToInnerSocket) {
   passthrough_socket_->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
 }
 
+class UpstreamTestFactory : public PassthroughFactory {
+public:
+  UpstreamTestFactory(Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)
+      : PassthroughFactory(std::move(transport_socket_factory)) {}
+
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr,
+                        std::shared_ptr<const Upstream::HostDescription>) const override {
+    return nullptr;
+  }
+};
+
 TEST(PassthroughFactoryTest, TestDelegation) {
   auto inner_factory_ptr = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
   Network::MockTransportSocketFactory* inner_factory = inner_factory_ptr.get();
-  Network::TransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
+  auto factory = std::make_unique<UpstreamTestFactory>(std::move(inner_factory_ptr));
 
   {
     EXPECT_CALL(*inner_factory, implementsSecureTransport());
@@ -113,6 +136,38 @@ TEST(PassthroughFactoryTest, TestDelegation) {
     std::vector<uint8_t> key;
     EXPECT_CALL(*inner_factory, hashKey(_, _));
     factory->hashKey(key, nullptr);
+  }
+  {
+    EXPECT_CALL(*inner_factory, sslCtx());
+    factory->sslCtx();
+  }
+  {
+    EXPECT_CALL(*inner_factory, clientContextConfig());
+    factory->clientContextConfig();
+  }
+  {
+    EXPECT_CALL(*inner_factory, getCryptoConfig());
+    factory->getCryptoConfig();
+  }
+}
+
+class DownstreamTestFactory : public DownstreamPassthroughFactory {
+public:
+  DownstreamTestFactory(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
+      : DownstreamPassthroughFactory(std::move(transport_socket_factory)) {}
+
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override { return nullptr; }
+};
+
+TEST(PassthroughFactoryTest, TestDownstreamDelegation) {
+  auto inner_factory_ptr =
+      std::make_unique<NiceMock<Network::MockDownstreamTransportSocketFactory>>();
+  Network::MockDownstreamTransportSocketFactory* inner_factory = inner_factory_ptr.get();
+  auto factory = std::make_unique<DownstreamTestFactory>(std::move(inner_factory_ptr));
+
+  {
+    EXPECT_CALL(*inner_factory, implementsSecureTransport());
+    factory->implementsSecureTransport();
   }
 }
 

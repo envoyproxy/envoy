@@ -27,6 +27,7 @@ types including:
 * :ref:`Bootstrap extensions <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.bootstrap_extensions>`
 * :ref:`Fatal actions <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.fatal_actions>`
 * :ref:`Formatters <config_access_log_command_operators>`
+* :ref:`Connection balance extensions <envoy_v3_api_field_config.listener.v3.Listener.ConnectionBalanceConfig.extend_balance>`
 
 As of this writing there is no high level extension developer documentation. The
 :repo:`existing extensions <source/extensions>` are a good way to learn what is possible.

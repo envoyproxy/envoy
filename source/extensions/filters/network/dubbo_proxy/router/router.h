@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/rds/config.h"
 #include "envoy/router/router.h"
 
 #include "source/extensions/filters/network/dubbo_proxy/metadata.h"
@@ -53,10 +54,8 @@ using RouteSharedPtr = std::shared_ptr<Route>;
 /**
  * The router configuration.
  */
-class Config {
+class Config : public Rds::Config {
 public:
-  virtual ~Config() = default;
-
   /**
    * Based on the incoming Dubbo request transport and/or protocol data, determine the target
    * route for the request.

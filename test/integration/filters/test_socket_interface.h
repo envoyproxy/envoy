@@ -30,7 +30,12 @@ public:
   TestIoSocketHandle(WriteOverrideProc write_override_proc, os_fd_t fd = INVALID_SOCKET,
                      bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
       : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain),
-        write_override_(write_override_proc) {}
+        write_override_(write_override_proc) {
+    int type;
+    socklen_t length = sizeof(int);
+    EXPECT_EQ(0, getOption(SOL_SOCKET, SO_TYPE, &type, &length).return_value_);
+    socket_type_ = type == SOCK_STREAM ? Socket::Type::Stream : Socket::Type::Datagram;
+  }
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override {
@@ -59,8 +64,11 @@ public:
     return Test::IoSocketHandlePlatformImpl::peerAddress();
   }
 
+  Socket::Type getSocketType() const { return socket_type_; }
+
 private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
+  Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
@@ -72,6 +80,7 @@ private:
   const WriteOverrideProc write_override_;
   absl::Mutex mutex_;
   Event::Dispatcher* dispatcher_ ABSL_GUARDED_BY(mutex_) = nullptr;
+  Socket::Type socket_type_;
 };
 
 /**

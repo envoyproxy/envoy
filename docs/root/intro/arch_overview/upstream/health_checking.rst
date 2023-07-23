@@ -11,12 +11,21 @@ even when using the other service discovery types. Envoy supports three differen
 checking along with various settings (check interval, failures required before marking a host
 unhealthy, successes required before marking a host healthy, etc.):
 
+.. _extension_envoy.health_checkers.grpc:
+.. _extension_envoy.health_checkers.http:
+.. _extension_envoy.health_checkers.tcp:
+
 * **HTTP**: During HTTP health checking Envoy will send an HTTP request to the upstream host. By
   default, it expects a 200 response if the host is healthy. Expected and retriable response codes are
   :ref:`configurable <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>`. The
   upstream host can return a non-expected or non-retriable status code (any non-200 code by default) if
   it wants to immediately notify downstream hosts to no longer forward traffic to it.
-* **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
+* **gRPC**: During gRPC health checking Envoy will send a gRPC request to the upstream host. By
+  default, it expects a 200 response if the host is healthy. gRPC health checks are configurable
+  :ref:`here <envoy_v3_api_msg_config.core.v3.HealthCheck.GrpcHealthCheck>`.
+* **L3/L4**: During L3/L4 health checking, Envoy will send a
+  :ref:`configurable <envoy_v3_api_msg_config.core.v3.HealthCheck.TcpHealthCheck>`
+  byte buffer to the
   upstream host. It expects the byte buffer to be echoed in the response if the host is to be
   considered healthy. Envoy also supports connect only L3/L4 health checking.
 * **Redis**: Envoy will send a Redis PING command and expect a PONG response. The upstream Redis
@@ -25,6 +34,9 @@ unhealthy, successes required before marking a host healthy, etc.):
   it is considered a passing healthcheck. This allows the user to mark a Redis instance for
   maintenance by setting the specified key to any value and waiting for traffic to drain. See
   :ref:`redis_key <envoy_v3_api_msg_extensions.health_checkers.redis.v3.Redis>`.
+* **Thrift**: Envoy will send a Thrift request and expect a success response. The upstream host may
+  also respond with an exception to cause the health check to fail. See
+  :ref:`thrift <envoy_v3_api_msg_extensions.health_checkers.thrift.v3.Thrift>`.
 
 Health checks occur over the transport socket specified for the cluster. This implies that if a cluster is
 using a TLS-enabled transport socket, the health check will also occur over TLS. The
@@ -47,6 +59,7 @@ of each defined :ref:`LocalityLbEndpoints<envoy_v3_api_msg_config.endpoint.v3.Lo
 
 An example of setting up :ref:`health check config<envoy_v3_api_msg_config.endpoint.v3.Endpoint.HealthCheckConfig>`
 to set a :ref:`cluster member<envoy_v3_api_msg_config.endpoint.v3.Endpoint>`'s alternative health check
+:ref:`address<envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.address>` and
 :ref:`port<envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.port_value>` is:
 
 .. code-block:: yaml
@@ -57,6 +70,10 @@ to set a :ref:`cluster member<envoy_v3_api_msg_config.endpoint.v3.Endpoint>`'s a
       - endpoint:
           health_check_config:
             port_value: 8080
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 80
           address:
             socket_address:
               address: localhost
@@ -68,9 +85,16 @@ Health check event logging
 --------------------------
 
 A per-healthchecker log of ejection and addition events can optionally be produced by Envoy by
-specifying a log file path in :ref:`the HealthCheck config <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>`.
+specifying a log file path in :ref:`the HealthCheck config event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>`.
 The log is structured as JSON dumps of
 :ref:`HealthCheckEvent messages <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>`.
+
+Note: :ref:`the HealthCheck config event_log_path <envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path>` is deperated in favor of
+:ref:`HealthCheck event_logger extension <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>`.
+The :ref:`event_log_path <envoy_v3_api_field_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink.event_log_path>` is used in the file sink extension for the JSON dumps.
+
+A new event sink extension catalog
+`envoy.health_check.event_sinks` is created, and APIs can be found :ref:`here <api_v3_health_check_event_sinks>`.
 
 Envoy can be configured to log all health check failure events by setting the :ref:`always_log_health_check_failures
 flag <envoy_v3_api_field_config.core.v3.HealthCheck.always_log_health_check_failures>` to true.

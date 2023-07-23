@@ -1,5 +1,7 @@
 """Type context for FileDescriptorProto traversal."""
 
+from functools import cached_property
+
 from tools.api_proto_plugin import annotations
 
 
@@ -30,16 +32,16 @@ class SourceCodeInfo(object):
     def __init__(self, name, source_code_info):
         self.name = name
         self.proto = source_code_info
-        # Map from path to SourceCodeInfo.Location
-        self._locations = {str(location.path): location for location in self.proto.location}
-        self._file_level_comments = None
         self._file_level_annotations = None
 
-    @property
+    @cached_property
+    def locations(self):
+        # Map from path to SourceCodeInfo.Location
+        return {str(location.path): location for location in self.proto.location}
+
+    @cached_property
     def file_level_comments(self):
         """Obtain inferred file level comment."""
-        if self._file_level_comments:
-            return self._file_level_comments
         comments = []
         # We find the earliest detached comment by first finding the maximum start
         # line for any location and then scanning for any earlier locations with
@@ -47,21 +49,19 @@ class SourceCodeInfo(object):
         earliest_detached_comment = max(location.span[0] for location in self.proto.location) + 1
         for location in self.proto.location:
             if location.leading_detached_comments and location.span[0] < earliest_detached_comment:
-                comments = location.leading_detached_comments
+                comments = [
+                    self._strip_comment(comment) for comment in location.leading_detached_comments
+                ]
                 earliest_detached_comment = location.span[0]
-        self._file_level_comments = comments
         return comments
 
-    @property
+    @cached_property
     def file_level_annotations(self):
         """Obtain inferred file level annotations."""
-        if self._file_level_annotations:
-            return self._file_level_annotations
-        self._file_level_annotations = dict(
+        return dict(
             sum([
                 list(annotations.extract_annotations(c).items()) for c in self.file_level_comments
             ], []))
-        return self._file_level_annotations
 
     def location_path_lookup(self, path):
         """Lookup SourceCodeInfo.Location by path in SourceCodeInfo.
@@ -73,7 +73,7 @@ class SourceCodeInfo(object):
         Returns:
             SourceCodeInfo.Location object if found, otherwise None.
         """
-        return self._locations.get(str(path), None)
+        return self.locations.get(str(path), None)
 
     # TODO(htuch): consider integrating comment lookup with overall
     # FileDescriptorProto, perhaps via two passes.
@@ -89,7 +89,8 @@ class SourceCodeInfo(object):
         """
         location = self.location_path_lookup(path)
         if location is not None:
-            return Comment(location.leading_comments, self.file_level_annotations)
+            return Comment(
+                self._strip_comment(location.leading_comments), self.file_level_annotations)
         return Comment('')
 
     def leading_detached_comments_path_lookup(self, path):
@@ -103,8 +104,12 @@ class SourceCodeInfo(object):
             List of detached comment strings.
         """
         location = self.location_path_lookup(path)
-        if location is not None and location.leading_detached_comments != self.file_level_comments:
-            return location.leading_detached_comments
+        if location is not None:
+            comments = [
+                self._strip_comment(comment) for comment in location.leading_detached_comments
+            ]
+            if comments != self.file_level_comments:
+                return comments
         return []
 
     def trailing_comment_path_lookup(self, path):
@@ -119,8 +124,11 @@ class SourceCodeInfo(object):
         """
         location = self.location_path_lookup(path)
         if location is not None:
-            return location.trailing_comments
+            return self._strip_comment(location.trailing_comments)
         return ''
+
+    def _strip_comment(self, comment):
+        return "\n".join(l[1:] for l in comment.split("\n"))
 
 
 class TypeContext(object):

@@ -149,7 +149,7 @@ public:
   void onHostHealthUpdate() override;
 
   // Upstream::LoadBalancerFactory
-  Upstream::LoadBalancerPtr create() override;
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override;
 
 private:
   class RedisShard {
@@ -170,8 +170,8 @@ private:
 
   private:
     const Upstream::HostConstSharedPtr primary_;
-    Upstream::HostSetImpl replicas_{0, absl::nullopt};
-    Upstream::HostSetImpl all_hosts_{0, absl::nullopt};
+    Upstream::HostSetImpl replicas_{0, absl::nullopt, absl::nullopt};
+    Upstream::HostSetImpl all_hosts_{0, absl::nullopt, absl::nullopt};
   };
 
   using RedisShardSharedPtr = std::shared_ptr<const RedisShard>;

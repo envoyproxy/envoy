@@ -13,7 +13,7 @@ class WasmtimeRuntimeFactory : public WasmRuntimeFactory {
 public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createWasmtimeVm(); }
 
-  absl::string_view name() override { return "envoy.wasm.runtime.wasmtime"; }
+  std::string name() const override { return "envoy.wasm.runtime.wasmtime"; }
 };
 
 #if defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)

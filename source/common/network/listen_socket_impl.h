@@ -192,9 +192,6 @@ public:
     connection_info_provider_->setLocalAddress(local_address);
   }
 
-  // Network::Socket
-  Socket::Type socketType() const override { return Socket::Type::Stream; }
-
   // Network::ConnectionSocket
   void setDetectedTransportProtocol(absl::string_view protocol) override {
     transport_protocol_ = std::string(protocol);

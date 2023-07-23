@@ -24,6 +24,7 @@ namespace {
 class FilterIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   void initialize() override {
+    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     envoy::config::core::v3::AlternateProtocolsCacheOptions alt_cache;
     alt_cache.set_name("default_alternate_protocols_cache");
@@ -80,12 +81,15 @@ typed_config:
       TRY_ASSERT_MAIN_THREAD {
         // Make the first upstream HTTP/2
         auto http2_config = configWithType(Http::CodecType::HTTP2);
-        Network::TransportSocketFactoryPtr http2_factory = createUpstreamTlsContext(http2_config);
-        addFakeUpstream(std::move(http2_factory), Http::CodecType::HTTP2);
+        Network::DownstreamTransportSocketFactoryPtr http2_factory =
+            createUpstreamTlsContext(http2_config);
+        addFakeUpstream(std::move(http2_factory), Http::CodecType::HTTP2,
+                        /*autonomous_upstream=*/false);
 
         // Make the next upstream is HTTP/3
         auto http3_config = configWithType(Http::CodecType::HTTP3);
-        Network::TransportSocketFactoryPtr http3_factory = createUpstreamTlsContext(http3_config);
+        Network::DownstreamTransportSocketFactoryPtr http3_factory =
+            createUpstreamTlsContext(http3_config);
         // If the UDP port is in use, this will throw an exception and get caught below.
         fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
             std::move(http3_factory), fake_upstreams_[0]->localAddress()->ip()->port(), version_,
@@ -140,6 +144,114 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
 }
 
+TEST_P(FilterIntegrationTest, AltSvcIgnoredWithProxyConfig) {
+  config_helper_.addFilter("{ name: header-to-proxy-filter }");
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},       {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
+  int port = fake_upstreams_[1]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  // First request should go out over HTTP/2 (upstream index 0). The response includes an
+  // Alt-Svc header.
+  auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                response_size, 0, timeout);
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
+
+  // Close the connection so the HTTP/2 connection will not be used.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  fake_upstream_connection_.reset();
+
+  absl::string_view upstream_address(fake_upstreams_[0]->localAddress()->asStringView());
+  request_headers.setCopy(Envoy::Http::LowerCaseString("connect-proxy"), upstream_address);
+
+  // Second request will still go to the HTTP/2 cluster, due to the presence of proxy config
+  // and will go over TCP/TLS due to proxy config.
+  auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                 response_size, 0, timeout);
+  checkSimpleRequestSuccess(request_size, response_size, response2.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 0);
+}
+
+TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  config_helper_.setConnectTimeout(std::chrono::seconds(2));
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  int port = fake_upstreams_[0]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  // First request should go out over HTTP/2. The response includes an Alt-Svc header.
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0,
+                                                /*upstream_index=*/0, timeout);
+  checkSimpleRequestSuccess(0, response_size, response.get());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
+  // Close the connection so the HTTP/2 connection will not be used.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  fake_upstream_connection_.reset();
+
+  // The 2nd request should go out over HTTP/3 because of the Alt-Svc information.
+  auto response2 = sendRequestAndWaitForResponse(default_request_headers_, 0,
+                                                 default_response_headers_, response_size,
+                                                 /*upstream_index=*/1, timeout);
+  checkSimpleRequestSuccess(0, response_size, response2.get());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+  // Close the h3 upstream connection so that the next request will create another connection.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 2);
+  fake_upstream_connection_.reset();
+
+  // Stop the HTTP/3 fake upstream.
+  fake_upstreams_[1]->cleanUp();
+
+  // The 3rd request should be sent over HTTP/3 as early data because of the cached 0-RTT
+  // credentials.
+  auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // Wait for the upstream to connect timeout and the failed early data request to be retried.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 3);
+
+  // The retry should attempt both HTTP/3 and HTTP/2. And the TCP connection will win the race.
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response3->waitForEndStream());
+  checkSimpleRequestSuccess(0, response_size, response3.get());
+  EXPECT_EQ(2u, test_server_->counter("cluster.cluster_0.upstream_cx_http2_total")->value());
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_fail", 2);
+  EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_http3_broken")->value());
+
+  upstream_request_.reset();
+  // As HTTP/3 is marked broken, the following request shouldn't cause the grid to attempt HTTP/3 to
+  // upstream at all.
+  auto response4 = sendRequestAndWaitForResponse(default_request_headers_, 0,
+                                                 default_response_headers_, response_size,
+                                                 /*upstream_index=*/0, timeout);
+  checkSimpleRequestSuccess(0, response_size, response4.get());
+
+  EXPECT_EQ(3u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+}
+
 TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
@@ -175,6 +287,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
   // Close the HTTP/3 connection before sending back response. This would cause an upstream reset.
   ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 2);
   fake_upstream_connection_.reset();
   upstream_request_.reset();
 
@@ -182,9 +295,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response2->waitForEndStream());
-  if (Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
-  }
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 
   checkSimpleRequestSuccess(0, response_size, response2.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
@@ -199,10 +310,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
 // an HTTP/2 or an HTTP/3 upstream (but not both).
 class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
-  MixedUpstreamIntegrationTest() {
-    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
-    default_request_headers_.setHost("sni.lyft.com");
-  }
+  MixedUpstreamIntegrationTest() { default_request_headers_.setHost("sni.lyft.com"); }
 
   void writeFile() {
     uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
@@ -223,12 +331,12 @@ protected:
 
     if (use_http2_) {
       auto config = configWithType(Http::CodecType::HTTP2);
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2);
+      Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     } else {
       auto config = configWithType(Http::CodecType::HTTP3);
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3);
+      Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3, /*autonomous_upstream=*/false);
       writeFile();
     }
   }

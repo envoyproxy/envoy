@@ -6,6 +6,8 @@
 
 #include "source/common/singleton/threadsafe_singleton.h"
 
+#define ENVOY_DEFAULT_PIPE_TYPE AF_INET
+
 namespace Envoy {
 namespace Api {
 
@@ -22,6 +24,7 @@ public:
   SysCallSizeResult pwrite(os_fd_t fd, const void* buffer, size_t length,
                            off_t offset) const override;
   SysCallSizeResult pread(os_fd_t fd, void* buffer, size_t length, off_t offset) const override;
+  SysCallSizeResult send(os_fd_t socket, void* buffer, size_t length, int flags) override;
   SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) override;
   SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) override;
   SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen, int flags,
@@ -29,13 +32,14 @@ public:
   bool supportsMmsg() const override;
   bool supportsUdpGro() const override;
   bool supportsUdpGso() const override;
-  bool supportsIpTransparent() const override;
+  bool supportsIpTransparent(Network::Address::IpVersion version) const override;
   bool supportsMptcp() const override;
   SysCallIntResult close(os_fd_t fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
                         off_t offset) override;
   SysCallIntResult stat(const char* pathname, struct stat* buf) override;
+  SysCallIntResult fstat(os_fd_t fd, struct stat* buf) override;
   SysCallIntResult setsockopt(os_fd_t sockfd, int level, int optname, const void* optval,
                               socklen_t optlen) override;
   SysCallIntResult getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
@@ -64,6 +68,9 @@ public:
   SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) override;
   bool supportsGetifaddrs() const override;
   SysCallIntResult getifaddrs(InterfaceAddressVector&) override;
+  SysCallIntResult getaddrinfo(const char* node, const char* service, const addrinfo* hints,
+                               addrinfo** res) override;
+  void freeaddrinfo(addrinfo* res) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

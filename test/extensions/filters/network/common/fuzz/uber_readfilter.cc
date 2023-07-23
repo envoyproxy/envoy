@@ -8,6 +8,12 @@ using testing::Return;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
+namespace {
+
+const char kLocalCloseReason[] = "fuzz_local_close_reason";
+
+} //  namespace
+
 void UberFilterFuzzer::reset() {
   // Reset some changes made by current filter on some mock objects.
 
@@ -41,6 +47,8 @@ void UberFilterFuzzer::fuzzerSetup() {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
       }));
+  ON_CALL(read_filter_callbacks_->connection_, localCloseReason())
+      .WillByDefault(Return(kLocalCloseReason));
 
   // Prepare sni for sni_cluster filter and sni_dynamic_forward_proxy filter.
   ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
@@ -115,6 +123,11 @@ void UberFilterFuzzer::fuzz(
       ASSERT(read_filter_ != nullptr);
       Buffer::OwnedImpl buffer(action.on_data().data());
       read_filter_->onData(buffer, action.on_data().end_stream());
+      if (read_filter_callbacks_->connection_.state_ != Envoy::Network::Connection::State::Open) {
+        ENVOY_LOG_MISC(trace, "Connection closed after data processing.");
+        reset();
+        return;
+      }
 
       break;
     }

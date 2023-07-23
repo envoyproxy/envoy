@@ -19,8 +19,9 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
-      metadata_parser_(
-          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {}
+      metadata_parser_(Router::HeaderParser::configure(
+          config.initial_metadata(),
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   ASSERT(isThreadSafe());
@@ -82,7 +83,6 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   auto& http_async_client = thread_local_cluster->httpAsyncClient();
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
-
   if (stream_ == nullptr) {
     callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
     http_reset_ = true;
@@ -95,6 +95,10 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
       parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
       service_full_name_, method_name_, options_.timeout);
   // Fill service-wide initial metadata.
+  // TODO(cpakulski): Find a better way to access requestHeaders
+  // request headers should not be stored in stream_info.
+  // Maybe put it to parent_context?
+  // Since request headers may be empty, consider using Envoy::OptRef.
   parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
                                             options_.parent_context.stream_info);
 
@@ -254,7 +258,7 @@ void AsyncRequestImpl::cancel() {
 }
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata);
+  current_span_->injectContext(metadata, nullptr);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

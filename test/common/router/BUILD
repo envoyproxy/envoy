@@ -48,6 +48,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "config_impl_integration_test",
+    size = "large",
     srcs = [
         "config_impl_integration_test.cc",
     ],
@@ -122,6 +123,7 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -155,6 +157,7 @@ envoy_cc_test(
         "//envoy/config:subscription_interface",
         "//envoy/init:manager_interface",
         "//source/common/config:api_version_lib",
+        "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
@@ -167,6 +170,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -402,6 +406,35 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "router_upstream_filter_test",
+    srcs = ["router_upstream_filter_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/router:router_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/upstreams/http/generic:config",
+        "//test/common/http:common_lib",
+        "//test/integration/filters:add_header_filter_config_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "shadow_writer_impl_test",
     srcs = ["shadow_writer_impl_test.cc"],
     deps = [
@@ -429,6 +462,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -450,7 +484,20 @@ envoy_cc_test(
     deps = [
         "//source/common/router:router_lib",
         "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/router:router_filter_interface",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "delegating_route_impl_test",
+    srcs = ["delegating_route_impl_test.cc"],
+    deps = [
+        "//source/common/router:config_lib",
+        "//source/common/router:delegating_route_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
 
@@ -482,4 +529,21 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "config_impl_benchmark_test",
     benchmark_binary = "config_impl_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "header_formatter_speed_test",
+    srcs = ["header_formatter_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/router:router_lib",
+        "//test/common/stream_info:test_util",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "header_formatter_benchmark_test",
+    benchmark_binary = "header_formatter_speed_test",
 )

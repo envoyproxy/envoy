@@ -99,7 +99,7 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
   }
 }
 
-Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create() {
+Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create(Upstream::LoadBalancerParams) {
   absl::ReaderMutexLock lock(&mutex_);
   return std::make_unique<RedisClusterLoadBalancer>(slot_array_, shard_vector_, random_);
 }
@@ -147,7 +147,7 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Primary:
       return shard->primary();
     case NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary:
-      if (shard->primary()->health() == Upstream::Host::Health::Healthy) {
+      if (shard->primary()->coarseHealth() == Upstream::Host::Health::Healthy) {
         return shard->primary();
       } else {
         return chooseRandomHost(shard->allHosts(), random_);

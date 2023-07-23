@@ -28,7 +28,11 @@ public:
     FakeUpstreamConfig config = upstreamConfig();
     config.upstream_protocol_ = Http::CodecType::HTTP1;
     auto uds_path = TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_);
-    fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(uds_path, config));
+    Network::DownstreamTransportSocketFactoryPtr factory =
+        upstream_tls_ ? createUpstreamTlsContext(config)
+                      : Network::Test::createRawBufferDownstreamSocketFactory();
+    fake_upstreams_.emplace_back(
+        std::make_unique<FakeUpstream>(std::move(factory), uds_path, config));
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

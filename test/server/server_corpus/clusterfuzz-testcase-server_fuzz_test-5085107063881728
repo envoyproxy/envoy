@@ -1,10 +1,11 @@
-watchdog {
-  megamiss_timeout {
-    seconds: -27037478448
+watchdogs {
+  main_thread_watchdog {
+    megamiss_timeout {
+      seconds: -27037478448
+    }
   }
 }
 admin {
-  access_log_path: "@"
   address {
     pipe {
       path: "!"

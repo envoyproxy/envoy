@@ -1,4 +1,3 @@
-version: '3.8'
 services:
 
   proxy:
@@ -11,6 +10,7 @@ services:
     - "8000:8000"
 
   web_service:
+    environment:
+    - PORT=9000
     build:
-      context: .
-      dockerfile: Dockerfile-web-service
+      context: ../shared/echo

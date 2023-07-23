@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/router.h"
@@ -147,7 +148,11 @@ public:
         upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
         upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
         zone_(stat_name_set_->add("zone")), local_zone_name_(local_info.zoneStatName()),
-        upstream_cx_drain_close_(stat_name_set_->add("thrift.upstream_cx_drain_close")) {}
+        upstream_cx_drain_close_(stat_name_set_->add("thrift.upstream_cx_drain_close")),
+        downstream_cx_partial_response_close_(
+            stat_name_set_->add("thrift.downstream_cx_partial_response_close")),
+        downstream_cx_underflow_response_close_(
+            stat_name_set_->add("thrift.downstream_cx_underflow_response_close")) {}
 
   /**
    * Increment counter for request calls.
@@ -179,6 +184,22 @@ public:
    */
   void incCloseDrain(const Upstream::ClusterInfo& cluster) const {
     incClusterScopeCounter(cluster, nullptr, upstream_cx_drain_close_);
+  }
+
+  /**
+   * Increment counter for downstream connections that were closed due to partial responses.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incClosePartialResponse(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, downstream_cx_partial_response_close_);
+  }
+
+  /**
+   * Increment counter for downstream connections that were closed due to underflow responses.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incCloseUnderflowResponse(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, downstream_cx_underflow_response_close_);
   }
 
   /**
@@ -354,6 +375,8 @@ private:
   const Stats::StatName zone_;
   const Stats::StatName local_zone_name_;
   const Stats::StatName upstream_cx_drain_close_;
+  const Stats::StatName downstream_cx_partial_response_close_;
+  const Stats::StatName downstream_cx_underflow_response_close_;
 };
 
 /**
@@ -581,9 +604,10 @@ public:
   /**
    * Starts the shadow request by requesting an upstream connection.
    */
-  virtual absl::optional<std::reference_wrapper<ShadowRouterHandle>>
-  submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
-         TransportType original_transport, ProtocolType original_protocol) PURE;
+  virtual OptRef<ShadowRouterHandle> submit(const std::string& cluster_name,
+                                            MessageMetadataSharedPtr metadata,
+                                            TransportType original_transport,
+                                            ProtocolType original_protocol) PURE;
 };
 
 } // namespace Router

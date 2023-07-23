@@ -36,10 +36,24 @@ enum class CacheEntryStatus {
   // This entry is fresh, and an appropriate basis for a 304 Not Modified
   // response.
   FoundNotModified,
+  // The cache lookup failed, e.g. because the cache was unreachable or an RPC
+  // timed out. The caller shouldn't use this lookup's context for an insert.
+  LookupError,
 };
 
 absl::string_view cacheEntryStatusString(CacheEntryStatus s);
 std::ostream& operator<<(std::ostream& os, CacheEntryStatus status);
+
+// For an updateHeaders operation, new headers must be merged into existing headers
+// for the cache entry. This helper function performs that merge correctly, i.e.
+// - if a header appears in new_headers, prior values for that header are erased
+//   from headers_to_update.
+// - if a header appears more than once in new_headers, all new values are added
+//   to headers_to_update.
+// - headers that are not supposed to be updated during updateHeaders operations
+//   (etag, content-length, content-range, vary) are ignored.
+void applyHeaderUpdate(const Http::ResponseHeaderMap& new_headers,
+                       Http::ResponseHeaderMap& headers_to_update);
 
 } // namespace Cache
 } // namespace HttpFilters

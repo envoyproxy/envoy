@@ -24,7 +24,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
         Fuzz::fromStreamInfo(input.stream_info(), time_system);
     for (const auto& it : formatters) {
       it->format(request_headers, response_headers, response_trailers, *stream_info,
-                 absl::string_view());
+                 absl::string_view(), AccessLog::AccessLogType::NotSet);
     }
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {

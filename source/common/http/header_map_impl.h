@@ -52,6 +52,9 @@ public:                                                                         
  */
 class HeaderMapImpl : NonCopyable {
 public:
+  HeaderMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                const uint32_t max_headers_count = UINT32_MAX)
+      : max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {}
   virtual ~HeaderMapImpl() = default;
 
   // The following "constructors" call virtual functions during construction and must use the
@@ -91,6 +94,8 @@ public:
   void setReferenceKey(const LowerCaseString& key, absl::string_view value);
   void setCopy(const LowerCaseString& key, absl::string_view value);
   uint64_t byteSize() const;
+  uint32_t maxHeadersKb() const { return max_headers_kb_; }
+  uint32_t maxHeadersCount() const { return max_headers_count_; }
   HeaderMap::GetResult get(const LowerCaseString& key) const;
   void iterate(HeaderMap::ConstIterateCb cb) const;
   void iterateReverse(HeaderMap::ConstIterateCb cb) const;
@@ -181,10 +186,9 @@ protected:
   /**
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
-   * When the list size is greater or equal to the envoy.http.headermap.lazy_map_min_size runtime
-   * feature value (defaults to 3, if not set), all headers are added to a map, to allow
-   * fast access given a header key. Once the map is initialized, it will be used even if the number
-   * of headers decreases below the threshold.
+   * When the list size is greater or equal to 3, all headers are added to a map, to allow fast
+   * access given a header key. Once the map is initialized, it will be used even
+   * if the number of headers decreases below the threshold.
    *
    * Note: the internal iterators held in fields make this unsafe to copy and move, since the
    * reference to end() is not preserved across a move (see Notes in
@@ -198,10 +202,7 @@ protected:
     using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
     using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
 
-    HeaderList()
-        : pseudo_headers_end_(headers_.end()),
-          lazy_map_min_size_(static_cast<uint32_t>(
-              Runtime::getInteger("envoy.http.headermap.lazy_map_min_size", 3))) {}
+    HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
@@ -278,8 +279,7 @@ protected:
     }
 
     /*
-     * Creates and populates a map if the number of headers is at least the
-     * envoy.http.headermap.lazy_map_min_size runtime feature value.
+     * Creates and populates a map if the number of headers is at least 3.
      *
      * @return if a map was created.
      */
@@ -311,8 +311,6 @@ protected:
   private:
     std::list<HeaderEntryImpl> headers_;
     HeaderNode pseudo_headers_end_;
-    // The number of headers threshold for lazy map usage.
-    const uint32_t lazy_map_min_size_;
     HeaderLazyMap lazy_map_;
   };
 
@@ -342,6 +340,10 @@ protected:
   StatefulHeaderKeyFormatterPtr formatter_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
+  // This holds the max size of the headers in kilobyte in the HeaderMap.
+  const uint32_t max_headers_kb_ = UINT32_MAX;
+  // This holds the max count of the headers in the HeaderMap.
+  const uint32_t max_headers_count_ = UINT32_MAX;
 };
 
 /**
@@ -351,6 +353,9 @@ protected:
  */
 template <class Interface> class TypedHeaderMapImpl : public HeaderMapImpl, public Interface {
 public:
+  TypedHeaderMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                     const uint32_t max_headers_count = UINT32_MAX)
+      : HeaderMapImpl(max_headers_kb, max_headers_count) {}
   void setFormatter(StatefulHeaderKeyFormatterPtr&& formatter) {
     formatter_ = std::move(formatter);
   }
@@ -389,6 +394,8 @@ public:
     HeaderMapImpl::setCopy(key, value);
   }
   uint64_t byteSize() const override { return HeaderMapImpl::byteSize(); }
+  uint32_t maxHeadersKb() const override { return HeaderMapImpl::maxHeadersKb(); }
+  uint32_t maxHeadersCount() const override { return HeaderMapImpl::maxHeadersCount(); }
   HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return HeaderMapImpl::get(key);
   }
@@ -472,8 +479,11 @@ protected:
 class RequestHeaderMapImpl final : public TypedHeaderMapImpl<RequestHeaderMap>,
                                    public InlineStorage {
 public:
-  static std::unique_ptr<RequestHeaderMapImpl> create() {
-    return std::unique_ptr<RequestHeaderMapImpl>(new (inlineHeadersSize()) RequestHeaderMapImpl());
+  static std::unique_ptr<RequestHeaderMapImpl>
+  create(const uint32_t max_headers_kb = UINT32_MAX,
+         const uint32_t max_headers_count = UINT32_MAX) {
+    return std::unique_ptr<RequestHeaderMapImpl>(
+        new (inlineHeadersSize()) RequestHeaderMapImpl(max_headers_kb, max_headers_count));
   }
 
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
@@ -483,7 +493,7 @@ public:
 
   // Tracing::TraceContext
   absl::string_view protocol() const override;
-  absl::string_view authority() const override;
+  absl::string_view host() const override;
   absl::string_view path() const override;
   absl::string_view method() const override;
   void forEach(Tracing::TraceContext::IterateCallback callback) const override;
@@ -511,7 +521,11 @@ private:
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
-  RequestHeaderMapImpl() { clearInline(); }
+  RequestHeaderMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                       const uint32_t max_headers_count = UINT32_MAX)
+      : TypedHeaderMapImpl<RequestHeaderMap>(max_headers_kb, max_headers_count) {
+    clearInline();
+  }
 
   HeaderEntryImpl* inline_headers_[];
 };
@@ -523,9 +537,11 @@ private:
 class RequestTrailerMapImpl final : public TypedHeaderMapImpl<RequestTrailerMap>,
                                     public InlineStorage {
 public:
-  static std::unique_ptr<RequestTrailerMapImpl> create() {
-    return std::unique_ptr<RequestTrailerMapImpl>(new (inlineHeadersSize())
-                                                      RequestTrailerMapImpl());
+  static std::unique_ptr<RequestTrailerMapImpl>
+  create(const uint32_t max_headers_kb = UINT32_MAX,
+         const uint32_t max_headers_count = UINT32_MAX) {
+    return std::unique_ptr<RequestTrailerMapImpl>(
+        new (inlineHeadersSize()) RequestTrailerMapImpl(max_headers_kb, max_headers_count));
   }
 
 protected:
@@ -535,7 +551,11 @@ protected:
   HeaderEntryImpl** inlineHeaders() override { return inline_headers_; }
 
 private:
-  RequestTrailerMapImpl() { clearInline(); }
+  RequestTrailerMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                        const uint32_t max_headers_count = UINT32_MAX)
+      : TypedHeaderMapImpl<RequestTrailerMap>(max_headers_kb, max_headers_count) {
+    clearInline();
+  }
 
   HeaderEntryImpl* inline_headers_[];
 };
@@ -547,9 +567,11 @@ private:
 class ResponseHeaderMapImpl final : public TypedHeaderMapImpl<ResponseHeaderMap>,
                                     public InlineStorage {
 public:
-  static std::unique_ptr<ResponseHeaderMapImpl> create() {
-    return std::unique_ptr<ResponseHeaderMapImpl>(new (inlineHeadersSize())
-                                                      ResponseHeaderMapImpl());
+  static std::unique_ptr<ResponseHeaderMapImpl>
+  create(const uint32_t max_headers_kb = UINT32_MAX,
+         const uint32_t max_headers_count = UINT32_MAX) {
+    return std::unique_ptr<ResponseHeaderMapImpl>(
+        new (inlineHeadersSize()) ResponseHeaderMapImpl(max_headers_kb, max_headers_count));
   }
 
   INLINE_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
@@ -577,8 +599,11 @@ private:
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
-  ResponseHeaderMapImpl() { clearInline(); }
-
+  ResponseHeaderMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                        const uint32_t max_headers_count = UINT32_MAX)
+      : TypedHeaderMapImpl<ResponseHeaderMap>(max_headers_kb, max_headers_count) {
+    clearInline();
+  }
   HeaderEntryImpl* inline_headers_[];
 };
 
@@ -589,9 +614,11 @@ private:
 class ResponseTrailerMapImpl final : public TypedHeaderMapImpl<ResponseTrailerMap>,
                                      public InlineStorage {
 public:
-  static std::unique_ptr<ResponseTrailerMapImpl> create() {
-    return std::unique_ptr<ResponseTrailerMapImpl>(new (inlineHeadersSize())
-                                                       ResponseTrailerMapImpl());
+  static std::unique_ptr<ResponseTrailerMapImpl>
+  create(const uint32_t max_headers_kb = UINT32_MAX,
+         const uint32_t max_headers_count = UINT32_MAX) {
+    return std::unique_ptr<ResponseTrailerMapImpl>(
+        new (inlineHeadersSize()) ResponseTrailerMapImpl(max_headers_kb, max_headers_count));
   }
 
   INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
@@ -611,7 +638,11 @@ private:
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
 
-  ResponseTrailerMapImpl() { clearInline(); }
+  ResponseTrailerMapImpl(const uint32_t max_headers_kb = UINT32_MAX,
+                         const uint32_t max_headers_count = UINT32_MAX)
+      : TypedHeaderMapImpl<ResponseTrailerMap>(max_headers_kb, max_headers_count) {
+    clearInline();
+  }
 
   HeaderEntryImpl* inline_headers_[];
 };

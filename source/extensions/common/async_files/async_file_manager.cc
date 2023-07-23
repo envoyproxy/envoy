@@ -21,7 +21,7 @@ public:
 };
 } // namespace
 
-std::function<void()> AsyncFileManager::whenReady(std::function<void(absl::Status)> on_complete) {
+CancelFunction AsyncFileManager::whenReady(std::function<void(absl::Status)> on_complete) {
   return enqueue(std::make_shared<ActionWhenReady>(std::move(on_complete)));
 }
 

@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         ":cache_custom_headers",
         ":cache_entry_utils_lib",
+        ":cache_filter_logging_info_lib",
         ":cache_headers_utils_lib",
         ":cacheability_utils_lib",
         ":http_cache_lib",
@@ -137,6 +138,15 @@ envoy_cc_library(
     hdrs = ["cache_custom_headers.h"],
     deps = [
         "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cache_filter_logging_info_lib",
+    srcs = ["cache_filter_logging_info.cc"],
+    hdrs = ["cache_filter_logging_info.h"],
+    deps = [
+        "//source/common/stream_info:filter_state_lib",
     ],
 )
 

@@ -19,6 +19,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/test_common/simulated_time_system.h"
@@ -346,6 +347,107 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
   EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(
       2UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_consecutive_gateway_failure")
+                     .value());
+}
+
+/*
+ Tests scenario when active health check clears the FAILED_OUTLIER_CHECK flag.
+*/
+TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+
+  // Add health checker to cluster and validate that host call back is called.
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  ON_CALL(cluster_, healthChecker()).WillByDefault(Return(health_checker.get()));
+
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  addHosts({"tcp://127.0.0.1:81"});
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({hosts_[1]}, {});
+
+  // Cause a consecutive 5xx error on host[0] by reporting HTTP codes.
+  loadRq(hosts_[0], 1, 500);
+  loadRq(hosts_[0], 1, 200);
+  hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  loadRq(hosts_[0], 4, 500);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Interval that doesn't bring the host back in.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  // Trigger the health checker callbacks with "Changed" status and validate host is unejected.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Cause a consecutive 5xx error again on host[0] by reporting HTTP codes.
+  loadRq(hosts_[0], 1, 500);
+  loadRq(hosts_[0], 1, 200);
+  hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  loadRq(hosts_[0], 4, 500);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Interval that doesn't bring the host back in.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  // Trigger the health checker callbacks with "UnChanged" status and validate host is unejected.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Eject host again to cause an ejection after an unejection has taken place
+  hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  loadRq(hosts_[0], 4, 500);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, hosts_);
+
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+  EXPECT_EQ(3UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(
+      3UL,
       cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
   EXPECT_EQ(0UL, cluster_.info_->stats_store_
                      .counter("outlier_detection.ejections_consecutive_gateway_failure")
@@ -1576,7 +1678,9 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   loadRq(hosts_[0], 1, 500);
 
   // Remove before the cross thread event comes in.
@@ -1599,7 +1703,9 @@ TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   loadRq(hosts_[0], 1, 500);
 
   // Destroy before the cross thread event comes in.
@@ -1623,7 +1729,9 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
   loadRq(hosts_[0], 1, 500);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
@@ -1639,6 +1747,41 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 }
 
+TEST_F(OutlierDetectorImplTest, MaxEjectionPercentage) {
+  // A 50% ejection limit should not eject more than 1 out of 3 pods.
+  const std::string yaml = R"EOF(
+max_ejection_percent: 50
+max_ejection_time_jitter: 13s
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection_;
+  TestUtility::loadFromYaml(yaml, outlier_detection_);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+
+  // add 3 hosts.
+  addHosts({"tcp://127.0.0.2:80"});
+  addHosts({"tcp://127.0.0.3:80"});
+  addHosts({"tcp://127.0.0.4:80"});
+
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_, random_));
+
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  // Expect only one ejection.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+
+  loadRq(hosts_[0], 5, 500);
+  loadRq(hosts_[1], 5, 500);
+  loadRq(hosts_[2], 5, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_FALSE(hosts_[1]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_FALSE(hosts_[2]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
 TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
@@ -1647,7 +1790,6 @@ TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
                                                               dispatcher_, runtime_, time_system_,
                                                               event_logger_, random_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
-
   // Cause a consecutive 5xx error.
   loadRq(hosts_[0], 4, 500);
 
@@ -2147,11 +2289,12 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   StringViewSaver log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
 
-  EXPECT_CALL(*file, write(absl::string_view(
-                         "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
-                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
-                         "\"num_ejections\":0,\"enforced\":true,\"eject_consecutive_event\":{}"
-                         ",\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
+  EXPECT_CALL(*file,
+              write(absl::string_view(
+                  "{\"type\":\"CONSECUTIVE_5XX\",\"timestamp\":\"2018-12-18T09:00:00Z\","
+                  "\"cluster_name\":\"fake_cluster\","
+                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
+                  "\"num_ejections\":0,\"enforced\":true,\"eject_consecutive_event\":{}}\n")))
       .WillOnce(SaveArg<0>(&log1));
 
   event_logger.logEject(host, detector, envoy::data::cluster::v3::CONSECUTIVE_5XX, true);
@@ -2161,10 +2304,10 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
 
   EXPECT_CALL(*file, write(absl::string_view(
-                         "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
+                         "{\"type\":\"CONSECUTIVE_5XX\",\"timestamp\":\"2018-12-18T09:00:00Z\","
+                         "\"cluster_name\":\"fake_cluster\","
                          "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
-                         "\"num_ejections\":0,\"enforced\":false,"
-                         "\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
+                         "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log2));
 
   event_logger.logUneject(host);
@@ -2184,26 +2327,26 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(detector, successRateEjectionThreshold(
                             DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
       .WillOnce(Return(0));
-  EXPECT_CALL(*file,
-              write(absl::string_view(
-                  "{\"type\":\"SUCCESS_RATE\",\"cluster_name\":\"fake_cluster\","
-                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
-                  "\"num_ejections\":0,\"enforced\":false,\"eject_success_rate_event\":{"
-                  "\"host_success_rate\":0,\"cluster_average_success_rate\":0,"
-                  "\"cluster_success_rate_ejection_threshold\":0},"
-                  "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\"}\n")))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"type\":\"SUCCESS_RATE\","
+                         "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\","
+                         "\"cluster_name\":\"fake_cluster\","
+                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
+                         "\"num_ejections\":0,\"enforced\":false,\"eject_success_rate_event\":{"
+                         "\"host_success_rate\":0,\"cluster_average_success_rate\":0,"
+                         "\"cluster_success_rate_ejection_threshold\":0}}\n")))
       .WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, detector, envoy::data::cluster::v3::SUCCESS_RATE, false);
   Json::Factory::loadFromString(log3);
 
   StringViewSaver log4;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file,
-              write(absl::string_view(
-                  "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
-                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
-                  "\"num_ejections\":0,\"enforced\":false,\"timestamp\":\"2018-12-18T09:00:00Z\","
-                  "\"secs_since_last_action\":\"30\"}\n")))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"type\":\"CONSECUTIVE_5XX\","
+                         "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\","
+                         "\"cluster_name\":\"fake_cluster\","
+                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
+                         "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log4);
@@ -2215,23 +2358,24 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
       .WillOnce(Return(0));
   EXPECT_CALL(*file,
               write(absl::string_view(
-                  "{\"type\":\"FAILURE_PERCENTAGE\",\"cluster_name\":\"fake_cluster\","
+                  "{\"type\":\"FAILURE_PERCENTAGE\","
+                  "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\","
+                  "\"cluster_name\":\"fake_cluster\","
                   "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
                   "\"num_ejections\":0,\"enforced\":false,\"eject_failure_percentage_event\":{"
-                  "\"host_success_rate\":0},\"timestamp\":\"2018-12-18T09:00:00Z\","
-                  "\"secs_since_last_action\":\"30\"}\n")))
+                  "\"host_success_rate\":0}}\n")))
       .WillOnce(SaveArg<0>(&log5));
   event_logger.logEject(host, detector, envoy::data::cluster::v3::FAILURE_PERCENTAGE, false);
   Json::Factory::loadFromString(log5);
 
   StringViewSaver log6;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file,
-              write(absl::string_view(
-                  "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
-                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
-                  "\"num_ejections\":0,\"enforced\":false,\"timestamp\":\"2018-12-18T09:00:00Z\","
-                  "\"secs_since_last_action\":\"30\"}\n")))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"type\":\"CONSECUTIVE_5XX\","
+                         "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\","
+                         "\"cluster_name\":\"fake_cluster\","
+                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
+                         "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log6));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log6);
@@ -2248,7 +2392,7 @@ TEST(OutlierUtility, SRThreshold) {
   DetectorImpl::EjectionPair success_rate_nums =
       DetectorImpl::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(90.0, success_rate_nums.success_rate_average_); // average success rate
-  EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   // ejection threshold
+  EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   //  ejection threshold
 }
 
 } // namespace

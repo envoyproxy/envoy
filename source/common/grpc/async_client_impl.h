@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/grpc/codec.h"
@@ -34,6 +35,7 @@ public:
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
                            RawAsyncStreamCallbacks& callbacks,
                            const Http::AsyncClient::StreamOptions& options) override;
+  absl::string_view destination() override { return remote_cluster_name_; }
 
 private:
   Upstream::ClusterManager& cm_;
@@ -77,6 +79,7 @@ public:
   }
 
   bool hasResetStream() const { return http_reset_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
 
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);

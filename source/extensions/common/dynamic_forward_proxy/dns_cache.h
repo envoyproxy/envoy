@@ -7,6 +7,9 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "source/common/http/header_utility.h"
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -17,6 +20,23 @@ namespace DynamicForwardProxy {
  */
 class DnsHostInfo {
 public:
+  // DFP hosts are created after a DNS lookup for a domain name (e.g. foo.com) but are created
+  // with an IP address and port to resolve to. To prevent bugs where we insert say foo.com
+  // (default port 80) then later look up foo.com (default port 443) and get IP addresses with
+  // port 80, we "fully qualify" hostnames with the port.
+  //
+  // This normalizes hostnames, respecting the port if it exists, and adding the default port
+  // if there is no port.
+  static std::string normalizeHostForDfp(absl::string_view host, uint16_t default_port) {
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_mixed_scheme")) {
+      return std::string(host);
+    }
+    if (Http::HeaderUtility::hostHasPort(host)) {
+      return std::string(host);
+    }
+    return absl::StrCat(host, ":", default_port);
+  }
+
   virtual ~DnsHostInfo() = default;
 
   /**
@@ -181,7 +201,16 @@ public:
     absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
+  /**
+   * Attempt to load a DNS cache entry.
+   * @param host the hostname to lookup
+   * @param default_port the port to use
+   * @param is_proxy_lookup indicates if the request is safe to fast-fail. The Dynamic Forward Proxy
+   * filter sets this to true if no address is necessary due to an upstream proxy being configured.
+   * @return a handle that on destruction will de-register the callbacks.
+   */
   virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
+                                                    bool is_proxy_lookup,
                                                     LoadDnsCacheEntryCallbacks& callbacks) PURE;
 
   /**

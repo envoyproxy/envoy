@@ -33,8 +33,8 @@ constexpr char EXPECTED_REQUEST_MESSAGE[] = R"EOF(
           - key: "node_name"
             value:
               string_value: "node_name"
-      instrumentation_library_logs:
-        - logs:
+      scope_logs:
+        - log_records:
             body:
               string_value: "GET HTTP/1.1 404"
             attributes:
@@ -49,7 +49,12 @@ namespace {
 class AccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat 'grpc.accesslog.streams_closed_1' and stat_prefix
+    // 'accesslog'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -113,8 +118,8 @@ public:
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
     // Clear start time which is not deterministic.
     request_msg.mutable_resource_logs(0)
-        ->mutable_instrumentation_library_logs(0)
-        ->mutable_logs(0)
+        ->mutable_scope_logs(0)
+        ->mutable_log_records(0)
         ->clear_time_unix_nano();
 
     EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
@@ -146,30 +151,9 @@ TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
   ASSERT_TRUE(waitForAccessLogStream());
   ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
 
+  // Make another request and expect a new stream to be used.
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("404", response->headers().getStatusValue());
-  ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
-
-  // Send an empty response and end the stream. This should never happen but make sure nothing
-  // breaks and we make a new stream on a follow up request.
-  access_log_request_->startGrpcStream();
-  opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse response_msg;
-  access_log_request_->sendGrpcMessage(response_msg);
-  access_log_request_->finishGrpcStream(Grpc::Status::Ok);
-  switch (clientType()) {
-  case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
-    break;
-  case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe("grpc.accesslog.streams_closed_0", 1);
-    break;
-  default:
-    PANIC("reached unexpected code");
-  }
-  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
-                                                downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogStream());

@@ -20,7 +20,7 @@ TOP_LEVEL_CONFIG_BLOB = {
     "tracing": {
         "http": {
             "driver": {
-                "type": "lightstep",
+                "type": "known",
                 "config": {
                     "access_token_file": "/etc/envoy/envoy.cfg",
                     "collector_cluster": "foo"

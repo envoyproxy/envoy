@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
@@ -18,6 +19,10 @@
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
+namespace Filter {
+class TcpListenerFilterConfigProviderManagerImpl;
+} // namespace Filter
+
 namespace Server {
 
 /**
@@ -78,9 +83,9 @@ public:
    * Creates a list of filter factories.
    * @param filters supplies the proto configuration.
    * @param context supplies the factory creation context.
-   * @return std::vector<Network::FilterFactoryCb> the list of filter factories.
+   * @return Filter::NetworkFilterFactoriesList the list of filter factories.
    */
-  virtual std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
+  virtual Filter::NetworkFilterFactoriesList createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
@@ -88,9 +93,9 @@ public:
    * Creates a list of listener filter factories.
    * @param filters supplies the JSON configuration.
    * @param context supplies the factory creation context.
-   * @return std::vector<Network::ListenerFilterFactoryCb> the list of filter factories.
+   * @return Filter::ListenerFilterFactoriesList the list of filter factories.
    */
-  virtual std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+  virtual Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
@@ -115,6 +120,13 @@ public:
    * @return uint64_t a listener tag usable for connection handler tracking.
    */
   virtual uint64_t nextListenerTag() PURE;
+
+  /**
+   * @return Filter::TcpListenerFilterConfigProviderManagerImpl* the pointer of the TCP listener
+   * config provider manager.
+   */
+  virtual Filter::TcpListenerFilterConfigProviderManagerImpl*
+  getTcpListenerConfigProviderManager() PURE;
 };
 
 /**
@@ -154,11 +166,13 @@ public:
    *        listener is not modifiable, future calls to this function or removeListener() on behalf
    *        of this listener will return false.
    * @return TRUE if a listener was added or FALSE if the listener was not updated because it is
-   *         a duplicate of the existing listener. This routine will throw an EnvoyException if
-   *         there is a fundamental error preventing the listener from being added or updated.
+   *         a duplicate of the existing listener. This routine will return
+   *         absl::InvalidArgumentError if there is a fundamental error preventing the listener
+   *         from being added or updated.
    */
-  virtual bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
-                                   const std::string& version_info, bool modifiable) PURE;
+  virtual absl::StatusOr<bool>
+  addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                      const std::string& version_info, bool modifiable) PURE;
 
   /**
    * Instruct the listener manager to create an LDS API provider. This is a separate operation

@@ -139,8 +139,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
                        data_to_write, enumToInt(type));
   const bool delayed_close_timeout_set = delayed_close_timeout_.count() > 0;
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
-      !transport_socket_->canFlushClose()) {
-    if (data_to_write > 0) {
+      type == ConnectionCloseType::Abort || !transport_socket_->canFlushClose()) {
+    if (data_to_write > 0 && type != ConnectionCloseType::Abort) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
       transport_socket_->doWrite(*write_buffer_, true);
@@ -268,6 +268,11 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   ConnectionImpl::raiseEvent(close_type);
 }
 
+void ConnectionImpl::onConnected() {
+  ASSERT(!connecting_);
+  transport_socket_->onConnected();
+}
+
 void ConnectionImpl::noDelay(bool enable) {
   // There are cases where a connection to localhost can immediately fail (e.g., if the other end
   // does not have enough fds, reaches a backlog limit, etc.). Because we run with deferred error
@@ -349,7 +354,7 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
   enable_half_close_ = enabled;
 }
 
-void ConnectionImpl::readDisable(bool disable) {
+Connection::ReadDisableStatus ConnectionImpl::readDisable(bool disable) {
   // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
 
@@ -368,11 +373,12 @@ void ConnectionImpl::readDisable(bool disable) {
 
     if (state() != State::Open) {
       // If readDisable is called on a closed connection, do not crash.
-      return;
+      return ReadDisableStatus::NoTransition;
     }
+
     if (read_disable_count_ > 1) {
       // The socket has already been read disabled.
-      return;
+      return ReadDisableStatus::StillReadDisabled;
     }
 
     // If half-close semantics are enabled, we never want early close notifications; we
@@ -382,18 +388,22 @@ void ConnectionImpl::readDisable(bool disable) {
     } else {
       ioHandle().enableFileEvents(Event::FileReadyType::Write);
     }
+
+    return ReadDisableStatus::TransitionedToReadDisabled;
   } else {
     ASSERT(read_disable_count_ != 0);
     --read_disable_count_;
     if (state() != State::Open) {
       // If readDisable is called on a closed connection, do not crash.
-      return;
+      return ReadDisableStatus::NoTransition;
     }
 
+    auto read_disable_status = ReadDisableStatus::StillReadDisabled;
     if (read_disable_count_ == 0) {
       // We never ask for both early close and read at the same time. If we are reading, we want to
       // consume all available data.
       ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
+      read_disable_status = ReadDisableStatus::TransitionedToReadEnabled;
     }
 
     if (filterChainWantsData() && (read_buffer_->length() > 0 || transport_wants_read_)) {
@@ -411,6 +421,8 @@ void ConnectionImpl::readDisable(bool disable) {
       dispatch_buffered_data_ = true;
       ioHandle().activateFileEvents(Event::FileReadyType::Read);
     }
+
+    return read_disable_status;
   }
 }
 
@@ -683,7 +695,6 @@ void ConnectionImpl::onWriteReady() {
       ENVOY_CONN_LOG_EVENT(debug, "connection_connected", "connected", *this);
       connecting_ = false;
       onConnected();
-      transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
         ENVOY_CONN_LOG_EVENT(debug, "connection_closed_callback", "close during connected callback",
@@ -811,9 +822,9 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
                                            ConnectionSocketPtr&& socket,
                                            TransportSocketPtr&& transport_socket,
-                                           StreamInfo::StreamInfo& stream_info, bool connected)
+                                           StreamInfo::StreamInfo& stream_info)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
-                     connected) {}
+                     true) {}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
                                                             Stats::Counter& timeout_stat) {
@@ -843,10 +854,22 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
   }
   ConnectionImpl::raiseEvent(event);
 }
+bool ServerConnectionImpl::initializeReadFilters() {
+  bool initialized = ConnectionImpl::initializeReadFilters();
+  if (initialized) {
+    // Server connection starts as connected, and we must explicitly signal to
+    // the downstream transport socket that the underlying socket is connected.
+    // We delay this step until after the filters are initialized and can
+    // receive the connection events.
+    onConnected();
+  }
+  return initialized;
+}
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
-  closeConnectionImmediately();
+  closeConnectionImmediatelyWithDetails(
+      StreamInfo::LocalCloseReasons::get().TransportSocketTimeout);
   transport_socket_timeout_stat_->inc();
   setFailureReason("connect timeout");
 }
@@ -855,20 +878,33 @@ ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options)
     : ClientConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
-                           source_address, std::move(transport_socket), options) {}
+                           source_address, std::move(transport_socket), options,
+                           transport_options) {}
 
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
     const Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+
+  if (transport_options) {
+    for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
+      // This does not throw as all objects are distinctly named and the stream info is empty.
+      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
+                                          StreamInfo::FilterState::LifeSpan::Connection,
+                                          object.stream_sharing_);
+    }
+  }
+
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip() == nullptr) {

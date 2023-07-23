@@ -1,61 +1,11 @@
 #include <memory>
 
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/stats/thread_local_store.h"
-#include "source/server/admin/stats_render.h"
-
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
-
-using testing::NiceMock;
+#include "test/server/admin/stats_render_test_base.h"
 
 namespace Envoy {
 namespace Server {
 
-class StatsRenderTest : public testing::Test {
-protected:
-  StatsRenderTest() : alloc_(symbol_table_), store_(alloc_) {
-    store_.addSink(sink_);
-    store_.initializeThreading(main_thread_dispatcher_, tls_);
-  }
-
-  ~StatsRenderTest() override {
-    tls_.shutdownGlobalThreading();
-    store_.shutdownThreading();
-    tls_.shutdownThread();
-  }
-
-  template <class T>
-  std::string render(StatsRender& render, absl::string_view name, const T& value) {
-    render.generate(response_, std::string(name), value);
-    render.finalize(response_);
-    return response_.toString();
-  }
-
-  Stats::ParentHistogram& populateHistogram(const std::string& name,
-                                            const std::vector<uint64_t>& vals) {
-    Stats::Histogram& h = store_.histogramFromString(name, Stats::Histogram::Unit::Unspecified);
-    for (uint64_t val : vals) {
-      h.recordValue(val);
-    }
-    store_.mergeHistograms([]() -> void {});
-    return dynamic_cast<Stats::ParentHistogram&>(h);
-  }
-
-  Stats::SymbolTableImpl symbol_table_;
-  Stats::AllocatorImpl alloc_;
-  NiceMock<Stats::MockSink> sink_;
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::ThreadLocalStoreImpl store_;
-  Http::TestResponseHeaderMapImpl response_headers_;
-  Buffer::OwnedImpl response_;
-  StatsParams params_;
-};
+using StatsRenderTest = StatsRenderTestBase;
 
 TEST_F(StatsRenderTest, TextInt) {
   StatsTextRender renderer(params_);
@@ -64,7 +14,7 @@ TEST_F(StatsRenderTest, TextInt) {
 
 TEST_F(StatsRenderTest, TextString) {
   StatsTextRender renderer(params_);
-  EXPECT_EQ("name: \"abc 123 ~!@#$%^&amp;*()-_=+;:&#39;&quot;,&lt;.&gt;/?\"\n",
+  EXPECT_EQ("name: \"abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?\"\n",
             render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"));
 }
 
@@ -94,6 +44,19 @@ TEST_F(StatsRenderTest, TextHistogramDisjoint) {
       "h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(1,1) B500(2,2) "
       "B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) "
       "B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n";
+  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+}
+
+TEST_F(StatsRenderTest, TextHistogramDetailed) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  StatsTextRender renderer(params_);
+  constexpr absl::string_view expected =
+      "h1:\n"
+      "  totals=200,10:1, 300,10:2\n"
+      "  intervals=200,10:1, 300,10:2\n"
+      "  summary=P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) P90(308.5,308.5) "
+      "P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) P99.9(309.985,309.985) "
+      "P100(310,310)\n";
   EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
 }
 
@@ -342,6 +305,39 @@ TEST_F(StatsRenderTest, JsonHistogramDisjoint) {
         }]
     }]
 }
+  )EOF";
+  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
+              JsonStringEq(expected));
+}
+
+TEST_F(StatsRenderTest, JsonHistogramDetailed) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  StatsJsonRender renderer(response_headers_, response_, params_);
+  const std::string expected = R"EOF(
+{
+    "stats": [{
+        "histograms": {
+            "supported_percentiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
+            "details": [{
+                "name": "h1",
+                "percentiles": [
+                    {"cumulative": 200, "interval": 200},
+                    {"cumulative": 207.5, "interval": 207.5},
+                    {"cumulative": 302.5, "interval": 302.5},
+                    {"cumulative": 306.25, "interval": 306.25},
+                    {"cumulative": 308.5, "interval": 308.5},
+                    {"cumulative": 309.25, "interval": 309.25},
+                    {"cumulative": 309.85, "interval": 309.85},
+                    {"cumulative": 309.925, "interval": 309.925},
+                    {"cumulative": 309.985, "interval": 309.985},
+                    {"cumulative": 310, "interval": 310}
+                ],
+                "totals": [
+                    {"lower_bound": 200, "width": 10, "count": 1},
+                    {"lower_bound": 300, "width": 10, "count": 2}],
+                "intervals":[
+                    {"lower_bound": 200, "width": 10, "count": 1},
+                    {"lower_bound": 300, "width": 10, "count": 2}]}]}}]}
   )EOF";
   EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
               JsonStringEq(expected));

@@ -46,6 +46,18 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
   cb(filter_callback);
 }
 
+TEST(BufferFilterFactoryTest, BufferFilterCorrectProtoUpstreamFactory) {
+  envoy::extensions::filters::http::buffer::v3::Buffer config;
+  config.mutable_max_request_bytes()->set_value(1028);
+
+  NiceMock<Server::Configuration::MockUpstreamHttpFactoryContext> context;
+  BufferFilterFactory factory;
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
 TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
   BufferFilterFactory factory;
   auto empty_proto = factory.createEmptyConfigProto();

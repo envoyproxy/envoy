@@ -69,6 +69,8 @@ public:
   MOCK_METHOD(Stats::Scope&, getRootScope, ());
   MOCK_METHOD(void, countDeprecatedFeatureUse, (), (const));
 
+  SnapshotConstSharedPtr threadsafe_snapshot_{
+      std::make_shared<const testing::NiceMock<MockSnapshot>>()};
   testing::NiceMock<MockSnapshot> snapshot_;
   testing::NiceMock<Stats::MockStore> store_;
 };

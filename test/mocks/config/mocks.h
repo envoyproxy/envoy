@@ -82,12 +82,13 @@ public:
   MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoder& resource_decoder, const SubscriptionOptions& options));
+               OpaqueResourceDecoderSharedPtr resource_decoder,
+               const SubscriptionOptions& options));
   MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
               (const xds::core::v3::ResourceLocator& collection_locator,
                const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoder& resource_decoder));
+               OpaqueResourceDecoderSharedPtr resource_decoder));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   MockSubscription* subscription_{};
@@ -120,7 +121,7 @@ public:
 
   MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
               (const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
-               SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+               SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
 
   MOCK_METHOD(void, requestOnDemandUpdate,
@@ -191,6 +192,18 @@ public:
               (UpdateNotificationCb callback), (const));
 
   Common::CallbackManager<absl::string_view> update_cb_handler_;
+};
+
+template <class FactoryCallback>
+class TestExtensionConfigProvider : public Config::ExtensionConfigProvider<FactoryCallback> {
+public:
+  TestExtensionConfigProvider(FactoryCallback cb) : cb_(cb) {}
+  const std::string& name() override { return name_; }
+  OptRef<FactoryCallback> config() override { return {cb_}; }
+
+private:
+  const std::string name_ = "mock_config_provider";
+  FactoryCallback cb_;
 };
 
 } // namespace Config

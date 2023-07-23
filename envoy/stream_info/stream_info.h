@@ -9,10 +9,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/stream_info/stream_id_provider.h"
 #include "envoy/tracing/trace_reason.h"
 #include "envoy/upstream/host_description.h"
 
@@ -135,6 +135,8 @@ struct ResponseCodeDetailValues {
   const std::string InvalidEnvoyRequestHeaders = "request_headers_failed_strict_check";
   // The request was rejected due to a missing Path or :path header field.
   const std::string MissingPath = "missing_path_rejected";
+  // The request was rejected due to an invalid Path or :path header field.
+  const std::string InvalidPath = "invalid_path";
   // The request was rejected due to using an absolute path on a route not supporting them.
   const std::string AbsolutePath = "absolute_path_rejected";
   // The request was rejected because path normalization was configured on and failed, probably due
@@ -156,8 +158,8 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
-  // The upstream response timed out.
-  const std::string UpstreamTimeout = "upstream_response_timeout";
+  // The request was forwarded upstream but the response timed out.
+  const std::string ResponseTimeout = "response_timeout";
   // The final upstream try timed out.
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
   // The final upstream try idle timed out.
@@ -176,8 +178,8 @@ struct ResponseCodeDetailValues {
   const std::string FilterChainNotFound = "filter_chain_not_found";
   // The client disconnected unexpectedly.
   const std::string DownstreamRemoteDisconnect = "downstream_remote_disconnect";
-  // The client connection was locally closed for an unspecified reason.
-  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect";
+  // The client connection was locally closed for the given reason.
+  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect({})";
   // The max connection duration was exceeded.
   const std::string DurationTimeout = "duration_timeout";
   // The max request downstream header duration was exceeded.
@@ -205,7 +207,47 @@ struct ResponseCodeDetailValues {
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
+/**
+ * Constants for the locally closing a connection. This is used in response code
+ * details field of StreamInfo for details sent by core (non-extension) code.
+ * This is incomplete as some details may be
+ *
+ * Custom extensions can define additional values provided they are appropriately
+ * scoped to avoid collisions.
+ */
+struct LocalCloseReasonValues {
+  const std::string DeferredCloseOnDrainedConnection = "deferred_close_on_drained_connection";
+  const std::string IdleTimeoutOnConnection = "on_idle_timeout";
+  const std::string CloseForConnectRequestOrTcpTunneling =
+      "close_for_connect_request_or_tcp_tunneling";
+  const std::string Http2PingTimeout = "http2_ping_timeout";
+  const std::string Http2ConnectionProtocolViolation = "http2_connection_protocol_violation";
+  const std::string TransportSocketTimeout = "transport_socket_timeout";
+  const std::string TriggeredDelayedCloseTimeout = "triggered_delayed_close_timeout";
+  const std::string TcpProxyInitializationFailure = "tcp_initializion_failure:";
+  const std::string TcpSessionIdleTimeout = "tcp_session_idle_timeout";
+  const std::string MaxConnectionDurationReached = "max_connection_duration_reached";
+  const std::string ClosingUpstreamTcpDueToDownstreamRemoteClose =
+      "closing_upstream_tcp_connection_due_to_downstream_remote_close";
+  const std::string ClosingUpstreamTcpDueToDownstreamLocalClose =
+      "closing_upstream_tcp_connection_due_to_downstream_local_close";
+  const std::string NonPooledTcpConnectionHostHealthFailure =
+      "non_pooled_tcp_connection_host_health_failure";
+};
+
+using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
+
 struct UpstreamTiming {
+  /**
+   * Records the latency from when the upstream request was created to when the
+   * connection pool callbacks (either success of failure were triggered).
+   */
+  void recordConnectionPoolCallbackLatency(MonotonicTime start, TimeSource& time_source) {
+    ASSERT(!connection_pool_callback_latency_);
+    connection_pool_callback_latency_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(time_source.monotonicTime() - start);
+  }
+
   /**
    * Sets the time when the first byte of the request was sent upstream.
    */
@@ -215,7 +257,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the first byte of the response is received from upstream.
+   * Sets the time when the last byte of the request was sent upstream.
    */
   void onLastUpstreamTxByteSent(TimeSource& time_source) {
     ASSERT(!last_upstream_tx_byte_sent_);
@@ -223,7 +265,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the last byte of the response is received from upstream.
+   * Sets the time when the first byte of the response is received from upstream.
    */
   void onFirstUpstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!first_upstream_rx_byte_received_);
@@ -231,7 +273,7 @@ struct UpstreamTiming {
   }
 
   /**
-   * Sets the time when the last byte of the request was sent upstream.
+   * Sets the time when the last byte of the response is received from upstream.
    */
   void onLastUpstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_upstream_rx_byte_received_);
@@ -251,6 +293,15 @@ struct UpstreamTiming {
     upstream_handshake_complete_ = time_source.monotonicTime();
   }
 
+  absl::optional<MonotonicTime> upstreamHandshakeComplete() const {
+    return upstream_handshake_complete_;
+  }
+
+  absl::optional<std::chrono::nanoseconds> connectionPoolCallbackLatency() const {
+    return connection_pool_callback_latency_;
+  }
+
+  absl::optional<std::chrono::nanoseconds> connection_pool_callback_latency_;
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
@@ -282,6 +333,12 @@ public:
   absl::optional<MonotonicTime> lastDownstreamTxByteSent() const {
     return last_downstream_tx_byte_sent_;
   }
+  absl::optional<MonotonicTime> downstreamHandshakeComplete() const {
+    return downstream_handshake_complete_;
+  }
+  absl::optional<MonotonicTime> lastDownstreamAckReceived() const {
+    return last_downstream_ack_received_;
+  }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_downstream_rx_byte_received_);
@@ -295,6 +352,14 @@ public:
     ASSERT(!last_downstream_tx_byte_sent_);
     last_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
+  void onDownstreamHandshakeComplete(TimeSource& time_source) {
+    // An existing value can be overwritten, e.g. in resumption case.
+    downstream_handshake_complete_ = time_source.monotonicTime();
+  }
+  void onLastDownstreamAckReceived(TimeSource& time_source) {
+    ASSERT(!last_downstream_ack_received_);
+    last_downstream_ack_received_ = time_source.monotonicTime();
+  }
 
 private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
@@ -304,30 +369,89 @@ private:
   absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
   // The time when the last byte of the response was sent downstream.
   absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  // The time the TLS handshake completed. Set at connection level.
+  absl::optional<MonotonicTime> downstream_handshake_complete_;
+  // The time the final ack was received from the client.
+  absl::optional<MonotonicTime> last_downstream_ack_received_;
 };
 
 // Measure the number of bytes sent and received for a stream.
 struct BytesMeter {
+  BytesMeter() = default;
   uint64_t wireBytesSent() const { return wire_bytes_sent_; }
   uint64_t wireBytesReceived() const { return wire_bytes_received_; }
   uint64_t headerBytesSent() const { return header_bytes_sent_; }
   uint64_t headerBytesReceived() const { return header_bytes_received_; }
+
   void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
   void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+
+  struct BytesSnapshot {
+    SystemTime snapshot_time;
+    uint64_t header_bytes_sent{};
+    uint64_t header_bytes_received{};
+    uint64_t wire_bytes_sent{};
+    uint64_t wire_bytes_received{};
+  };
+  void takeDownstreamPeriodicLoggingSnapshot(const SystemTime& snapshot_time) {
+    downstream_periodic_logging_bytes_snapshot_ = std::make_unique<BytesSnapshot>();
+
+    downstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
+    downstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    downstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
+  }
+  void takeUpstreamPeriodicLoggingSnapshot(const SystemTime& snapshot_time) {
+    upstream_periodic_logging_bytes_snapshot_ = std::make_unique<BytesSnapshot>();
+
+    upstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
+    upstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    upstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
+  }
+  const BytesSnapshot* bytesAtLastDownstreamPeriodicLog() const {
+    return downstream_periodic_logging_bytes_snapshot_.get();
+  }
+  const BytesSnapshot* bytesAtLastUpstreamPeriodicLog() const {
+    return upstream_periodic_logging_bytes_snapshot_.get();
+  }
+  // Adds the bytes from `existing` to `this`.
+  // Additionally, captures the snapshots on `existing` and adds them to `this`.
+  void captureExistingBytesMeter(BytesMeter& existing) {
+    // Add bytes accumulated on `this` to the pre-existing periodic bytes collectors.
+    if (existing.downstream_periodic_logging_bytes_snapshot_) {
+      downstream_periodic_logging_bytes_snapshot_ =
+          std::move(existing.downstream_periodic_logging_bytes_snapshot_);
+      existing.downstream_periodic_logging_bytes_snapshot_ = nullptr;
+    }
+    if (existing.upstream_periodic_logging_bytes_snapshot_) {
+      upstream_periodic_logging_bytes_snapshot_ =
+          std::move(existing.upstream_periodic_logging_bytes_snapshot_);
+      existing.upstream_periodic_logging_bytes_snapshot_ = nullptr;
+    }
+
+    // Accumulate existing bytes.
+    header_bytes_sent_ += existing.header_bytes_sent_;
+    header_bytes_received_ += existing.header_bytes_received_;
+    wire_bytes_sent_ += existing.wire_bytes_sent_;
+    wire_bytes_received_ += existing.wire_bytes_received_;
+  }
 
 private:
   uint64_t header_bytes_sent_{};
   uint64_t header_bytes_received_{};
   uint64_t wire_bytes_sent_{};
   uint64_t wire_bytes_received_{};
+  std::unique_ptr<BytesSnapshot> downstream_periodic_logging_bytes_snapshot_;
+  std::unique_ptr<BytesSnapshot> upstream_periodic_logging_bytes_snapshot_;
 };
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 
-// TODO(alyssawilk) after landing this, remove all the duplicate getters and
-// setters from StreamInfo.
 class UpstreamInfo {
 public:
   virtual ~UpstreamInfo() = default;
@@ -392,6 +516,17 @@ public:
    * @return the upstream local address.
    */
   virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
+
+  /**
+   * @param upstream_remote_address sets the remote address of the upstream connection.
+   */
+  virtual void setUpstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_remote_address) PURE;
+
+  /**
+   * @return the upstream remote address.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& upstreamRemoteAddress() const PURE;
 
   /**
    * @param failure_reason the upstream transport failure reason.
@@ -505,6 +640,26 @@ public:
   virtual uint64_t bytesReceived() const PURE;
 
   /**
+   * @param bytes_retransmitted denotes number of bytes to add to total retransmitted bytes.
+   */
+  virtual void addBytesRetransmitted(uint64_t bytes_retransmitted) PURE;
+
+  /**
+   * @return the number of bytes retransmitted by the stream.
+   */
+  virtual uint64_t bytesRetransmitted() const PURE;
+
+  /**
+   * @param packets_retransmitted denotes number of packets to add to total retransmitted packets.
+   */
+  virtual void addPacketsRetransmitted(uint64_t packets_retransmitted) PURE;
+
+  /**
+   * @return the number of packets retransmitted by the stream.
+   */
+  virtual uint64_t packetsRetransmitted() const PURE;
+
+  /**
    * @return the protocol of the request.
    */
   virtual absl::optional<Http::Protocol> protocol() const PURE;
@@ -550,6 +705,11 @@ public:
    */
   virtual std::shared_ptr<UpstreamInfo> upstreamInfo() PURE;
   virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
+
+  /**
+   * @return the current duration of the request, or the total duration of the request, if ended.
+   */
+  virtual absl::optional<std::chrono::nanoseconds> currentDuration() const PURE;
 
   /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
@@ -662,15 +822,14 @@ public:
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 
   /**
-   * @param provider The requestID provider implementation this stream uses.
+   * @param provider The unique id implementation this stream uses.
    */
-  virtual void
-  setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) PURE;
+  virtual void setStreamIdProvider(StreamIdProviderSharedPtr provider) PURE;
 
   /**
-   * @return the request ID provider for this stream if available.
+   * @return the unique id for this stream if available.
    */
-  virtual const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const PURE;
+  virtual OptRef<const StreamIdProvider> getStreamIdProvider() const PURE;
 
   /**
    * Set the trace reason for the stream.
@@ -723,11 +882,34 @@ public:
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
 
+  virtual bool isShadow() const PURE;
+
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
                                                   StreamInfo& upstream_info) {
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+
+  /**
+   * Dump the info to the specified ostream.
+   *
+   * @param os the ostream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @return absl::string_view the downstream transport failure reason,
+   *         e.g. certificate validation failed.
+   */
+  virtual absl::string_view downstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param failure_reason the downstream transport failure reason.
+   */
+  virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

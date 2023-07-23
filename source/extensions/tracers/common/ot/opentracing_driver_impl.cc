@@ -107,7 +107,8 @@ std::string OpenTracingSpan::getBaggage(absl::string_view key) {
   return span_->BaggageItem({key.data(), key.length()});
 }
 
-void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context) {
+void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context,
+                                    const Upstream::HostDescriptionConstSharedPtr&) {
   if (driver_.propagationMode() == OpenTracingDriver::PropagationMode::SingleHeader) {
     // Inject the span context using Envoy's single-header format.
     std::ostringstream oss;
@@ -152,8 +153,8 @@ OpenTracingDriver::OpenTracingDriver(Stats::Scope& scope)
 
 Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
                                               Tracing::TraceContext& trace_context,
+                                              const StreamInfo::StreamInfo& stream_info,
                                               const std::string& operation_name,
-                                              SystemTime start_time,
                                               const Tracing::Decision tracing_decision) {
   const PropagationMode propagation_mode = this->propagationMode();
   const opentracing::Tracer& tracer = this->tracer();
@@ -195,7 +196,7 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   opentracing::StartSpanOptions options;
   options.references.emplace_back(opentracing::SpanReferenceType::ChildOfRef,
                                   parent_span_ctx.get());
-  options.start_system_timestamp = start_time;
+  options.start_system_timestamp = stream_info.startTime();
   if (!tracing_decision.traced) {
     options.tags.emplace_back(opentracing::ext::sampling_priority, 0);
   }

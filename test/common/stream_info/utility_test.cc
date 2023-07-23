@@ -64,6 +64,21 @@ TEST(UtilityTest, formatDownstreamAddressNoPort) {
             Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
 }
 
+TEST(UtilityTest, formatDownstreamAddressJustPort) {
+  EXPECT_EQ("0",
+            Utility::formatDownstreamAddressJustPort(Network::Address::Ipv4Instance("1.2.3.4")));
+  EXPECT_EQ("8080", Utility::formatDownstreamAddressJustPort(
+                        Network::Address::Ipv4Instance("1.2.3.4", 8080)));
+}
+
+TEST(UtilityTest, extractDownstreamAddressJustPort) {
+
+  EXPECT_EQ(0,
+            *Utility::extractDownstreamAddressJustPort(Network::Address::Ipv4Instance("1.2.3.4")));
+  EXPECT_EQ(8080, *Utility::extractDownstreamAddressJustPort(
+                      Network::Address::Ipv4Instance("1.2.3.4", 8080)));
+}
+
 class ProxyStatusTest : public ::testing::Test {
 protected:
   void SetUp() override {
@@ -316,7 +331,7 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
            {ResponseFlag::NoFilterConfigFound, ProxyStatusError::ProxyConfigurationError},
            {ResponseFlag::UpstreamProtocolError, ProxyStatusError::HttpProtocolError},
            {ResponseFlag::NoClusterFound, ProxyStatusError::DestinationUnavailable},
-       }) {
+           {ResponseFlag::DnsResolutionFailed, ProxyStatusError::DnsError}}) {
     NiceMock<MockStreamInfo> stream_info;
     ON_CALL(stream_info, hasResponseFlag(response_flag)).WillByDefault(Return(true));
     EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), proxy_status_error);

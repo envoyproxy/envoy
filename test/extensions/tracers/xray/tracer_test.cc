@@ -508,7 +508,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
                                absl::nullopt /*headers*/,
                                absl::nullopt /*client_ip from x-forwarded-for header*/);
   Http::TestRequestHeaderMapImpl request_headers;
-  span->injectContext(request_headers);
+  span->injectContext(request_headers, nullptr);
   auto header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_FALSE(header.empty());
   EXPECT_NE(header[0]->value().getStringView().find("Root="), absl::string_view::npos);
@@ -526,7 +526,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
                 server_.api().randomGenerator()};
   auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
   Http::TestRequestHeaderMapImpl request_headers;
-  span->injectContext(request_headers);
+  span->injectContext(request_headers, nullptr);
   auto header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_FALSE(header.empty());
   EXPECT_NE(header[0]->value().getStringView().find("Root="), absl::string_view::npos);

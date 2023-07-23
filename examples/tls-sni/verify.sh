@@ -2,6 +2,8 @@
 
 export NAME=tls-sni
 export MANUAL=true
+export PORT_PROXY="${TLS_SNI_PORT_PROXY:-12020}"
+export PORT_PROXY_CLIENT="${TLS_SNI_PORT_PROXY_CLIENT:-12021}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -27,28 +29,28 @@ create_self_signed_certs domain2
 bring_up_example
 
 run_log "Query domain1 with curl and tls/sni"
-curl -sk --resolve domain1.example.com:10000:127.0.0.1 \
-     https://domain1.example.com:10000 \
+curl -sk --resolve "domain1.example.com:${PORT_PROXY}:127.0.0.1" \
+     "https://domain1.example.com:${PORT_PROXY}" \
     | jq '.os.hostname' | grep http-upstream1
 
 run_log "Query domain2 with curl and tls/sni"
-curl -sk --resolve domain2.example.com:10000:127.0.0.1 \
-     https://domain2.example.com:10000 \
+curl -sk --resolve "domain2.example.com:${PORT_PROXY}:127.0.0.1" \
+     "https://domain2.example.com:${PORT_PROXY}" \
     | jq '.os.hostname' | grep http-upstream2
 
 run_log "Query domain3 with curl and tls/sni"
-curl -sk --resolve domain3.example.com:10000:127.0.0.1 \
-     https://domain3.example.com:10000 \
+curl -sk --resolve "domain3.example.com:${PORT_PROXY}:127.0.0.1" \
+     "https://domain3.example.com:${PORT_PROXY}" \
     | jq '.os.hostname' | grep https-upstream3
 
 run_log "Query domain1 via Envoy sni client"
-curl -s http://localhost:20000/domain1 \
+curl -s "http://localhost:${PORT_PROXY_CLIENT}/domain1" \
     | jq '.os.hostname' | grep http-upstream1
 
 run_log "Query domain2 via Envoy sni client"
-curl -s http://localhost:20000/domain2 \
+curl -s "http://localhost:${PORT_PROXY_CLIENT}/domain2" \
     | jq '.os.hostname' | grep http-upstream2
 
 run_log "Query domain3 via Envoy sni client"
-curl -s http://localhost:20000/domain3 \
+curl -s "http://localhost:${PORT_PROXY_CLIENT}/domain3" \
     | jq '.os.hostname' | grep https-upstream3

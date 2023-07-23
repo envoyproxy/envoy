@@ -18,6 +18,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::StrictMock;
 
 namespace Envoy {
@@ -62,12 +63,11 @@ public:
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config) {
     // Delegate call to mock async client manager to real async client manager.
     ON_CALL(context_, getServerFactoryContext()).WillByDefault(testing::ReturnRef(server_context_));
-    ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
+    ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& config,
-                                  Stats::Scope& scope, bool skip_cluster_check,
-                                  Grpc::CacheOption cache_option) {
-          return async_client_manager_->getOrCreateRawAsyncClient(config, scope, skip_cluster_check,
-                                                                  cache_option);
+                                  Stats::Scope& scope, bool skip_cluster_check) {
+          return async_client_manager_->getOrCreateRawAsyncClient(config, scope,
+                                                                  skip_cluster_check);
         }));
     ExtAuthzFilterConfig factory;
     return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_);
@@ -117,17 +117,16 @@ TEST_F(ExtAuthzFilterHttpTest, ExtAuthzFilterFactoryTestHttp) {
   const std::string ext_authz_config_yaml = R"EOF(
   stat_prefix: "wall"
   transport_api_version: V3
+  allowed_headers:
+      patterns:
+      - exact: baz
+      - prefix: x-
   http_service:
     server_uri:
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 0.25s
-
     authorization_request:
-      allowed_headers:
-        patterns:
-        - exact: baz
-        - prefix: x-
       headers_to_add:
       - key: foo
         value: bar
@@ -193,7 +192,8 @@ private:
     EXPECT_NE(filter, nullptr);
     Http::TestRequestHeaderMapImpl request_headers;
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-    ON_CALL(decoder_callbacks, connection()).WillByDefault(Return(&connection_));
+    ON_CALL(decoder_callbacks, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     filter->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter->decodeHeaders(request_headers, false));
@@ -205,7 +205,7 @@ private:
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config,
       int requests_sent_per_thread) {
     Grpc::RawAsyncClientSharedPtr async_client = async_client_manager_->getOrCreateRawAsyncClient(
-        ext_authz_config.grpc_service(), context_.scope(), false, Grpc::CacheOption::AlwaysCache);
+        ext_authz_config.grpc_service(), context_.scope(), false);
     Grpc::MockAsyncClient* mock_async_client =
         dynamic_cast<Grpc::MockAsyncClient*>(async_client.get());
     EXPECT_NE(mock_async_client, nullptr);

@@ -27,7 +27,7 @@ to
     - "www.host.com:80"
     - "www.host.com:443"
 
-The other is to strip ports entirely using :ref:`stripping port from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_matching_host_port>`. Not that this will only stip port 80 from insecure requests and 443 from secure request. It does
-not just stop ports when routes are matched, but changes
-the host sent downstream to also not include the port.
+The other is to strip ports entirely using :ref:`strip_any_host_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_any_host_port>` or
+:ref:`strip_matching_host_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_matching_host_port>`. The diffent is :ref:`strip_matching_host_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_matching_host_port>`
+only strip port if it is equal to the listener's local port.
 

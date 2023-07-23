@@ -35,7 +35,12 @@ class StatsRequest : public Admin::Request {
   };
 
 public:
-  StatsRequest(Stats::Store& stats, const StatsParams& params);
+  using UrlHandlerFn = std::function<Admin::UrlHandler()>;
+
+  static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
+
+  StatsRequest(Stats::Store& stats, const StatsParams& params,
+               UrlHandlerFn url_handler_fn = nullptr);
 
   // Admin::Request
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
@@ -102,8 +107,11 @@ private:
   ScopeVec scopes_;
   absl::btree_map<std::string, StatOrScopes> stat_map_;
   Phase phase_{Phase::TextReadouts};
+  uint64_t phase_stat_count_{0};
+  absl::string_view phase_string_{"text readouts"};
   Buffer::OwnedImpl response_;
-  uint64_t chunk_size_{2 * 1000 * 1000};
+  UrlHandlerFn url_handler_fn_;
+  uint64_t chunk_size_{DefaultChunkSize};
 };
 
 } // namespace Server

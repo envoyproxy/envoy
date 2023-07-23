@@ -6,20 +6,6 @@ namespace Compression {
 namespace Brotli {
 namespace Compressor {
 
-namespace {
-// Default input block size.
-const uint32_t DefaultInputBlockBits = 24;
-
-// Default compression window size.
-const uint32_t DefaultWindowBits = 18;
-
-// Default quality.
-const uint32_t DefaultQuality = 3;
-
-// Default zlib chunk size.
-const uint32_t DefaultChunkSize = 4096;
-} // namespace
-
 BrotliCompressorFactory::BrotliCompressorFactory(
     const envoy::extensions::compression::brotli::compressor::v3::Brotli& brotli)
     : chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(brotli, chunk_size, DefaultChunkSize)),

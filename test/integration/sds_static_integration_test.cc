@@ -83,15 +83,15 @@ public:
 
   Network::ClientConnectionPtr makeSslClientConnection() {
     Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
-    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_ssl_ctx_->createTransportSocket(nullptr),
-                                               nullptr);
+    return dispatcher_->createClientConnection(
+        address, Network::Address::InstanceConstSharedPtr(),
+        client_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
   }
 
 private:
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 
-  Network::TransportSocketFactoryPtr client_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticDownstreamIntegrationTest,
@@ -143,7 +143,8 @@ public:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_), Http::CodecType::HTTP1);
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_), Http::CodecType::HTTP1,
+                    /*autonomous_upstream=*/false);
   }
 
 private:

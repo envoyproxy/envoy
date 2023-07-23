@@ -53,7 +53,7 @@ TEST_F(ZstdDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   drainBuffer(buffer);
 
   Stats::IsolatedStoreImpl stats_store{};
-  ZstdDecompressorImpl decompressor{stats_store, "test.", default_ddict_manager_, 16};
+  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_, 16};
 
   decompressor.decompress(accumulation_buffer, buffer);
   std::string decompressed_text{buffer.toString()};
@@ -72,7 +72,7 @@ TEST_F(ZstdDecompressorImplTest, WrongInput) {
       zeros, 20, [](const void*, size_t, const Buffer::BufferFragmentImpl* frag) { delete frag; });
   buffer.addBufferFragment(*frag);
   Stats::IsolatedStoreImpl stats_store{};
-  ZstdDecompressorImpl decompressor{stats_store, "test.", default_ddict_manager_, 16};
+  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_, 16};
   decompressor.decompress(buffer, output_buffer);
   EXPECT_EQ(1, stats_store.counterFromString("test.zstd_generic_error").value());
 }
@@ -108,7 +108,7 @@ TEST_F(ZstdDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   drainBuffer(buffer);
 
   Stats::IsolatedStoreImpl stats_store{};
-  ZstdDecompressorImpl decompressor{stats_store, "test.", default_ddict_manager_, 16};
+  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_, 16};
 
   decompressor.decompress(accumulation_buffer, buffer);
   std::string decompressed_text{buffer.toString()};
@@ -149,6 +149,27 @@ TEST_F(ZstdDecompressorImplTest, IllegalConfig) {
                "assert failure: id != 0. Details: Illegal Zstd dictionary");
 }
 
+// Detect excessive compression ratio by compressing a long whitespace string
+// into a very small chunk of data and decompressing it again.
+TEST_F(ZstdDecompressorImplTest, DetectExcessiveCompressionRatio) {
+  const absl::string_view ten_whitespaces = "          ";
+  Buffer::OwnedImpl buffer;
+  for (int i = 0; i < 1000; i++) {
+    buffer.add(ten_whitespaces);
+  }
+
+  Zstd::Compressor::ZstdCompressorImpl compressor{default_compression_level_,
+                                                  default_enable_checksum_, default_strategy_,
+                                                  default_cdict_manager_, 4096};
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+
+  Buffer::OwnedImpl output_buffer;
+  Stats::IsolatedStoreImpl stats_store{};
+  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_, 16};
+  decompressor.decompress(buffer, output_buffer);
+  ASSERT_EQ(stats_store.counterFromString("test.zstd_generic_error").value(), 1);
+}
+
 } // namespace
 
 // Copy from
@@ -162,7 +183,7 @@ protected:
 
   Stats::IsolatedStoreImpl stats_store_{};
   ZstdDDictManagerPtr ddict_manager_{nullptr};
-  ZstdDecompressorImpl decompressor_{stats_store_, "test.", ddict_manager_, 16};
+  ZstdDecompressorImpl decompressor_{*stats_store_.rootScope(), "test.", ddict_manager_, 16};
 };
 
 TEST_F(ZstdDecompressorStatsTest, ChargeErrorStats) {

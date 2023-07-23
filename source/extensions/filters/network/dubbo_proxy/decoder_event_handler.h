@@ -15,12 +15,12 @@ namespace DubboProxy {
 enum class FilterStatus : uint8_t {
   // Continue filter chain iteration.
   Continue,
-  // Do not iterate to any of the remaining filters in the chain. Returning
-  // FilterDataStatus::Continue from decodeData()/encodeData() or calling
-  // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  // Pause iterating to any of the remaining filters in the chain.
+  // The current message remains in the connection manager to wait to be continued.
+  // ContinueDecoding()/continueEncoding() MUST be called to continue filter iteration.
   StopIteration,
-  // Indicates that a retry is required for the reply message received.
-  Retry,
+  // Abort the iteration and remove the current message from the connection manager.
+  AbortIteration,
 };
 
 class StreamDecoder {

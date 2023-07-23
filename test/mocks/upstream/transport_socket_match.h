@@ -15,13 +15,13 @@ namespace Upstream {
 class MockTransportSocketMatcher : public TransportSocketMatcher {
 public:
   MockTransportSocketMatcher();
-  MockTransportSocketMatcher(Network::TransportSocketFactoryPtr default_factory);
+  MockTransportSocketMatcher(Network::UpstreamTransportSocketFactoryPtr default_factory);
   ~MockTransportSocketMatcher() override;
   MOCK_METHOD(TransportSocketMatcher::MatchData, resolve,
               (const envoy::config::core::v3::Metadata*), (const));
   MOCK_METHOD(bool, allMatchesSupportAlpn, (), (const));
 
-  Network::TransportSocketFactoryPtr socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr socket_factory_;
   Stats::TestUtil::TestStore stats_store_;
   TransportSocketMatchStats stats_;
 };

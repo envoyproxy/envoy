@@ -84,6 +84,8 @@ cluster_manager {
     }
   }
   load_stats_config {
+    api_type: REST
+    transport_api_version: V3
     refresh_delay {
       seconds: 4611686018427387903
     }
@@ -104,15 +106,19 @@ stats_sinks {
     type_url: "\001\000\000\t"
   }
 }
-watchdog {
-  miss_timeout {
-    seconds: 2147483707
-  }
-  kill_timeout {
-    seconds: 2046820352
+watchdogs {
+  main_thread_watchdog {
+    miss_timeout {
+      seconds: 2147483707
+    }
+    kill_timeout {
+      seconds: 2046820352
+    }
   }
 }
 hds_config {
+  api_type: REST
+  transport_api_version: V3
 }
 layered_runtime {
 }

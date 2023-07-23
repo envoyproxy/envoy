@@ -63,7 +63,7 @@ std::string sha256(absl::string_view data) {
   rc = EVP_DigestFinal(ctx, digest.data(), nullptr);
   RELEASE_ASSERT(rc == 1, "Failed to finalize digest");
   EVP_MD_CTX_free(ctx);
-  return std::string(reinterpret_cast<const char*>(&digest[0]), digest.size());
+  return {reinterpret_cast<const char*>(&digest[0]), digest.size()};
 }
 
 class TestContext : public ::Envoy::Extensions::Common::Wasm::Context {
@@ -150,7 +150,8 @@ TEST_P(WasmCommonTest, WasmFailState) {
       StreamInfo::FilterState::LifeSpan::FilterChain);
   auto wasm_state = std::make_unique<Filters::Common::Expr::CelState>(wasm_state_prototype);
   Protobuf::Arena arena;
-  EXPECT_EQ(wasm_state->exprValue(&arena, true).MessageOrDie(), nullptr);
+  EXPECT_EQ(wasm_state->exprValue(&arena, true).type(),
+            Filters::Common::Expr::CelValue::Type::kNullType);
   wasm_state->setValue("foo");
   auto any = wasm_state->serializeAsProto();
   EXPECT_TRUE(static_cast<ProtobufWkt::Any*>(any.get())->Is<ProtobufWkt::BytesValue>());
@@ -681,8 +682,7 @@ TEST_P(WasmCommonTest, VmCache) {
              remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
   EXPECT_NE(wasm_handle, nullptr);
-  Event::PostCb post_cb = [] {};
-  lifecycle_callback(post_cb);
+  lifecycle_callback([] {});
 
   WasmHandleSharedPtr wasm_handle2;
   createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,
@@ -1297,7 +1297,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
   thread_local_wasm->start(plugin);
 }
 
-class WasmCommonContextTest : public Common::Wasm::WasmTestBase<
+class WasmCommonContextTest : public Common::Wasm::WasmHttpFilterTestBase<
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmCommonContextTest() = default;
@@ -1311,16 +1311,10 @@ public:
               });
   }
 
-  void setupContext() {
-    context_ =
-        std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_handle_);
-    context_->onCreate();
-  }
+  void setupContext() { setupFilterBase<TestContext>(); }
 
   TestContext& rootContext() { return *static_cast<TestContext*>(root_context_); }
-  TestContext& context() { return *context_; }
-
-  std::unique_ptr<TestContext> context_;
+  TestContext& context() { return *static_cast<TestContext*>(context_.get()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest,
@@ -1396,6 +1390,56 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   NiceMock<Envoy::Stats::MockMetricSnapshot> stats_snapshot;
   root_context_->onStatsUpdate(stats_snapshot);
   root_context_->validateConfiguration("", plugin_);
+}
+
+// test that we don't send the local reply twice, even though it's specified in the wasm code
+TEST_P(WasmCommonContextTest, DuplicateLocalReply) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestContextCpp";
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "context", "send local reply twice");
+  setupContext();
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce([this](Http::ResponseHeaderMap&, bool) { context().onResponseHeaders(0, false); });
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _, _, testing::Eq("ok")));
+
+  // Create in-VM context.
+  context().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(0, false));
+}
+
+// test that we don't send the local reply twice when the wasm code panics
+TEST_P(WasmCommonContextTest, LocalReplyWhenPanic) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    // no need test the Null VM plugin.
+    return;
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "context", "panic after sending local reply");
+  setupContext();
+  // In the case of VM failure, failStream is called, so we need to make sure that we don't send the
+  // local reply twice.
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create in-VM context.
+  context().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(0, false));
 }
 
 } // namespace Wasm

@@ -29,7 +29,8 @@ public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version, bool enable_half_close,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       Network::Address::InstanceConstSharedPtr source_address = nullptr);
+                       Network::Address::InstanceConstSharedPtr source_address = nullptr,
+                       absl::string_view destination_address = "");
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
@@ -37,7 +38,8 @@ public:
   ABSL_MUST_USE_RESULT AssertionResult
   waitForData(size_t length, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForDisconnect(bool ignore_spurious_events = false);
-  void waitForHalfClose();
+  void waitForHalfClose(bool ignore_spurious_events = false);
+  void waitForHalfClose(std::chrono::milliseconds timeout, bool ignore_spurious_events = false);
   void readDisable(bool disabled);
   ABSL_MUST_USE_RESULT AssertionResult
   write(const std::string& data, bool end_stream = false, bool verify = true,

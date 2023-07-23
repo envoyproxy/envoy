@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/utility.h"
 
+#include <cstdint>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/safe_memcpy.h"
@@ -14,29 +16,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-#if BORINGSSL_API_VERSION < 10
-static constexpr absl::string_view SSL_ERROR_NONE_MESSAGE = "NONE";
-static constexpr absl::string_view SSL_ERROR_SSL_MESSAGE = "SSL";
-static constexpr absl::string_view SSL_ERROR_WANT_READ_MESSAGE = "WANT_READ";
-static constexpr absl::string_view SSL_ERROR_WANT_WRITE_MESSAGE = "WANT_WRITE";
-static constexpr absl::string_view SSL_ERROR_WANT_X509_LOOPUP_MESSAGE = "WANT_X509_LOOKUP";
-static constexpr absl::string_view SSL_ERROR_SYSCALL_MESSAGE = "SYSCALL";
-static constexpr absl::string_view SSL_ERROR_ZERO_RETURN_MESSAGE = "ZERO_RETURN";
-static constexpr absl::string_view SSL_ERROR_WANT_CONNECT_MESSAGE = "WANT_CONNECT";
-static constexpr absl::string_view SSL_ERROR_WANT_ACCEPT_MESSAGE = "WANT_ACCEPT";
-static constexpr absl::string_view SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE =
-    "WANT_CHANNEL_ID_LOOKUP";
-static constexpr absl::string_view SSL_ERROR_PENDING_SESSION_MESSAGE = "PENDING_SESSION";
-static constexpr absl::string_view SSL_ERROR_PENDING_CERTIFICATE_MESSAGE = "PENDING_CERTIFICATE";
-static constexpr absl::string_view SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE =
-    "WANT_PRIVATE_KEY_OPERATION";
-static constexpr absl::string_view SSL_ERROR_PENDING_TICKET_MESSAGE = "PENDING_TICKET";
-static constexpr absl::string_view SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE = "EARLY_DATA_REJECTED";
-static constexpr absl::string_view SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE =
-    "WANT_CERTIFICATE_VERIFY";
-static constexpr absl::string_view SSL_ERROR_HANDOFF_MESSAGE = "HANDOFF";
-static constexpr absl::string_view SSL_ERROR_HANDBACK_MESSAGE = "HANDBACK";
-#endif
 static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
 
 Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const std::string& path,
@@ -45,8 +24,8 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
       std::make_unique<envoy::admin::v3::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
-  certificate_details->set_days_until_expiration(
-      Utility::getDaysUntilExpiration(cert, time_source));
+  const auto days_until_expiry = Utility::getDaysUntilExpiration(cert, time_source).value_or(0);
+  certificate_details->set_days_until_expiration(days_until_expiry);
 
   ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
   TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
@@ -253,16 +232,19 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return getRFC2253NameFromCertificate(cert, CertName::Subject);
 }
 
-int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
+absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
+                                                         TimeSource& time_source) {
   if (cert == nullptr) {
-    return std::numeric_limits<int>::max();
+    return absl::make_optional(std::numeric_limits<uint32_t>::max());
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
-    return days;
+    if (days >= 0 && seconds >= 0) {
+      return absl::make_optional(days);
+    }
   }
-  return 0;
+  return absl::nullopt;
 }
 
 absl::string_view Utility::getCertificateExtensionValue(X509& cert,
@@ -327,54 +309,12 @@ absl::optional<std::string> Utility::getLastCryptoError() {
 }
 
 absl::string_view Utility::getErrorDescription(int err) {
-#if BORINGSSL_API_VERSION < 10
-  // TODO(davidben): Remove this and the corresponding SSL_ERROR_*_MESSAGE constants when the FIPS
-  // build is updated to a later version.
-  switch (err) {
-  case SSL_ERROR_NONE:
-    return SSL_ERROR_NONE_MESSAGE;
-  case SSL_ERROR_SSL:
-    return SSL_ERROR_SSL_MESSAGE;
-  case SSL_ERROR_WANT_READ:
-    return SSL_ERROR_WANT_READ_MESSAGE;
-  case SSL_ERROR_WANT_WRITE:
-    return SSL_ERROR_WANT_WRITE_MESSAGE;
-  case SSL_ERROR_WANT_X509_LOOKUP:
-    return SSL_ERROR_WANT_X509_LOOPUP_MESSAGE;
-  case SSL_ERROR_SYSCALL:
-    return SSL_ERROR_SYSCALL_MESSAGE;
-  case SSL_ERROR_ZERO_RETURN:
-    return SSL_ERROR_ZERO_RETURN_MESSAGE;
-  case SSL_ERROR_WANT_CONNECT:
-    return SSL_ERROR_WANT_CONNECT_MESSAGE;
-  case SSL_ERROR_WANT_ACCEPT:
-    return SSL_ERROR_WANT_ACCEPT_MESSAGE;
-  case SSL_ERROR_WANT_CHANNEL_ID_LOOKUP:
-    return SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE;
-  case SSL_ERROR_PENDING_SESSION:
-    return SSL_ERROR_PENDING_SESSION_MESSAGE;
-  case SSL_ERROR_PENDING_CERTIFICATE:
-    return SSL_ERROR_PENDING_CERTIFICATE_MESSAGE;
-  case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
-    return SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE;
-  case SSL_ERROR_PENDING_TICKET:
-    return SSL_ERROR_PENDING_TICKET_MESSAGE;
-  case SSL_ERROR_EARLY_DATA_REJECTED:
-    return SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE;
-  case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
-    return SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE;
-  case SSL_ERROR_HANDOFF:
-    return SSL_ERROR_HANDOFF_MESSAGE;
-  case SSL_ERROR_HANDBACK:
-    return SSL_ERROR_HANDBACK_MESSAGE;
-  }
-#else
   const char* description = SSL_error_description(err);
   if (description) {
     return description;
   }
-#endif
-  ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
+
+  IS_ENVOY_BUG("BoringSSL error had occurred: SSL_error_description() returned nullptr");
   return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
 }
 

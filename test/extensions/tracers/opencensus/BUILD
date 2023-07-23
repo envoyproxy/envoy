@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/opencensus:opencensus_tracer_impl",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],

@@ -28,6 +28,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "cors_filter_integration_test",
+    size = "large",
     srcs = ["cors_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.cors"],
     deps = [

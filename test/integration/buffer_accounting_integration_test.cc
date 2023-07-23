@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -15,6 +16,7 @@
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "fake_upstream.h"
 #include "gtest/gtest.h"
@@ -96,7 +98,8 @@ class Http2BufferWatermarksTest
       public HttpIntegrationTest {
 public:
   std::vector<IntegrationStreamDecoderPtr>
-  sendRequests(uint32_t num_responses, uint32_t request_body_size, uint32_t response_body_size) {
+  sendRequests(uint32_t num_responses, uint32_t request_body_size, uint32_t response_body_size,
+               absl::string_view cluster_to_wait_for = "") {
     std::vector<IntegrationStreamDecoderPtr> responses;
 
     Http::TestRequestHeaderMapImpl header_map{
@@ -108,17 +111,26 @@ public:
 
     for (uint32_t idx = 0; idx < num_responses; ++idx) {
       responses.emplace_back(codec_client_->makeRequestWithBody(header_map, request_body_size));
+      if (!cluster_to_wait_for.empty()) {
+        test_server_->waitForGaugeEq(
+            absl::StrCat("cluster.", cluster_to_wait_for, ".upstream_rq_active"), idx + 1);
+      }
     }
 
     return responses;
   }
 
   Http2BufferWatermarksTest()
-      : HttpIntegrationTest(
+      : SocketInterfaceSwap(Network::Socket::Type::Stream),
+        HttpIntegrationTest(
             std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
+    // This test tracks the number of buffers created, and the tag extraction check uses some
+    // buffers, so disable it in this test.
+    skip_tag_extraction_rule_check_ = true;
+
     if (streamBufferAccounting()) {
       buffer_factory_ =
           std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
@@ -127,7 +139,8 @@ public:
     }
 
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    setupHttp2Overrides(protocol_test_params.http2_implementation);
+    setupHttp1ImplOverrides(protocol_test_params.http1_implementation);
+    setupHttp2ImplOverrides(protocol_test_params.http2_implementation);
     config_helper_.addRuntimeOverride(
         Runtime::defer_processing_backedup_streams,
         protocol_test_params.defer_processing_backedup_streams ? "true" : "false");
@@ -218,7 +231,9 @@ TEST_P(Http2BufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
 
   // Check the expected number of buffers per account
   if (streamBufferAccounting()) {
-    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
+    // Wait for a short period less than the request timeout time.
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(
+        1, 4, std::chrono::milliseconds(2000)));
   } else {
     EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
   }
@@ -231,6 +246,91 @@ TEST_P(Http2BufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
 
   // Check the expected number of buffers per account
   EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
+}
+
+TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirect) {
+  const Http::TestResponseHeaderMapImpl redirect_response{
+      {":status", "302"}, {"content-length", "0"}, {"location", "http://authority2/new/url"}};
+
+  auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
+  handle.mutable_routes(0)->set_name("redirect");
+  handle.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+  config_helper_.addVirtualHost(handle);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  if (streamBufferAccounting()) {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 1);
+  } else {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 0);
+  }
+
+  upstream_request_->encodeHeaders(redirect_response, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  if (streamBufferAccounting()) {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 1) << printAccounts();
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(1)) << printAccounts();
+  } else {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 0);
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
+  }
+}
+
+TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirectWithRequestBody) {
+  const Http::TestResponseHeaderMapImpl redirect_response{
+      {":status", "302"}, {"content-length", "0"}, {"location", "http://authority2/new/url"}};
+
+  auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
+  handle.mutable_routes(0)->set_name("redirect");
+  handle.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+  config_helper_.addVirtualHost(handle);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  default_request_headers_.setMethod("POST");
+
+  const std::string request_body = "foobarbizbaz";
+  buffer_factory_->setExpectedAccountBalance(request_body.size(), 1);
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(default_request_headers_, request_body);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(redirect_response, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  if (streamBufferAccounting()) {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 1) << printAccounts();
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(1)) << printAccounts();
+    EXPECT_TRUE(
+        buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
+        << "buffer total: " << buffer_factory_->totalBufferSize()
+        << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
+  } else {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 0);
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
+  }
 }
 
 TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
@@ -250,7 +350,8 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto responses = sendRequests(num_requests, request_body_size, response_body_size);
+  auto responses = sendRequests(num_requests, request_body_size, response_body_size,
+                                /*cluster_to_wait_for=*/"cluster_0");
 
   // Wait for all requests to have accounted for the requests we've sent.
   if (streamBufferAccounting()) {
@@ -266,6 +367,63 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
   }
+}
+
+TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToShadowUpstream) {
+  const int num_requests = 5;
+  const uint32_t request_body_size = 4096;
+  const uint32_t response_body_size = 4096;
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.streaming_shadow", "true"}});
+
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  setUpstreamCount(2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    cluster->set_name("cluster_1");
+  });
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+      });
+  initialize();
+
+  buffer_factory_->setExpectedAccountBalance(request_body_size, num_requests);
+
+  // Makes us have Envoy's writes to shadow upstream return EAGAIN
+  write_matcher_->setDestinationPort(fake_upstreams_[1]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto responses = sendRequests(num_requests, request_body_size, response_body_size,
+                                /*cluster_to_wait_for=*/"cluster_1");
+
+  // The main request should complete.
+  for (auto& response : responses) {
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+  }
+
+  // Wait for all requests to have accounted for the requests we've sent.
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(
+        buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
+        << "buffer total: " << buffer_factory_->totalBufferSize() << "\n"
+        << " buffer max: " << buffer_factory_->maxBufferSize() << "\n"
+        << printAccounts();
+  }
+
+  write_matcher_->setResumeWrites();
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", num_requests);
 }
 
 TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
@@ -318,6 +476,10 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
+    // This test tracks the number of buffers created, and the tag extraction check uses some
+    // buffers, so disable it in this test.
+    skip_tag_extraction_rule_check_ = true;
+
     if (streamBufferAccounting()) {
       buffer_factory_ =
           std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
@@ -325,7 +487,8 @@ public:
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    setupHttp2Overrides(protocol_test_params.http2_implementation);
+    setupHttp1ImplOverrides(protocol_test_params.http1_implementation);
+    setupHttp2ImplOverrides(protocol_test_params.http2_implementation);
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(protocol_test_params.upstream_protocol);
   }
@@ -442,6 +605,71 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
   } else {
     EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
   }
+}
+
+class TcpTunnelingWatermarkIntegrationTest : public Http2BufferWatermarksTest {
+public:
+  void SetUp() override {
+    enableHalfClose(true);
+
+    setDownstreamProtocol(std::get<0>(GetParam()).downstream_protocol);
+    setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
+
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+          proxy_config.set_stat_prefix("tcp_stats");
+          proxy_config.set_cluster("cluster_0");
+          proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+
+          auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+          listener->set_name("tcp_proxy");
+          auto* socket_address = listener->mutable_address()->mutable_socket_address();
+          socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+          socket_address->set_port_value(0);
+
+          auto* filter_chain = listener->add_filter_chains();
+          auto* filter = filter_chain->add_filters();
+          filter->mutable_typed_config()->PackFrom(proxy_config);
+          filter->set_name("envoy.filters.network.tcp_proxy");
+
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          auto* options =
+              protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+          options->mutable_initial_stream_window_size()->set_value(65536);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+  }
+
+protected:
+  IntegrationTcpClientPtr tcp_client_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, TcpTunnelingWatermarkIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Bool()),
+    protocolTestParamsAndBoolToString);
+
+TEST_P(TcpTunnelingWatermarkIntegrationTest, MultipleReadDisableCallsIncrementsStatsOnce) {
+  config_helper_.setBufferLimits(16384, 131072);
+  initialize();
+
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  write_matcher_->setWriteReturnsEgain();
+  ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
+  test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
+  tcp_client_->close();
 }
 
 class Http2OverloadManagerIntegrationTest : public Http2BufferWatermarksTest,
@@ -651,6 +879,13 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 }
 
 TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
+  // This test is not applicable if expand_agnostic_stream_lifetime is enabled
+  // as the gap between lifetimes of the codec level and envoy level stream
+  // shrinks.
+  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+    return;
+  }
+
   useAccessLog("%RESPONSE_CODE%");
   initializeOverloadManagerInBootstrap(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
@@ -1242,7 +1477,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
 
   const uint32_t num_requests = 3;
   const uint32_t request_body_size = 1;
-  const uint32_t response_body_size = 20000;
+  const uint32_t response_body_size = 14000;
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
@@ -1282,9 +1517,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
 
   // Data that should be buffered by the upstream codec.
   upstream_requests[0]->encodeData(4000, false);
-  upstream_requests[1]->encodeData(16000, true);
-  upstream_requests[2]->encodeData(16000, true);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 48000);
+  upstream_requests[1]->encodeData(10000, true);
+  upstream_requests[2]->encodeData(10000, true);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 36000);
 
   // Enable writes, check drainage.
   write_matcher_->setResumeWrites();
@@ -1322,8 +1557,8 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   // Send the 1st stream data so that both remaining streams have data to
   // process. We expect that the 3rd stream, which didn't get a turn above will
   // get to go and exit.
-  upstream_requests[0]->encodeData(12000, true);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 60000);
+  upstream_requests[0]->encodeData(6000, true);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 42000);
   write_matcher_->setResumeWrites();
 
   waitForNumTurns(turns, mu, 6);
@@ -1352,6 +1587,122 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
 
   for (auto& response : responses) {
     ASSERT_TRUE(response->waitForEndStream());
+  }
+}
+
+TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
+  // Limit the connection buffers to 10Kb, and the downstream HTTP2 stream
+  // buffers to 64KiB.
+  config_helper_.setBufferLimits(10000, 10000);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* h2_options = hcm.mutable_http2_protocol_options();
+        h2_options->mutable_initial_stream_window_size()->set_value(
+            Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        h2_options->mutable_initial_connection_window_size()->set_value(
+            Http2::Utility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+      });
+
+  initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
+
+  // Stop writes to the upstream.
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const uint32_t num_requests = 3;
+  auto request_response_pairs = startRequests(num_requests);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
+
+  // Track which stream processed what amount of the request data at a
+  // particular point.
+  absl::Mutex mu;
+  using StreamIdAndRequestBodySizePair = std::pair<uint64_t, uint64_t>;
+  std::vector<StreamIdAndRequestBodySizePair> turns;
+  auto record_on_decode =
+      [this, &turns, &mu](StreamTee& tee, Http::StreamDecoderFilterCallbacks* decoder_callbacks)
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
+    absl::MutexLock l(&mu);
+    turns.emplace_back(decoder_callbacks->streamId(), tee.request_body_.length());
+
+    // Allows us to build more than chunk size in a stream, as the
+    // the 3rd stream won't get to drain.
+    if (turns.size() == 2) {
+      write_matcher_->setWriteReturnsEgain();
+    }
+    return Http::FilterDataStatus::Continue;
+  };
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    EXPECT_TRUE(tee_filter_factory_.setDecodeDataCallback(
+        tee_filter_factory_.computeClientStreamId(i), record_on_decode));
+  }
+
+  writeToRequests(request_response_pairs, {10000, 10000, 65535}, false);
+
+  // Wait for an upstream request to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 3);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 3);
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 85000);
+
+  // Only the first stream should have drained its data, the second streams data
+  // is stuck in the connection output buffer. This read-disables all the
+  // streams flowing to that connection, allowing us to queue additional
+  // data for the third stream.
+  write_matcher_->setResumeWrites();
+  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 3);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 6);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_tx_bytes_total", 10000);
+
+  std::vector<FakeStreamPtr> upstream_requests;
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    upstream_requests.emplace_back(std::move(upstream_request_));
+    if (i == 0) {
+      EXPECT_TRUE(upstream_requests[i]->waitForData(*dispatcher_, 10000));
+    }
+  }
+
+  // Should be able to write to third stream with data.
+  Buffer::OwnedImpl data(std::string(65535, 'C'));
+  codec_client_->sendData(request_response_pairs[2].first, 65535, true);
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 150000);
+
+  // Enabling again should cause us to chunk this write to third stream.
+  write_matcher_->setResumeWrites();
+  EXPECT_TRUE(upstream_requests[2]->waitForData(*dispatcher_, 131000));
+
+  {
+    absl::MutexLock l(&mu);
+    // The 3rd stream should have gone multiple times to drain out the 128KiB of
+    // data. Each chunk drain is 10KB.
+    ASSERT_GE(turns.size(), 3);
+    for (uint32_t i = 2; i < turns.size(); ++i) {
+      EXPECT_EQ(turns[i].first, turns[2].first);
+      if (i != turns.size() - 1) {
+        EXPECT_EQ(turns[i].second, 10000 * (i - 1));
+      } else {
+        EXPECT_EQ(turns[i].second, 131070);
+      }
+    }
+  }
+
+  // Clean up
+  codec_client_->sendData(request_response_pairs[0].first, 1, true);
+  codec_client_->sendData(request_response_pairs[1].first, 1, true);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    upstream_requests[i]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    EXPECT_TRUE(request_response_pairs[i].second->waitForEndStream());
   }
 }
 

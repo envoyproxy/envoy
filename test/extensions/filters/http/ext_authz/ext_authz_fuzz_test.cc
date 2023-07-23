@@ -14,6 +14,8 @@
 
 #include "gmock/gmock.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -58,7 +60,8 @@ class FuzzerMocks {
 public:
   FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
 
-    ON_CALL(decoder_callbacks_, connection()).WillByDefault(Return(&connection_));
+    ON_CALL(decoder_callbacks_, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
@@ -80,6 +83,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
 
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Http::ContextImpl http_context(stats_store.symbolTable());
 
@@ -88,8 +92,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   FilterConfigSharedPtr config;
 
   try {
-    config = std::make_shared<FilterConfig>(proto_config, stats_store, mocks.runtime_, http_context,
-                                            "ext_authz_prefix", bootstrap);
+    config = std::make_shared<FilterConfig>(proto_config, *stats_store.rootScope(), mocks.runtime_,
+                                            http_context, "ext_authz_prefix", bootstrap);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
     return;

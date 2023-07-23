@@ -55,7 +55,8 @@ public:
         proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
-    config_ = std::make_shared<Config>(proto_config, local_info_, stats_store_, runtime_, cm_);
+    config_ = std::make_shared<Config>(proto_config, local_info_, *stats_store_.rootScope(),
+                                       runtime_, cm_);
 
     request_metadata_ = std::make_shared<ThriftProxy::MessageMetadata>();
 
@@ -217,7 +218,7 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
             request_callbacks_ = &callbacks;
           })));
 
-  request_metadata_->headers().addCopy(ThriftProxy::Headers::get().ClientId, "clientid");
+  request_metadata_->requestHeaders().addCopy(ThriftProxy::Headers::get().ClientId, "clientid");
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 

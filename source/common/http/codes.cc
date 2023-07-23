@@ -32,7 +32,7 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
       upstream_rq_completed_(stat_name_pool_.add("upstream_rq_completed")),
       upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
       vcluster_(stat_name_pool_.add("vcluster")), vhost_(stat_name_pool_.add("vhost")),
-      zone_(stat_name_pool_.add("zone")) {
+      route_(stat_name_pool_.add("route")), zone_(stat_name_pool_.add("zone")) {
 
   // Pre-allocate response codes 200, 404, and 503, as those seem quite likely.
   // We don't pre-allocate all the HTTP codes because the first 127 allocations
@@ -108,6 +108,16 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info,
                {vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_, rq_code});
   }
 
+  // Handle route level stats.
+  if (!info.request_route_name_.empty()) {
+    incCounter(info.global_scope_, {vhost_, info.request_vhost_name_, route_,
+                                    info.request_route_name_, upstream_rq_completed_});
+    incCounter(info.global_scope_,
+               {vhost_, info.request_vhost_name_, route_, info.request_route_name_, rq_group});
+    incCounter(info.global_scope_,
+               {vhost_, info.request_vhost_name_, route_, info.request_route_name_, rq_code});
+  }
+
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
     incCounter(info.cluster_scope_,
@@ -149,6 +159,13 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
                     {vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
                      upstream_rq_time_},
                     Stats::Histogram::Unit::Milliseconds, count);
+  }
+
+  if (!info.request_route_name_.empty()) {
+    recordHistogram(
+        info.global_scope_,
+        {vhost_, info.request_vhost_name_, route_, info.request_route_name_, upstream_rq_time_},
+        Stats::Histogram::Unit::Milliseconds, count);
   }
 
   // Handle per zone stats.

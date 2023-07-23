@@ -38,7 +38,7 @@ IntegrationTcpClient::IntegrationTcpClient(
     Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
     Network::Address::IpVersion version, bool enable_half_close,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::Address::InstanceConstSharedPtr source_address)
+    Network::Address::InstanceConstSharedPtr source_address, absl::string_view destination_address)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, createBuffer_(_, _, _))
@@ -55,9 +55,12 @@ IntegrationTcpClient::IntegrationTcpClient(
       }));
 
   connection_ = dispatcher.createClientConnection(
-      Network::Utility::resolveUrl(
-          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      source_address, Network::Test::createRawBufferSocket(), options);
+      Network::Utility::resolveUrl(fmt::format(
+          "tcp://{}:{}",
+          destination_address.empty() ? Network::Test::getLoopbackAddressUrlString(version)
+                                      : destination_address,
+          port)),
+      source_address, Network::Test::createRawBufferSocket(), options, nullptr);
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
@@ -77,7 +80,7 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
     return;
   }
 
-  payload_reader_->set_data_to_wait_for(data, exact_match);
+  payload_reader_->setDataToWaitFor(data, exact_match);
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
@@ -105,11 +108,27 @@ void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
   EXPECT_TRUE(disconnected_);
 }
 
-void IntegrationTcpClient::waitForHalfClose() {
+void IntegrationTcpClient::waitForHalfClose(bool ignore_spurious_events) {
+  waitForHalfClose(TestUtility::DefaultTimeout, ignore_spurious_events);
+}
+
+void IntegrationTcpClient::waitForHalfClose(std::chrono::milliseconds timeout,
+                                            bool ignore_spurious_events) {
   if (payload_reader_->readLastByte()) {
     return;
   }
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(timeout);
+
+  if (ignore_spurious_events) {
+    while (!payload_reader_->readLastByte() && timeout_timer->enabled()) {
+      connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+    }
+  } else {
+    connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  }
+
   EXPECT_TRUE(payload_reader_->readLastByte());
 }
 

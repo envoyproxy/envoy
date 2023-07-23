@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "source/server/ssl_context_manager.h"
 
 #include "test/mocks/ssl/mocks.h"
@@ -13,7 +15,8 @@ namespace {
 
 TEST(SslContextManager, createStub) {
   Event::SimulatedTimeSystem time_system;
-  Stats::MockStore scope;
+  Stats::MockStore store;
+  Stats::Scope& scope(*store.rootScope());
   Ssl::MockClientContextConfig client_config;
   Ssl::MockServerContextConfig server_config;
   std::vector<std::string> server_names;
@@ -21,7 +24,7 @@ TEST(SslContextManager, createStub) {
   Ssl::ContextManagerPtr manager = createContextManager("fake_factory_name", time_system);
 
   // Check we've created a stub, not real manager.
-  EXPECT_EQ(manager->daysUntilFirstCertExpires(), std::numeric_limits<int>::max());
+  EXPECT_EQ(manager->daysUntilFirstCertExpires().value(), std::numeric_limits<uint32_t>::max());
   EXPECT_EQ(manager->secondsUntilFirstOcspResponseExpires(), absl::nullopt);
   EXPECT_THROW_WITH_MESSAGE(manager->createSslClientContext(scope, client_config), EnvoyException,
                             "SSL is not supported in this configuration");

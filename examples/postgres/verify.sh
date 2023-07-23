@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 export NAME=postgres
-export DELAY=10
+export PORT_ADMIN="${POSTGRES_PORT_ADMIN:-11600}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -11,6 +11,10 @@ _psql () {
     postgres_client=(docker run -i --rm --network postgres_default -e "PGSSLMODE=disable" postgres:latest psql -U postgres -h proxy -p 1999)
     "${postgres_client[@]}" "${@}"
 }
+
+export -f _psql
+
+wait_for 40 bash -c "_psql -c '\l'"
 
 DBNAME=testdb
 
@@ -40,9 +44,9 @@ _psql -d ${DBNAME} -c 'INSERT INTO tbl VALUES (DEFAULT);'
 run_log "Check postgres egress stats"
 responds_with \
     egress_postgres \
-    "http://localhost:8001/stats?filter=egress_postgres"
+    "http://localhost:${PORT_ADMIN}/stats?filter=egress_postgres"
 
 run_log "Check postgres TCP stats"
 responds_with \
     postgres_tcp \
-    "http://localhost:8001/stats?filter=postgres_tcp"
+    "http://localhost:${PORT_ADMIN}/stats?filter=postgres_tcp"

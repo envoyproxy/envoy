@@ -41,13 +41,14 @@ public:
                                         stream_info);
   }
 
-  Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override {
+  Network::ClientConnectionPtr createClientConnection(
+      Network::Address::InstanceConstSharedPtr address,
+      Network::Address::InstanceConstSharedPtr source_address,
+      Network::TransportSocketPtr&& transport_socket,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options) override {
     return impl_.createClientConnection(std::move(address), std::move(source_address),
-                                        std::move(transport_socket), options);
+                                        std::move(transport_socket), options, transport_options);
   }
 
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
@@ -61,9 +62,8 @@ public:
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
-                                      bool bind_to_port, bool ignore_global_conn_limit) override {
-    return impl_.createListener(std::move(socket), cb, runtime, bind_to_port,
-                                ignore_global_conn_limit);
+                                      const Network::ListenerConfig& listener_config) override {
+    return impl_.createListener(std::move(socket), cb, runtime, listener_config);
   }
 
   Network::UdpListenerPtr
@@ -95,7 +95,7 @@ public:
     return impl_.listenForSignal(signal_num, std::move(cb));
   }
 
-  void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
+  void post(Event::PostCb callback) override { impl_.post(std::move(callback)); }
 
   void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override {
     impl_.deleteInDispatcherThread(std::move(deletable));

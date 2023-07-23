@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["stream_info_impl.h"],
     deps = [
         ":filter_state_lib",
+        ":stream_id_provider_lib",
         "//envoy/http:request_id_extension_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
@@ -54,9 +55,35 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "uint64_accessor_lib",
+    hdrs = ["uint64_accessor_impl.h"],
+    deps = [
+        "//envoy/stream_info:uint64_accessor_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "upstream_address_lib",
     hdrs = ["upstream_address.h"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "stream_id_provider_lib",
+    srcs = ["stream_id_provider_impl.cc"],
+    hdrs = ["stream_id_provider_impl.h"],
+    deps = [
+        "//envoy/stream_info:stream_id_provider_interface",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "bool_accessor_lib",
+    hdrs = ["bool_accessor_impl.h"],
+    deps = [
+        "//envoy/stream_info:bool_accessor_interface",
     ],
 )

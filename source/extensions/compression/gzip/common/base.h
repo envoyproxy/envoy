@@ -7,12 +7,14 @@
 #include "zlib.h"
 
 namespace Envoy {
-namespace Zlib {
+namespace Extensions {
+namespace Compression {
+namespace Gzip {
+namespace Common {
 
 /**
  * Shared code between the compressor and the decompressor.
  */
-// TODO(junr03): move to extensions tree once the compressor side is moved to extensions.
 class Base {
 public:
   Base(uint64_t chunk_size, std::function<void(z_stream*)> zstream_deleter);
@@ -37,5 +39,8 @@ protected:
   const std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
 };
 
-} // namespace Zlib
+} // namespace Common
+} // namespace Gzip
+} // namespace Compression
+} // namespace Extensions
 } // namespace Envoy

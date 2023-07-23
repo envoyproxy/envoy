@@ -148,7 +148,7 @@ public:
   /**
    * @return the transport socket factory responsible for this host.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual Network::UpstreamTransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
    * @return the address used to connect to the host.
@@ -198,9 +198,10 @@ public:
   virtual void priority(uint32_t) PURE;
 
   /**
-   * @return timestamp in milliseconds of when host was created.
+   * @return timestamp of when host has transitioned from unhealthy to
+   *         healthy state via an active healthchecking.
    */
-  virtual MonotonicTime creationTime() const PURE;
+  virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
@@ -220,10 +221,10 @@ struct TransportSocketMatchStats {
 class TransportSocketMatcher {
 public:
   struct MatchData {
-    MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats,
+    MatchData(Network::UpstreamTransportSocketFactory& factory, TransportSocketMatchStats& stats,
               std::string name)
         : factory_(factory), stats_(stats), name_(std::move(name)) {}
-    Network::TransportSocketFactory& factory_;
+    Network::UpstreamTransportSocketFactory& factory_;
     TransportSocketMatchStats& stats_;
     std::string name_;
   };

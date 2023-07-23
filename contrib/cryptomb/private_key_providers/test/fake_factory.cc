@@ -78,8 +78,6 @@ uint32_t FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
     status = mbxSetSts(status, i, inject_errors_ ? !ret : ret);
   }
 
-  UNREFERENCED_PARAMETER(expected_rsa_bitsize);
-
   return status;
 }
 
@@ -110,8 +108,6 @@ uint32_t FakeIppCryptoImpl::mbxRsaPublicSslMb8(const uint8_t* const from_pa[8],
     status = mbxSetSts(status, i, inject_errors_ ? !ret : ret);
   }
 
-  UNREFERENCED_PARAMETER(expected_rsa_bitsize);
-
   return status;
 }
 
@@ -139,8 +135,8 @@ FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
       std::make_shared<FakeIppCryptoImpl>(supported_instruction_set_);
 
   // We need to get more RSA key params in order to be able to use BoringSSL signing functions.
-  std::string private_key =
-      Config::DataSource::read(conf.private_key(), false, private_key_provider_context.api());
+  std::string private_key = Config::DataSource::read(
+      conf.private_key(), false, private_key_provider_context.serverFactoryContext().api());
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));

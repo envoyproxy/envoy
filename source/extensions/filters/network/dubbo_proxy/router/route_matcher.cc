@@ -15,6 +15,14 @@ RouteEntryImplBase::RouteEntryImplBase(
     const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())) {
+  if (route.route().has_metadata_match()) {
+    const auto filter_it = route.route().metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != route.route().metadata_match().filter_metadata().end()) {
+      metadata_match_criteria_ =
+          std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    }
+  }
   if (route.route().cluster_specifier_case() ==
       envoy::extensions::filters::network::dubbo_proxy::v3::RouteAction::ClusterSpecifierCase::
           kWeightedClusters) {
@@ -56,7 +64,22 @@ bool RouteEntryImplBase::headersMatch(const RpcInvocationImpl& invocation) const
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(const RouteEntryImplBase& parent,
                                                                const WeightedCluster& cluster)
     : parent_(parent), cluster_name_(cluster.name()),
-      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {}
+      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {
+  if (cluster.has_metadata_match()) {
+    const auto filter_it = cluster.metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != cluster.metadata_match().filter_metadata().end()) {
+
+      if (parent.metadata_match_criteria_) {
+        metadata_match_criteria_ =
+            parent.metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+      } else {
+        metadata_match_criteria_ =
+            std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+      }
+    }
+  }
+}
 
 ParameterRouteEntryImpl::ParameterRouteEntryImpl(
     const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
@@ -113,9 +136,9 @@ RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& meta
       return nullptr;
     }
 
-    if (!matchParameter(absl::string_view(*data.value()), config_data)) {
+    if (!matchParameter(absl::string_view(data.value().get()), config_data)) {
       ENVOY_LOG(debug, "dubbo route matcher: parameter matching failed, index '{}', value '{}'",
-                config_data.index_, *data.value());
+                config_data.index_, data.value().get());
       return nullptr;
     }
   }

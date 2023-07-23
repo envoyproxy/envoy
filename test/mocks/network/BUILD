@@ -74,7 +74,9 @@ envoy_cc_mock(
     srcs = ["transport_socket.cc"],
     hdrs = ["transport_socket.h"],
     deps = [
+        "//envoy/network:io_handle_interface",
         "//envoy/network:transport_socket_interface",
+        "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
     ],
 )

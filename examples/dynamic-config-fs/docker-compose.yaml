@@ -1,10 +1,10 @@
-version: "3.8"
 services:
 
   proxy:
     build:
       context: .
-      dockerfile: Dockerfile-proxy
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-dynamic-fs
     depends_on:
     - service1
     - service2
@@ -13,9 +13,11 @@ services:
     - 19000:19000
 
   service1:
-    image: jmalloc/echo-server
+    build:
+      context: ../shared/echo
     hostname: service1
 
   service2:
-    image: jmalloc/echo-server
+    build:
+      context: ../shared/echo
     hostname: service2

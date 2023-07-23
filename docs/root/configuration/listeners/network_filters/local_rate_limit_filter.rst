@@ -4,9 +4,9 @@ Local rate limit
 ================
 
 * Local rate limiting :ref:`architecture overview <arch_overview_local_rate_limit>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit``.
 * :ref:`v3 API reference
   <envoy_v3_api_msg_extensions.filters.network.local_ratelimit.v3.LocalRateLimit>`
-* This filter should be configured with the name *envoy.filters.network.local_ratelimit*.
 
 .. note::
   The token bucket is shared across all workers, thus the rate limits are applied per Envoy process.
@@ -29,6 +29,9 @@ be immediately closed without further filter iteration.
 
 .. _config_network_filters_local_rate_limit_stats:
 
+**Planned future enhancements**:
+* rate limit on specific `requestedApplicationProtocols`` or `detectedTransportProtocol`
+
 Statistics
 ----------
 
@@ -47,3 +50,4 @@ Runtime
 The local rate limit filter can be runtime feature flagged via the :ref:`enabled
 <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.runtime_enabled>`
 configuration field.
+

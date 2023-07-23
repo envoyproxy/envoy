@@ -13,23 +13,8 @@ namespace Envoy {
 namespace Regex {
 namespace {
 
-TEST(Utility, ParseStdRegex) {
-  EXPECT_THROW_WITH_REGEX(Utility::parseStdRegex("(+invalid)"), EnvoyException,
-                          "Invalid regex '\\(\\+invalid\\)': .+");
-
-  {
-    std::regex regex = Utility::parseStdRegex("x*");
-    EXPECT_NE(0, regex.flags() & std::regex::optimize);
-  }
-
-  {
-    std::regex regex = Utility::parseStdRegex("x*", std::regex::icase);
-    EXPECT_NE(0, regex.flags() & std::regex::icase);
-    EXPECT_EQ(0, regex.flags() & std::regex::optimize);
-  }
-}
-
 TEST(Utility, ParseRegex) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();
@@ -69,12 +54,19 @@ TEST(Utility, ParseRegex) {
     EXPECT_NO_THROW(Utility::parseRegex(matcher));
   }
 
+  // Positive case to ensure matcher can be created by config without google_re2 field.
+  {
+    TestScopedRuntime scoped_runtime;
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    matcher.set_regex("/asdf/.*");
+    EXPECT_NO_THROW(Utility::parseRegex(matcher));
+  }
+
   // Verify max program size with the deprecated field codepath plus runtime.
   // The deprecated field codepath precedes any runtime settings.
   {
     TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"},
-                                {"re2.max_program_size.error_level", "3"}});
+    scoped_runtime.mergeValues({{"re2.max_program_size.error_level", "3"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
@@ -90,8 +82,7 @@ TEST(Utility, ParseRegex) {
   // Verify that an exception is thrown for the error level max program size.
   {
     TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"},
-                                {"re2.max_program_size.error_level", "1"}});
+    scoped_runtime.mergeValues({{"re2.max_program_size.error_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
@@ -109,7 +100,6 @@ TEST(Utility, ParseRegex) {
   // Verify that the error level max program size defaults to 100 if not set by runtime.
   {
     TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex(
         "/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*/asdf/.*");
@@ -128,8 +118,7 @@ TEST(Utility, ParseRegex) {
   // Verify that a warning is logged for the warn level max program size.
   {
     TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.deprecate_global_ints", "false"},
-                                {"re2.max_program_size.warn_level", "1"}});
+    scoped_runtime.mergeValues({{"re2.max_program_size.warn_level", "1"}});
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();

@@ -35,6 +35,13 @@ Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped
   };
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+CompressorFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<CompressorPerRouteFilterConfig>(proto_config);
+}
+
 /**
  * Static registration for the compressor filter. @see NamedHttpFilterConfigFactory.
  */

@@ -64,7 +64,9 @@ void ThreadSynchronizer::barrierOnWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
   absl::MutexLock lock(&entry.mutex_);
   ENVOY_LOG(debug, "thread synchronizer: barrier on {}", event_name);
-  entry.mutex_.Await(absl::Condition(&entry.at_barrier_));
+  while (!entry.mutex_.AwaitWithTimeout(absl::Condition(&entry.at_barrier_), absl::Seconds(10))) {
+    ENVOY_LOG(warn, "thread synchronizer: barrier on {} stuck for 10 seconds", event_name);
+  }
   ENVOY_LOG(debug, "thread synchronizer: barrier complete {}", event_name);
 }
 
