@@ -2271,7 +2271,6 @@ TEST_P(ExtProcIntegrationTest, SendHeaderAndSmallChunkBodyStreamedMode) {
   const uint32_t chunk_size = 1;
   const uint32_t chunk_number = 10;
   for (uint32_t i = 0; i < chunk_number; i++) {
-    ENVOY_LOG_MISC(debug, "Sending chunk of {} bytes", chunk_size);
     codec_client_->sendData(*request_encoder_, chunk_size, false);
     processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
   }
