@@ -71,9 +71,10 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap
   return Http::Code::OK;
 }
 
-Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
+Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream, bool active_html) {
   StatsParams params;
   Buffer::OwnedImpl response;
+  params.active_html_ = active_html;
   Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
   if (code != Http::Code::OK) {
     return Admin::makeStaticTextRequest(response, code);
@@ -201,9 +202,11 @@ Admin::UrlHandler StatsHandler::statsHandler(const std::string& prefix, bool act
   }
 
   return {
-      "/stats",
+      prefix,
       "print server stats",
-      [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
+      [this, active_html](AdminStream& admin_stream) -> Admin::RequestPtr {
+        return makeRequest(admin_stream, active_html);
+      },
       false,
       false,
       params};

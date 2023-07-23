@@ -86,12 +86,16 @@ public:
    */
   Admin::UrlHandler statsHandler(const std::string& prefix, bool active_html);
 
+  //Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+  //                              StatsRequest::UrlHandlerFn url_handler_fn);
+
 #ifdef ENVOY_ADMIN_HTML
   Admin::UrlHandler activeHtmlStatsHandler();
 #endif
 
   Admin::RequestPtr makeRequest(AdminStream&, bool active_html);
-  Admin::UrlHandler prometheusStatsHandler();
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+                                       StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
 
 private:
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,

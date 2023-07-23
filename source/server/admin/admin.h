@@ -212,7 +212,7 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
   GenRequestFn createRequestFunction() const {
-    return [this](AdminStream& admin_stream) -> RequestPtr { return makeRequest(admin_stream); };
+    return [this](AdminStream& admin_stream) -> RequestPtr { return makeRequest(admin_stream, false); };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
@@ -231,7 +231,7 @@ private:
   /**
    * Creates a Request from the request in the admin stream.
    */
-  RequestPtr makeRequest(AdminStream& admin_stream) const;
+  RequestPtr makeRequest(AdminStream& admin_stream, bool html_active) const;
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.
