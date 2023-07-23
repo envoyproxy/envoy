@@ -71,6 +71,7 @@ void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
+  std::cout << "tyxia_5 \n";
   for (auto action : response->bucket_action()) {
     // TODO(tyxia) Uncomment this section to finish the implementation and test.
     // if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
@@ -88,6 +89,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
   if (stream_ != nullptr && !stream_closed_) {
+    std::cout << "tyxia_7 \n";
     stream_->closeStream();
     stream_closed_ = true;
     stream_->resetStream();
@@ -96,7 +98,9 @@ void RateLimitClientImpl::closeStream() {
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
   // TODO(tyxia) Add implementation later.
-  stream_closed_ = true;
+  std::cout << "tyxia_9 \n";
+  // stream_closed_ = true;
+  closeStream();
 }
 
 absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {

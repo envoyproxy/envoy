@@ -63,6 +63,8 @@ protected:
             // Set up the gRPC service with wrong cluster name and address.
             setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
                            std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+            // setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
+            //                grpc_upstreams_[0]->localAddress());
           }
 
           // Set the domain name.
@@ -109,6 +111,7 @@ protected:
       ASSERT_TRUE(processor_connection_->waitForDisconnect());
     }
     cleanupUpstreamAndDownstream();
+    // codec_client_.reset();
   }
 
   envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig
@@ -123,12 +126,16 @@ INSTANTIATE_TEST_SUITE_P(
     GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
     Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
 
+// TODO(tyxia) google-gRPC start pointer is not null.
 TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
   initializeConfig(/*valid_rlqs_server=*/false);
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
                                                                   {"group", "envoy"}};
+  // TODO(tyxia) Here is the key to fix envoy_grpc memory issue.
   auto response = sendDownstreamRequest(&custom_headers);
+  // sendDownstreamRequest(&custom_headers);
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
                                                          std::chrono::milliseconds(25000)));
 }

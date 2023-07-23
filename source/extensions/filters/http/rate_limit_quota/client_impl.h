@@ -62,6 +62,8 @@ public:
   // Send the usage report to RLQS server
   void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id);
 
+  void setStreamClosed() { stream_closed_ = true; }
+
 private:
   // Store the client as the bare object since there is no ownership transfer involved.
   GrpcAsyncClient aync_client_;
