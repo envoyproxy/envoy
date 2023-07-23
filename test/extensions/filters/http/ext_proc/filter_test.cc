@@ -1342,7 +1342,7 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   processRequestHeaders(false, absl::nullopt);
 
-  const uint32_t chunk_number = 100;
+  const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
   processRequestTrailers(absl::nullopt, true);
