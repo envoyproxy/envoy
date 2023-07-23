@@ -44,17 +44,15 @@ public:
     if (reset_callbacks_started_) {
       return;
     }
-    std::cout << "tyxia_1 \n";
     reset_callbacks_started_ = true;
     int i = 0;
     for (StreamCallbacks* callbacks : callbacks_) {
       if (callbacks) {
         ++i;
-        std::cout << "tyxia_2 \n";
-        if (i >= 2) {
-          // TODO(tyxia) Second callback is the problem!!!
-          continue;
-        }
+        // if (i >= 2) {
+        //   // TODO(tyxia) Second callback is the problem!!!
+        //   continue;
+        // }
         callbacks->onResetStream(reason, absl::string_view());
       }
     }

@@ -64,7 +64,6 @@ RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
 
   // Store the bucket into the quota bucket container.
   quota_buckets_[bucket_id] = std::move(new_bucket);
-  std::cout << "tyxia_3 \n";
   initiating_call_ = false;
   // TODO(tyxia) Do we need to stop here???
   // Stop the iteration for headers as well as data and trailers for the current filter and the
