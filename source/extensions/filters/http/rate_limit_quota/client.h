@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,8 +32,9 @@ class RateLimitClient {
 public:
   virtual ~RateLimitClient() = default;
 
-  virtual void rateLimit(RateLimitQuotaCallbacks& callbacks) PURE;
-
+  virtual void
+  sendUsageReport(absl::string_view domain,
+                  absl::optional<envoy::service::rate_limit_quota::v3::BucketId> bucket_id) PURE;
   virtual absl::Status startStream(const StreamInfo::StreamInfo& stream_info) PURE;
 };
 

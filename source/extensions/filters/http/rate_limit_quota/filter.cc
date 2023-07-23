@@ -14,7 +14,7 @@ using ::envoy::type::v3::RateLimitStrategy;
 Http::FilterHeadersStatus
 RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
                                       const RateLimitOnMatchAction& match_action) {
-  auto bucket_settings = match_action.bucketSettings();
+  const auto& bucket_settings = match_action.bucketSettings();
   // The first matched request that doesn't have quota assignment from the RLQS server yet, so the
   // action is performed based on pre-configured strategy from no assignment behavior config.
   // TODO(tyxia) Implement no assignment logic with the allow/deny interface

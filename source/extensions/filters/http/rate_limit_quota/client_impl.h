@@ -51,8 +51,6 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // RateLimitClient
-  // TODO(tyxia) remove. sendUsageReport() accomplish the work
-  void rateLimit(RateLimitQuotaCallbacks&) override{};
 
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
   void closeStream();
@@ -60,7 +58,7 @@ public:
   // Build the usage report (i.e., the request sent to RLQS server).
   RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain, const BucketId& bucket_id);
   // Send the usage report to RLQS server
-  void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id);
+  void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id) override;
 
   void setStreamClosed() { stream_closed_ = true; }
 

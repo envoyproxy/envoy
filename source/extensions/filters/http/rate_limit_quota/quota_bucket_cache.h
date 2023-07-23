@@ -50,7 +50,10 @@ struct Bucket {
   virtual ~Bucket() = default;
   // TODO(tyxia) Each bucket owns the unique grpc client for sending the quota usage report
   // periodically.
-  std::unique_ptr<RateLimitClientImpl> rate_limit_client;
+  // std::unique_ptr<RateLimitClientImpl> rate_limit_client;
+  // TODO(tyxia) Store the abstract interface to avoid cyclic dependency between quota bucket and
+  // client.
+  std::unique_ptr<RateLimitClient> rate_limit_client;
   // The timer for sending the reports periodically.
   Event::TimerPtr send_reports_timer;
   // Cached bucket action from the response that was received from the RLQS server.

@@ -79,7 +79,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
     //   continue;
     // }
     // TODO(tyxia) Extend lifetime and store in the bucket.
-    quota_buckets_[action.bucket_id()].bucket_action = action;
+    quota_buckets_[action.bucket_id()].bucket_action = std::move(action);
   }
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
   callbacks_.onQuotaResponse(*response);
