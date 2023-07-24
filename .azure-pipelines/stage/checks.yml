@@ -99,7 +99,7 @@ jobs:
   condition: |
     and(not(canceled()),
         eq(${{ parameters.runChecks }}, 'true'))
-  timeoutInMinutes: 240
+  timeoutInMinutes: 300
   pool: "envoy-x64-large"
   strategy:
     maxParallel: 2
