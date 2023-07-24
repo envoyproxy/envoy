@@ -133,7 +133,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         keyValueStores, statSinks, runtimeGuards, mEnablePlatformCertificatesValidation,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsJwtToken=*/"", /*xdsJwtTokenLifetime=*/0, /*xdsSslRootCerts=*/"",
-        mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, /*cdsResourcesLocator=*/"",
+        /*xdsSni=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, /*cdsResourcesLocator=*/"",
         /*cdsTimeoutSeconds=*/0, /*enableCds=*/false);
   }
 }
