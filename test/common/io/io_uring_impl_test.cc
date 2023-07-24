@@ -15,7 +15,9 @@ class IoUringImplTest : public ::testing::Test {
 public:
   IoUringImplTest() : api_(Api::createApiForTest()), should_skip_(!isIoUringSupported()) {
     if (!should_skip_) {
-      io_uring_ = std::make_unique<IoUringImpl>(2, false);
+      factory_ = std::make_unique<IoUringFactoryImpl>(2, false, context_.threadLocal());
+      factory_->onServerInitialized();
+      io_uring_ = factory_->getOrCreate();
     }
   }
 
@@ -36,7 +38,9 @@ public:
   }
 
   Api::ApiPtr api_;
-  IoUringPtr io_uring_{};
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  std::unique_ptr<IoUringFactoryImpl> factory_{};
+  OptRef<IoUring> io_uring_{};
   bool should_skip_{};
 };
 
