@@ -221,28 +221,122 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
   return cluster_options;
 }
 
+std::vector<::Envoy::Upstream::UpstreamLocalAddress>
+parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
+                Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
+                Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options) {
+
+  std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses;
+  if (bind_config.has_value()) {
+    UpstreamLocalAddress upstream_local_address;
+    upstream_local_address.address_ =
+        bind_config->has_source_address()
+            ? ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address())
+            : nullptr;
+    upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
+
+    ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
+                                            base_socket_options);
+    ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
+                                            cluster_socket_options);
+
+    upstream_local_addresses.push_back(upstream_local_address);
+
+    for (const auto& extra_source_address : bind_config->extra_source_addresses()) {
+      UpstreamLocalAddress extra_upstream_local_address;
+      extra_upstream_local_address.address_ =
+          ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
+
+      extra_upstream_local_address.socket_options_ =
+          std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
+      ::Envoy::Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
+                                              base_socket_options);
+
+      if (extra_source_address.has_socket_options()) {
+        ::Envoy::Network::Socket::appendOptions(
+            extra_upstream_local_address.socket_options_,
+            ::Envoy::Network::SocketOptionFactory::buildLiteralOptions(
+                extra_source_address.socket_options().socket_options()));
+      } else {
+        ::Envoy::Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
+                                                cluster_socket_options);
+      }
+      upstream_local_addresses.push_back(extra_upstream_local_address);
+    }
+
+    for (const auto& additional_source_address : bind_config->additional_source_addresses()) {
+      UpstreamLocalAddress additional_upstream_local_address;
+      additional_upstream_local_address.address_ =
+          ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
+      additional_upstream_local_address.socket_options_ =
+          std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
+      ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
+                                              base_socket_options);
+      ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
+                                              cluster_socket_options);
+      upstream_local_addresses.push_back(additional_upstream_local_address);
+    }
+  } else {
+    // If there is no bind config specified, then return a nullptr for the address.
+    UpstreamLocalAddress local_address;
+    local_address.address_ = nullptr;
+    local_address.socket_options_ = std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
+    ::Envoy::Network::Socket::appendOptions(local_address.socket_options_, base_socket_options);
+    Network::Socket::appendOptions(local_address.socket_options_, cluster_socket_options);
+    upstream_local_addresses.push_back(local_address);
+  }
+
+  return upstream_local_addresses;
+}
+
 Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalAddressSelector(
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
 
+  // Use the cluster bind config if specified. This completely overrides the
+  // bootstrap bind config when present.
+  OptRef<const envoy::config::core::v3::BindConfig> bind_config;
+  absl::optional<std::string> cluster_name;
+  if (cluster_config.has_upstream_bind_config()) {
+    bind_config.emplace(cluster_config.upstream_bind_config());
+    cluster_name.emplace(cluster_config.name());
+  } else if (bootstrap_bind_config.has_value()) {
+    bind_config.emplace(*bootstrap_bind_config);
+  }
+
+  // Verify that bind config is valid.
+  if (bind_config.has_value()) {
+    if (bind_config->additional_source_addresses_size() > 0 &&
+        bind_config->extra_source_addresses_size() > 0) {
+      throw EnvoyException(fmt::format(
+          "Can't specify both `extra_source_addresses` and `additional_source_addresses` "
+          "in the {}'s upstream binding config",
+          !(cluster_name.has_value()) ? "Bootstrap"
+                                      : fmt::format("Cluster {}", cluster_name.value())));
+    }
+
+    if (!bind_config->has_source_address() &&
+        (bind_config->extra_source_addresses_size() > 0 ||
+         bind_config->additional_source_addresses_size() > 0)) {
+      throw EnvoyException(fmt::format(
+          "{}'s upstream binding config has extra/additional source addresses but no "
+          "source_address. Extra/additional addresses cannot be specified if "
+          "source_address is not set.",
+          !(cluster_name.has_value()) ? "Bootstrap"
+                                      : fmt::format("Cluster {}", cluster_name.value())));
+    }
+  }
   UpstreamLocalAddressSelectorFactory* local_address_selector_factory;
-  // The ``upstream_bind_config`` field on Cluster overrides the ``bootstrap_bind_config``
-  // entirely. Thus we ignore the ``local_address_selector`` on the bootstrap bind config if
-  // ``upstream_bind_config`` is specified without a ``local_address_selector``.
   const envoy::config::core::v3::TypedExtensionConfig* const local_address_selector_config =
-      cluster_config.has_upstream_bind_config()
-          ? (cluster_config.upstream_bind_config().has_local_address_selector()
-                 ? &cluster_config.upstream_bind_config().local_address_selector()
-                 : nullptr)
-          : (bootstrap_bind_config.has_value() &&
-                     bootstrap_bind_config->has_local_address_selector()
-                 ? &bootstrap_bind_config->local_address_selector()
-                 : nullptr);
+      bind_config.has_value() && bind_config->has_local_address_selector()
+          ? &bind_config->local_address_selector()
+          : nullptr;
   if (local_address_selector_config) {
     local_address_selector_factory =
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(
             *local_address_selector_config, false);
   } else {
+    // Create the default local address selector if one was not specified.
     envoy::extensions::upstream::local_address_selector::v3::DefaultLocalAddressSelector
         default_config;
     envoy::config::core::v3::TypedExtensionConfig typed_extension;
@@ -251,20 +345,14 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
         Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
                                                                                  false);
   }
-  OptRef<const envoy::config::core::v3::BindConfig> bind_config_to_use;
-  if (cluster_config.has_upstream_bind_config()) {
-    bind_config_to_use.emplace(cluster_config.upstream_bind_config());
-  } else if (bootstrap_bind_config.has_value()) {
-    bind_config_to_use.emplace(*bootstrap_bind_config);
-  }
   return local_address_selector_factory->createLocalAddressSelector(
-      bind_config_to_use,
-      buildBaseSocketOptions(cluster_config,
-                             bootstrap_bind_config.value_or(envoy::config::core::v3::BindConfig{})),
-      buildClusterSocketOptions(
-          cluster_config, bootstrap_bind_config.value_or(envoy::config::core::v3::BindConfig{})),
-      cluster_config.has_upstream_bind_config() ? absl::optional<std::string>(cluster_config.name())
-                                                : absl::nullopt);
+      parseBindConfig(
+          bind_config,
+          buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
+                                                     envoy::config::core::v3::BindConfig{})),
+          buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
+                                                        envoy::config::core::v3::BindConfig{}))),
+      cluster_name);
 }
 
 } // namespace

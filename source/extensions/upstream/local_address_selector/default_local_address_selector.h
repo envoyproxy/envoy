@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -19,9 +20,7 @@ namespace Upstream {
 class DefaultUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:
   DefaultUpstreamLocalAddressSelector(
-      ::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
-      Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
-      Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options,
+      std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
       absl::optional<std::string> cluster_name);
 
   // UpstreamLocalAddressSelector

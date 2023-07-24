@@ -2809,7 +2809,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         StaticClusterImpl cluster(config, factory_context), EnvoyException,
         "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
         "different IP version source addresses can be supported in BindConfig's source_address and "
-        "extra_source_addresses fields");
+        "extra_source_addresses/additional_source_addresses fields");
   }
 
   {
@@ -2832,8 +2832,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
     EXPECT_THROW_WITH_MESSAGE(
         StaticClusterImpl cluster(config, factory_context), EnvoyException,
-        "Bootstrap's upstream binding config has more than one extra source addresses. Only "
-        "one extra source can be supported in BindConfig's extra_source_addresses field");
+        "Bootstrap's upstream binding config has more than one extra/additional source addresses. "
+        "Only one extra/additional source can be supported in BindConfig's "
+        "extra_source_addresses/additional_source_addresses field");
   }
 
   {
@@ -2911,10 +2912,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
 
-    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(config, factory_context), EnvoyException,
-                              "Cluster staticcluster's upstream binding config has more than one "
-                              "extra source addresses. Only one extra source can be "
-                              "supported in BindConfig's extra_source_addresses field");
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(config, factory_context), EnvoyException,
+        "Cluster staticcluster's upstream binding config has more than one "
+        "extra/additional source addresses. Only one extra/additional source can be "
+        "supported in BindConfig's extra_source_addresses/additional_source_addresses field");
   }
 
   {
@@ -3067,7 +3069,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         StaticClusterImpl cluster(config, factory_context), EnvoyException,
         "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
         "different IP version source addresses can be supported in BindConfig's source_address and "
-        "additional_source_addresses fields");
+        "extra_source_addresses/additional_source_addresses fields");
   }
 
   {
@@ -3085,10 +3087,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    EXPECT_THROW_WITH_MESSAGE(
-        StaticClusterImpl cluster(config, factory_context), EnvoyException,
-        "Bootstrap's upstream binding config has more than one additional source addresses. Only "
-        "one additional source can be supported in BindConfig's additional_source_addresses field");
+    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(config, factory_context), EnvoyException,
+                              "Bootstrap's upstream binding config has more than one "
+                              "extra/additional source addresses. Only "
+                              "one extra/additional source can be supported in BindConfig's "
+                              "extra_source_addresses/additional_source_addresses field");
   }
 
   {
@@ -3125,10 +3128,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(config, factory_context), EnvoyException,
-                              "Cluster staticcluster's upstream binding config has more than one "
-                              "additional source addresses. Only one additional source can be "
-                              "supported in BindConfig's additional_source_addresses field");
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(config, factory_context), EnvoyException,
+        "Cluster staticcluster's upstream binding config has more than one "
+        "extra/additional source addresses. Only one extra/additional source can be "
+        "supported in BindConfig's extra_source_addresses/additional_source_addresses field");
   }
 
   {
@@ -3176,22 +3180,9 @@ TEST_F(StaticClusterImplTest, LedsUnsupported) {
 class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 
 public:
-  TestUpstreamLocalAddressSelector(const envoy::config::core::v3::BindConfig& bind_config) {
-    UpstreamLocalAddress upstream_local_address;
-    upstream_local_address.address_ =
-        ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config.source_address());
-    upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
-    upstream_local_addresses_.push_back(upstream_local_address);
-
-    for (const auto& extra_source_address : bind_config.extra_source_addresses()) {
-      UpstreamLocalAddress extra_upstream_local_address;
-      extra_upstream_local_address.address_ =
-          ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
-      extra_upstream_local_address.socket_options_ =
-          std::make_shared<Network::ConnectionSocket::Options>();
-      upstream_local_addresses_.push_back(extra_upstream_local_address);
-    }
-  }
+  TestUpstreamLocalAddressSelector(
+      std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses)
+      : upstream_local_addresses_{std::move(upstream_local_addresses)} {}
 
   UpstreamLocalAddress
   getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr&,
@@ -3206,12 +3197,10 @@ private:
 };
 
 class TestUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
-  UpstreamLocalAddressSelectorConstSharedPtr
-  createLocalAddressSelector(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
-                             Network::ConnectionSocket::OptionsSharedPtr,
-                             Network::ConnectionSocket::OptionsSharedPtr,
-                             absl::optional<std::string>) const override {
-    return std::make_shared<TestUpstreamLocalAddressSelector>(*bind_config);
+  UpstreamLocalAddressSelectorConstSharedPtr createLocalAddressSelector(
+      std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
+      absl::optional<std::string>) const override {
+    return std::make_shared<TestUpstreamLocalAddressSelector>(upstream_local_addresses);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
