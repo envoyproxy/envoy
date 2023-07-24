@@ -377,6 +377,12 @@ public:
 
   static Logger* logger(const std::string& log_name);
 
+  /**
+   * Resetting the value to its original value.
+   * Only used for tests.
+   */
+  static void resetJsonLogFormatSetForTest() { json_log_format_set_ = false; }
+
 private:
   /*
    * @return std::vector<Logger>& return the installed loggers.

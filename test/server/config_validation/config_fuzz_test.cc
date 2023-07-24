@@ -53,6 +53,8 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
   }
+  // Reset the logger to initial value.
+  Envoy::Logger::Registry::resetJsonLogFormatSetForTest();
 }
 
 } // namespace
