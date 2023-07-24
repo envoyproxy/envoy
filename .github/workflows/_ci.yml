@@ -77,7 +77,11 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-ci-${{ inputs.target }}
+  group: |
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-${{ inputs.target }}
   cancel-in-progress: true
 
 jobs:
