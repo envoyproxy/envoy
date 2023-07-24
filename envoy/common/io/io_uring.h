@@ -1,8 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-
-#include "source/common/network/address_impl.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Io {
@@ -12,8 +11,15 @@ namespace Io {
  * @param user_data is any data attached to an entry submitted to the submission
  * queue.
  * @param result is a return code of submitted system call.
+ * @param injected indicated the completion is injected or not.
  */
-using CompletionCb = std::function<void(void* user_data, int32_t result)>;
+using CompletionCb = std::function<void(void* user_data, int32_t result, bool injected)>;
+
+/**
+ * Callback for release the user data.
+ * @param user_data the pointer to the user data.
+ */
+using InjectedCompletionUserDataReleasor = std::function<void(void* user_data)>;
 
 enum class IoUringResult { Ok, Busy, Failed };
 
@@ -44,7 +50,7 @@ public:
    * Iterates over entries in the completion queue, calls the given callback for
    * every entry and marks them consumed.
    */
-  virtual void forEveryCompletion(CompletionCb completion_cb) PURE;
+  virtual void forEveryCompletion(const CompletionCb& completion_cb) PURE;
 
   /**
    * Prepares an accept system call and puts it into the submission queue.
@@ -95,7 +101,26 @@ public:
    * with the forEveryCompletion() method and try again.
    */
   virtual IoUringResult submit() PURE;
+
+  /**
+   * Inject a request completion into the io_uring. Those completions will be iterated
+   * when calling the `forEveryCompletion`.
+   * @param fd is the file descriptor of this completion refer to.
+   * @param user_data is the user data related to this completion.
+   * @param result is request result for this completion.
+   */
+  virtual void injectCompletion(os_fd_t fd, void* user_data, int32_t result) PURE;
+
+  /**
+   * Remove all the injected completions for the specific fd.
+   * @param fd is used to refer to the completions will be removed.
+   * @param releasor should be provided for how to release the related user data.
+   */
+  virtual void removeInjectedCompletion(os_fd_t fd,
+                                        InjectedCompletionUserDataReleasor releasor) PURE;
 };
+
+using IoUringPtr = std::unique_ptr<IoUring>;
 
 /**
  * Abstract factory for IoUring wrappers.

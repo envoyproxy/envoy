@@ -47,13 +47,18 @@ IoUringImpl::~IoUringImpl() { io_uring_queue_exit(&ring_); }
 
 os_fd_t IoUringImpl::registerEventfd() {
   ASSERT(!isEventfdRegistered());
-  event_fd_ = eventfd(0, 0);
+  // Mark the eventfd as non-blocking. since after injected completion is added. the eventfd
+  // will be activated to trigger the event callback. For the case of only injected completion
+  // is added and no actual iouring event. Then non-blocking can avoid the reading of eventfd
+  // blocking.
+  event_fd_ = eventfd(0, EFD_NONBLOCK);
   int res = io_uring_register_eventfd(&ring_, event_fd_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to register eventfd: {}", errorDetails(-res)));
   return event_fd_;
 }
 
 void IoUringImpl::unregisterEventfd() {
+  ASSERT(isEventfdRegistered());
   int res = io_uring_unregister_eventfd(&ring_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to unregister eventfd: {}", errorDetails(-res)));
   SET_SOCKET_INVALID(event_fd_);
@@ -61,20 +66,41 @@ void IoUringImpl::unregisterEventfd() {
 
 bool IoUringImpl::isEventfdRegistered() const { return SOCKET_VALID(event_fd_); }
 
-void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
+void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   ASSERT(SOCKET_VALID(event_fd_));
 
   eventfd_t v;
-  int ret = eventfd_read(event_fd_, &v);
-  RELEASE_ASSERT(ret == 0, "unable to drain eventfd");
+  while (true) {
+    int ret = eventfd_read(event_fd_, &v);
+    if (ret != 0) {
+      ASSERT(errno == EAGAIN);
+      break;
+    }
+  }
 
   unsigned count = io_uring_peek_batch_cqe(&ring_, cqes_.data(), io_uring_size_);
 
   for (unsigned i = 0; i < count; ++i) {
     struct io_uring_cqe* cqe = cqes_[i];
-    completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
+    completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res, false);
   }
+
   io_uring_cq_advance(&ring_, count);
+
+  ENVOY_LOG(trace, "the num of injected completion is {}", injected_completions_.size());
+  // TODO(soulxu): Add bound here to avoid too many completion to stuck the thread too
+  // long.
+  // Iterate the injected completion.
+  while (!injected_completions_.empty()) {
+    auto& completion = injected_completions_.front();
+    completion_cb(completion.user_data_, completion.result_, true);
+    // The socket may closed in the completion_cb and all the related completions are
+    // removed.
+    if (injected_completions_.empty()) {
+      break;
+    }
+    injected_completions_.pop_front();
+  }
 }
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
@@ -141,6 +167,25 @@ IoUringResult IoUringImpl::submit() {
   int res = io_uring_submit(&ring_);
   RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
   return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
+}
+
+void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) {
+  injected_completions_.emplace_back(fd, user_data, result);
+  ENVOY_LOG(trace, "inject completion, fd = {}, req = {}, num injects = {}", fd,
+            fmt::ptr(user_data), injected_completions_.size());
+}
+
+void IoUringImpl::removeInjectedCompletion(os_fd_t fd,
+                                           InjectedCompletionUserDataReleasor releasor) {
+  ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
+            injected_completions_.size());
+  injected_completions_.remove_if([fd, releasor](InjectedCompletion& completion) {
+    if (fd == completion.fd_) {
+      // Release the user data before remove this completion.
+      releasor(completion.user_data_);
+    }
+    return fd == completion.fd_;
+  });
 }
 
 } // namespace Io

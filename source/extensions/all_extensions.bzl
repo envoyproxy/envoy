@@ -14,7 +14,7 @@ def _selected_extension_target(target):
     return target + "_envoy_extension"
 
 # Return all extensions to be compiled into Envoy.
-def envoy_all_extensions(denylist = []):
+def envoy_all_extensions(denylist = ["envoy.transport_sockets.tcp_stats"]):
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
     # These extensions can be removed on a site specific basis.
