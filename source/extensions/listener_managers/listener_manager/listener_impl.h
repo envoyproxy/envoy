@@ -399,7 +399,7 @@ public:
 
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
-                                const std::vector<Network::FilterFactoryCb>& factories) override;
+                                const Filter::NetworkFilterFactoriesList& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;

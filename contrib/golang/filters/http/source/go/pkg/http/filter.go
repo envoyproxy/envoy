@@ -209,6 +209,10 @@ func (s *streamInfo) UpstreamClusterName() (string, bool) {
 	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamClusterName)
 }
 
+func (s *streamInfo) VirtualClusterName() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueVirtualClusterName)
+}
+
 type filterState struct {
 	request *httpRequest
 }
