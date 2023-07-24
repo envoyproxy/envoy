@@ -46,10 +46,6 @@ const EncryptionDecryptionOutput UtilityImpl::decrypt(CryptoObject& key,
 
   // Step 2: initialize EVP_PKEY_CTX
   EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(pkey, nullptr);
-  if (!ctx) {
-    return {false, "failed to create context for decryption"};
-  }
-
   int ok = EVP_PKEY_decrypt_init(ctx);
   if (!ok) {
     EVP_PKEY_CTX_free(ctx);
@@ -90,10 +86,6 @@ const EncryptionDecryptionOutput UtilityImpl::encrypt(CryptoObject& key,
 
   // Step 2: initialize EVP_PKEY_CTX
   EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(pkey, nullptr);
-  if (!ctx) {
-    return {false, "failed to create context for encryption"};
-  }
-
   int ok = EVP_PKEY_encrypt_init(ctx);
   if (!ok) {
     EVP_PKEY_CTX_free(ctx);
