@@ -992,6 +992,19 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       "--service-node and --service-cluster options.");
 }
 
+// Validates that the EDS cache getter returns the cache.
+TEST_F(GrpcMuxImplTest, EdsResourcesCacheForEds) {
+  eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
+  setup();
+  EXPECT_NE({}, grpc_mux_->edsResourcesCache());
+}
+
+// Validates that the EDS cache getter returns empty if there is no cache.
+TEST_F(GrpcMuxImplTest, EdsResourcesCacheForEdsNoCache) {
+  setup();
+  EXPECT_EQ({}, grpc_mux_->edsResourcesCache());
+}
+
 // Validate that an EDS resource is cached if there's a cache.
 TEST_F(GrpcMuxImplTest, CacheEdsResource) {
   // Create the cache that will also be passed to the GrpcMux object via setup().

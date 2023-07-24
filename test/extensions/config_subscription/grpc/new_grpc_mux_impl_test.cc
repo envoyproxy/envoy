@@ -565,6 +565,19 @@ TEST_P(NewGrpcMuxImplTest, Shutdown) {
   // There won't be any unsubscribe messages for the legacy mux either for the same reason
 }
 
+// Validates that the EDS cache getter returns the cache.
+TEST_P(NewGrpcMuxImplTest, EdsResourcesCacheForEds) {
+  eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
+  setup();
+  EXPECT_NE({}, grpc_mux_->edsResourcesCache());
+}
+
+// Validates that the EDS cache getter returns empty if there is no cache.
+TEST_P(NewGrpcMuxImplTest, EdsResourcesCacheForEdsNoCache) {
+  setup();
+  EXPECT_EQ({}, grpc_mux_->edsResourcesCache());
+}
+
 // Validate that an EDS resource is cached if there's a cache.
 TEST_P(NewGrpcMuxImplTest, CacheEdsResource) {
   // Create the cache that will also be passed to the GrpcMux object via setup().
