@@ -65,7 +65,6 @@ request_rules:
       key: version
       value: 'error'
       preserve_existing_metadata_value: true
-  buffer_limit_bytes: 200
 )EOF";
 
   void initializeFilter(const std::string& yaml) {
@@ -141,7 +140,6 @@ TEST_F(FilterTest, BasicStringMatch) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -164,7 +162,6 @@ TEST_F(FilterTest, BasicBoolMatch) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -187,7 +184,6 @@ TEST_F(FilterTest, BasicIntegerMatch) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -210,7 +206,6 @@ TEST_F(FilterTest, BasicDoubleMatch) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -243,7 +238,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -271,7 +265,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -303,7 +296,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -339,7 +331,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -367,7 +358,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -399,7 +389,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -427,7 +416,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -459,7 +447,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -487,7 +474,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -519,7 +505,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -547,7 +532,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -580,7 +564,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -607,7 +590,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -639,7 +621,6 @@ TEST_F(FilterTest, DecodeTwoDataStreams) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -672,7 +653,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -706,7 +686,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -740,7 +719,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -774,7 +752,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -791,7 +768,6 @@ TEST_F(FilterTest, NoRequestContentType) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -808,7 +784,6 @@ TEST_F(FilterTest, MismatchedRequestContentType) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -820,7 +795,6 @@ TEST_F(FilterTest, NoRequestBody) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 1);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -835,7 +809,6 @@ TEST_F(FilterTest, EmptyPayloadValue) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 1);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -863,7 +836,6 @@ TEST_F(FilterTest, InvalidJsonPayload) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 1);
 }
 
@@ -884,7 +856,6 @@ TEST_F(FilterTest, InvalidJsonForAdditionalPrefixSuffix) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 1);
 }
 
@@ -916,7 +887,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -950,7 +920,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -985,7 +954,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1010,7 +978,6 @@ TEST_F(FilterTest, MissingMetadataKeyAndFallbackValue) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1045,7 +1012,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1074,88 +1040,6 @@ TEST_F(FilterTest, MissingMetadataKeyWithExistingMetadata) {
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
-}
-
-TEST_F(FilterTest, TooLargeRequestBody) {
-  initializeFilter(request_config_yaml_);
-  std::string request_body(201, 'z');
-  std::map<std::string, std::string> expected = {{"version", "error"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(incoming_headers_, false));
-  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-  Buffer::OwnedImpl buffer(request_body);
-  testRequestWithBody(request_body, false, Http::FilterDataStatus::Continue);
-
-  EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 1);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
-}
-
-TEST_F(FilterTest, DefaultBufferLimitAccepted) {
-  initializeFilter(R"EOF(
-request_rules:
-  rules:
-  - selectors:
-    - key: version
-    on_present:
-      metadata_namespace: envoy.lb
-      key: version
-)EOF");
-
-  std::string value(1024 * 1024 - 44, 'z');
-  std::string request_body =
-      absl::StrCat(R"delimiter({"version":"good version", "placeholder":")delimiter", value,
-                   R"delimiter("})delimiter");
-
-  EXPECT_EQ(1024 * 1024, request_body.length());
-
-  std::map<std::string, std::string> expected = {{"version", "good version"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(incoming_headers_, false));
-  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-  Buffer::OwnedImpl buffer(request_body);
-  testRequestWithBody(request_body);
-
-  EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
-}
-
-TEST_F(FilterTest, DefaultBufferLimitRejected) {
-  initializeFilter(R"EOF(
-request_rules:
-  rules:
-  - selectors:
-    - key: version
-    on_present:
-      metadata_namespace: envoy.lb
-      key: version
-    on_error:
-      metadata_namespace: envoy.lb
-      key: version
-      value: 'error'
-)EOF");
-  std::string request_body(1024 * 1024 + 1, 'z');
-  std::map<std::string, std::string> expected = {{"version", "error"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(incoming_headers_, false));
-  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-  Buffer::OwnedImpl buffer(request_body);
-  testRequestWithBody(request_body, false, Http::FilterDataStatus::Continue);
-
-  EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1188,7 +1072,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1221,7 +1104,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1265,7 +1147,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1296,7 +1177,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1319,7 +1199,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
@@ -1348,7 +1227,6 @@ request_rules:
   EXPECT_EQ(findCounter("json_to_metadata.rq_success"), 1);
   EXPECT_EQ(findCounter("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_no_body"), 0);
-  EXPECT_EQ(findCounter("json_to_metadata.rq_too_large_body"), 0);
   EXPECT_EQ(findCounter("json_to_metadata.rq_invalid_json_body"), 0);
 }
 

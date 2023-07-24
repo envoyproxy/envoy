@@ -29,7 +29,6 @@ request_rules:
       key: version
       value: 'error'
       preserve_existing_metadata_value: true
-  buffer_limit_bytes: 16384
   )";
 
   JsonToMetadataConfig factory;

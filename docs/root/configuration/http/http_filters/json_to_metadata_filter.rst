@@ -49,5 +49,4 @@ comes from the owning HTTP connection manager.
   rq_success, Counter, Total requests that succeed to parse the json body
   rq_mismatched_content_type, Counter, Total requests that mismatch the content type
   rq_no_body, Counter, Total requests without content body
-  rq_too_large_body, Counter, Total requests with too large content body
   rq_invalid_json_body, Counter, Total requests with invalid json body

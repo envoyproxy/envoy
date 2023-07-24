@@ -27,7 +27,6 @@ namespace JsonToMetadata {
   COUNTER(rq_success)                                                                              \
   COUNTER(rq_mismatched_content_type)                                                              \
   COUNTER(rq_no_body)                                                                              \
-  COUNTER(rq_too_large_body)                                                                       \
   COUNTER(rq_invalid_json_body)
 
 /**
@@ -67,7 +66,6 @@ public:
   // True if we have rules for requests
   bool doRequest() const { return !request_rules_.empty(); }
   const Rules& requestRules() const { return request_rules_; }
-  uint32_t requestBufferLimitBytes() const { return request_buffer_limit_bytes_; }
   bool requestContentTypeAllowed(absl::string_view) const;
 
 private:
@@ -79,7 +77,6 @@ private:
       const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
       const;
   JsonToMetadataStats stats_;
-  const uint32_t request_buffer_limit_bytes_;
   const Rules request_rules_;
   const absl::flat_hash_set<std::string> request_allow_content_types_;
   const bool request_allow_empty_content_type_;

@@ -43,7 +43,6 @@ static_resources:
                     key: default
                     value: "true"
                     preserve_existing_metadata_value: true
-                buffer_limit_bytes: 16384
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

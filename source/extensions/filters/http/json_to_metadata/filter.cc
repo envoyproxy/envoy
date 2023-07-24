@@ -86,8 +86,6 @@ FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
     Stats::Scope& scope)
     : stats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata."))},
-      request_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.request_rules(),
-                                                                  buffer_limit_bytes, 1024 * 1024)),
       request_rules_(generateRequestRules(proto_config)),
       request_allow_content_types_(generateRequestAllowContentTypes(proto_config)),
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()) {}
@@ -361,14 +359,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
     return Http::FilterDataStatus::Continue;
   }
 
-  if (decoder_callbacks_->decodingBuffer() &&
-      decoder_callbacks_->decodingBuffer()->length() > config_->requestBufferLimitBytes()) {
-    handleAllOnError(config_->requestRules(), request_processing_finished_);
-    ENVOY_LOG(debug, "Request body is too large. buffer_size {} buffer_limit {}",
-              decoder_callbacks_->decodingBuffer()->length(), config_->requestBufferLimitBytes());
-    config_->stats().rq_too_large_body_.inc();
-    return Http::FilterDataStatus::Continue;
-  }
   return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
