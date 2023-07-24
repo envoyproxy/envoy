@@ -1194,7 +1194,7 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
         }
         dynamic_lib_->envoyGoRequestSemaDec(req_);
       } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+        ENVOY_LOG(info, "golang filter has gone or destroyed in getStringFilterState");
       }
     });
     return CAPIStatus::CAPIYield;
