@@ -11,6 +11,9 @@ on:
       workflow_name:
         required: true
         type: string
+      sha:
+        required: true
+        type: string
 
 jobs:
   start:
@@ -24,7 +27,7 @@ jobs:
       with:
         check_mobile_run: false
 
-    - if: ${{ ! steps.env.outputs.trusted }}
+    - if: ${{ steps.env.outputs.trusted != 'true' }}
       name: Start status check
       uses: envoyproxy/toolshed/gh-actions/status@actions-v0.0.10
       with:
@@ -33,14 +36,14 @@ jobs:
         state: 'pending'
         sha: ${{ inputs.sha }}
         target_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-    - if: ${{ ! steps.env.outputs.trusted }}
+    - if: ${{ steps.env.outputs.trusted != 'true' }}
       name: Save the SHA
       env:
         STATE_SHA: ${{ inputs.sha }}
       run: |
         mkdir -p ./sha
         echo $STATE_SHA > ./sha/state_sha
-    - if: ${{ ! steps.env.outputs.trusted }}
+    - if: ${{ steps.env.outputs.trusted != 'true' }}
       uses: actions/upload-artifact@v3
       with:
         name: state_sha
