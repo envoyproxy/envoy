@@ -57,13 +57,20 @@ private:
   std::unique_ptr<Http::ResponseTrailerMap> trailers_;
 };
 
+// We capture the values from encoder_callbacks, and the callbacks as lambdas, so
+// that we don't have to keep checking whether the filter has been deleted.
+// When the filter *is* deleted, we simply replace all the callback lambdas with no-op.
 CacheInsertQueue::CacheInsertQueue(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
-                                   InsertContextPtr insert_context, size_t low_watermark_bytes,
-                                   size_t high_watermark_bytes, OverHighWatermarkCallback high,
-                                   UnderLowWatermarkCallback low, AbortInsertCallback abort)
+                                   InsertContextPtr insert_context, AbortInsertCallback abort)
     : dispatcher_(encoder_callbacks.dispatcher()), insert_context_(std::move(insert_context)),
-      low_watermark_bytes_(low_watermark_bytes), high_watermark_bytes_(high_watermark_bytes),
-      under_low_watermark_callback_(low), over_high_watermark_callback_(high),
+      low_watermark_bytes_(encoder_callbacks.encoderBufferLimit() / 2),
+      high_watermark_bytes_(encoder_callbacks.encoderBufferLimit()),
+      under_low_watermark_callback_([&encoder_callbacks]() {
+        encoder_callbacks.onEncoderFilterBelowWriteBufferLowWatermark();
+      }),
+      over_high_watermark_callback_([&encoder_callbacks]() {
+        encoder_callbacks.onEncoderFilterAboveWriteBufferHighWatermark();
+      }),
       abort_callback_(abort) {}
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,

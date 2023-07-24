@@ -140,18 +140,13 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
       // The callbacks passed to CacheInsertQueue are all called through the dispatcher,
       // so they're thread-safe, and onDestroy will prevent them from being called via
       // giving the queue ownership of itself, so they're also filter-destruction-safe.
-      insert_queue_ = std::make_unique<CacheInsertQueue>(
-          *encoder_callbacks_, std::move(insert_context), encoder_callbacks_->encoderBufferLimit(),
-          encoder_callbacks_->encoderBufferLimit() / 2,
-          // High watermark callback.
-          [this]() { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
-          // Low watermark callback.
-          [this]() { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
-          // Cache aborted callback.
-          [this]() {
-            insert_queue_ = nullptr;
-            insert_status_ = InsertStatus::InsertAbortedByCache;
-          });
+      insert_queue_ =
+          std::make_unique<CacheInsertQueue>(*encoder_callbacks_, std::move(insert_context),
+                                             // Cache aborted callback.
+                                             [this]() {
+                                               insert_queue_ = nullptr;
+                                               insert_status_ = InsertStatus::InsertAbortedByCache;
+                                             });
       // Add metadata associated with the cached response. Right now this is only response_time;
       const ResponseMetadata metadata = {time_source_.systemTime()};
       insert_queue_->insertHeaders(headers, metadata, end_stream);
