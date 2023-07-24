@@ -18,7 +18,7 @@
 namespace Envoy {
 
 /**
- * This file contains classes to help make very fast maps where a subset frequently used keys are
+ * This file contains classes to help make very fast maps where a subset of frequently used keys are
  * known before the map is constructed.
  *
  * For example, the filter state always uses the filter name as the key and the filter name is
@@ -79,7 +79,7 @@ public:
     // This constructor should only be called by InlineMapDescriptor.
     Handle(uint32_t inline_id) : inline_id_(inline_id) {}
 
-    uint32_t inline_id_{};
+    const uint32_t inline_id_{};
   };
 
   using InlineKeysMap = absl::flat_hash_map<StorageKey, Handle>;
@@ -127,7 +127,7 @@ public:
   }
 
   /**
-   * Finalize this descriptor. No further changes are allowed after this point. This guaranteed that
+   * Finalize this descriptor. No further changes are allowed after this point. This guarantees that
    * all map created by the process have the same variable size and custom inline key adding. This
    * method should only be called once.
    */
@@ -142,10 +142,9 @@ public:
   bool finalized() const { return finalized_; }
 
   /**
-   * @return the debug string of this descriptor. This will return all inline keys that joined by
-   * the given separator.
+   * @return all inline keys that joined by the given separator.
    */
-  std::string debugString(absl::string_view separator = ",") const {
+  std::string inlineKeysAsString(absl::string_view separator = ",") const {
     ASSERT(finalized_, "Cannot fetch debug string before finalize()");
     return absl::StrJoin(inline_keys_, separator);
   }
@@ -199,15 +198,15 @@ public:
   /**
    * Get the entry by the given key. Heterogeneous lookup is supported here.
    * @param key the key to lookup.
-   * @return the entry if the key is found, otherwise return null reference.
+   * @return the entry if the key is found, otherwise returns an OptRef with has_value() == false.
    */
   template <class GetKey> OptRef<const Value> get(const GetKey& key) const {
     // Because the dynamic key is used here, try the normal map entry first.
-    if (auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
+    if (const auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
       return it->second;
     }
 
-    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       if (inlineEntryValid(*entry_id)) {
         return inline_entries_[*entry_id];
       }
@@ -219,7 +218,7 @@ public:
   /**
    * Get the entry by the given key. Heterogeneous lookup is supported here.
    * @param key the key to lookup.
-   * @return the entry if the key is found, otherwise return null reference.
+   * @return the entry if the key is found, otherwise returns an OptRef with has_value() == false.
    */
   template <class GetKey> OptRef<Value> get(const GetKey& key) {
     // Because the dynamic key is used here, try the normal map entry first.
@@ -227,7 +226,7 @@ public:
       return it->second;
     }
 
-    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       if (inlineEntryValid(*entry_id)) {
         return inline_entries_[*entry_id];
       }
@@ -239,7 +238,8 @@ public:
   /**
    * Get the entry by the given handle.
    * @param handle the handle to lookup.
-   * @return the entry if the handle is valid, otherwise return null reference.
+   * @return the entry if the handle is valid, otherwise returns an OptRef with has_value() ==
+   * false.
    */
   OptRef<const Value> get(Handle handle) const {
     if (inlineEntryValid(handle.inlineId())) {
@@ -251,7 +251,8 @@ public:
   /**
    * Get the entry by the given handle.
    * @param handle the handle to lookup.
-   * @return the entry if the handle is valid, otherwise return null reference.
+   * @return the entry if the handle is valid, otherwise returns an OptRef with has_value() ==
+   * false.
    */
   OptRef<Value> get(Handle handle) {
     if (inlineEntryValid(handle.inlineId())) {
@@ -270,7 +271,7 @@ public:
    */
   template <class SetKey, class SetValue>
   std::pair<ValueRef, bool> set(SetKey&& key, SetValue&& value) {
-    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       // This key is registered as inline key and try to insert the value to the inline array.
 
       // If the entry is already valid, insert will fail and return the ref of exist value.
@@ -313,7 +314,7 @@ public:
    * @return the number of elements erased.
    */
   template <class GetKey> uint64_t erase(const GetKey& key) {
-    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       return clearInlineMapEntry(*entry_id);
     } else {
       return dynamic_entries_.erase(key);
@@ -327,6 +328,10 @@ public:
    */
   uint64_t erase(Handle handle) { return clearInlineMapEntry(handle.inlineId()); }
 
+  /**
+   * Iterate all elements in the map.
+   * @param callback the callback function to handle each element.
+   */
   void iterate(std::function<bool(const Key&, const Value&)> callback) const {
     for (const auto& entry : dynamic_entries_) {
       if (!callback(entry.first, entry.second)) {
@@ -370,16 +375,11 @@ public:
    */
   bool empty() const { return size() == 0; }
 
-  ~InlineMap() {
-    // Destruct all inline entries.
-    for (uint64_t i = 0; i < descriptor_.inlineKeysNum(); ++i) {
-      clearInlineMapEntry(i);
-    }
-  };
+  ~InlineMap() { clear(); }
 
   // Override operator [] to support the normal key assignment.
   template <class GetKey> Value& operator[](const GetKey& key) {
-    if (auto entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       // This key is registered as inline key and try to add the value to the inline array.
       if (!inlineEntryValid(*entry_id)) {
         resetInlineMapEntry(*entry_id, Value());
