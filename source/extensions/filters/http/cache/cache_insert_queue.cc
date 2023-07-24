@@ -35,7 +35,7 @@ public:
 
 private:
   Buffer::OwnedImpl buffer_;
-  bool end_stream_;
+  const bool end_stream_;
 };
 
 class CacheInsertChunkTrailers : public CacheInsertChunk {
@@ -173,17 +173,11 @@ void CacheInsertQueue::takeOwnershipOfYourself(std::unique_ptr<CacheInsertQueue>
     // If the queue can't be completed we can abort early but we need to wait for
     // any callback-in-flight to complete before destroying the queue.
     aborting_ = true;
-    insert_context_->onDestroy();
-    insert_context_ = nullptr;
   }
   self_ownership_ = std::move(self);
 }
 
-CacheInsertQueue::~CacheInsertQueue() {
-  if (insert_context_) {
-    insert_context_->onDestroy();
-  }
-}
+CacheInsertQueue::~CacheInsertQueue() { insert_context_->onDestroy(); }
 
 } // namespace Cache
 } // namespace HttpFilters

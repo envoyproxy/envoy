@@ -30,8 +30,8 @@ private:
   void onChunkComplete(bool ready_for_next_chunk, bool end_stream, size_t sz);
 
   Event::Dispatcher& dispatcher_;
-  InsertContextPtr insert_context_;
-  size_t low_watermark_bytes_, high_watermark_bytes_;
+  const InsertContextPtr insert_context_;
+  const size_t low_watermark_bytes_, high_watermark_bytes_;
   UnderLowWatermarkCallback under_low_watermark_callback_;
   OverHighWatermarkCallback over_high_watermark_callback_;
   AbortInsertCallback abort_callback_;
