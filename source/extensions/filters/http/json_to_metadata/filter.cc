@@ -95,7 +95,8 @@ FilterConfig::FilterConfig(
 Filter::~Filter() = default;
 
 Rules FilterConfig::generateRequestRules(
-    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config) {
+    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
+    const {
   Rules rules;
   for (const auto& rule : proto_config.request_rules().rules()) {
     rules.emplace_back(rule);
@@ -104,7 +105,8 @@ Rules FilterConfig::generateRequestRules(
 }
 
 absl::flat_hash_set<std::string> FilterConfig::generateRequestAllowContentTypes(
-    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config) {
+    const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
+    const {
   if (proto_config.request_rules().allow_content_types().empty()) {
     return {Http::Headers::get().ContentTypeValues.Json};
   }
@@ -179,9 +181,9 @@ bool Filter::addMetadata(const std::string& meta_namespace, const std::string& k
 }
 
 void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
-                                     const StructMap& struct_map, bool& reported_flag) {
-  ASSERT(!reported_flag);
-  reported_flag = true;
+                                     const StructMap& struct_map, bool& processing_finished_flag) {
+  ASSERT(!processing_finished_flag);
+  processing_finished_flag = true;
   if (!struct_map.empty()) {
     for (auto const& entry : struct_map) {
       filter_callback.streamInfo().setDynamicMetadata(entry.first, entry.second);
@@ -189,7 +191,7 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
   }
 }
 
-void Filter::handleAllOnMissing(const Rules& rules, bool& reported_flag) {
+void Filter::handleAllOnMissing(const Rules& rules, bool& processing_finished_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_missing()) {
@@ -197,7 +199,7 @@ void Filter::handleAllOnMissing(const Rules& rules, bool& reported_flag) {
     }
   }
 
-  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, reported_flag);
+  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, processing_finished_flag);
 }
 
 void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map) {
@@ -206,14 +208,14 @@ void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map) {
   }
 }
 
-void Filter::handleAllOnError(const Rules& rules, bool& reported_flag) {
+void Filter::handleAllOnError(const Rules& rules, bool& processing_finished_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_error()) {
       applyKeyValue(rule.rule_.on_error().value(), rule.rule_.on_error(), struct_map);
     }
   }
-  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, reported_flag);
+  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, processing_finished_flag);
 }
 
 absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const std::string& key,
@@ -272,9 +274,9 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
   return absl::OkStatus();
 }
 
-void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool& reported_flag,
-                         Stats::Counter& success, Stats::Counter& no_body,
-                         Stats::Counter& non_json) {
+void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
+                         bool& processing_finished_flag, Stats::Counter& success,
+                         Stats::Counter& no_body, Stats::Counter& non_json) {
   if (!body) {
     handleAllOnMissing(rules, request_processing_finished_);
     no_body.inc();
@@ -286,7 +288,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool&
   if (!result.ok()) {
     ENVOY_LOG(debug, result.status().message());
     non_json.inc();
-    handleAllOnError(rules, reported_flag);
+    handleAllOnError(rules, processing_finished_flag);
     return;
   }
 
@@ -317,7 +319,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules, bool&
   }
   success.inc();
 
-  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, reported_flag);
+  finalizeDynamicMetadata(*decoder_callbacks_, struct_map, processing_finished_flag);
 }
 
 void Filter::processRequestBody() {

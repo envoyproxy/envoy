@@ -73,9 +73,11 @@ public:
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
   Rules generateRequestRules(
-      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config);
+      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
+      const;
   absl::flat_hash_set<std::string> generateRequestAllowContentTypes(
-      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config);
+      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
+      const;
   JsonToMetadataStats stats_;
   const uint32_t request_buffer_limit_bytes_;
   const Rules request_rules_;
@@ -108,11 +110,11 @@ private:
                                const Rule& rule, StructMap& struct_map);
 
   // Process the case without body, i.e., on_missing is applied for all rules.
-  void handleAllOnMissing(const Rules& rules, bool& reported_flag);
+  void handleAllOnMissing(const Rules& rules, bool& processing_finished_flag);
   // Process the case with error, i.e., on_error is applied for all rules.
-  void handleAllOnError(const Rules& rules, bool& reported_flag);
+  void handleAllOnError(const Rules& rules, bool& processing_finished_flag);
   // Parse the body while we have the whole json.
-  void processBody(const Buffer::Instance* body, const Rules& rules, bool& reported_flag,
+  void processBody(const Buffer::Instance* body, const Rules& rules, bool& processing_finished_flag,
                    Stats::Counter& success, Stats::Counter& no_body, Stats::Counter& non_json);
   void processRequestBody();
 
@@ -124,7 +126,7 @@ private:
   void applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map);
   void applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval, StructMap& struct_map);
   void finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
-                               const StructMap& struct_map, bool& reported_flag);
+                               const StructMap& struct_map, bool& processing_finished_flag);
 
   std::shared_ptr<FilterConfig> config_;
   bool request_processing_finished_{false};
