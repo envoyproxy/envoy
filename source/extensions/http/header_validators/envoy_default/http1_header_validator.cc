@@ -307,6 +307,7 @@ void ServerHttp1HeaderValidator::sanitizeContentLength(
 ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
   sanitizeContentLength(header_map);
   sanitizeHeadersWithUnderscores(header_map);
+  sanitizePathWithFragment(header_map);
   if (!config_.uri_path_normalization_options().skip_path_normalization()) {
     auto path_result = path_normalizer_.normalizePathUri(header_map);
     if (!path_result.ok()) {

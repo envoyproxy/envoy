@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/extension_config_provider.h"
+#include "envoy/config/dynamic_extension_config_provider.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/filter_config.h"
 
@@ -18,6 +18,9 @@ template <class FactoryCb>
 using DynamicFilterConfigProvider = Envoy::Config::DynamicExtensionConfigProvider<FactoryCb>;
 template <class FactoryCb>
 using DynamicFilterConfigProviderPtr = std::unique_ptr<DynamicFilterConfigProvider<FactoryCb>>;
+
+// Network filter config provider aliases
+using NetworkFilterFactoriesList = std::vector<FilterConfigProviderPtr<Network::FilterFactoryCb>>;
 
 // Listener filter config provider aliases
 using ListenerFilterFactoriesList =

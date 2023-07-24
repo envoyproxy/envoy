@@ -293,6 +293,11 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
 	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
 	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))
+	if name, ok := f.callbacks.StreamInfo().VirtualClusterName(); ok {
+		header.Set("rsp-virtual-cluster-name", name)
+	} else {
+		header.Set("rsp-virtual-cluster-name", "not found")
+	}
 
 	if f.panic == "encode-header" {
 		badcode()
