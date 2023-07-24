@@ -39,10 +39,10 @@ CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::Cach
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
-  if (lookup_) {
+  if (lookup_ != nullptr) {
     lookup_->onDestroy();
   }
-  if (insert_queue_) {
+  if (insert_queue_ != nullptr) {
     insert_queue_->takeOwnershipOfYourself(std::move(insert_queue_));
     insert_queue_.reset();
   }
@@ -136,7 +136,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
       CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     auto insert_context = cache_->makeInsertContext(std::move(lookup_), *encoder_callbacks_);
-    if (insert_context) {
+    if (insert_context != nullptr) {
       // The callbacks passed to CacheInsertQueue are all called through the dispatcher,
       // so they're thread-safe, and onDestroy will prevent them from being called via
       // giving the queue ownership of itself, so they're also filter-destruction-safe.
@@ -178,7 +178,7 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
-  if (insert_queue_) {
+  if (insert_queue_ != nullptr) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeData inserting body", *encoder_callbacks_);
     insert_queue_->insertBody(data, end_stream);
     if (end_stream) {
@@ -202,7 +202,7 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
     return Http::FilterTrailersStatus::StopIteration;
   }
   response_has_trailers_ = !trailers.empty();
-  if (insert_queue_) {
+  if (insert_queue_ != nullptr) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
     insert_queue_->insertTrailers(trailers);
   }
