@@ -506,6 +506,9 @@ new_features:
 - area: http
   change: |
     added OVERWRITE_IF_EXISTS header manipulation keyword to overwrite a header only when it exists before manipulation.
+- area: tls
+  change: |
+    Added FIPS compliant build for arm64.
 
 deprecated:
 - area: access_log
