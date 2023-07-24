@@ -118,6 +118,10 @@ void CacheInsertQueue::insertTrailers(const Http::ResponseTrailerMap& trailers) 
 }
 
 void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
+  // If the cache implementation is asynchronous, this may be called from whatever
+  // thread that cache implementation runs on. Therefore, we post it to the
+  // dispatcher to be certain any callbacks and updates are called on the filter's
+  // thread (and therefore we don't have to mutex-guard anything).
   dispatcher_.post([this, ready, end_stream, sz]() {
     chunk_in_flight_ = false;
     if (aborting_) {
