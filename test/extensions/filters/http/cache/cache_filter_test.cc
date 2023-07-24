@@ -48,6 +48,7 @@ protected:
   }
 
   void SetUp() override {
+    ON_CALL(encoder_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
     ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
     ON_CALL(decoder_callbacks_.stream_info_, filterState())
         .WillByDefault(::testing::ReturnRef(filter_state_));

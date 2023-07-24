@@ -17,10 +17,10 @@ class CacheInsertChunk;
 
 class CacheInsertQueue {
 public:
-  CacheInsertQueue(Event::Dispatcher& dispatcher, InsertContextPtr insert_context,
-                   size_t low_watermark_bytes, size_t high_watermark_bytes,
-                   UnderLowWatermarkCallback low, OverHighWatermarkCallback high,
-                   AbortInsertCallback abort);
+  CacheInsertQueue(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
+                   InsertContextPtr insert_context, size_t low_watermark_bytes,
+                   size_t high_watermark_bytes, UnderLowWatermarkCallback low,
+                   OverHighWatermarkCallback high, AbortInsertCallback abort);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata, bool end_stream);
   void insertBody(const Buffer::Instance& chunk, bool end_stream);

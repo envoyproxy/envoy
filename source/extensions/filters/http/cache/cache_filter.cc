@@ -141,8 +141,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
       // so they're thread-safe, and onDestroy will prevent them from being called via
       // giving the queue ownership of itself, so they're also filter-destruction-safe.
       insert_queue_ = std::make_unique<CacheInsertQueue>(
-          decoder_callbacks_->dispatcher(), std::move(insert_context),
-          encoder_callbacks_->encoderBufferLimit(), encoder_callbacks_->encoderBufferLimit() / 2,
+          *encoder_callbacks_, std::move(insert_context), encoder_callbacks_->encoderBufferLimit(),
+          encoder_callbacks_->encoderBufferLimit() / 2,
           // High watermark callback.
           [this]() { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
           // Low watermark callback.
