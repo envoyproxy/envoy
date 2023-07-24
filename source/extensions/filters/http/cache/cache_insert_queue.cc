@@ -125,7 +125,7 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
       self_ownership_.reset();
       return;
     }
-    ASSERT(queue_size_bytes_ >= sz);
+    ASSERT(queue_size_bytes_ >= sz, "queue can't be emptied by more than its size");
     queue_size_bytes_ -= sz;
     if (sent_watermark_ && queue_size_bytes_ <= low_watermark_bytes_) {
       under_low_watermark_callback_();
@@ -143,10 +143,9 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
       return;
     }
     if (end_stream) {
-      // We should only complete with end_stream with an empty queue for obvious reasons.
-      ASSERT(chunks_.empty());
-      // If the queue is empty we should not be over the high watermark.
-      ASSERT(!sent_watermark_);
+      ASSERT(chunks_.empty(), "ending a stream with the queue not empty is a bug");
+      ASSERT(!sent_watermark_,
+             "being over the high watermark when the queue is empty makes no sense");
       self_ownership_.reset();
       return;
     }
