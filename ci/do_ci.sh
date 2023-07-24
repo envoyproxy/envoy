@@ -627,6 +627,13 @@ case $CI_TARGET in
         if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
             PUBLISH_ARGS+=(--dry-run)
         fi
+
+        if [[ -z "$GITHUB_TOKEN" ]]; then
+            echo "TOKEN IS NOT SET"
+        else
+            echo "TOKEN IS SET"
+        fi
+
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               @envoy_repo//:publish \
               -- "${PUBLISH_ARGS[@]}"
