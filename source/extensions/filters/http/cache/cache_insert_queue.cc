@@ -58,12 +58,12 @@ private:
 };
 
 CacheInsertQueue::CacheInsertQueue(Event::Dispatcher& dispatcher, InsertContextPtr insert_context,
-                                   size_t high_watermark_bytes, size_t low_watermark_bytes,
+                                   size_t low_watermark_bytes, size_t high_watermark_bytes,
                                    OverHighWatermarkCallback high, UnderLowWatermarkCallback low,
                                    AbortInsertCallback abort)
     : dispatcher_(dispatcher), insert_context_(std::move(insert_context)),
-      high_watermark_bytes_(high_watermark_bytes), low_watermark_bytes_(low_watermark_bytes),
-      over_high_watermark_callback_(high), under_low_watermark_callback_(low),
+      low_watermark_bytes_(low_watermark_bytes), high_watermark_bytes_(high_watermark_bytes),
+      under_low_watermark_callback_(low), over_high_watermark_callback_(high),
       abort_callback_(abort) {}
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
