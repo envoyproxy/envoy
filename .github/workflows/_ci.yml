@@ -61,7 +61,15 @@ on:
         type: string
         default:
 
+      repo_fetch_depth:
+        type: number
+        default: 1
+      repo_ref:
+        type: string
       skip:
+        type: boolean
+        default: false
+      trusted:
         type: boolean
         default: false
 
@@ -69,20 +77,40 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-ci-${{ inputs.target }}
+  group: |
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-${{ inputs.target }}
   cancel-in-progress: true
 
 jobs:
   do_ci:
     if: ${{ ! inputs.skip }}
     runs-on: ubuntu-22.04
-    name: do_ci.sh ${{ inputs.target }}
+    name: ${{ inputs.command_ci }} ${{ inputs.target }}
     steps:
     - if: ${{ inputs.cache_build_image }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.8
+      name: Restore Docker cache (${{ inputs.cache_build_image }})
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.10
       with:
         image_tag: ${{ inputs.cache_build_image }}
+
+    # If the run is "trusted" (ie has access to secrets) then it should
+    # **not** set the ref and should use the code of the calling context.
+    - if: ${{ inputs.repo_ref && inputs.trusted }}
+      run: |
+        echo '`repo_ref` should not be set for trusted CI runs'
+        exit 1
+
     - uses: actions/checkout@v3
+      name: Checkout Envoy repository
+      with:
+        fetch-depth: ${{ inputs.repo_fetch_depth }}
+        # WARNING: This allows untrusted code to run!!!
+        #  If this is set, then anything before or after in the job should be regarded as
+        #  compromised.
+        ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
 
@@ -107,12 +135,14 @@ jobs:
       name: "Check disk space at beginning"
 
     - if: ${{ inputs.run_pre }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.8
+      name: Run pre action ${{ inputs.run_pre && format('({0})', inputs.run_pre) || '' }}
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
       with:
         uses: ${{ inputs.run_pre }}
         with: ${{ inputs.run_pre_with }}
 
     - uses: ./.github/actions/do_ci
+      name: Do CI
       with:
         target: ${{ inputs.target }}
         rbe: ${{ inputs.rbe }}
@@ -129,7 +159,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - if: ${{ inputs.run_post }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.8
+      name: Run post action ${{ inputs.run_pre && format('({0})', inputs.run_post) || '' }}
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
       with:
         uses: ${{ inputs.run_post }}
         with: ${{ inputs.run_post_with }}

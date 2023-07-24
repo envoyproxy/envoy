@@ -221,7 +221,6 @@ message HeaderForwardingRules {
 
   // If set, specifically disallow any header in this list to be forwarded to the external
   // processing server. This overrides the above ``allowed_headers`` if a header matches both.
-  // [#not-implemented-hide:]
   type.matcher.v3.ListStringMatcher disallowed_headers = 2;
 }
 
