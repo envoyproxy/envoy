@@ -137,7 +137,7 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOve
       ASSERT_TRUE(tcp_clients.back()->connected());
     }
   };
-  // todo (nezdolik) this should be logged once per each run (ipv4,ipv6),
+  // TODO(nezdolik) this should be logged once per each run (ipv4,ipv6),
   //  but second run does not contain the log line even though logging code is hit. Some macro+test
   //  setup weirdness.
   if (version_ == Network::Address::IpVersion::v4) {

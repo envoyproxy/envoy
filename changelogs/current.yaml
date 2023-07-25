@@ -33,6 +33,11 @@ behavior_changes:
     Preserve the active-health check status of a host after a cluster/assignment update. This is now preserved in cases
     where the assignment updates a host's locality. This behavioral change can be temporarily reverted by setting the
     runtime flag ``envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update`` to false.
+- area: overload manager
+  change: |
+    Global downstream connections tracking in TCP listener can now be done via
+    :ref:`downstream connections monitor <envoy_v3_api_msg_config.resource_monitor.downstream_connections.v3.DownstreamConnectionsConfig>`.
+    Marked ``overload.global_downstream_max_connections`` runtime key as deprecated.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

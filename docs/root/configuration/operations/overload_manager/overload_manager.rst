@@ -224,7 +224,7 @@ listeners configure :ref:`downstream connections monitor <envoy_v3_api_msg_confi
          "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
          max_active_downstream_connections: 1000
 
-Once could also set this limit via specifying an integer through the runtime key
+One could also set this limit via specifying an integer through the runtime key
 ``overload.global_downstream_max_connections``, though this key is deprecated and will be removed in future.
 The connection limit is recommended to be less than
 half of the system's file descriptor limit, to account for upstream connections, files, and other
