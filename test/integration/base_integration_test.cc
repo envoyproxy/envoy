@@ -74,9 +74,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       }));
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
-  // Allow extension lookup by name in the integration tests.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
-                                    "false");
 
 #ifndef ENVOY_ADMIN_FUNCTIONALITY
   config_helper_.addConfigModifier(
@@ -435,7 +432,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 std::string getListenerDetails(Envoy::Server::Instance& server) {
   const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
-  auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
+  auto listener_info = dynamic_cast<envoy::admin::v3::ListenersConfigDump&>(*details);
 #ifdef ENVOY_ENABLE_YAML
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 #else

@@ -20,6 +20,7 @@ struct UhvResponseCodeDetailValues {
   const std::string EmptyHeaderName = "uhv.empty_header_name";
   const std::string InvalidPseudoHeader = "uhv.invalid_pseudo_header";
   const std::string InvalidHostDeprecatedUserInfo = "uhv.invalid_host_deprecated_user_info";
+  const std::string FragmentInUrlPath = "uhv.fragment_in_url_path";
 };
 
 using UhvResponseCodeDetail = ConstSingleton<UhvResponseCodeDetailValues>;

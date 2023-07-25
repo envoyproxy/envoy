@@ -45,13 +45,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .setRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-      .enableAdminInterface(true)
-#endif
       .setForceAlwaysUsev6(true)
-#ifdef ENVOY_GOOGLE_GRPC
-      .setNodeId("my_test_node")
-#endif
       .setDeviceOs("probably-ubuntu-on-CI");
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
@@ -177,19 +171,6 @@ TEST(TestConfig, PerTryIdleTimeout) {
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("per_try_idle_timeout { seconds: 42 }"));
 }
 
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-TEST(TestConfig, EnableAdminInterface) {
-  EngineBuilder engine_builder;
-
-  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-  EXPECT_FALSE(bootstrap->has_admin());
-
-  engine_builder.enableAdminInterface(true);
-  bootstrap = engine_builder.generateBootstrap();
-  EXPECT_TRUE(bootstrap->has_admin());
-}
-#endif
-
 TEST(TestConfig, EnableInterfaceBinding) {
   EngineBuilder engine_builder;
 
@@ -279,22 +260,13 @@ TEST(TestConfig, DisableHttp3) {
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
 #endif
 }
-#ifdef ENVOY_GOOGLE_GRPC
-TEST(TestConfig, RtdsWithoutAds) {
-  EngineBuilder engine_builder;
-  engine_builder.addRtdsLayer("some rtds layer");
-  try {
-    engine_builder.generateBootstrap();
-    FAIL() << "Expected std::runtime_error";
-  } catch (std::runtime_error& err) {
-    EXPECT_EQ(err.what(), std::string("ADS must be configured when using xDS"));
-  }
-}
 
-TEST(TestConfig, AdsConfig) {
+#ifdef ENVOY_GOOGLE_GRPC
+TEST(TestConfig, XdsConfig) {
   EngineBuilder engine_builder;
-  engine_builder.setAggregatedDiscoveryService(/*target_uri=*/"fake-td.googleapis.com",
-                                               /*port=*/12345);
+  XdsBuilder xds_builder(/*xds_server_address=*/"fake-td.googleapis.com",
+                         /*xds_server_port=*/12345);
+  engine_builder.setXds(std::move(xds_builder));
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   auto& ads_config = bootstrap->dynamic_resources().ads_config();
   EXPECT_EQ(ads_config.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -310,10 +282,13 @@ TEST(TestConfig, AdsConfig) {
   EXPECT_THAT(ads_config.grpc_services(0).google_grpc().call_credentials(), SizeIs(0));
 
   // With security credentials.
-  engine_builder.setAggregatedDiscoveryService(/*target_uri=*/"fake-td.googleapis.com",
-                                               /*port=*/12345, /*jwt_token=*/"my_jwt_token",
-                                               /*jwt_token_lifetime_seconds=*/500,
-                                               /*ssl_root_certs=*/"my_root_cert");
+  xds_builder =
+      XdsBuilder(/*xds_server_address=*/"fake-td.googleapis.com", /*xds_server_port=*/12345);
+  xds_builder.setJwtAuthenticationToken(/*token=*/"my_jwt_token",
+                                        /*token_lifetime_in_seconds=*/500);
+  xds_builder.setSslRootCerts(/*root_certs=*/"my_root_cert");
+  xds_builder.setSni(/*sni=*/"fake-td.googleapis.com");
+  engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
   auto& ads_config_with_tokens = bootstrap->dynamic_resources().ads_config();
   EXPECT_EQ(ads_config_with_tokens.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -339,6 +314,39 @@ TEST(TestConfig, AdsConfig) {
                 .service_account_jwt_access()
                 .token_lifetime_seconds(),
             500);
+  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+                .google_grpc()
+                .channel_args()
+                .args()
+                .at("grpc.default_authority")
+                .string_value(),
+            "fake-td.googleapis.com");
+}
+
+TEST(TestConfig, CopyConstructor) {
+  EngineBuilder engine_builder;
+  engine_builder.setRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  std::string bootstrap_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, Not(HasSubstr("envoy.filters.http.decompressor")));
+
+  EngineBuilder engine_builder_copy(engine_builder);
+  engine_builder_copy.enableGzipDecompression(true);
+  XdsBuilder xdsBuilder("FAKE_XDS_SERVER", 0);
+  xdsBuilder.addClusterDiscoveryService();
+  engine_builder_copy.setXds(xdsBuilder);
+  bootstrap_str = engine_builder_copy.generateBootstrap()->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
+
+  EngineBuilder engine_builder_copy2(engine_builder_copy);
+  bootstrap_str = engine_builder_copy2.generateBootstrap()->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
 }
 #endif
 
@@ -431,7 +439,6 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   release_envoy_data(data);
 }
 
-#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, SetNodeId) {
   EngineBuilder engine_builder;
   const std::string default_node_id = "envoy-mobile";
@@ -454,20 +461,24 @@ TEST(TestConfig, SetNodeLocality) {
   EXPECT_EQ(bootstrap->node().locality().sub_zone(), sub_zone);
 }
 
+#ifdef ENVOY_GOOGLE_GRPC
 TEST(TestConfig, AddCdsLayer) {
+  XdsBuilder xds_builder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);
+  xds_builder.addClusterDiscoveryService();
   EngineBuilder engine_builder;
-  engine_builder.setAggregatedDiscoveryService(/*address=*/"fake-xds-server", /*port=*/12345);
+  engine_builder.setXds(std::move(xds_builder));
 
-  engine_builder.addCdsLayer();
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_EQ(bootstrap->dynamic_resources().cds_resources_locator(), "");
   EXPECT_EQ(bootstrap->dynamic_resources().cds_config().initial_fetch_timeout().seconds(),
             /*default_timeout=*/5);
 
+  xds_builder = XdsBuilder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);
   const std::string cds_resources_locator =
       "xdstp://traffic-director-global.xds.googleapis.com/envoy.config.cluster.v3.Cluster";
   const int timeout_seconds = 300;
-  engine_builder.addCdsLayer(cds_resources_locator, timeout_seconds);
+  xds_builder.addClusterDiscoveryService(cds_resources_locator, timeout_seconds);
+  engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_EQ(bootstrap->dynamic_resources().cds_resources_locator(), cds_resources_locator);
   EXPECT_EQ(bootstrap->dynamic_resources().cds_config().initial_fetch_timeout().seconds(),

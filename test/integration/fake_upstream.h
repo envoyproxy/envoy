@@ -728,7 +728,7 @@ public:
   // Network::FilterChainFactory
   bool
   createNetworkFilterChain(Network::Connection& connection,
-                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
+                           const Filter::NetworkFilterFactoriesList& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
@@ -879,6 +879,9 @@ private:
     }
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+      return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+    }
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return false; }
 

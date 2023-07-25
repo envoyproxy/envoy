@@ -25,11 +25,14 @@ filegroup(
             "root/**/envoy-dynamic-cds-demo.yaml",
             "root/**/envoy-dynamic-lds-demo.yaml",
             "root/**/envoy-dynamic-filesystem-demo.yaml",
+            "root/operations/_include/traffic_tapping_*.yaml",
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/other_features/_include/dlb.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
+            "root/configuration/overview/_include/xds_api/oauth-sds-example.yaml",
+            "root/configuration/security/_include/sds-source-example.yaml",
         ],
     ) + select({
         "//bazel:windows_x86_64": [],

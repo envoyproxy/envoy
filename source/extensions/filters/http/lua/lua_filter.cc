@@ -456,12 +456,11 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     state_ = State::Running;
     markLive();
 
-    try {
+    TRY_NEEDS_AUDIT {
       resumeCoroutine(2, yield_callback_);
       markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      filter_.scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { filter_.scriptError(e); }
 
     if (state_ == State::Running) {
       headers_continued_ = true;
@@ -864,12 +863,11 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
                true);
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
-  try {
+  TRY_NEEDS_AUDIT {
     status = handle.get()->start(function_ref);
     handle.markDead();
-  } catch (const Filters::Common::Lua::LuaException& e) {
-    scriptError(e);
   }
+  END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
 
   return status;
 }
@@ -878,13 +876,12 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
                                       bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
-    try {
+    TRY_NEEDS_AUDIT {
       handle.markLive();
       status = handle.get()->onData(data, end_stream);
       handle.markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
@@ -893,13 +890,12 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
 Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
-    try {
+    TRY_NEEDS_AUDIT {
       handle.markLive();
       status = handle.get()->onTrailers(trailers);
       handle.markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;

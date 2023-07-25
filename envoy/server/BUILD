@@ -43,7 +43,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:context_interface",
-        "//envoy/ratelimit:ratelimit_interface",
         "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -96,6 +95,7 @@ envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = [
+        ":factory_context_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/upstream:health_checker_interface",

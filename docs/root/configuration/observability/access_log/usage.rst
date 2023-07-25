@@ -187,6 +187,30 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%BYTES_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Body bytes retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
+%PACKETS_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Number of packets retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
 %PROTOCOL%
   HTTP
     Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
@@ -887,6 +911,32 @@ The following command operators are supported:
 %REQUESTED_SERVER_NAME%
   HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI)
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_LOCAL_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the peer certificate received from the downstream client to establish the
+    TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_LOCAL_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the peer certificate received from the downstream client to establish the
+    TLS connection.
   UDP
     Not implemented ("-").
 

@@ -109,7 +109,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       time_source_(time_source), proxy_name_(StreamInfo::ProxyStatusUtils::makeProxyName(
                                      /*node_id=*/local_info_.node().id(),
                                      /*server_name=*/config_.serverName(),
-                                     /*proxy_status_config=*/config_.proxyStatusConfig())) {}
+                                     /*proxy_status_config=*/config_.proxyStatusConfig())),
+      refresh_rtt_after_request_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -300,10 +302,14 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.completeRequest();
 
-  // Set roundtrip time in connectionInfoSetter before OnStreamComplete
-  absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
-  if (t.has_value()) {
-    read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+  // If refresh rtt after request is required explicitly, then try to get rtt again set it into
+  // connection info.
+  if (refresh_rtt_after_request_) {
+    // Set roundtrip time in connectionInfoSetter before OnStreamComplete
+    absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
+    if (t.has_value()) {
+      read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+    }
   }
 
   stream.filter_manager_.onStreamComplete();
@@ -833,6 +839,16 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         filter_manager_.log(AccessLog::AccessLogType::DownstreamPeriodic);
         refreshAccessLogFlushTimer();
       }
+      const SystemTime now = connection_manager_.timeSource().systemTime();
+      // Downstream bytes meter is guaranteed to be non-null because ActiveStream and the timer
+      // event are created on the same thread that sets the meter in
+      // ConnectionManagerImpl::newStream.
+      filter_manager_.streamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(
+          now);
+      if (auto& upstream_bytes_meter = filter_manager_.streamInfo().getUpstreamBytesMeter();
+          upstream_bytes_meter != nullptr) {
+        upstream_bytes_meter->takeDownstreamPeriodicLoggingSnapshot(now);
+      }
     });
     refreshAccessLogFlushTimer();
   }
@@ -990,7 +1006,11 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         resetStream();
       } else {
         sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
-        if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+        // Pre UHV HCM did not respect stream_error_on_invalid_http_message
+        // and only sent 400 when :path contained fragment
+        // TODO(#28555): make this error respect the stream_error_on_invalid_http_message
+        if (!response_encoder_->streamErrorOnInvalidHttpMessage() &&
+            failure_details != UhvResponseCodeDetail::get().FragmentInUrlPath) {
           connection_manager_.handleCodecError(failure_details);
         }
       }
@@ -1164,6 +1184,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
       request_headers_->getPathValue().empty()) {
     sendLocalReply(Code::NotFound, "", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().MissingPath);
+    return;
+  }
+
+  // Rewrites the host of CONNECT-UDP requests.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+      HeaderUtility::isConnectUdp(*request_headers_) &&
+      !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
+    sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().InvalidPath);
     return;
   }
 

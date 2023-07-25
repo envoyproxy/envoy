@@ -143,7 +143,7 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   // The validation mode controls whether uppercase letters are permitted.
   absl::string_view scheme = value.getStringView();
 
-  if (scheme != "http" && scheme != "https") {
+  if (!absl::EqualsIgnoreCase(scheme, "http") && !absl::EqualsIgnoreCase(scheme, "https")) {
     // TODO(#23313) - Honor config setting for mixed case.
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidScheme};
@@ -446,6 +446,10 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   }
 
   if (is_valid && iter != end && *iter == '#') {
+    if (!config_.strip_fragment_from_path()) {
+      return {HeaderValueValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().FragmentInUrlPath};
+    }
     // Validate the fragment component of the URI
     ++iter;
     for (; iter != end && is_valid; ++iter) {
@@ -568,6 +572,15 @@ void HeaderValidator::sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& h
   for (auto& name : drop_headers) {
     stats_.incDroppedHeadersWithUnderscores();
     header_map.remove(::Envoy::Http::LowerCaseString(name));
+  }
+}
+
+void HeaderValidator::sanitizePathWithFragment(::Envoy::Http::RequestHeaderMap& header_map) {
+  auto fragment_pos = header_map.getPathValue().find('#');
+  if (fragment_pos != absl::string_view::npos) {
+    ASSERT(config_.strip_fragment_from_path());
+    // Check runtime override and throw away fragment from URI path
+    header_map.setPath(header_map.getPathValue().substr(0, fragment_pos));
   }
 }
 

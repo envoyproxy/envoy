@@ -87,7 +87,16 @@ public:
 
   void setDenyAtDisableRuntimeConfig(bool deny_at_disable, bool disable_with_metadata) {
     if (!disable_with_metadata) {
-      config_helper_.addRuntimeOverride("envoy.ext_authz.enable", "numerator: 0");
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
+        layer->set_name("enable layer");
+        ProtobufWkt::Struct& runtime = *layer->mutable_static_layer();
+        bootstrap.mutable_layered_runtime()->mutable_layers(0)->set_name("base layer");
+
+        ProtobufWkt::Struct& enable =
+            *(*runtime.mutable_fields())["envoy.ext_authz.enable"].mutable_struct_value();
+        (*enable.mutable_fields())["numerator"].set_number_value(0);
+      });
     }
     if (deny_at_disable) {
       config_helper_.addRuntimeOverride("envoy.ext_authz.deny_at_disable", "true");
@@ -471,7 +480,7 @@ public:
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    response_ = codec_client_->makeHeaderOnlyRequest(
+    const auto headers =
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                        {":path", "/"},
                                        {":scheme", "http"},
@@ -488,7 +497,12 @@ public:
                                        {"not-allowed", "nope"},
                                        {"authorization", "legit"},
                                        {"regex-food", "food"},
-                                       {"regex-fool", "fool"}});
+                                       {"regex-fool", "fool"}};
+    if (client_request_body_.empty()) {
+      response_ = codec_client_->makeHeaderOnlyRequest(headers);
+    } else {
+      response_ = codec_client_->makeRequestWithBody(headers, client_request_body_, true);
+    }
   }
 
   void waitForExtAuthzRequest() {
@@ -632,6 +646,7 @@ public:
   FakeHttpConnectionPtr fake_ext_authz_connection_;
   FakeStreamPtr ext_authz_request_;
   IntegrationStreamDecoderPtr response_;
+  std::string client_request_body_;
   const Http::LowerCaseString case_sensitive_header_name_{"x-case-sensitive-header"};
   const std::string case_sensitive_header_value_{"Case-Sensitive"};
   const std::string legacy_default_config_ = R"EOF(
@@ -689,6 +704,9 @@ public:
         - exact: bat
         - prefix: x-append
   failure_mode_allow: true
+  with_request_body:
+    max_request_bytes: 1024
+    allow_partial_message: true
   )EOF";
 };
 
@@ -909,6 +927,23 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
   setup(false);
   const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_TRUE(header_entry.empty());
+}
+
+// Verifies that by default HTTP service uses the case-sensitive string matcher
+// (uses new config for allowed_headers).
+TEST_P(ExtAuthzHttpIntegrationTest, Body) {
+  client_request_body_ = "the request body";
+  setup(false);
+  EXPECT_EQ(ext_authz_request_->body().toString(), client_request_body_);
+}
+
+TEST_P(ExtAuthzHttpIntegrationTest, BodyNonUtf8) {
+  client_request_body_ = "valid_prefix";
+  client_request_body_.append(1, char(0xc3));
+  client_request_body_.append(1, char(0x28));
+  client_request_body_.append("valid_suffix");
+  setup(false);
+  EXPECT_EQ(ext_authz_request_->body().toString(), client_request_body_);
 }
 
 // (uses new config for allowed_headers).

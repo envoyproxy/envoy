@@ -216,3 +216,14 @@ envoy_cc_library(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "eds_resources_cache_lib",
+    srcs = ["eds_resources_cache_impl.cc"],
+    hdrs = ["eds_resources_cache_impl.h"],
+    deps = [
+        "//envoy/config:eds_resources_cache_interface",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)

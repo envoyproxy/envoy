@@ -58,6 +58,10 @@ protected:
       skip_path_normalization: true
       path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
     )EOF";
+
+  static constexpr absl::string_view fragment_in_path_allowed = R"EOF(
+    strip_fragment_from_path: true
+    )EOF";
 };
 
 } // namespace EnvoyDefault

@@ -816,6 +816,7 @@ idx
 ifdef
 iff
 ified
+ifndef
 impl
 implementors
 impls
@@ -925,6 +926,7 @@ metatable
 microbenchmarks
 midp
 milli
+mimics
 misconfiguration
 misconfigured
 mixin
@@ -1161,6 +1163,7 @@ responder
 restarter
 resync
 ret
+retransmissions
 retransmitted
 retransmitting
 retriable
@@ -1206,6 +1209,7 @@ serv
 servercert
 setenv
 setsockopt
+sfixed
 sig
 sigaction
 sigactions
@@ -1215,6 +1219,7 @@ signalstack
 siloed
 sim
 sinked
+sint
 sizeof
 smatch
 snapshotted

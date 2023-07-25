@@ -13,6 +13,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/filter_factory.h"
+#include "envoy/http/hash_policy.h"
 #include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
@@ -21,6 +22,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/access_log/access_log_impl.h"
@@ -270,15 +272,16 @@ public:
     }
   }
 
-  bool createFilterChain(Http::FilterChainManager& manager,
-                         bool only_create_if_configured = false) const override {
+  bool createFilterChain(
+      Http::FilterChainManager& manager, bool only_create_if_configured = false,
+      const Http::FilterChainOptions& options = Http::EmptyFilterChainOptions{}) const override {
     // Currently there is no default filter chain, so only_create_if_configured true doesn't make
     // sense.
     ASSERT(!only_create_if_configured);
     if (upstream_http_filter_factories_.empty()) {
       return false;
     }
-    Http::FilterChainUtility::createFilterChainForFactories(manager,
+    Http::FilterChainUtility::createFilterChainForFactories(manager, options,
                                                             upstream_http_filter_factories_);
     return true;
   }
@@ -408,8 +411,9 @@ public:
         return hash_policy->generateHash(
             callbacks_->streamInfo().downstreamAddressProvider().remoteAddress().get(),
             *downstream_headers_,
-            [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
-              return addDownstreamSetCookie(key, path, max_age);
+            [this](const std::string& key, const std::string& path, std::chrono::seconds max_age,
+                   Http::CookieAttributeRefVector attributes) {
+              return addDownstreamSetCookie(key, path, max_age, attributes);
             },
             callbacks_->streamInfo().filterState());
       }
@@ -443,6 +447,9 @@ public:
   }
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection().ptr();
+  }
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &callbacks_->streamInfo();
   }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
@@ -500,7 +507,8 @@ public:
    * @return std::string the value of the new cookie
    */
   std::string addDownstreamSetCookie(const std::string& key, const std::string& path,
-                                     std::chrono::seconds max_age) {
+                                     std::chrono::seconds max_age,
+                                     Http::CookieAttributeRefVector attributes) {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
     // Since the downstream port is part of the hashed value, multiple HTTP1
@@ -513,7 +521,7 @@ public:
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
-        Http::Utility::makeSetCookieValue(key, cookie_value, path, max_age, true));
+        Http::Utility::makeSetCookieValue(key, cookie_value, path, max_age, true, attributes));
     return cookie_value;
   }
 

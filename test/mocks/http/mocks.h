@@ -201,7 +201,8 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(FilterChainManager& manager, bool) const override {
+  bool createFilterChain(FilterChainManager& manager, bool,
+                         const FilterChainOptions&) const override {
     return createFilterChain(manager);
   }
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
@@ -860,8 +861,12 @@ public:
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
     expected_headers_.iterate(saveHeaders(&expected_headers_vec));
 
-    return ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
-                              listener);
+    if (!ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
+                            listener)) {
+      *listener << "\nActual headers:\n" << headers;
+      return false;
+    }
+    return true;
   }
 
   void DescribeTo(std::ostream* os) const override {
@@ -896,6 +901,27 @@ IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers
 
 MATCHER_P(HeaderMapEqual, rhs, "") {
   const bool equal = (*arg == *rhs);
+  if (!equal) {
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("header map:") << "\n"
+                     << *rhs << TestUtility::addLeftAndRightPadding("is not equal to:") << "\n"
+                     << *arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
+
+MATCHER_P(HeaderMapEqualWithMaxSize, rhs, "") {
+  bool equal = (*arg == *rhs);
+
+  // Check the max header count and size of the HeaderMap also equal.
+  if (equal) {
+    if (arg->maxHeadersCount() != rhs->maxHeadersCount() ||
+        arg->maxHeadersKb() != rhs->maxHeadersKb()) {
+      equal = false;
+    }
+  }
+
   if (!equal) {
     *result_listener << "\n"
                      << TestUtility::addLeftAndRightPadding("header map:") << "\n"

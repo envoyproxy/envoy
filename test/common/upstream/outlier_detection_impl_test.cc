@@ -1747,6 +1747,41 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 }
 
+TEST_F(OutlierDetectorImplTest, MaxEjectionPercentage) {
+  // A 50% ejection limit should not eject more than 1 out of 3 pods.
+  const std::string yaml = R"EOF(
+max_ejection_percent: 50
+max_ejection_time_jitter: 13s
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection_;
+  TestUtility::loadFromYaml(yaml, outlier_detection_);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+
+  // add 3 hosts.
+  addHosts({"tcp://127.0.0.2:80"});
+  addHosts({"tcp://127.0.0.3:80"});
+  addHosts({"tcp://127.0.0.4:80"});
+
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_, random_));
+
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  // Expect only one ejection.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+
+  loadRq(hosts_[0], 5, 500);
+  loadRq(hosts_[1], 5, 500);
+  loadRq(hosts_[2], 5, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_FALSE(hosts_[1]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_FALSE(hosts_[2]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
 TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
@@ -1755,7 +1790,6 @@ TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
                                                               dispatcher_, runtime_, time_system_,
                                                               event_logger_, random_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
-
   // Cause a consecutive 5xx error.
   loadRq(hosts_[0], 4, 500);
 
@@ -2255,11 +2289,12 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   StringViewSaver log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
 
-  EXPECT_CALL(*file, write(absl::string_view(
-                         "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
-                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
-                         "\"num_ejections\":0,\"enforced\":true,\"eject_consecutive_event\":{}"
-                         ",\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
+  EXPECT_CALL(*file,
+              write(absl::string_view(
+                  "{\"type\":\"CONSECUTIVE_5XX\",\"timestamp\":\"2018-12-18T09:00:00Z\","
+                  "\"cluster_name\":\"fake_cluster\","
+                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
+                  "\"num_ejections\":0,\"enforced\":true,\"eject_consecutive_event\":{}}\n")))
       .WillOnce(SaveArg<0>(&log1));
 
   event_logger.logEject(host, detector, envoy::data::cluster::v3::CONSECUTIVE_5XX, true);
@@ -2269,10 +2304,10 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
 
   EXPECT_CALL(*file, write(absl::string_view(
-                         "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
+                         "{\"type\":\"CONSECUTIVE_5XX\",\"timestamp\":\"2018-12-18T09:00:00Z\","
+                         "\"cluster_name\":\"fake_cluster\","
                          "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
-                         "\"num_ejections\":0,\"enforced\":false,"
-                         "\"timestamp\":\"2018-12-18T09:00:00Z\"}\n")))
+                         "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log2));
 
   event_logger.logUneject(host);
@@ -2292,26 +2327,26 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(detector, successRateEjectionThreshold(
                             DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
       .WillOnce(Return(0));
-  EXPECT_CALL(*file,
-              write(absl::string_view(
-                  "{\"type\":\"SUCCESS_RATE\",\"cluster_name\":\"fake_cluster\","
-                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
-                  "\"num_ejections\":0,\"enforced\":false,\"eject_success_rate_event\":{"
-                  "\"host_success_rate\":0,\"cluster_average_success_rate\":0,"
-                  "\"cluster_success_rate_ejection_threshold\":0},"
-                  "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\"}\n")))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"type\":\"SUCCESS_RATE\","
+                         "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\","
+                         "\"cluster_name\":\"fake_cluster\","
+                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
+                         "\"num_ejections\":0,\"enforced\":false,\"eject_success_rate_event\":{"
+                         "\"host_success_rate\":0,\"cluster_average_success_rate\":0,"
+                         "\"cluster_success_rate_ejection_threshold\":0}}\n")))
       .WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, detector, envoy::data::cluster::v3::SUCCESS_RATE, false);
   Json::Factory::loadFromString(log3);
 
   StringViewSaver log4;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file,
-              write(absl::string_view(
-                  "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
-                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
-                  "\"num_ejections\":0,\"enforced\":false,\"timestamp\":\"2018-12-18T09:00:00Z\","
-                  "\"secs_since_last_action\":\"30\"}\n")))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"type\":\"CONSECUTIVE_5XX\","
+                         "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\","
+                         "\"cluster_name\":\"fake_cluster\","
+                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
+                         "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log4);
@@ -2323,23 +2358,24 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
       .WillOnce(Return(0));
   EXPECT_CALL(*file,
               write(absl::string_view(
-                  "{\"type\":\"FAILURE_PERCENTAGE\",\"cluster_name\":\"fake_cluster\","
+                  "{\"type\":\"FAILURE_PERCENTAGE\","
+                  "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\","
+                  "\"cluster_name\":\"fake_cluster\","
                   "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
                   "\"num_ejections\":0,\"enforced\":false,\"eject_failure_percentage_event\":{"
-                  "\"host_success_rate\":0},\"timestamp\":\"2018-12-18T09:00:00Z\","
-                  "\"secs_since_last_action\":\"30\"}\n")))
+                  "\"host_success_rate\":0}}\n")))
       .WillOnce(SaveArg<0>(&log5));
   event_logger.logEject(host, detector, envoy::data::cluster::v3::FAILURE_PERCENTAGE, false);
   Json::Factory::loadFromString(log5);
 
   StringViewSaver log6;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file,
-              write(absl::string_view(
-                  "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
-                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
-                  "\"num_ejections\":0,\"enforced\":false,\"timestamp\":\"2018-12-18T09:00:00Z\","
-                  "\"secs_since_last_action\":\"30\"}\n")))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"type\":\"CONSECUTIVE_5XX\","
+                         "\"timestamp\":\"2018-12-18T09:00:00Z\",\"secs_since_last_action\":\"30\","
+                         "\"cluster_name\":\"fake_cluster\","
+                         "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
+                         "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log6));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log6);

@@ -97,13 +97,14 @@ void ConnectionManager::dispatch() {
     return;
   }
 
-  try {
+  TRY_NEEDS_AUDIT {
     bool underflow = false;
     while (!underflow) {
       decoder_->onData(request_buffer_, underflow);
     }
     return;
-  } catch (const EnvoyException& ex) {
+  }
+  END_TRY catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "dubbo error: {}", read_callbacks_->connection(), ex.what());
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     stats_.request_decoding_error_.inc();
@@ -121,11 +122,12 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata,
   DubboFilters::DirectResponse::ResponseType result =
       DubboFilters::DirectResponse::ResponseType::ErrorReply;
 
-  try {
+  TRY_NEEDS_AUDIT {
     Buffer::OwnedImpl buffer;
     result = response.encode(metadata, *protocol_, buffer);
     read_callbacks_->connection().write(buffer, end_stream);
-  } catch (const EnvoyException& ex) {
+  }
+  END_TRY catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "dubbo error: {}", read_callbacks_->connection(), ex.what());
   }
 

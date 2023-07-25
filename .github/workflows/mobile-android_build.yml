@@ -13,14 +13,14 @@ concurrency:
 jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/env.yml
+    uses: ./.github/workflows/_env.yml
     secrets: inherit
 
   androidbuild:
     if: ${{ needs.env.outputs.mobile_android_build == 'true' }}
     needs: env
     name: android_build
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 90
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
@@ -214,7 +214,6 @@ jobs:
         cd mobile && ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --fat_apk_cpu=x86_64 \
-            --define=admin_functionality=enabled \
             --define envoy_mobile_listener=enabled \
             //test/kotlin/apps/experimental:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk

@@ -336,6 +336,9 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
     return;
   }
 
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   requestWithBodyTest(R"EOF(
     typed_dns_resolver_config:
       name: envoy.network.dns_resolver.getaddrinfo
@@ -639,8 +642,6 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
 
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_multiple_dns_addresses",
-                                    "true");
   use_cache_file_ = true;
   // Prepend a bad address
   if (GetParam() == Network::Address::IpVersion::v4) {

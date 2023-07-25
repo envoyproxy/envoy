@@ -299,8 +299,8 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      String grpcStatsDomain, boolean adminInterfaceEnabled, long connectTimeoutSeconds,
-      long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
+      String grpcStatsDomain, long connectTimeoutSeconds, long dnsRefreshSeconds,
+      long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
       boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
@@ -309,8 +309,9 @@ public class JniLibrary {
       long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
       long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
-      boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsLayerName,
-      long rtdsTimeoutSeconds, String adsAddress, long adsPort, String adsToken,
-      long adsTokenLifetime, String adsRootCerts, String nodeId, String nodeRegion, String nodeZone,
-      String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
+      boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsResourceName,
+      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsJwtToken,
+      long xdsJwtTokenLifetime, String xdsRootCerts, String xdsJni, String nodeId,
+      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
+      long cdsTimeoutSeconds, boolean enableCds);
 }

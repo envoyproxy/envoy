@@ -13,14 +13,14 @@ concurrency:
 jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/env.yml
+    uses: ./.github/workflows/_env.yml
     secrets: inherit
 
   unittests:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     needs: env
     name: unit_tests
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 120
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
