@@ -82,9 +82,6 @@ public:
     const uint32_t inline_id_{};
   };
 
-  using InlineKeysMap = absl::flat_hash_map<StorageKey, Handle>;
-  using InlineKeys = std::vector<StorageKey>;
-
   InlineMapDescriptor() = default;
 
   /**
@@ -152,6 +149,10 @@ public:
 private:
   template <class Key, class Value> friend class InlineMap;
 
+  using Hash = absl::container_internal::hash_default_hash<StorageKey>;
+  using InlineKeysMap = absl::flat_hash_map<StorageKey, Handle, Hash>;
+  using InlineKeys = std::vector<StorageKey>;
+
   /**
    * Get the inline keys map that contains all inline keys and their handle. May only be called
    * after finalize().
@@ -189,7 +190,8 @@ private:
 template <class Key, class Value> class InlineMap : public InlineStorage {
 private:
   using TypedInlineMapDescriptor = InlineMapDescriptor<Key>;
-  using DynamicHashMap = absl::flat_hash_map<Key, Value>;
+  using Hash = typename TypedInlineMapDescriptor::Hash;
+  using DynamicHashMap = absl::flat_hash_map<Key, Value, Hash>;
 
 public:
   using Handle = typename TypedInlineMapDescriptor::Handle;
@@ -201,12 +203,16 @@ public:
    * @return the entry if the key is found, otherwise returns an OptRef with has_value() == false.
    */
   template <class GetKey> OptRef<const Value> get(const GetKey& key) const {
+    // Compute the hash value here to avoid computing it twice in the dynamic map and inline keys
+    // map.
+    const size_t hash = Hash{}(key);
+
     // Because the dynamic key is used here, try the normal map entry first.
-    if (const auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
+    if (const auto it = dynamic_entries_.find(key, hash); it != dynamic_entries_.end()) {
       return it->second;
     }
 
-    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (absl::optional<uint64_t> entry_id = inlineLookup(key, hash); entry_id.has_value()) {
       if (inlineEntryValid(*entry_id)) {
         return inline_entries_[*entry_id];
       }
@@ -221,12 +227,16 @@ public:
    * @return the entry if the key is found, otherwise returns an OptRef with has_value() == false.
    */
   template <class GetKey> OptRef<Value> get(const GetKey& key) {
+    // Compute the hash value here to avoid computing it twice in the dynamic map and inline keys
+    // map.
+    const size_t hash = Hash{}(key);
+
     // Because the dynamic key is used here, try the normal map entry first.
-    if (auto it = dynamic_entries_.find(key); it != dynamic_entries_.end()) {
+    if (auto it = dynamic_entries_.find(key, hash); it != dynamic_entries_.end()) {
       return it->second;
     }
 
-    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (absl::optional<uint64_t> entry_id = inlineLookup(key, hash); entry_id.has_value()) {
       if (inlineEntryValid(*entry_id)) {
         return inline_entries_[*entry_id];
       }
@@ -357,7 +367,8 @@ public:
    */
   void clear() {
     // Destruct all inline entries.
-    for (uint64_t i = 0; i < descriptor_.inlineKeysNum(); ++i) {
+    const uint64_t inline_keys_num = descriptor_.inlineKeysNum();
+    for (uint64_t i = 0; i < inline_keys_num; ++i) {
       clearInlineMapEntry(i);
     }
 
@@ -447,6 +458,15 @@ private:
   template <class GetKey> absl::optional<uint64_t> inlineLookup(const GetKey& key) const {
     const auto& map_ref = descriptor_.inlineKeysMap();
     if (auto iter = map_ref.find(key); iter != map_ref.end()) {
+      return iter->second.inlineId();
+    }
+    return absl::nullopt;
+  }
+
+  template <class GetKey>
+  absl::optional<uint64_t> inlineLookup(const GetKey& key, size_t hash) const {
+    const auto& map_ref = descriptor_.inlineKeysMap();
+    if (auto iter = map_ref.find(key, hash); iter != map_ref.end()) {
       return iter->second.inlineId();
     }
     return absl::nullopt;
