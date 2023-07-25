@@ -38,7 +38,6 @@ public:
   Upstream::MockLoadBalancerContext lb_context_;
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy_;
   NiceMock<Stats::MockStore> store_;
-  Stats::MockScope& scope_{store_.mockScope()};
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
@@ -53,7 +52,7 @@ TEST_F(TcpConnPoolTest, TestNoTunnelingConfig) {
 TEST_F(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
-  const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
+  const TcpProxy::TunnelingConfigHelperImpl config(tcp_proxy_, context_);
 
   downstream_stream_info_.filterState()->setData(
       TcpProxy::DisableTunnelingFilterStateKey,
@@ -69,7 +68,7 @@ TEST_F(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
 TEST_F(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
-  const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
+  const TcpProxy::TunnelingConfigHelperImpl config(tcp_proxy_, context_);
 
   downstream_stream_info_.filterState()->setData(
       TcpProxy::DisableTunnelingFilterStateKey,
@@ -85,7 +84,7 @@ TEST_F(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
 TEST_F(TcpConnPoolTest, TestNoConnPool) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
-  const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
+  const TcpProxy::TunnelingConfigHelperImpl config(tcp_proxy_, context_);
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
                          thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
@@ -101,7 +100,7 @@ TEST_F(TcpConnPoolTest, Http2Config) {
   EXPECT_CALL(thread_local_cluster_, info).Times(2).WillRepeatedly(Return(info));
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
-  const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
+  const TcpProxy::TunnelingConfigHelperImpl config(tcp_proxy_, context_);
 
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
@@ -119,7 +118,7 @@ TEST_F(TcpConnPoolTest, Http3Config) {
   EXPECT_CALL(thread_local_cluster_, info).Times(AnyNumber()).WillRepeatedly(Return(info));
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
-  const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
+  const TcpProxy::TunnelingConfigHelperImpl config(tcp_proxy_, context_);
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
                          thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
