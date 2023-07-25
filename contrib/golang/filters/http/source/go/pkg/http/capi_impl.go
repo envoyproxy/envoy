@@ -32,6 +32,7 @@ package http
 */
 import "C"
 import (
+	"errors"
 	"reflect"
 	"runtime"
 	"strings"
@@ -60,21 +61,35 @@ const (
 
 type httpCApiImpl struct{}
 
-// Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
+// When the status means unexpected stage when invoke C API,
 // panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
-	case C.CAPIOK:
-		return
-	case C.CAPIFilterIsGone:
-		panic(errRequestFinished)
-	case C.CAPIFilterIsDestroy:
-		panic(errFilterDestroyed)
-	case C.CAPINotInGo:
-		panic(errNotInGo)
-	case C.CAPIInvalidPhase:
-		panic(errInvalidPhase)
+	case C.CAPIFilterIsGone,
+		C.CAPIFilterIsDestroy,
+		C.CAPINotInGo,
+		C.CAPIInvalidPhase:
+		panic(capiStatusToStr(status))
 	}
+}
+
+func capiStatusToStr(status C.CAPIStatus) string {
+	switch status {
+	case C.CAPIFilterIsGone:
+		return errRequestFinished
+	case C.CAPIFilterIsDestroy:
+		return errFilterDestroyed
+	case C.CAPINotInGo:
+		return errNotInGo
+	case C.CAPIInvalidPhase:
+		return errInvalidPhase
+	case C.CAPIInternalFailure:
+		return errInternalFailure
+	case C.CAPISerializationFailure:
+		return errSerializationFailure
+	}
+
+	return "unknown status"
 }
 
 func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
@@ -317,4 +332,32 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 	}
 
 	return strings.Clone(value)
+}
+
+func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (string, error) {
+	r := (*httpRequest)(rr)
+	var value string
+	var rc int
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetStringProperty(unsafe.Pointer(r.req), unsafe.Pointer(&key),
+		unsafe.Pointer(&value), (*C.int)(unsafe.Pointer(&rc)))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+		res = C.CAPIStatus(rc)
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+
+	switch res {
+	case C.CAPIOK:
+		return strings.Clone(value), nil
+	case C.CAPIValueNotFound:
+		return "", nil
+	default:
+		return "", errors.New(capiStatusToStr(res))
+	}
 }

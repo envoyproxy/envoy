@@ -39,6 +39,8 @@ typedef enum { // NOLINT(modernize-use-using)
   CAPIInvalidPhase = -4,
   CAPIValueNotFound = -5,
   CAPIYield = -6,
+  CAPIInternalFailure = -7,
+  CAPISerializationFailure = -8,
 } CAPIStatus;
 
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status);
@@ -73,6 +75,7 @@ void envoyGoFilterHttpFinalize(void* r, int reason);
 CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value, int state_type,
                                                  int life_span, int stream_sharing);
 CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value);
+CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key, void* value, int* rc);
 
 // downstream
 CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int closeType);
