@@ -608,6 +608,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, filter_iteration_start_state);
 
+  bool early_break = false;
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame types, return now.
     if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
@@ -689,13 +690,15 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added trailers.
+      early_break = true;
       break;
     }
   }
 
   // If trailers were adding during decodeData we need to trigger decodeTrailers in order
-  // to allow filters to process the trailers.
-  if (trailers_added_entry != decoder_filters_.end()) {
+  // to allow filters to process the trailers. Only do this after all filters finished call
+  // decodeData(). i.e., code doesn't have an early break as above.
+  if (trailers_added_entry != decoder_filters_.end() && !early_break) {
     decodeTrailers(trailers_added_entry->get(), *filter_manager_callbacks_.requestTrailers());
   }
 

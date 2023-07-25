@@ -2682,4 +2682,39 @@ TEST_P(ExtProcIntegrationTest, HeaderMutationResultSizeFailWithResponseTrailer) 
   EXPECT_FALSE(response->complete());
 }
 
+// Test the case that client doesn't send trailer and the  ext_proc filter config
+// processing mode is set to send trailer.
+TEST_P(ExtProcIntegrationTest, ClientNoTrailerProcessingModeSendTrailer) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  // Client send data with end_stream set to true.
+  codec_client_->sendData(*request_encoder_, 10, true);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
+        EXPECT_FALSE(headers.end_of_stream());
+        return true;
+      });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+        EXPECT_TRUE(body.end_of_stream());
+        return true;
+      });
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace Envoy
