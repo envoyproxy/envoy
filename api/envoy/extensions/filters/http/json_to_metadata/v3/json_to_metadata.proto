@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.filters.http.json_to_metadata.v3;
 
 import "google/protobuf/struct.proto";
-import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
