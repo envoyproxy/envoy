@@ -726,17 +726,6 @@ public:
   }
 
   /**
-   * When a filter adds a trailer and returns a non-Continue filer status during
-   * decodeData(), check whether the filter manager can call decodeTrailer()
-   * right after it breaks out from the filter iteration loop.
-   * Returns false for ext_proc filter.
-   * @param filter_name the filter name which returns stopIteration.
-   */
-  bool canDecodeTrailer(const std::string& filter_name) {
-    return (filter_name != "envoy.filters.http.ext_proc");
-  }
-
-  /**
    * Decodes the provided trailers starting at the first filter in the chain.
    * @param trailers the trailers to decode.
    */
