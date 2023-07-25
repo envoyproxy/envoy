@@ -446,8 +446,8 @@ TEST_F(PostgresFilterTest, UpstreamSSLStats) {
   EXPECT_CALL(filter_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(true));
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onWrite(upstream_data, false));
 
-  createPostgresMsg(data_, "C", "SELECT blah");
-  filter_->onWrite(data_, false);
+  createPostgresMsg(upstream_data, "C", "SELECT blah");
+  filter_->onWrite(upstream_data, false);
   ASSERT_THAT(filter_->getStats().sessions_upstream_ssl_success_.value(), 1);
   ASSERT_THAT(filter_->getStats().statements_.value(), 1);
   ASSERT_THAT(filter_->getStats().statements_select_.value(), 1);
