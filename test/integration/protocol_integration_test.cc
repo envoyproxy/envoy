@@ -411,6 +411,17 @@ name: add-trailers-filter
   }
 }
 
+TEST_P(ProtocolIntegrationTest, MixedCaseScheme) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setScheme("Http");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  auto scheme = upstream_request_->headers().getSchemeValue();
+  EXPECT_TRUE(scheme.empty() || scheme == "http");
+}
+
 TEST_P(ProtocolIntegrationTest, AccessLogOnRequestStartTest) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
@@ -3990,6 +4001,8 @@ TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, PathWithFragmentRejectedByDefault) {
+  // Prevent UHV in test client from stripping fragment
+  disable_client_header_validation_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

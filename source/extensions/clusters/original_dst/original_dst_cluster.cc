@@ -24,7 +24,9 @@ namespace Upstream {
 
 OriginalDstClusterHandle::~OriginalDstClusterHandle() {
   std::shared_ptr<OriginalDstCluster> cluster = std::move(cluster_);
-  cluster->dispatcher_.post([cluster]() mutable { cluster.reset(); });
+  cluster_.reset();
+  Event::Dispatcher& dispatcher = cluster->dispatcher_;
+  dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
 }
 
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
