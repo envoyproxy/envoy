@@ -40,7 +40,7 @@ HttpApiListener::ApiListenerWrapper::~ApiListenerWrapper() {
 
 Http::RequestDecoderHandlePtr
 HttpApiListener::ApiListenerWrapper::newStreamHandle(Http::ResponseEncoder& response_encoder,
-                                               bool is_internally_created) {
+                                                     bool is_internally_created) {
   return http_connection_manager_->newStreamHandle(response_encoder, is_internally_created);
 }
 

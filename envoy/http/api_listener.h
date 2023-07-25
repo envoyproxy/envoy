@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Http {
 
 class RequestDecoderHandle {
- public:
+public:
   virtual ~RequestDecoderHandle() = default;
 
   /**
@@ -40,7 +40,7 @@ public:
    *   decoding events.
    */
   virtual RequestDecoderHandlePtr newStreamHandle(ResponseEncoder& response_encoder,
-                                               bool is_internally_created = false) PURE;
+                                                  bool is_internally_created = false) PURE;
 };
 
 using ApiListenerPtr = std::unique_ptr<ApiListener>;
