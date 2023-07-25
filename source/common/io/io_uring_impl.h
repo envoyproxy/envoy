@@ -46,7 +46,6 @@ public:
   void removeInjectedCompletion(os_fd_t fd, InjectedCompletionUserDataReleasor releasor) override;
 
 private:
-  const uint32_t io_uring_size_;
   struct io_uring ring_ {};
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
