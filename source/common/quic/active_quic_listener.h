@@ -89,6 +89,8 @@ private:
   uint32_t packets_to_read_to_connection_count_ratio_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   QuicConnectionIdGeneratorPtr connection_id_generator_;
+  // Latches envoy.reloadable_features.quic_reject_all at the beginning of each event loop.
+  bool reject_all_{false};
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
