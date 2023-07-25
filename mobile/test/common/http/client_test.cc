@@ -46,20 +46,17 @@ ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
 }
 
 class TestHandle : public RequestDecoderHandle {
- public:
+public:
   explicit TestHandle(MockRequestDecoder& decoder) : decoder_(decoder) {}
 
   ~TestHandle() override = default;
 
   bool isValid() override { return true; }
 
-  OptRef<RequestDecoder> get() override {
-    return { decoder_ };
-  }
+  OptRef<RequestDecoder> get() override { return {decoder_}; }
 
- private:
+private:
   MockRequestDecoder& decoder_;
-
 };
 
 class ClientTest : public testing::TestWithParam<bool> {
