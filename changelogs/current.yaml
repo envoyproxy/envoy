@@ -120,6 +120,14 @@ minor_behavior_changes:
   change: |
     Added new type of gauge with type hidden. These stats are hidden from admin/stats-sinks but can shown with a
     query-parameter of ``/stats?hidden=include`` or ``/stats?hidden=showonly``.
+- area: ext_authz
+  change: |
+    forward :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` selected by
+    ``typed_metadata_context_namespaces`` and :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
+    selected by
+    :ref:`metadata_context_namespaces <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.metadata_context_namespaces>`
+    from connection metadata to external auth service. This is addition to the current behavior of forwarding request metadata.
+    In the event of both connection and request metadata containing the requested metadata the request value will be provided.
 - area: eds
   change: |
     Added the ability to specify mulitple addresses for a host in an EDS cluster. Connections to the host with more than one
@@ -132,6 +140,10 @@ minor_behavior_changes:
   change: |
     Round trip time will not be refreshed for every request by default. And if this is necessary, it can be
     enabled by setting runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` to true.
+- area: http
+  change: |
+    Envoy will now lower case scheme values by default. This behaviorial change can be temporarily reverted
+    by setting runtime guard ``envoy.reloadable_features.lowercase_scheme`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -145,6 +157,10 @@ bug_fixes:
 - area: tls
   change: |
     Fix build FIPS compliance when using both FIPS mode and Wasm extensions (``--define boringssl=fips`` and ``--define wasm=v8``).
+- area: http
+  change: |
+    Switched Envoy internal scheme checks from case sensitive to case insensitive. This behaviorial change can be temporarily
+    reverted by setting runtime guard ``envoy.reloadable_features.handle_uppercase_scheme`` to ``false``.
 - area: ext_authz
   change: |
     Fix a bug where the ext_authz filter will ignore the request body when the
@@ -187,6 +203,12 @@ bug_fixes:
     This was fixed now by marking the cookie as httpOnly.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` to false.
+- area: opentelemetry/grpc/access log
+  change: |
+    Fixed a bug in the open telemetry access logger. This logger now uses the
+    server scope for stats instead of the listener's global scope. This fixes a
+    use-after-free that can occur if the listener is drained but the cached
+    gRPC access logger uses the listener's global scope for stats.
 - area: dependency
   change: |
     update Wasmtime and related deps -> 9.0.3 to resolve
@@ -232,6 +254,15 @@ bug_fixes:
   change: |
     Fix memory leak in nghttp2 when scheduled requests are cancelled due to the ``GOAWAY`` frame being received from the
     upstream service.
+- area: cors
+  change: |
+    Fix a use-after-free bug that occurs in the CORS filter if the ``origin`` header is removed between
+    request header decoding and response header encoding.
+- area: oauth2
+  change: |
+    Fixed a cookie validator bug that meant the HMAC calculation could be the same for different payloads.
+
+    This prevents malicious clients from constructing credentials with permanent validity in some specific scenarios.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

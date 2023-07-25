@@ -1546,6 +1546,7 @@ TEST_P(IntegrationTest, AbsolutePathWithMixedScheme) {
 TEST_P(IntegrationTest, AbsolutePathWithMixedSchemeLegacy) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme", "false");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.handle_uppercase_scheme", "false");
 
   // Mixed scheme requests will be rejected
   auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
