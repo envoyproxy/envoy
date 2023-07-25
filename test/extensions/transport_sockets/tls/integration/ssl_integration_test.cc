@@ -491,7 +491,7 @@ typed_config:
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
-TEST_P(SslIntegrationTest, AsyncCertValidationSucceedsWithLocalAddressVerification) {
+TEST_P(SslIntegrationTest, AsyncCertValidationSucceedsWithLocalAddress) {
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -514,24 +514,21 @@ typed_config:
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
 
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
-      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
-          *client_transport_socket_factory_ptr)
-          .sslCtx();
-
-  Extensions::TransportSockets::Tls::TimedCertValidator& cert_validator =
-      static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
-          ContextImplPeer::getMutableCertValidator(
-              static_cast<
-                  Extensions::TransportSockets::Tls::ClientContextImpl&>(
-                  *client_ssl_ctx)));
-
-  // cert_validator.setExpectedLocalAddress(connection->connectionInfoProvider().localAddress()->asString());
   ConnectionStatusCallbacks callbacks;
   connection->addConnectionCallbacks(callbacks);
   connection->connect();
 
-  cert_validator.setExpectedLocalAddress(connection->connectionInfoProvider().localAddress()->asString());
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
+      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
+          *client_transport_socket_factory_ptr)
+          .sslCtx();
+  Extensions::TransportSockets::Tls::TimedCertValidator& cert_validator =
+      static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+          ContextImplPeer::getMutableCertValidator(
+              static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(connection->connectionInfoProvider().localAddress() != nullptr);
+  cert_validator.setExpectedLocalAddress(
+      connection->connectionInfoProvider().localAddress()->asString());
 
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
@@ -544,14 +541,6 @@ typed_config:
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   connection->close(Network::ConnectionCloseType::NoFlush);
-
-  // EXPECT_TRUE(cert_validator.validationPending());
-  // ASSERT_EQ(connection->state(), Network::Connection::State::Open);
-  // connection->close(Network::ConnectionCloseType::NoFlush);
-  // connection.reset();
-  // while (cert_validator.validationPending()) {
-  //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // }
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationAfterTearDown) {

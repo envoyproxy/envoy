@@ -22,7 +22,7 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
   if (expected_host_name_.has_value()) {
     EXPECT_EQ(expected_host_name_.value(), host_name);
   }
-  if (expected_local_address.has_value() && validation_context.local_address != nullptr) {
+  if (expected_local_address_.has_value() && validation_context.local_address != nullptr) {
     EXPECT_EQ(expected_local_address_.value(), validation_context.local_address->asString());
   }
   // Store cert chain for the delayed validation.
