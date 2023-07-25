@@ -864,6 +864,8 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   bool resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   EXPECT_TRUE(resource_allocated);
+  EXPECT_EQ(1, manager->getThreadLocalOverloadState().currentResourceUsage(
+                   Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections));
   resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 3);
   EXPECT_FALSE(resource_allocated);

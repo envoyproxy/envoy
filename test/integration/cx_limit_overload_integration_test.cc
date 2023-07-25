@@ -6,8 +6,6 @@
 #include "test/integration/integration.h"
 #include "test/test_common/test_runtime.h"
 
-using testing::InvokeWithoutArgs;
-
 namespace Envoy {
 
 namespace {
@@ -44,7 +42,7 @@ protected:
           num_downstream_conns_reached.Notify();
         }
         // TODO(mattklein123): Do not use a real sleep here. Switch to events with waitFor().
-        timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(100));
+        timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(50));
       }
       if (overload_state.currentResourceUsage(
               Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) ==
@@ -123,8 +121,7 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitInOverloadManager) {
 
 TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOverloadManager) {
   // Configure global connections limit via deprecated runtime key.
-  config_helper_.addRuntimeOverride("overload.global_downstream_max_connections",
-                                    std::to_string(3));
+  config_helper_.addRuntimeOverride("overload.global_downstream_max_connections", "3");
   initializeOverloadManager(2);
   const std::string log_line =
       "Global downstream connections limits is configured via deprecated runtime key "
@@ -185,7 +182,32 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitOptOutRespected) {
   raw_conns.clear();
 }
 
-// TEST_P(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitNotAffected) {}
+TEST_P(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInOverloadManager) {
+  config_helper_.addRuntimeOverride("envoy.resource_limits.listener.listener_0.connection_limit",
+                                    "2");
+  initializeOverloadManager(5);
+  std::vector<IntegrationTcpClientPtr> tcp_clients;
+  std::vector<FakeRawConnectionPtr> raw_conns;
+  for (int i = 0; i < 2; ++i) {
+    tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+    raw_conns.emplace_back();
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
+    ASSERT_TRUE(tcp_clients.back()->connected());
+  }
+  // Third connection should fail because we have hit the configured limit per listener.
+  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+  raw_conns.emplace_back();
+  ASSERT_FALSE(
+      fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
+  tcp_clients.back()->waitForDisconnect();
+  test_server_->waitForCounterEq(counterPrefix() + "downstream_cx_overflow", 1);
+  test_server_->waitForCounterEq(counterPrefix() + "downstream_global_cx_overflow", 0);
+  for (auto& tcp_client : tcp_clients) {
+    tcp_client->close();
+  }
+  tcp_clients.clear();
+  raw_conns.clear();
+}
 
 } // namespace
 } // namespace Envoy
