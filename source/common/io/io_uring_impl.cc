@@ -39,9 +39,9 @@ IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polli
   if (use_submission_queue_polling) {
     p.flags |= IORING_SETUP_SQPOLL;
   }
-  // TODO (soulxu): According to the man page: `By default, the CQ ring will have twice the number of entries as
-  // specified by entries for the SQ ring`. But currently we only use the same size with SQ ring. We will figure
-  // out better handle of entries number in the future.
+  // TODO (soulxu): According to the man page: `By default, the CQ ring will have twice the number
+  // of entries as specified by entries for the SQ ring`. But currently we only use the same size
+  // with SQ ring. We will figure out better handle of entries number in the future.
   int ret = io_uring_queue_init_params(io_uring_size, &ring_, &p);
   RELEASE_ASSERT(ret == 0, fmt::format("unable to initialize io_uring: {}", errorDetails(-ret)));
 }
