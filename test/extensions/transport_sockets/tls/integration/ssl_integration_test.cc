@@ -518,6 +518,7 @@ typed_config:
   connection->addConnectionCallbacks(callbacks);
   connection->connect();
 
+  // Get the `TimedCertValidator` object and set its expected local address.
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
       static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
           *client_transport_socket_factory_ptr)

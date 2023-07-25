@@ -816,13 +816,6 @@ void testUtilV2(const TestUtilOptionsV2& options) {
         server_ssl_requested_server_name = std::string(requested_server_name);
       }
 
-      auto callbacks = static_cast<Network::TransportSocketCallbacks*>(
-          SSL_get_ex_data(server_ssl, ContextImpl::sslSocketIndex()));
-      ASSERT_TRUE(callbacks != nullptr);
-      ASSERT_TRUE(callbacks->connection().connectionInfoProvider().localAddress() != nullptr);
-      EXPECT_EQ(callbacks->connection().connectionInfoProvider().localAddress(),
-                socket->connectionInfoProvider().localAddress());
-
       if (!options.expectedRequestedServerName().empty()) {
         EXPECT_TRUE(server_ssl_requested_server_name.has_value());
         EXPECT_EQ(options.expectedRequestedServerName(), server_ssl_requested_server_name.value());
