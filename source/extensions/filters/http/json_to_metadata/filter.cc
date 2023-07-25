@@ -275,7 +275,8 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
 void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
                          bool& processing_finished_flag, Stats::Counter& success,
                          Stats::Counter& no_body, Stats::Counter& non_json) {
-  if (!body) {
+  // In case we have trailers but no body.
+  if (!body || body->length() == 0) {
     handleAllOnMissing(rules, request_processing_finished_);
     no_body.inc();
     return;
@@ -342,13 +343,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(config_->doRequest());
   if (request_processing_finished_) {
     return Http::FilterDataStatus::Continue;
   }
 
   if (end_stream) {
+    decoder_callbacks_->addDecodedData(data, true);
+
     if (!decoder_callbacks_->decodingBuffer() ||
         decoder_callbacks_->decodingBuffer()->length() == 0) {
       handleAllOnMissing(config_->requestRules(), request_processing_finished_);

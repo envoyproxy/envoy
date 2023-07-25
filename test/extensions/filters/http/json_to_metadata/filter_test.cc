@@ -112,7 +112,6 @@ request_rules:
   std::shared_ptr<Filter> filter_;
   Http::TestRequestHeaderMapImpl incoming_headers_{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/json"}};
-  Http::TestResponseHeaderMapImpl outgoing_headers_{{":status", "200"}};
   Buffer::OwnedImpl buffer_;
 };
 

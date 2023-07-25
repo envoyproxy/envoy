@@ -40,6 +40,6 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.json_to_metadata"],
     deps = [
         "//source/extensions/filters/http/json_to_metadata:config",
-        "//test/integration:http_integration_lib",
+        "//test/integration:http_protocol_integration_lib",
     ],
 )
