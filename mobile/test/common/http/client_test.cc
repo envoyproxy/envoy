@@ -45,6 +45,23 @@ ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
   return transformed_headers;
 }
 
+class TestHandle : public RequestDecoderHandle {
+ public:
+  explicit TestHandle(MockRequestDecoder& decoder) : decoder_(decoder) {}
+
+  ~TestHandle() override = default;
+
+  bool isValid() override { return true; }
+
+  OptRef<RequestDecoder> get() override {
+    return { decoder_ };
+  }
+
+ private:
+  MockRequestDecoder& decoder_;
+
+};
+
 class ClientTest : public testing::TestWithParam<bool> {
 public:
   typedef struct {
@@ -131,10 +148,10 @@ public:
     // Grab the response encoder in order to dispatch responses on the stream.
     // Return the request decoder to make sure calls are dispatched to the decoder via the
     // dispatcher API.
-    EXPECT_CALL(*api_listener_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+    EXPECT_CALL(*api_listener_, newStreamHandle(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoderHandlePtr {
           response_encoder_ = &encoder;
-          return *request_decoder_;
+          return std::make_unique<TestHandle>(*request_decoder_);
         }));
     http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_, 0);
   }
@@ -425,10 +442,10 @@ TEST_P(ClientTest, MultipleStreams) {
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
-  EXPECT_CALL(*api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+  EXPECT_CALL(*api_listener_, newStreamHandle(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoderHandlePtr {
         response_encoder2 = &encoder;
-        return request_decoder2;
+        return std::make_unique<TestHandle>(request_decoder2);
       }));
   http_client_.startStream(stream2, bridge_callbacks_2, explicit_flow_control_, 0);
 
@@ -686,10 +703,10 @@ TEST_P(ClientTest, NullAccessors) {
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
-  EXPECT_CALL(*api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+  EXPECT_CALL(*api_listener_, newStreamHandle(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoderHandlePtr {
         response_encoder_ = &encoder;
-        return *request_decoder_;
+        return std::make_unique<TestHandle>(*request_decoder_);
       }));
   http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_, 0);
 
