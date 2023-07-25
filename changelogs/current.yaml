@@ -1,17 +1,12 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+date: July 25, 2023
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: http
   change: |
     Envoy will now lower case scheme values by default. This behaviorial change can be temporarily reverted
     by setting runtime guard ``envoy.reloadable_features.lowercase_scheme`` to ``false``.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: cors
   change: |
     Fix a use-after-free bug that occurs in the CORS filter if the ``origin`` header is removed between
@@ -40,12 +35,7 @@ bug_fixes:
 
     Fix `CVE-2023-35941 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-7mhv-gr67-hq55>`_.
 
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
 new_features:
 - area: tls
   change: |
     Added FIPS compliant build for arm64.
-
-deprecated:
