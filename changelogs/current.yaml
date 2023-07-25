@@ -232,6 +232,9 @@ bug_fixes:
   change: |
     Fix memory leak in nghttp2 when scheduled requests are cancelled due to the ``GOAWAY`` frame being received from the
     upstream service.
+- area: postgres
+  change: |
+    enable parsing when using upstream SSL.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
