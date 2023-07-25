@@ -41,7 +41,7 @@ public:
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::unique_ptr<IoUringFactoryImpl> factory_{};
   OptRef<IoUring> io_uring_{};
-  bool should_skip_{};
+  const bool should_skip_{};
 };
 
 class IoUringImplParamTest

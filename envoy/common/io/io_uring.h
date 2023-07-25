@@ -11,12 +11,12 @@ namespace Io {
  * @param user_data is any data attached to an entry submitted to the submission
  * queue.
  * @param result is a return code of submitted system call.
- * @param injected indicated the completion is injected or not.
+ * @param injected indicates whether the completion is injected or not.
  */
 using CompletionCb = std::function<void(void* user_data, int32_t result, bool injected)>;
 
 /**
- * Callback for release the user data.
+ * Callback for releasing the user data.
  * @param user_data the pointer to the user data.
  */
 using InjectedCompletionUserDataReleasor = std::function<void(void* user_data)>;
@@ -104,7 +104,10 @@ public:
 
   /**
    * Inject a request completion into the io_uring. Those completions will be iterated
-   * when calling the `forEveryCompletion`.
+   * when calling the `forEveryCompletion`. This is used to inject an emulated iouring
+   * request completion by the upper-layer, then trigger the request completion processing.
+   * it is used to emulate an activation of READ/WRITE/CLOSED event on the specific file
+   * descriptor by the IoSocketHandle.
    * @param fd is the file descriptor of this completion refer to.
    * @param user_data is the user data related to this completion.
    * @param result is request result for this completion.
@@ -112,7 +115,8 @@ public:
   virtual void injectCompletion(os_fd_t fd, void* user_data, int32_t result) PURE;
 
   /**
-   * Remove all the injected completions for the specific fd.
+   * Remove all the injected completions for the specific file descriptor. This is used
+   * to cleanup all the injected completions when a socket closed and remove from the iouring.
    * @param fd is used to refer to the completions will be removed.
    * @param releasor should be provided for how to release the related user data.
    */
