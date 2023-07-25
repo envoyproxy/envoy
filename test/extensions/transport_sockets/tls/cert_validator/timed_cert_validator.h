@@ -53,6 +53,10 @@ public:
 
   void setExpectedHostName(const std::string host_name) { expected_host_name_ = host_name; }
 
+  void setExpectedLocalAddress(absl::string_view expected_local_address) {
+    expected_local_address_ = expected_local_address;
+  }
+
   void resetForTest() {
     validation_time_out_ms_ = std::chrono::milliseconds(5);
     expected_host_name_.reset();
@@ -61,6 +65,7 @@ public:
 private:
   std::chrono::milliseconds validation_time_out_ms_{5};
   absl::optional<std::string> expected_host_name_;
+  absl::optional<std::string> expected_local_address_;
 };
 
 DECLARE_FACTORY(TimedCertValidatorFactory);
