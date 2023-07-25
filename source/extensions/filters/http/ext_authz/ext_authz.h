@@ -62,7 +62,12 @@ public:
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
-        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
+
+        // `pack_as_bytes_` should be true when configured with an http service because there is no
+        // difference to where the body is written in http requests, and a value of false here will
+        // cause non UTF-8 body content to be changed when it doesn't need to.
+        pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
+
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()

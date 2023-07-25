@@ -672,7 +672,7 @@ void FakeUpstream::cleanUp() {
 }
 
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
-                                            const std::vector<Network::FilterFactoryCb>&) {
+                                            const Filter::NetworkFilterFactoriesList&) {
   absl::MutexLock lock(&lock_);
   if (read_disable_on_new_connection_ && http_type_ != Http::CodecType::HTTP3) {
     // Disable early close detection to avoid closing the network connection before full

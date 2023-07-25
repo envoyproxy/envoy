@@ -81,6 +81,7 @@ def envoy_cc_fuzz_test(
         dictionaries = [],
         repository = "",
         size = "medium",
+        shard_count = None,
         deps = [],
         tags = [],
         **kwargs):
@@ -120,6 +121,7 @@ def envoy_cc_fuzz_test(
             "//conditions:default": ["$(locations %s)" % corpus_name],
         }),
         data = [corpus_name],
+        shard_count = shard_count,
         # No fuzzing on macOS or Windows
         deps = select({
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],

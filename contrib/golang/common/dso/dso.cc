@@ -149,6 +149,9 @@ NetworkFilterDsoImpl::NetworkFilterDsoImpl(const std::string dso_name)
       envoy_go_filter_on_upstream_data_, handler_, dso_name, "envoyGoFilterOnUpstreamData");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_upstream_event_)>(
       envoy_go_filter_on_upstream_event_, handler_, dso_name, "envoyGoFilterOnUpstreamEvent");
+
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_sema_dec_)>(
+      envoy_go_filter_on_sema_dec_, handler_, dso_name, "envoyGoFilterOnSemaDec");
 }
 
 GoUint64 NetworkFilterDsoImpl::envoyGoFilterOnNetworkFilterConfig(GoUint64 library_id_ptr,
@@ -207,6 +210,11 @@ void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamData(void* w, GoUint64 data_si
 void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamEvent(void* w, GoInt event) {
   ASSERT(envoy_go_filter_on_upstream_event_ != nullptr);
   envoy_go_filter_on_upstream_event_(w, event);
+}
+
+void NetworkFilterDsoImpl::envoyGoFilterOnSemaDec(void* w) {
+  ASSERT(envoy_go_filter_on_sema_dec_ != nullptr);
+  envoy_go_filter_on_sema_dec_(w);
 }
 
 } // namespace Dso

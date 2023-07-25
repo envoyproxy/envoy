@@ -77,7 +77,6 @@ envoy_cc_test(
         "//test/server:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

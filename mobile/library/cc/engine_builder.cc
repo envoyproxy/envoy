@@ -54,7 +54,12 @@ XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
 }
 
 XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
-  ssl_root_certs_ = root_certs;
+  ssl_root_certs_ = std::move(root_certs);
+  return *this;
+}
+
+XdsBuilder& XdsBuilder::setSni(std::string sni) {
+  sni_ = std::move(sni);
   return *this;
 }
 
@@ -95,6 +100,11 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
                      ->mutable_service_account_jwt_access();
     jwt.set_json_key(jwt_token_);
     jwt.set_token_lifetime_seconds(jwt_token_lifetime_in_seconds_);
+  }
+  if (!sni_.empty()) {
+    auto& channel_args =
+        *grpc_service.mutable_google_grpc()->mutable_channel_args()->mutable_args();
+    channel_args["grpc.default_authority"].set_string_value(sni_);
   }
 
   if (!rtds_resource_name_.empty()) {

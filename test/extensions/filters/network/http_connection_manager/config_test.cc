@@ -3079,6 +3079,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
 #ifdef ENVOY_ENABLE_UHV
   EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
   EXPECT_FALSE(proto_config.restrict_http_methods());
+  EXPECT_FALSE(proto_config.strip_fragment_from_path());
   EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_path_normalization());
   EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_merging_slashes());
   EXPECT_EQ(proto_config.uri_path_normalization_options().path_with_escaped_slashes_action(),
@@ -3107,6 +3108,11 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
+  // Make sure the http_reject_path_with_fragment runtime value is reflected in config
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
+
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
@@ -3121,6 +3127,7 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                                      filter_config_provider_manager_);
 #ifdef ENVOY_ENABLE_UHV
   EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+  EXPECT_TRUE(proto_config.strip_fragment_from_path());
   EXPECT_FALSE(proto_config.restrict_http_methods());
   EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_path_normalization());
   EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_merging_slashes());

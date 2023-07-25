@@ -238,6 +238,7 @@ paths:
   protobuf:
     include:
     - api/test
+    - bazel/cc_proto_descriptor_library
     - ci/prebuilt
     - source/common/protobuf
     - test/extensions/bootstrap/wasm/test_data
@@ -287,6 +288,7 @@ paths:
   # Files in these paths can use MessageLite::SerializeAsString
   serialize_as_string:
     include:
+    - bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
     - contrib/config/source/kv_store_xds_delegate.cc
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc

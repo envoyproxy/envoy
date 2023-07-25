@@ -323,6 +323,27 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   }
 }
 
+TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddressGetifaddrsFailure) {
+  Api::SysCallIntResult rc;
+  rc.return_value_ = -1;
+  rc.errno_ = 42;
+  testing::StrictMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_)).WillRepeatedly(Return(rc));
+  Address::IpVersion ip_version = GetParam();
+  Address::InstanceConstSharedPtr expected_address;
+  if (ip_version == Address::IpVersion::v6) {
+    expected_address = std::make_shared<Address::Ipv6Instance>("::1");
+  } else {
+    expected_address = std::make_shared<Address::Ipv4Instance>("127.0.0.1");
+  }
+  Address::InstanceConstSharedPtr local_address = Utility::getLocalAddress(ip_version);
+  EXPECT_EQ(ip_version, local_address->ip()->version());
+  EXPECT_NE(nullptr, local_address);
+  EXPECT_EQ(*expected_address, *local_address);
+}
+
 TEST(NetworkUtility, GetOriginalDst) {
   testing::NiceMock<Network::MockConnectionSocket> socket;
 #ifdef SOL_IP
