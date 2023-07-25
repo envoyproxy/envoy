@@ -101,6 +101,11 @@ func envoyGoFilterOnDownstreamConnection(wrapper unsafe.Pointer, pluginNamePtr u
 		writeFunc: cgoAPI.DownstreamWrite,
 		closeFunc: cgoAPI.DownstreamClose,
 		infoFunc:  cgoAPI.DownstreamInfo,
+		state: &filterState{
+			wrapper: wrapper,
+			setFunc: cgoAPI.SetFilterState,
+			getFunc: cgoAPI.GetFilterState,
+		},
 	}
 	filter := filterFactory.CreateFilter(cb)
 
@@ -110,7 +115,10 @@ func envoyGoFilterOnDownstreamConnection(wrapper unsafe.Pointer, pluginNamePtr u
 	})
 
 	// TODO: handle error
-	_ = DownstreamFilters.StoreFilter(uint64(uintptr(wrapper)), filter)
+	_ = DownstreamFilters.StoreFilter(uint64(uintptr(wrapper)), &downstreamFilterWrapper{
+		filter: filter,
+		cb:     cb,
+	})
 
 	return uint64(filter.OnNewConnection())
 }
@@ -161,6 +169,14 @@ func envoyGoFilterOnDownstreamWrite(wrapper unsafe.Pointer, dataSize uint64, dat
 	return uint64(filter.OnWrite(buf, endOfStream == 1))
 }
 
+//export envoyGoFilterOnSemaDec
+func envoyGoFilterOnSemaDec(wrapper unsafe.Pointer) {
+	w := DownstreamFilters.GetFilterWrapper(uint64(uintptr(wrapper)))
+	if atomic.CompareAndSwapInt32(&w.cb.waitingOnEnvoy, 1, 0) {
+		w.cb.sema.Done()
+	}
+}
+
 //export envoyGoFilterOnUpstreamConnectionReady
 func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer) {
 	cb := &connectionCallback{
@@ -208,11 +224,16 @@ func envoyGoFilterOnUpstreamEvent(wrapper unsafe.Pointer, event int) {
 	}
 }
 
-type DownstreamFilterMap struct {
-	m sync.Map // uint64 -> DownstreamFilter
+type downstreamFilterWrapper struct {
+	filter api.DownstreamFilter
+	cb     *connectionCallback
 }
 
-func (f *DownstreamFilterMap) StoreFilter(key uint64, filter api.DownstreamFilter) error {
+type DownstreamFilterMap struct {
+	m sync.Map // uint64 -> *downstreamFilterWrapper
+}
+
+func (f *DownstreamFilterMap) StoreFilter(key uint64, filter *downstreamFilterWrapper) error {
 	if _, loaded := f.m.LoadOrStore(key, filter); loaded {
 		return ErrDupRequestKey
 	}
@@ -220,8 +241,16 @@ func (f *DownstreamFilterMap) StoreFilter(key uint64, filter api.DownstreamFilte
 }
 
 func (f *DownstreamFilterMap) GetFilter(key uint64) api.DownstreamFilter {
+	w := f.GetFilterWrapper(key)
+	if w != nil {
+		return w.filter
+	}
+	return nil
+}
+
+func (f *DownstreamFilterMap) GetFilterWrapper(key uint64) *downstreamFilterWrapper {
 	if v, ok := f.m.Load(key); ok {
-		return v.(api.DownstreamFilter)
+		return v.(*downstreamFilterWrapper)
 	}
 	return nil
 }
