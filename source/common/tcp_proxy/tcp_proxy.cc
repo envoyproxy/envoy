@@ -32,9 +32,7 @@
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
-#include "source/common/router/shadow_writer_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
-#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -83,8 +81,7 @@ Config::SharedConfig::SharedConfig(
     idle_timeout_ = std::chrono::hours(1);
   }
   if (config.has_tunneling_config()) {
-    tunneling_config_helper_ =
-        std::make_unique<TunnelingConfigHelperImpl>(*stats_scope_.get(), config, context);
+    tunneling_config_helper_ = std::make_unique<TunnelingConfigHelperImpl>(config, context);
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
@@ -204,8 +201,7 @@ UpstreamDrainManager& Config::drainManager() {
 }
 
 Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
-    : tracing_config_(Tracing::EgressConfig::get()), config_(config),
-      cluster_manager_(cluster_manager), downstream_callbacks_(*this),
+    : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(this)) {
   ASSERT(config != nullptr);
 }
@@ -560,18 +556,13 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
                                 Upstream::HostDescriptionConstSharedPtr& host,
                                 const Network::ConnectionInfoProvider& address_provider,
                                 Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
-  // No need to set information using address_provider in case routing via Router::UpstreamRequest
-  // because in that case, information is already set by the
-  // Router::UpstreamRequest::onPoolReady() method before reaching here.
-  if (upstream_info.upstreamLocalAddress() == nullptr) {
-    upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
-    upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
-  }
+  StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
   upstream_info.setUpstreamHost(host);
+  upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
+  upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
   upstream_info.setUpstreamSslConnection(ssl_info);
   onUpstreamConnection();
   read_callbacks_->continueReading();
@@ -619,7 +610,6 @@ const std::string& TunnelResponseTrailers::key() {
 }
 
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
-    Stats::Scope& stats_scope,
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
     Server::Configuration::FactoryContext& context)
     : use_post_(config_message.tunneling_config().use_post()),
@@ -628,13 +618,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
       post_path_(config_message.tunneling_config().post_path()),
-      route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()),
-      router_config_(route_stat_name_storage_.statName(), context.localInfo(), stats_scope,
-                     context.clusterManager(), context.runtime(), context.api().randomGenerator(),
-                     std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()), true,
-                     false, false, false, false, false, {}, context.api().timeSource(),
-                     context.httpContext(), context.routerContext()),
-      stream_id_(context.api().randomGenerator().random()) {
+      route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }

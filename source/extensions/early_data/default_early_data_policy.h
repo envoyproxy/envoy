@@ -1,5 +1,3 @@
-#pragma once
-
 #include <memory>
 
 #include "envoy/extensions/early_data/v3/default_early_data_policy.pb.h"

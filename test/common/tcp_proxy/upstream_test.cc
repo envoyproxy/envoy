@@ -77,7 +77,7 @@ public:
 
   void setupUpstream() {
     route_ = std::make_unique<HttpConnPool::RouteImpl>(cluster_, &lb_context_);
-    tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
+    tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(tcp_proxy_, context_);
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
                                                 Http::CodecType::HTTP2, downstream_stream_info_);
     upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, &decoder_callbacks_, *route_,
@@ -314,7 +314,7 @@ public:
 
   void setupUpstream() {
     route_ = std::make_unique<HttpConnPool::RouteImpl>(cluster_, &lb_context_);
-    config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
+    config_ = std::make_unique<TunnelingConfigHelperImpl>(tcp_proxy_, context_);
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *config_, callbacks_,
                                                 Http::CodecType::HTTP2, downstream_stream_info_);
     upstream_ = std::make_unique<T>(*conn_pool_, callbacks_, &decoder_callbacks_, *route_, *config_,

@@ -2,13 +2,10 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
-#include "envoy/http/filter.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
-
-#include "source/common/router/router.h"
 
 namespace Envoy {
 
@@ -51,10 +48,6 @@ public:
   virtual void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
-  // Returns the router filter config.
-  virtual const Envoy::Router::FilterConfig& routerFilterConfig() const PURE;
-  // Returns the stream Id.
-  virtual uint64_t streamId() const PURE;
 };
 
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;

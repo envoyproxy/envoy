@@ -156,7 +156,6 @@ class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
                                   protected Logger::Loggable<Logger::Id::filter> {
 public:
   TunnelingConfigHelperImpl(
-      Stats::Scope& scope,
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
@@ -164,15 +163,12 @@ public:
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
 
-  const Envoy::Router::FilterConfig& routerFilterConfig() const override { return router_config_; }
   void
   propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
                            const StreamInfo::FilterStateSharedPtr& filter_state) const override;
   void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
-
-  uint64_t streamId() const override { return stream_id_; }
 
 private:
   const bool use_post_;
@@ -182,8 +178,6 @@ private:
   const bool propagate_response_trailers_;
   std::string post_path_;
   Stats::StatNameManagedStorage route_stat_name_storage_;
-  const Router::FilterConfig router_config_;
-  uint64_t stream_id_;
 };
 
 /**
@@ -472,7 +466,6 @@ public:
 
   StreamInfo::StreamInfo& getStreamInfo();
   Tracing::NullSpan active_span_;
-  const Tracing::Config& tracing_config_;
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {

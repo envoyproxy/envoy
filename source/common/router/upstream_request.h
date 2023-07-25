@@ -69,7 +69,7 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool can_send_early_data, bool can_use_http3, bool enable_tcp_tunneling = false);
+                  bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
   void deleteIsPending() override { cleanUp(); }
 
@@ -255,7 +255,6 @@ private:
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   bool grpc_rq_success_deferred_ : 1;
   bool upstream_wait_for_response_headers_before_disabling_read_ : 1;
-  bool enable_half_close_ : 1;
 };
 
 class UpstreamRequestFilterManagerCallbacks : public Http::FilterManagerCallbacks,
@@ -369,9 +368,7 @@ public:
   void setUpstreamToDownstream(UpstreamToDownstream& upstream_to_downstream_interface) override {
     upstream_request_.upstream_interface_ = upstream_to_downstream_interface;
   }
-  bool allowDownstreamOpenOnUpstreamClosed() override {
-    return upstream_request_.enable_half_close_;
-  }
+
   Http::RequestTrailerMapPtr trailers_;
   Http::ResponseHeaderMapPtr informational_headers_;
   Http::ResponseHeaderMapPtr response_headers_;
