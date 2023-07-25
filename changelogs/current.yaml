@@ -1,24 +1,18 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+date: July 25, 2023
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: http
   change: |
     Envoy will now lower case scheme values by default. This behaviorial change can be temporarily reverted
     by setting runtime guard ``envoy.reloadable_features.lowercase_scheme`` to ``false``.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: cors
   change: |
     Fix a use-after-free bug that occurs in the CORS filter if the ``origin`` header is removed between
     request header decoding and response header encoding.
 
     Fix `CVE-2023-35943 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-mc6h-6j9x-v3gq>`_.
-
 - area: opentelemetry/grpc/access log
   change: |
     Fixed a bug in the open telemetry access logger. This logger now uses the
@@ -27,7 +21,6 @@ bug_fixes:
     gRPC access logger uses the listener's global scope for stats.
 
     Fix `CVE-2023-35942 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-69vr-g55c-v2v4>`_.
-
 - area: oauth2
   change: |
     Fixed a cookie validator bug that meant the HMAC calculation could be the same for different payloads.
@@ -35,17 +28,9 @@ bug_fixes:
     This prevents malicious clients from constructing credentials with permanent validity in some specific scenarios.
 
     Fix `CVE-2023-35941 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-7mhv-gr67-hq55>`_.
-
 - area: http
   change: |
     Switched Envoy internal scheme checks from case sensitive to case insensitive. This behaviorial change can be temporarily
     reverted by setting runtime guard ``envoy.reloadable_features.handle_uppercase_scheme`` to ``false``.
 
     Fix `CVE-2023-35944 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-pvgm-7jpg-pw5g>`_.
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
