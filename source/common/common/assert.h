@@ -167,9 +167,9 @@ void resetEnvoyBugCountersForTest();
  * clients but has no effect for Envoy as a server.
  */
 #if TARGET_OS_IOS || defined(__ANDROID_API__)
-#define MOBILE_RELEASE_ASSERT(X,DETAILS) RELEASE_ASSERT(X, DETAILS)
+#define MOBILE_RELEASE_ASSERT(X, DETAILS) RELEASE_ASSERT(X, DETAILS)
 #else
-#define MOBILE_RELEASE_ASSERT(X,DETAILS)
+#define MOBILE_RELEASE_ASSERT(X, DETAILS)
 #endif
 
 /**
