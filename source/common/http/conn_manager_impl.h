@@ -514,8 +514,6 @@ private:
 
     ~ActiveStreamHandle() override = default;
 
-    bool isValid() override { return !valid_.expired(); }
-
     OptRef<RequestDecoder> get() override {
       if (valid_.expired()) {
         return {};

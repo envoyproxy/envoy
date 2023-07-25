@@ -51,8 +51,6 @@ public:
 
   ~TestHandle() override = default;
 
-  bool isValid() override { return true; }
-
   OptRef<RequestDecoder> get() override { return {decoder_}; }
 
 private:

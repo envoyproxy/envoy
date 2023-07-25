@@ -10,11 +10,6 @@ public:
   virtual ~RequestDecoderHandle() = default;
 
   /**
-   * @return true if the underlying decoder is still valid.
-   */
-  virtual bool isValid() PURE;
-
-  /**
    * @return a reference to the underlying decoder if it is still valid.
    */
   virtual OptRef<RequestDecoder> get() PURE;
