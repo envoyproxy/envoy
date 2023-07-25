@@ -594,25 +594,27 @@ HeaderValidator::sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_
   const auto escaped_slashes_action =
       config_.uri_path_normalization_options().path_with_escaped_slashes_action();
 
-  if (escaped_slashes_action !=
+  if (escaped_slashes_action ==
       HeaderValidatorConfig::UriPathNormalizationOptions::KEEP_UNCHANGED) {
-    // When path normalization is enabled decoding of slashes is done as part of the normalization
-    // function for performance.
-    auto escaped_slashes_result = PathUtil::unescapeSlashes(header_map);
-    if (escaped_slashes_result == PathUtil::UnescapeSlashesResult::FoundAndUnescaped) {
-      if (escaped_slashes_action ==
-          HeaderValidatorConfig::UriPathNormalizationOptions::REJECT_REQUEST) {
-        return {PathNormalizer::PathNormalizationResult::Action::Reject,
-                UhvResponseCodeDetail::get().EscapedSlashesInPath};
-      } else if (escaped_slashes_action ==
-                 HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_REDIRECT) {
-        return {PathNormalizer::PathNormalizationResult::Action::Redirect,
-                ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
-      } else {
-        ASSERT(escaped_slashes_action ==
-               HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_FORWARD);
-      }
-    }
+    return PathNormalizer::PathNormalizationResult::success();
+  }
+  // When path normalization is enabled decoding of slashes is done as part of the normalization
+  // function for performance.
+  auto escaped_slashes_result = PathUtil::unescapeSlashes(header_map);
+  if (escaped_slashes_result != PathUtil::UnescapeSlashesResult::FoundAndUnescaped) {
+    return PathNormalizer::PathNormalizationResult::success();
+  }
+  if (escaped_slashes_action ==
+      HeaderValidatorConfig::UriPathNormalizationOptions::REJECT_REQUEST) {
+    return {PathNormalizer::PathNormalizationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EscapedSlashesInPath};
+  } else if (escaped_slashes_action ==
+             HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_REDIRECT) {
+    return {PathNormalizer::PathNormalizationResult::Action::Redirect,
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+  } else {
+    ASSERT(escaped_slashes_action ==
+           HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_FORWARD);
   }
   return PathNormalizer::PathNormalizationResult::success();
 }
