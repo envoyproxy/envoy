@@ -132,6 +132,10 @@ minor_behavior_changes:
   change: |
     Round trip time will not be refreshed for every request by default. And if this is necessary, it can be
     enabled by setting runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` to true.
+- area: http3/quic
+  change: |
+    EnvoyQuicConnectionIdGeneratorFactory gained a new function ``connectionIdWorkerSelector``. Extensions
+    implementing this factory will need to have an implementation of this function added.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
