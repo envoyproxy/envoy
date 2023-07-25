@@ -79,7 +79,7 @@ public:
     // This constructor should only be called by InlineMapDescriptor.
     Handle(uint32_t inline_id) : inline_id_(inline_id) {}
 
-    const uint32_t inline_id_{};
+    const uint32_t inline_id_;
   };
 
   InlineMapDescriptor() = default;
