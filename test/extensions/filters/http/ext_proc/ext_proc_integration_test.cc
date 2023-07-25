@@ -2701,16 +2701,15 @@ TEST_P(ExtProcIntegrationTest, ClientNoTrailerProcessingModeSendTrailer) {
   // Client send data with end_stream set to true.
   codec_client_->sendData(*request_encoder_, 10, true);
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse&) {
-        EXPECT_FALSE(headers.end_of_stream());
-        return true;
-      });
-  processRequestBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
-        EXPECT_TRUE(body.end_of_stream());
-        return true;
-      });
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders& headers, HeadersResponse&) {
+                                 EXPECT_FALSE(headers.end_of_stream());
+                                 return true;
+                               });
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    return true;
+  });
   processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   handleUpstreamRequest();
