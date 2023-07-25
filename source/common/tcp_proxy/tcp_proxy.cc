@@ -532,7 +532,6 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   absl::string_view failure_reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   generic_conn_pool_.reset();
-
   read_callbacks_->upstreamHost(host);
   getStreamInfo().upstreamInfo()->setUpstreamHost(host);
   getStreamInfo().upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
@@ -617,8 +616,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
           config_message.tunneling_config().headers_to_add())),
       propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
-      post_path_(config_message.tunneling_config().post_path()),
-      route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()) {
+      post_path_(config_message.tunneling_config().post_path()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }
@@ -778,12 +776,8 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
         getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
-        // upstreamHost can be nullptr if we received a disconnect from the upstream before
-        // receiving any response
-        if (read_callbacks_->upstreamHost() != nullptr) {
-          read_callbacks_->upstreamHost()->outlierDetector().putResult(
-              Upstream::Outlier::Result::LocalOriginConnectFailed);
-        }
+        read_callbacks_->upstreamHost()->outlierDetector().putResult(
+            Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
       if (!downstream_closed_) {
         route_ = pickRoute();

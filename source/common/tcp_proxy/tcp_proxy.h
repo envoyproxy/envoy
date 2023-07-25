@@ -23,7 +23,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
@@ -151,7 +150,6 @@ public:
 private:
   const Http::ResponseTrailerMapPtr response_trailers_;
 };
-class Config;
 class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
                                   protected Logger::Loggable<Logger::Id::filter> {
 public:
@@ -177,7 +175,6 @@ private:
   const bool propagate_response_headers_;
   const bool propagate_response_trailers_;
   std::string post_path_;
-  Stats::StatNameManagedStorage route_stat_name_storage_;
 };
 
 /**
@@ -465,7 +462,7 @@ public:
   };
 
   StreamInfo::StreamInfo& getStreamInfo();
-  Tracing::NullSpan active_span_;
+  // Tracing::NullSpan active_span_;
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
