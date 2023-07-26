@@ -325,7 +325,7 @@ absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
   if (starting == value_str.npos) {
     return value_str;
   }
-  
+
   // There should be two dots (periods; 0x2e) inside the string, but we don't verify that here
   return value_str.substr(starting);
 }
