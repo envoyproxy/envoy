@@ -17,6 +17,8 @@ systemctl stop docker docker.socket
 mv /var/lib/docker/ /var/lib/docker.old
 mkdir -p /var/lib/docker
 
+rm -rf /var/lib/docker.old
+
 if id -u vsts &> /dev/null && [[ -n "$DOCKER_BIND_PATH" ]]; then
     # use separate disk on windows hosted
     echo "Binding docker directory ${DOCKER_BIND_PATH} -> /var/lib/docker ..."
