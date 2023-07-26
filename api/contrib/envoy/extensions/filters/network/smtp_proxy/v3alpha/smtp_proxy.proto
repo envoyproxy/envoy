@@ -18,16 +18,25 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.network.smtp_proxy]
 
 message SmtpProxy {
-  // Upstream SSL operational modes.
+  // SMTP STARTTLS operational modes.
+  // Refer to SMTP STARTTLS spec rfc3207 https://www.rfc-editor.org/rfc/rfc3207.html for details
   enum SSLMode {
     // Do not encrypt upstream connection to the server.
     DISABLE = 0;
 
+    // Upstream: initiate STARTTLS to the upstream if it advertises
+    // the capability. If the upstream returns an error response to
+    // the STARTTLS command or the TLS negotiation fails, the session
+    // is terminated.
+    // Downstream: insert the STARTTLS capability into the upstream's
+    // EHLO response if not present and service the STARTTLS command
+    // from the downstream locally (i.e. do not forward the STARTTLS
+    // command to the upstream)
     ENABLE = 1;
 
+    // Like ENABLE but in addition:
     // Upstream: if the server does not advertise the STARTTLS
-    // extension or rejects the request for SSL connection, the
-    // session is terminated.
+    // extension, the session is terminated.
     // Downstream: if the SMTP command following EHLO is not STARTTLS,
     // terminate the session.
     // In either case, REQUIRE must only be used with well-known peers
@@ -40,20 +49,10 @@ message SmtpProxy {
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // Controls whether to terminate SSL session initiated by a client.
-  // If the value is false, the Smtp proxy filter will not try to
-  // terminate SSL session, but will pass all the packets to the upstream server.
-  // If the value is true, the Smtp proxy filter will try to terminate SSL
-  // session. In order to do that, the filter chain must use :ref:`starttls transport socket
-  // <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
-  // If the filter does not manage to terminate the SSL session, it will close the connection from the client.
-  // Refer to SMTP STARTTLS spec rfc3207 https://www.rfc-editor.org/rfc/rfc3207.html for details
+  // Defaults to DISABLE.
   SSLMode downstream_ssl = 3;
 
   // Controls whether to establish upstream SSL connection to the server.
-  // Envoy will try to establish upstream SSL connection to the server only when
-  // Smtp filter is able to read Smtp payload in clear-text. It happens when
-  // a client established a clear-text connection to Envoy or when a client established
-  // SSL connection to Envoy and Smtp filter is configured to terminate SSL.
-  // Defaults to SSL_DISABLE.
+  // Defaults to DISABLE.
   SSLMode upstream_ssl = 4;
 }
