@@ -13,5 +13,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: access_log
+  change: |
+    added %RESPONSE_FLAGS_FULL% substitution string, that will output a pascal case string representing the resonse flags.
+    The output response flags will correspond with %RESPONSE_FLAGS%, only with a full textual string representation.
 
 deprecated:
