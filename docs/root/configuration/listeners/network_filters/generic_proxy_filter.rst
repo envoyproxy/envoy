@@ -107,7 +107,7 @@ the downstream connection, the upstream connection will have same lifetime as th
 used only by requests that come from the related downstream connection. This is useful for the protocols that need to keep the connection state.
 
 
-In addition, the developers could operate the downstream connection and upstream connection in the codec directly. This give the developers more control
+Developers can also operate the downstream connection and upstream connection in the codec directly. This gives developers more control
 of the connection.
 
 
