@@ -15,7 +15,7 @@ There are many common features like route, L7 filter chain, tracing, metrics, lo
 new network filter.
 
 
-Another fact is that lots of RPC protocols has a similar architecture, which is request/response based. The request could be routed to different upstream
+Many RPC protocols has a similar request/response based architecture. The request could be routed to different upstreams
 based on the request properties. For these similar protocols, their network filters also are similar and could be abstracted to following modules:
 
 * Codec: parse the binary to request/response object.
