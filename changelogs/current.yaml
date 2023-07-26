@@ -540,10 +540,6 @@ new_features:
 - area: tls
   change: |
     Added FIPS compliant build for arm64.
-- area: access_log
-  change: |
-    added %RESPONSE_FLAGS_FULL% substitution string, that will output a pascal case string representing the resonse flags.
-    The output response flags will correspond with %RESPONSE_FLAGS%, only with a full textual string representation.
 
 deprecated:
 - area: access_log

@@ -28,11 +28,18 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
     EXPECT_EQ(flag_string, ResponseFlagUtils::toShortString(stream_info));
   }
 
+  for (const auto& [flag_string, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_FULL_STRING_FLAGS) {
+    NiceMock<MockStreamInfo> stream_info;
+    ON_CALL(stream_info, hasResponseFlag(flag_enum)).WillByDefault(Return(true));
+    EXPECT_EQ(flag_string, ResponseFlagUtils::toString(stream_info));
+  }
+
   // No flag is set.
   {
     NiceMock<MockStreamInfo> stream_info;
     ON_CALL(stream_info, hasResponseFlag(_)).WillByDefault(Return(false));
     EXPECT_EQ("-", ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ("-", ResponseFlagUtils::toString(stream_info));
   }
 
   // Test combinations.
@@ -44,6 +51,8 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
     ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
     EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ("UpstreamRequestTimeout,DelayInjected,FaultInjected",
+              ResponseFlagUtils::toString(stream_info));
   }
 }
 

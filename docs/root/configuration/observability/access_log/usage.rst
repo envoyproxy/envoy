@@ -488,7 +488,7 @@ The following command operators are supported:
 
 %RESPONSE_FLAGS_FULL%
   Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
-  the descriptions do not apply. Possible values are:
+  the descriptions do not apply. The values output will be a pascal case string. Possible values are:
 
   HTTP and TCP
     * **NoHealthyUpstream**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
