@@ -47,7 +47,7 @@ Different protocols can extend the ``Request`` and implement the virtual methods
 An abstract class ``Response`` is defined to represent the response. It is similar to ``Request``.
 
 
-Based on the abstraction of the request/response, the generic proxy could handle the request/response stream, route the request to different upstream,
+Based on the abstraction of the request/response, the generic proxy can handle the request/response stream, route the request to different upstreams,
 filter the request/response, etc. and need not to know the L7 application and specific data structure of the request/response.
 
 
