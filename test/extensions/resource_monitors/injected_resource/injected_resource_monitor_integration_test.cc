@@ -178,28 +178,16 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
   codec_client_->close();
 }
 
-// TODO (soulxu): Using the test parameter to disable this test. This test doesn't fit to the
-// io-uring, since io-uring always only accept one connection each event loop.
-
 // class ListenerMaxConnectionPerSocketEventTest : public OverloadIntegrationTest {};
 
-// TEST_P(ListenerMaxConnectionPerSocketEventTest,
-//        DISABLED_AcceptsConnectionsUpToTheMaximumPerSocketEvent) {
-//   auto set_max_connections_per_socket_event_to_two =
-//       [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-//         for (auto& listener_config : *bootstrap.mutable_static_resources()->mutable_listeners())
-//         {
-//           listener_config.mutable_max_connections_to_accept_per_socket_event()->set_value(2);
-//         }
-//       };
-//   config_helper_.addConfigModifier(set_max_connections_per_socket_event_to_two);
+// INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerMaxConnectionPerSocketEventTest,
+//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+//                          TestUtility::ipTestParamsToString);
 
-//
 // TEST_P(ListenerMaxConnectionPerSocketEventTest, AcceptsConnectionsUpToTheMaximumPerSocketEvent) {
 //   auto set_max_connections_per_socket_event_to_two =
 //       [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-//         for (auto& listener_config : *bootstrap.mutable_static_resources()->mutable_listeners())
-//         {
+//         for (auto& listener_config : *bootstrap.mutable_static_resources()->mutable_listeners()) {
 //           listener_config.mutable_max_connections_to_accept_per_socket_event()->set_value(2);
 //         }
 //       };
@@ -228,21 +216,28 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
 //     // Reduce load a little to allow the connection to be accepted.
 //     updateResource(file_updater_1_, 0.8);
 
+//     // As we are using level trigger for listeners, all new connections get recognized.
+//     test_server_->waitForGaugeEq(downstream_cx_active, 10);
+
+//     // Wait for the histogram to be updated as that occurs after the logs we are
+//     // expecting.
+//     const std::string connections_accepted_per_socket_event =
+//         (version_ == Network::Address::IpVersion::v4)
+//             ? "listener.127.0.0.1_0.connections_accepted_per_socket_event"
+//             : "listener.[__1]_0.connections_accepted_per_socket_event";
+//     test_server_->waitUntilHistogramHasSamples(connections_accepted_per_socket_event);
+//     auto connections_accepted_histogram =
+//         test_server_->histogram(connections_accepted_per_socket_event);
+//     EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
+//                                            *connections_accepted_histogram),
+//               5);
+//     EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+//                                                           *connections_accepted_histogram)),
+//               10);
+//   });
+
 //   std::for_each(client_codecs.begin(), client_codecs.end(),
 //                 [](IntegrationCodecClientPtr& client_codec) { client_codec->close(); });
-//   const std::string connections_accepted_per_socket_event =
-//       (version_ == Network::Address::IpVersion::v4)
-//           ? "listener.127.0.0.1_0.connections_accepted_per_socket_event"
-//           : "listener.[__1]_0.connections_accepted_per_socket_event";
-//   test_server_->waitUntilHistogramHasSamples(connections_accepted_per_socket_event);
-//   auto connections_accepted_histogram =
-//       test_server_->histogram(connections_accepted_per_socket_event);
-//   EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
-//                                          *connections_accepted_histogram),
-//             5);
-//   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
-//                                                         *connections_accepted_histogram)),
-//             10);
 // }
 
 } // namespace Envoy

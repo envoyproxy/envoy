@@ -31,7 +31,7 @@ public:
   /**
    * A callback which will be executed at most once upon handshake failure.
    */
-  virtual void onFailure() PURE;
+  virtual void onFailure(bool syscall_error_occurred = false) PURE;
 
   /**
    * Returns a pointer to the transportSocketCallbacks struct, or nullptr if

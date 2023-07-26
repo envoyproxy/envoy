@@ -62,7 +62,7 @@ CAPIStatus envoyGoFilterHttpRemoveTrailer(void* r, void* key);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
 
-// TODO: implement get dynamic metadata
+CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name, void* hand);
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf);
 
 void envoyGoFilterHttpLog(uint32_t level, void* message);
@@ -87,6 +87,11 @@ CAPIStatus envoyGoFilterUpstreamWrite(void* wrapper, void* buffers, int buffersN
 CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int closeType);
 void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterUpstreamInfo(void* wrapper, int t, void* ret);
+
+// filter state
+CAPIStatus envoyGoFilterSetFilterState(void* wrapper, void* key, void* value, int state_type,
+                                       int life_span, int stream_sharing);
+CAPIStatus envoyGoFilterGetFilterState(void* wrapper, void* key, void* value);
 
 #ifdef __cplusplus
 } // extern "C"

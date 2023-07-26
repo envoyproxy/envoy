@@ -137,7 +137,7 @@ public:
 
   void verifyStaticFilePerTap(const std::string& filter_config) {
     const std::string path_prefix = getTempPathPrefix();
-    initializeFilter(fmt::format(filter_config, path_prefix));
+    initializeFilter(fmt::format(fmt::runtime(filter_config), path_prefix));
 
     // Initial request/response with tap.
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -460,7 +460,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapContent) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -509,7 +509,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapConcurrent) {
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -591,7 +591,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapTimeout) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -645,7 +645,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapLongTimeout) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -690,7 +690,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapConsecutive) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -772,7 +772,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapBuffering) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -819,7 +819,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapEmptyResponse) {
   // Initial request / response with no tap
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -859,7 +859,7 @@ TEST_P(TapIntegrationTest, AdminBufferedTapOverBuffering) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
 
-  const std::string admin_request_yaml = R"EOF(
+  constexpr absl::string_view admin_request_yaml = R"EOF(
 config_id: test_config_id
 tap_config:
   match:
@@ -1034,7 +1034,7 @@ tap_config:
 // Verify a static configuration with a request header matcher, writing to a streamed file per tap
 // sink.
 TEST_P(TapIntegrationTest, StaticFilePerTapStreaming) {
-  const std::string filter_config =
+  constexpr absl::string_view filter_config =
       R"EOF(
 name: tap
 typed_config:
@@ -1081,7 +1081,7 @@ typed_config:
 // Verify a static configuration with a response header matcher, writing to a streamed file per tap
 // sink. This verifies request buffering.
 TEST_P(TapIntegrationTest, StaticFilePerTapStreamingWithRequestBuffering) {
-  const std::string filter_config =
+  constexpr absl::string_view filter_config =
       R"EOF(
 name: tap
 typed_config:

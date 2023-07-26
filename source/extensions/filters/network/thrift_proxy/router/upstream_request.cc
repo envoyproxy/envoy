@@ -286,11 +286,11 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
 static Upstream::Outlier::Result
 poolFailureReasonToResult(ConnectionPool::PoolFailureReason reason) {
   switch (reason) {
-  case ConnectionPool::PoolFailureReason::Overflow:
-    FALLTHRU;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     FALLTHRU;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    FALLTHRU;
+  case ConnectionPool::PoolFailureReason::Overflow:
     return Upstream::Outlier::Result::LocalOriginConnectFailed;
   case ConnectionPool::PoolFailureReason::Timeout:
     return Upstream::Outlier::Result::LocalOriginTimeout;

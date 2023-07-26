@@ -91,6 +91,12 @@ public:
   const std::string HTTP_USER_AGENT = "envoy.http_user_agent";
   // SSL cipher for a connection
   const std::string SSL_CIPHER = "envoy.ssl_cipher";
+  // SSL curve for a connection
+  const std::string SSL_CURVE = "envoy.ssl_curve";
+  // SSL signature algorithm for a connection
+  const std::string SSL_SIGALG = "envoy.ssl_sigalg";
+  // SSL version for a connection
+  const std::string SSL_VERSION = "envoy.ssl_version";
   // SSL cipher suite
   const std::string SSL_CIPHER_SUITE = "cipher_suite";
   // Stats prefix for the Client SSL Auth network filter

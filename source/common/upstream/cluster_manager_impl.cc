@@ -421,8 +421,6 @@ ClusterManagerImpl::ClusterManagerImpl(
           makeOptRefFromPtr(xds_config_tracker_.get()), {});
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      const std::string target_xds_authority =
-          Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or("");
       auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
       std::string name;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
@@ -1225,7 +1223,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
                             hosts_added, hosts_removed, weighted_priority_health,
                             overprovisioning_factor, std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
-  if (lb_factory_ != nullptr) {
+  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
     lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }

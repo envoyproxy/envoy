@@ -104,7 +104,6 @@ docker run --rm \
        "${VOLUMES[@]}" \
        -e AZP_BRANCH \
        -e AZP_COMMIT_SHA \
-       -e AZP_TARGET_BRANCH \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
@@ -114,13 +113,13 @@ docker run --rm \
        -e BAZEL_EXTRA_TEST_OPTIONS \
        -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
+       -e CI_TARGET_BRANCH \
        -e DOCKERHUB_USERNAME \
        -e DOCKERHUB_PASSWORD \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
        -e BAZEL_NO_CACHE_TEST_RESULTS \
        -e BAZEL_REMOTE_INSTANCE \
-       -e BAZEL_REMOTE_INSTANCE_BRANCH \
        -e GOOGLE_BES_PROJECT_ID \
        -e GCP_SERVICE_ACCOUNT_KEY \
        -e NUM_CPUS \
@@ -144,9 +143,6 @@ docker run --rm \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \
-       -e SLACK_TOKEN \
-       -e BUILD_URI\
-       -e REPO_URI \
        -e SYSTEM_STAGEDISPLAYNAME \
        -e SYSTEM_JOBDISPLAYNAME \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \

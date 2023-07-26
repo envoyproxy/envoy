@@ -548,10 +548,10 @@ public:
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
-  MOCK_METHOD(absl::optional<std::reference_wrapper<ShadowRouterHandle>>, submit,
+  MOCK_METHOD(OptRef<ShadowRouterHandle>, submit,
               (const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType), ());
 
-  absl::optional<std::reference_wrapper<ShadowRouterHandle>> router_handle_{absl::nullopt};
+  OptRef<ShadowRouterHandle> router_handle_{absl::nullopt};
 };
 
 } // namespace Router

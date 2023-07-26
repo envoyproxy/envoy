@@ -482,6 +482,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
