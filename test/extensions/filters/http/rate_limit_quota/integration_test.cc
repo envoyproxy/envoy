@@ -127,7 +127,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 // TODO(tyxia) google-gRPC start pointer is not null.
 TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
-  // SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
   initializeConfig(/*valid_rlqs_server=*/false);
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
@@ -136,6 +136,38 @@ TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
   auto response = sendClientRequest(&custom_headers);
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_,
                                                          std::chrono::milliseconds(25000)));
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlow) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+  // Send downstream client request to upstream.
+  auto response = sendClientRequest(&custom_headers);
+
+  // Start the gRPC stream to RLQS server.
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+  ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  rlqs_stream_->startGrpcStream();
+
+  // Send the response from RLQS server.
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+  rlqs_stream_->sendGrpcMessage(rlqs_response);
+
+  // Handle the request received by upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  // Verify the response to downstream.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
 }
 
 } // namespace
