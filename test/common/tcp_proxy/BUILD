@@ -77,6 +77,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
+    shard_count = 4,
     deps = [
         "//source/common/tcp_proxy",
         "//test/mocks/http:http_mocks",
