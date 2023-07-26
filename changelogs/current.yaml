@@ -209,6 +209,9 @@ bug_fixes:
     This was fixed now by marking the cookie as ``httpOnly``.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` to ``false``.
+
+    Fix `CVE-2023-35941 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-7mhv-gr67-hq55>`_.
+
 - area: opentelemetry/grpc/access log
   change: |
     Fixed a bug in the open telemetry access logger. This logger now uses the
@@ -277,9 +280,7 @@ bug_fixes:
     This prevents malicious clients from constructing credentials with permanent validity in some specific scenarios.
 - area: postgres
   change: |
-    enable parsing when using upstream SSL.
-
-    Fix `CVE-2023-35941 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-7mhv-gr67-hq55>`_.
+    Enable parsing when using upstream SSL.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
