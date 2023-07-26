@@ -21,9 +21,9 @@ public:
   // The following values are returned by the decoder, when filter
   // passes bytes of data via onData method:
   enum class Result {
-    ReadyForNext,  // Decoder processed previous message and is ready for the next message.
-    NeedMoreData,  // Decoder needs more data to reconstruct the message.
-    ProtocolError  // invalid SMTP
+    ReadyForNext, // Decoder processed previous message and is ready for the next message.
+    NeedMoreData, // Decoder needs more data to reconstruct the message.
+    ProtocolError // invalid SMTP
   };
 
   struct Command {
