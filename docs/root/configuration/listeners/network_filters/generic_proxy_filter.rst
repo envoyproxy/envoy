@@ -48,7 +48,7 @@ An abstract class ``Response`` is defined to represent the response. It is simil
 
 
 Based on the abstraction of the request/response, the generic proxy can handle the request/response stream, route the request to different upstreams,
-filter the request/response, etc. and need not to know the L7 application and specific data structure of the request/response.
+filter the request/response, etc. without needing to know the L7 application and specific data structure of the request/response.
 
 
 If the developers want to implement a new protocol proxying, they only need to implement the codec to parse the binary data to specific request/response
