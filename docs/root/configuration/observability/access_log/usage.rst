@@ -486,6 +486,42 @@ The following command operators are supported:
   UDP
     Not implemented ("-").
 
+%RESPONSE_FLAGS_FULL%
+  Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
+  the descriptions do not apply. Possible values are:
+
+  HTTP and TCP
+    * **NoHealthyUpstream**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
+    * **UpstreamConnectionFailure**: Upstream connection failure in addition to 503 response code.
+    * **UpstreamOverflow**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
+    * **NoRouteFound**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
+    * **UpstreamRetryLimitExceeded**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
+    * **NoClusterFound**: Upstream cluster not found.
+    * **DurationTimeout**: When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
+  HTTP only
+    * **DownstreamConnectionTermination**: Downstream connection termination.
+    * **FailedLocalHealthCheck**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
+    * **UpstreamRequestTimeout**: Upstream request timeout in addition to 504 response code.
+    * **LocalReset**: Connection local reset in addition to 503 response code.
+    * **UpstreamRemoteReset**: Upstream remote reset in addition to 503 response code.
+    * **UpstreamConnectionTermination**: Upstream connection termination in addition to 503 response code.
+    * **DelayInjected**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+    * **FaultInjected**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+    * **RateLimited**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+    * **UnauthorizedExternalService**: The request was denied by the external authorization service.
+    * **RateLimitServiceError**: The request was rejected because there was an error in rate limit service.
+    * **InvalidEnvoyRequestHeaders**: The request was rejected because it set an invalid value for a
+      :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
+    * **StreamIdleTimeout**: Stream idle timeout in addition to 408 or 504 response code.
+    * **DownstreamProtocolError**: The downstream request had an HTTP protocol error.
+    * **UpstreamProtocolError**: The upstream response had an HTTP protocol error.
+    * **UpstreamMaxStreamDurationReached**: The upstream request reached max stream duration.
+    * **OverloadManagerTerminated**: Overload Manager terminated the request.
+    * **DnsResolutionFailed**: The request was terminated due to DNS resolution failure.
+
+  UDP
+    Not implemented ("-").
+
 %ROUTE_NAME%
   HTTP/TCP
     Name of the route.

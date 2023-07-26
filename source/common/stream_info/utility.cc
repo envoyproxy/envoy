@@ -11,6 +11,21 @@
 namespace Envoy {
 namespace StreamInfo {
 
+const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info) {
+  // We don't expect more than 4 flags are set. Relax to 16 since the vector is allocated on stack
+  // anyway.
+  absl::InlinedVector<absl::string_view, 16> flag_strings;
+  for (const auto& [flag_string, flag] : ALL_RESPONSE_FULL_STRING_FLAGS) {
+    if (stream_info.hasResponseFlag(flag)) {
+      flag_strings.push_back(flag_string);
+    }
+  }
+  if (flag_strings.empty()) {
+    return std::string(NONE);
+  }
+  return absl::StrJoin(flag_strings, ",");
+}
+
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
   // We don't expect more than 4 flags are set. Relax to 16 since the vector is allocated on stack
   // anyway.

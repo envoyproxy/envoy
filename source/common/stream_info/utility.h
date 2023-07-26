@@ -15,6 +15,7 @@ namespace StreamInfo {
  */
 class ResponseFlagUtils {
 public:
+  static const std::string toString(const StreamInfo& stream_info);
   static const std::string toShortString(const StreamInfo& stream_info);
   static absl::optional<ResponseFlag> toResponseFlag(absl::string_view response_flag);
 
@@ -49,6 +50,40 @@ public:
   constexpr static absl::string_view OVERLOAD_MANAGER = "OM";
   constexpr static absl::string_view DNS_FAIL = "DF";
 
+  constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION_FULL =
+      "DownstreamConnectionTermination";
+  constexpr static absl::string_view FAILED_LOCAL_HEALTH_CHECK_FULL = "FailedLocalHealthCheck";
+  constexpr static absl::string_view NO_HEALTHY_UPSTREAM_FULL = "NoHealthyUpstream";
+  constexpr static absl::string_view UPSTREAM_REQUEST_TIMEOUT_FULL = "UpstreamRequestTimeout";
+  constexpr static absl::string_view LOCAL_RESET_FULL = "LocalReset";
+  constexpr static absl::string_view UPSTREAM_REMOTE_RESET_FULL = "UpstreamRemoteReset";
+  constexpr static absl::string_view UPSTREAM_CONNECTION_FAILURE_FULL = "UpstreamConnectionFailure";
+  constexpr static absl::string_view UPSTREAM_CONNECTION_TERMINATION_FULL =
+      "UpstreamConnectionTermination";
+  constexpr static absl::string_view UPSTREAM_OVERFLOW_FULL = "UpstreamOverflow";
+  constexpr static absl::string_view UPSTREAM_RETRY_LIMIT_EXCEEDED_FULL =
+      "UpstreamRetryLimitExceeded";
+  constexpr static absl::string_view NO_ROUTE_FOUND_FULL = "NoRouteFound";
+  constexpr static absl::string_view DELAY_INJECTED_FULL = "DelayInjected";
+  constexpr static absl::string_view FAULT_INJECTED_FULL = "FaultInjected";
+  constexpr static absl::string_view RATE_LIMITED_FULL = "RateLimited";
+  constexpr static absl::string_view UNAUTHORIZED_EXTERNAL_SERVICE_FULL =
+      "UnauthorizedExternalService";
+  constexpr static absl::string_view RATELIMIT_SERVICE_ERROR_FULL = "RateLimitServiceError";
+  constexpr static absl::string_view STREAM_IDLE_TIMEOUT_FULL = "StreamIdleTimeout";
+  constexpr static absl::string_view INVALID_ENVOY_REQUEST_HEADERS_FULL =
+      "InvalidEnvoyRequestHeaders";
+  constexpr static absl::string_view DOWNSTREAM_PROTOCOL_ERROR_FULL = "DownstreamProtocolError";
+  constexpr static absl::string_view UPSTREAM_MAX_STREAM_DURATION_REACHED_FULL =
+      "UpstreamMaxStreamDurationReached";
+  constexpr static absl::string_view RESPONSE_FROM_CACHE_FILTER_FULL = "ResponseFromCacheFilter";
+  constexpr static absl::string_view NO_FILTER_CONFIG_FOUND_FULL = "NoFilterConfigFound";
+  constexpr static absl::string_view DURATION_TIMEOUT_FULL = "DurationTimeout";
+  constexpr static absl::string_view UPSTREAM_PROTOCOL_ERROR_FULL = "UpstreamProtocolError";
+  constexpr static absl::string_view NO_CLUSTER_FOUND_FULL = "NoClusterFound";
+  constexpr static absl::string_view OVERLOAD_MANAGER_FULL = "OverloadManagerTerminated";
+  constexpr static absl::string_view DNS_FAIL_FULL = "DnsResolutionFailed";
+
   static constexpr std::array ALL_RESPONSE_STRING_FLAGS{
       FlagStringAndEnum{FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck},
       FlagStringAndEnum{NO_HEALTHY_UPSTREAM, ResponseFlag::NoHealthyUpstream},
@@ -79,6 +114,42 @@ public:
       FlagStringAndEnum{UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
       FlagStringAndEnum{NO_CLUSTER_FOUND, ResponseFlag::NoClusterFound},
       FlagStringAndEnum{OVERLOAD_MANAGER, ResponseFlag::OverloadManager},
+  };
+
+  static constexpr std::array ALL_RESPONSE_FULL_STRING_FLAGS{
+      FlagStringAndEnum{FAILED_LOCAL_HEALTH_CHECK_FULL, ResponseFlag::FailedLocalHealthCheck},
+      FlagStringAndEnum{NO_HEALTHY_UPSTREAM_FULL, ResponseFlag::NoHealthyUpstream},
+      FlagStringAndEnum{UPSTREAM_REQUEST_TIMEOUT_FULL, ResponseFlag::UpstreamRequestTimeout},
+      FlagStringAndEnum{LOCAL_RESET_FULL, ResponseFlag::LocalReset},
+      FlagStringAndEnum{UPSTREAM_REMOTE_RESET_FULL, ResponseFlag::UpstreamRemoteReset},
+      FlagStringAndEnum{UPSTREAM_CONNECTION_FAILURE_FULL, ResponseFlag::UpstreamConnectionFailure},
+      FlagStringAndEnum{UPSTREAM_CONNECTION_TERMINATION_FULL,
+                        ResponseFlag::UpstreamConnectionTermination},
+      FlagStringAndEnum{UPSTREAM_OVERFLOW_FULL, ResponseFlag::UpstreamOverflow},
+      FlagStringAndEnum{NO_ROUTE_FOUND_FULL, ResponseFlag::NoRouteFound},
+      FlagStringAndEnum{DELAY_INJECTED_FULL, ResponseFlag::DelayInjected},
+      FlagStringAndEnum{FAULT_INJECTED_FULL, ResponseFlag::FaultInjected},
+      FlagStringAndEnum{RATE_LIMITED_FULL, ResponseFlag::RateLimited},
+      FlagStringAndEnum{UNAUTHORIZED_EXTERNAL_SERVICE_FULL,
+                        ResponseFlag::UnauthorizedExternalService},
+      FlagStringAndEnum{RATELIMIT_SERVICE_ERROR_FULL, ResponseFlag::RateLimitServiceError},
+      FlagStringAndEnum{DOWNSTREAM_CONNECTION_TERMINATION_FULL,
+                        ResponseFlag::DownstreamConnectionTermination},
+      FlagStringAndEnum{UPSTREAM_RETRY_LIMIT_EXCEEDED_FULL,
+                        ResponseFlag::UpstreamRetryLimitExceeded},
+      FlagStringAndEnum{STREAM_IDLE_TIMEOUT_FULL, ResponseFlag::StreamIdleTimeout},
+      FlagStringAndEnum{INVALID_ENVOY_REQUEST_HEADERS_FULL,
+                        ResponseFlag::InvalidEnvoyRequestHeaders},
+      FlagStringAndEnum{DOWNSTREAM_PROTOCOL_ERROR_FULL, ResponseFlag::DownstreamProtocolError},
+      FlagStringAndEnum{UPSTREAM_MAX_STREAM_DURATION_REACHED_FULL,
+                        ResponseFlag::UpstreamMaxStreamDurationReached},
+      FlagStringAndEnum{RESPONSE_FROM_CACHE_FILTER_FULL, ResponseFlag::ResponseFromCacheFilter},
+      FlagStringAndEnum{NO_FILTER_CONFIG_FOUND_FULL, ResponseFlag::NoFilterConfigFound},
+      FlagStringAndEnum{DURATION_TIMEOUT_FULL, ResponseFlag::DurationTimeout},
+      FlagStringAndEnum{UPSTREAM_PROTOCOL_ERROR_FULL, ResponseFlag::UpstreamProtocolError},
+      FlagStringAndEnum{NO_CLUSTER_FOUND_FULL, ResponseFlag::NoClusterFound},
+      FlagStringAndEnum{OVERLOAD_MANAGER_FULL, ResponseFlag::OverloadManager},
+      FlagStringAndEnum{DNS_FAIL_FULL, ResponseFlag::DnsResolutionFailed},
   };
 
 private:
