@@ -50,7 +50,7 @@ public:
   ~OriginalDstClusterHandle();
 
 private:
-  const std::shared_ptr<OriginalDstCluster> cluster_;
+  std::shared_ptr<OriginalDstCluster> cluster_;
   friend class OriginalDstCluster;
 };
 

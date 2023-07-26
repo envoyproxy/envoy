@@ -128,6 +128,8 @@ public:
   virtual void envoyGoFilterOnUpstreamData(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                            GoInt slice_num, GoInt end_of_stream) PURE;
   virtual void envoyGoFilterOnUpstreamEvent(void* w, GoInt event) PURE;
+
+  virtual void envoyGoFilterOnSemaDec(void* w) PURE;
 };
 
 class NetworkFilterDsoImpl : public NetworkFilterDso {
@@ -152,6 +154,8 @@ public:
                                    GoInt end_of_stream) override;
   void envoyGoFilterOnUpstreamEvent(void* w, GoInt event) override;
 
+  void envoyGoFilterOnSemaDec(void* w) override;
+
 private:
   GoUint64 (*envoy_go_filter_on_network_filter_config_)(GoUint64 library_id_ptr,
                                                         GoUint64 library_id_len,
@@ -172,6 +176,8 @@ private:
   void (*envoy_go_filter_on_upstream_data_)(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                             GoInt slice_num, GoInt end_of_stream) = {nullptr};
   void (*envoy_go_filter_on_upstream_event_)(void* w, GoInt event) = {nullptr};
+
+  void (*envoy_go_filter_on_sema_dec_)(void* w) = {nullptr};
 };
 
 using NetworkFilterDsoPtr = std::shared_ptr<NetworkFilterDso>;

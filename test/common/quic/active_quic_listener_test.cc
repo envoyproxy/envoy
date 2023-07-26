@@ -501,6 +501,29 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
 
+TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
+  initialize();
+  maybeConfigureMocks(/* connection_count = */ 2);
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_reject_all"));
+  sendCHLO(quic::test::TestConnectionId(1));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
+
+  // Reject all packet.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_reject_all", true);
+  sendCHLO(quic::test::TestConnectionId(2));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // No new connection was created.
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
+
+  // Stop rejecting traffic.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_reject_all", false);
+  sendCHLO(quic::test::TestConnectionId(2));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
+  EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
+}
+
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {
 protected:
   std::string yamlForQuicConfig() override {
