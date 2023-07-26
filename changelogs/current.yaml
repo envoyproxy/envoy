@@ -266,6 +266,9 @@ bug_fixes:
     Fixed a cookie validator bug that meant the HMAC calculation could be the same for different payloads.
 
     This prevents malicious clients from constructing credentials with permanent validity in some specific scenarios.
+- area: postgres
+  change: |
+    enable parsing when using upstream SSL.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
