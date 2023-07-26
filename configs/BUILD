@@ -19,6 +19,7 @@ py_binary(
     data = glob([
         "*.yaml",
     ]),
+    python_version = "PY3",
     deps = [
         requirement("jinja2"),
     ],
