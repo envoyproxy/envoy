@@ -164,6 +164,9 @@ bug_fixes:
   change: |
     Switched Envoy internal scheme checks from case sensitive to case insensitive. This behaviorial change can be temporarily
     reverted by setting runtime guard ``envoy.reloadable_features.handle_uppercase_scheme`` to ``false``.
+
+    Fix `CVE-2023-35944 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-pvgm-7jpg-pw5g>`_.
+
 - area: ext_authz
   change: |
     Fix a bug where the ext_authz filter will ignore the request body when the
@@ -212,6 +215,9 @@ bug_fixes:
     server scope for stats instead of the listener's global scope. This fixes a
     use-after-free that can occur if the listener is drained but the cached
     gRPC access logger uses the listener's global scope for stats.
+
+    Fix `CVE-2023-35942 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-69vr-g55c-v2v4>`_.
+
 - area: dependency
   change: |
     update Wasmtime and related deps -> 9.0.3 to resolve
@@ -261,6 +267,9 @@ bug_fixes:
   change: |
     Fix a use-after-free bug that occurs in the CORS filter if the ``origin`` header is removed between
     request header decoding and response header encoding.
+
+    Fix `CVE-2023-35943 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-mc6h-6j9x-v3gq>`_.
+
 - area: oauth2
   change: |
     Fixed a cookie validator bug that meant the HMAC calculation could be the same for different payloads.
@@ -269,6 +278,8 @@ bug_fixes:
 - area: postgres
   change: |
     enable parsing when using upstream SSL.
+
+    Fix `CVE-2023-35941 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-7mhv-gr67-hq55>`_.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
