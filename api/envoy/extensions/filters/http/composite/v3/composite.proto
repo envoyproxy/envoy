@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.composite.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/config_source.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -35,5 +36,15 @@ message Composite {
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
 // This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
 message ExecuteFilterAction {
-  config.core.v3.TypedExtensionConfig typed_config = 1;
+  oneof config_type {
+    // Filter specific configuration which depends on the filter being
+    // instantiated. See the supported filters for further documentation.
+    // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
+    config.core.v3.TypedExtensionConfig typed_config = 1;
+
+    // Configuration source specifier for an extension configuration discovery
+    // service. In case of a failure and without the default configuration, the
+    // listener closes the connections.
+    config.core.v3.ExtensionConfigSource config_discovery = 2;
+  }
 }
