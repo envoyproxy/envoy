@@ -119,7 +119,7 @@ generic proxy. The dubbo codec is a good example showing how to implement a new 
 
 
 You could find the dubbo codec implementation in :repo:`contrib/generic_proxy/filters/network/source/codecs/dubbo` directory. You can also configure the
-dubbo codec in the generic proxy by following configuration:
+dubbo codec in the generic proxy with the following configuration:
 
 
 .. literalinclude:: _include/generic_proxy_filter.yaml
