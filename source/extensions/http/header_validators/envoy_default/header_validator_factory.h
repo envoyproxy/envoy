@@ -23,6 +23,11 @@ public:
   createClientHeaderValidator(::Envoy::Http::Protocol protocol,
                               ::Envoy::Http::HeaderValidatorStats& stats) override;
 
+  const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
+  getConfigurationForTestsOnly() const {
+    return config_;
+  }
+
 private:
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

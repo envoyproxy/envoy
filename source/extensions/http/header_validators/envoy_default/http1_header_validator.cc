@@ -313,6 +313,13 @@ ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeader
     if (!path_result.ok()) {
       return path_result;
     }
+  } else {
+    // Path normalization includes sanitization of encoded slashes for performance reasons.
+    // If normalization is disabled, sanitize encoded slashes here
+    auto result = sanitizeEncodedSlashes(header_map);
+    if (!result.ok()) {
+      return result;
+    }
   }
   return ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::success();
 }
