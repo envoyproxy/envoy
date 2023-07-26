@@ -62,7 +62,7 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool) {
   Decoder::Result res = decoder_->decodeCommand(frontend_buffer_, command);
 
   switch (res) {
-  case Decoder::Result::Bad: {
+  case Decoder::Result::ProtocolError: {
     config_->stats_.sessions_bad_line_.inc();
     Buffer::OwnedImpl err("500 syntax error\r\n");
     write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
@@ -177,7 +177,7 @@ Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool) {
   Decoder::Response response;
   Decoder::Result res = decoder_->decodeResponse(backend_buffer_, response);
   switch (res) {
-  case Decoder::Result::Bad: {
+  case Decoder::Result::ProtocolError: {
     Buffer::OwnedImpl err("451 upstream syntax error\r\n");
     write_callbacks_->injectWriteDataToFilterChain(err, /*end_stream=*/true);
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

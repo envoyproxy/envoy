@@ -28,7 +28,7 @@ TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
   EXPECT_EQ(Decoder::Result::NeedMoreData, decoder_->decodeCommand(data_, command));
 
   data_.add("\r\n");
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Result::ProtocolError, decoder_->decodeCommand(data_, command));
   data_.drain(data_.length());
 
   data_.add(std::string(1022, 'q'));
@@ -42,7 +42,7 @@ TEST_F(SmtpProxyDecoderTest, DecodeCommand) {
 
   data_.add(std::string(1023, 'q'));
   data_.add("\r\n");
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeCommand(data_, command));
+  EXPECT_EQ(Decoder::Result::ProtocolError, decoder_->decodeCommand(data_, command));
   data_.drain(data_.length());
 
   data_.add("fOo bar\r\n");
@@ -89,7 +89,7 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
   data_.add("200 ");
   data_.add(std::string(1019, 'q'));
   data_.add("\r\n");
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ProtocolError, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   // exactly 64KiB response is accepted
@@ -116,7 +116,7 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
     }
     max_line[3] = ' ';
     data_.add(max_line);
-    EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
+    EXPECT_EQ(Decoder::Result::ProtocolError, decoder_->decodeResponse(data_, response));
     data_.drain(data_.length());
   }
 
@@ -128,15 +128,15 @@ TEST_F(SmtpProxyDecoderTest, DecodeResponse) {
   EXPECT_EQ(8, response.wire_len);
 
   data_.add("qqq \r\n"); // isdigit
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ProtocolError, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   data_.add("123q\r\n"); // space or dash
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ProtocolError, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   data_.add("123-q\r\n321 q\r\n"); // codes must match
-  EXPECT_EQ(Decoder::Result::Bad, decoder_->decodeResponse(data_, response));
+  EXPECT_EQ(Decoder::Result::ProtocolError, decoder_->decodeResponse(data_, response));
   data_.drain(data_.length());
 
   data_.add("200 ok\r\n");

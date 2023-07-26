@@ -41,10 +41,10 @@ using RawLinePtr = std::unique_ptr<char[]>;
 
 Decoder::Result getLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_line,
                         absl::string_view& line, size_t max_line) {
-  ssize_t crlf = data.search(CRLF.data(), CRLF.size(), start, max_line);
+  const ssize_t crlf = data.search(CRLF.data(), CRLF.size(), start, max_line);
   if (crlf == -1) {
     if (data.length() >= max_line) {
-      return Decoder::Result::Bad;
+      return Decoder::Result::ProtocolError;
     } else {
       return Decoder::Result::NeedMoreData;
     }
@@ -52,7 +52,7 @@ Decoder::Result getLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_li
   ASSERT(crlf >= 0);
   // empty line is invalid
   if (static_cast<size_t>(crlf) == start) {
-    return Decoder::Result::Bad;
+    return Decoder::Result::ProtocolError;
   }
 
   size_t len = crlf + CRLF.size() - start;
@@ -118,24 +118,24 @@ Decoder::Result DecoderImpl::decodeResponse(Buffer::Instance& data, Response& re
   std::string msg;
   for (;;) {
     absl::string_view line;
-    Result res = getLine(data, line_off, raw_line, line, kMaxReplyLine);
+    const Result res = getLine(data, line_off, raw_line, line, kMaxReplyLine);
     if (res != Result::ReadyForNext) {
       return res;
     }
     line_off += line.size();
     if (line_off > kMaxReplyBytes) {
-      return Result::Bad;
+      return Result::ProtocolError;
     }
     // https://www.rfc-editor.org/rfc/rfc5321.html#section-4.2
     //  Reply-line     = *( Reply-code "-" [ textstring ] CRLF )
     //                 Reply-code [ SP textstring ] CRLF
     //  Reply-code     = %x32-35 %x30-35 %x30-39
     if (line.size() < 3) {
-      return Result::Bad;
+      return Result::ProtocolError;
     }
     for (int i = 0; i < 3; ++i) {
       if (!absl::ascii_isdigit(line[i])) {
-        return Result::Bad;
+        return Result::ProtocolError;
       }
     }
     absl::string_view code_str = line.substr(0, 3);
@@ -144,7 +144,7 @@ Decoder::Result DecoderImpl::decodeResponse(Buffer::Instance& data, Response& re
     ASSERT(atoi_result);
 
     if (code && this_code != *code) {
-      return Result::Bad;
+      return Result::ProtocolError;
     }
     code = this_code;
 
@@ -153,7 +153,7 @@ Decoder::Result DecoderImpl::decodeResponse(Buffer::Instance& data, Response& re
     if (!line.empty() && line != CRLF) {
       sp_or_dash = line[0];
       if (sp_or_dash != ' ' && sp_or_dash != '-') {
-        return Result::Bad;
+        return Result::ProtocolError;
       }
       line = line.substr(1);
       absl::StrAppend(&msg, line);
@@ -166,7 +166,7 @@ Decoder::Result DecoderImpl::decodeResponse(Buffer::Instance& data, Response& re
     }
   }
   if (!code) {
-    return Result::Bad; // assert
+    return Result::ProtocolError; // assert
   }
   result.code = *code;
   result.msg = msg;
