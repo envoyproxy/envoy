@@ -91,7 +91,7 @@ By default, the generic proxy supports following input and matcher:
 Asynchronous codec API
 ----------------------
 
-The generic proxy provides extension point to let the developers to implement specific codec for their own protocol. The codec API is designed to be
+The generic proxy provides an extension point to let the developers implement a codec specific to their own protocol. The codec API is designed to be
 asynchronous to avoid blocking the worker thread. And the asynchronous codec API make it is possible to accelerate the codec by offloading the parsing
 work to specific hardware.
 
