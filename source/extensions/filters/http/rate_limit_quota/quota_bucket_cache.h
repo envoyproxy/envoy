@@ -9,6 +9,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/rate_limit_quota/client.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +24,7 @@ using BucketQuotaUsage =
     ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
 
 // Forward declaration
-class RateLimitClientImpl;
+// class RateLimitClientImpl;
 
 // Customized hash and equal struct for `BucketId` hash key.
 struct BucketIdHash {
@@ -47,7 +48,12 @@ struct Bucket {
   Bucket(Bucket&& bucket) = default;
   Bucket& operator=(Bucket&& bucket) = default;
 
-  virtual ~Bucket() = default;
+  ~Bucket() {
+    // Close stream
+    // TODO(tyxia) filter test failure related to here.
+    // rate_limit_client->closeStream();
+  }
+
   // TODO(tyxia) Each bucket owns the unique grpc client for sending the quota usage report
   // periodically.
   // std::unique_ptr<RateLimitClientImpl> rate_limit_client;
@@ -57,12 +63,18 @@ struct Bucket {
   // The timer for sending the reports periodically.
   Event::TimerPtr send_reports_timer;
   // Cached bucket action from the response that was received from the RLQS server.
-  BucketAction bucket_action;
+  // BucketAction bucket_action;
+  // TODO(tyxia) Thread local storage should take the ownership of all the objects so that
+  // it is also responsible for destruction.
+  std::unique_ptr<BucketAction> bucket_action;
   // TODO(tyxia) No need to store bucket ID  as it is already the key of BucketsContainer.
+  // TODO(tyxia) Seems unused
   BucketQuotaUsage quota_usage;
 };
 
-using BucketsContainer = absl::node_hash_map<BucketId, Bucket, BucketIdHash, BucketIdEqual>;
+// using BucketsContainer = absl::node_hash_map<BucketId, Bucket, BucketIdHash, BucketIdEqual>;
+using BucketsContainer =
+    absl::node_hash_map<BucketId, std::unique_ptr<Bucket>, BucketIdHash, BucketIdEqual>;
 
 class ThreadLocalBucket : public Envoy::ThreadLocal::ThreadLocalObject {
 public:

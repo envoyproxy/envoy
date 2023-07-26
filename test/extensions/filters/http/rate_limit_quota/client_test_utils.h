@@ -91,6 +91,7 @@ public:
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   RateLimitClientPtr client_;
+  // std::unique_ptr<RateLimitClient> client_;
   MockRateLimitQuotaCallbacks callbacks_;
   bool external_inited_ = false;
   bool start_failed_ = false;

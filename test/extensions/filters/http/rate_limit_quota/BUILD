@@ -109,7 +109,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/rate_limit_quota:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
-        "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",

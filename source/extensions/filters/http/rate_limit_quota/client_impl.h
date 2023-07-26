@@ -50,17 +50,14 @@ public:
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
-  // RateLimitClient
-
-  absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
-  void closeStream();
-
   // Build the usage report (i.e., the request sent to RLQS server).
   RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain, const BucketId& bucket_id);
+
+  // RateLimitClient
+  absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
+  void closeStream() override;
   // Send the usage report to RLQS server
   void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id) override;
-
-  void setStreamClosed() { stream_closed_ = true; }
 
 private:
   // Store the client as the bare object since there is no ownership transfer involved.

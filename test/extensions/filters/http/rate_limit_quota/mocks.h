@@ -26,8 +26,10 @@ public:
   MockRateLimitClient() = default;
   ~MockRateLimitClient() override = default;
 
-  MOCK_METHOD(void, rateLimit, (RateLimitQuotaCallbacks & callbacks));
   MOCK_METHOD(absl::Status, startStream, (const StreamInfo::StreamInfo&));
+  MOCK_METHOD(void, closeStream, ());
+  MOCK_METHOD(void, sendUsageReport,
+              (absl::string_view, absl::optional<envoy::service::rate_limit_quota::v3::BucketId>));
 };
 
 } // namespace RateLimitQuota

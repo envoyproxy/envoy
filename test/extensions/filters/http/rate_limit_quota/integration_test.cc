@@ -11,7 +11,6 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -32,7 +31,7 @@ protected:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
 
-    // Create separate "upstreams" for rate limit quota server
+    // Create separate side stream for rate limit quota server
     for (int i = 0; i < 2; ++i) {
       grpc_upstreams_.push_back(&addFakeUpstream(Http::CodecType::HTTP2));
     }
@@ -91,8 +90,9 @@ protected:
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
-  IntegrationStreamDecoderPtr sendDownstreamRequest(
-      const absl::flat_hash_map<std::string, std::string>* custom_headers = nullptr) {
+  // Send downstream client request.
+  IntegrationStreamDecoderPtr
+  sendClientRequest(const absl::flat_hash_map<std::string, std::string>* custom_headers = nullptr) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
@@ -106,19 +106,18 @@ protected:
   }
 
   void TearDown() override {
-    if (processor_connection_) {
-      ASSERT_TRUE(processor_connection_->close());
-      ASSERT_TRUE(processor_connection_->waitForDisconnect());
+    if (rlqs_connection_) {
+      ASSERT_TRUE(rlqs_connection_->close());
+      ASSERT_TRUE(rlqs_connection_->waitForDisconnect());
     }
     cleanupUpstreamAndDownstream();
-    // codec_client_.reset();
   }
 
   envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig
       proto_config_{};
   std::vector<FakeUpstream*> grpc_upstreams_;
-  FakeHttpConnectionPtr processor_connection_;
-  FakeStreamPtr processor_stream_;
+  FakeHttpConnectionPtr rlqs_connection_;
+  FakeStreamPtr rlqs_stream_;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -128,15 +127,14 @@ INSTANTIATE_TEST_SUITE_P(
 
 // TODO(tyxia) google-gRPC start pointer is not null.
 TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
-  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+  // SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
   initializeConfig(/*valid_rlqs_server=*/false);
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
                                                                   {"group", "envoy"}};
   // TODO(tyxia) Here is the key to fix envoy_grpc memory issue.
-  auto response = sendDownstreamRequest(&custom_headers);
-  // sendDownstreamRequest(&custom_headers);
-  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
+  auto response = sendClientRequest(&custom_headers);
+  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_,
                                                          std::chrono::milliseconds(25000)));
 }
 

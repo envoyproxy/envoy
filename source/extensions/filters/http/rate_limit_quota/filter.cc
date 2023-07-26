@@ -29,41 +29,46 @@ RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
   //   // We just use fail-open (i.e. ALLOW_ALL) here.
   //   return Envoy::Http::FilterHeadersStatus::Continue;
   // }
-  Bucket new_bucket = {};
+  // Allocate new bucket.
+  std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
   // Create the gRPC client.
-  new_bucket.rate_limit_client = createRateLimitClient(factory_context_, config_->rlqs_server(),
-                                                       *this, quota_buckets_, quota_usage_reports_);
+  new_bucket->rate_limit_client = createRateLimitClient(
+      factory_context_, config_->rlqs_server(), *this, quota_buckets_, quota_usage_reports_);
   // It can not be nullptr based on current implementation.
-  ASSERT(new_bucket.rate_limit_client != nullptr);
+  ASSERT(new_bucket->rate_limit_client != nullptr);
 
   // Start the streaming on the first request.
-  auto status = new_bucket.rate_limit_client->startStream(callbacks_->streamInfo());
+  auto status = new_bucket->rate_limit_client->startStream(callbacks_->streamInfo());
   if (!status.ok()) {
     ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   initiating_call_ = true;
+
+  // Store the bucket into the quota bucket container.
+  quota_buckets_[bucket_id] = std::move(new_bucket);
+
   // Send the usage report to RLQS server immediately on the first time when the request is
   // matched.
   // TODO(tyxia) Due to the lifetime concern of the bucket_id, I switch from pointer to
   // absl::optional
-  new_bucket.rate_limit_client->sendUsageReport(config_->domain(), bucket_id);
+  quota_buckets_[bucket_id]->rate_limit_client->sendUsageReport(config_->domain(), bucket_id);
 
   // Set up the quota usage report method that sends the reports the RLS server periodically.
-  new_bucket.send_reports_timer =
+  quota_buckets_[bucket_id]->send_reports_timer =
       // TODO(tyxia) Timer should be on localThread dispatcher !!!
       // decode callback's dispatcher ----- worker thread dispatcher!!!!
-      callbacks_->dispatcher().createTimer([&new_bucket, this]() -> void {
+      callbacks_->dispatcher().createTimer([&bucket_id, this]() -> void {
         // No `BucketID` is provided (i.e., absl::nullopt) in periodical reports for quota usage.
-        new_bucket.rate_limit_client->sendUsageReport(config_->domain(), absl::nullopt);
+        quota_buckets_[bucket_id]->rate_limit_client->sendUsageReport(config_->domain(),
+                                                                      absl::nullopt);
       });
   // Set the reporting interval.
   const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
-  new_bucket.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
+  quota_buckets_[bucket_id]->send_reports_timer->enableTimer(
+      std::chrono::milliseconds(reporting_interval));
 
-  // Store the bucket into the quota bucket container.
-  quota_buckets_[bucket_id] = std::move(new_bucket);
   initiating_call_ = false;
   // TODO(tyxia) Do we need to stop here???
   // Stop the iteration for headers as well as data and trailers for the current filter and the
@@ -198,7 +203,6 @@ void RateLimitQuotaFilter::onDestroy() {
   // TODO(tyxia) Clean up resource. Should close on quota bucket destroy.
   // for (auto& bucket : quota_buckets_) {
   //     bucket.second.rate_limit_client->closeStream();
-  //     bucket.second.rate_limit_client->setStreamClosed();
   // }
 }
 

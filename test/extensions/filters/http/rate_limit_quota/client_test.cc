@@ -6,10 +6,6 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 namespace {
 
-// using Server::Configuration::MockFactoryContext;
-// using testing::Invoke;
-// using testing::Unused;
-
 constexpr char SingleBukcetId[] = R"EOF(
   bucket:
     "fairshare_group_id":
@@ -42,7 +38,7 @@ TEST_F(RateLimitClientTest, SendUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
-  bool end_stream = true;
+  bool end_stream = false;
   // Send quota usage report and ensure that we get it.
   EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, end_stream));
   test_client.client_->sendUsageReport("cloud_12345_67890_td_rlqs", bucket_id);
@@ -62,7 +58,7 @@ TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
   test_client.stream_callbacks_->onReceiveInitialMetadata(std::move(empty_response_headers));
 
   // Send empty report and ensure that we get it.
-  EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, true));
+  EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, false));
   test_client.client_->sendUsageReport("cloud_12345_67890_td_rlqs", absl::nullopt);
 
   // `onQuotaResponse` callback is expected to be called.

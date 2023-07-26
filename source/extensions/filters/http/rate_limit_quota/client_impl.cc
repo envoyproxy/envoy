@@ -64,10 +64,10 @@ void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
   // In periodical report case, there is no bucked id provided because client just reports
   // based on the cached report which is also updated every time we build the report (i.e.,
   // buildUsageReport is called).
-  // TODO(tyxia) end_stream!!
+  // TODO(tyxia) end_stream means send and close.
   stream_->sendMessage(bucket_id.has_value() ? buildUsageReport(domain, bucket_id.value())
                                              : reports_,
-                       /*end_stream=*/true);
+                       /*end_stream=*/false);
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
@@ -79,7 +79,9 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
     //   continue;
     // }
     // TODO(tyxia) Extend lifetime and store in the bucket.
-    quota_buckets_[action.bucket_id()].bucket_action = std::move(action);
+    BucketId bucket_id = action.bucket_id();
+    quota_buckets_[bucket_id]->bucket_action = std::make_unique<BucketAction>(std::move(action));
+    // quota_buckets_[action.bucket_id()].bucket_action = std::move(action);
   }
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
   callbacks_.onQuotaResponse(*response);
@@ -97,7 +99,7 @@ void RateLimitClientImpl::closeStream() {
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
   // TODO(tyxia) Add implementation later.
-  // stream_closed_ = true;
+  stream_closed_ = true;
   closeStream();
 }
 
