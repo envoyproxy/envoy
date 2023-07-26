@@ -108,7 +108,7 @@ used only by requests that come from the related downstream connection. This is 
 
 
 Developers can also operate the downstream connection and upstream connection in the codec directly. This gives developers more control
-of the connection.
+over the connection.
 
 
 Example codec implementation
