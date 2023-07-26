@@ -25,7 +25,7 @@ based on the request properties. For these similar protocols, their network filt
 * Observability: tracing, metrics, logging, etc.
 
 
-Except the codec, all other modules are common and could be shared by different protocols. This is the motivation of generic proxy.
+With the exception of the codec, all other modules are common and could be shared by different protocols. This is the motivation of generic proxy.
 
 
 Generic proxy is a network filter that could be used to implement new protocol proxying. An extension point is provided to let the users
