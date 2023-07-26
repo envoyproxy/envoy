@@ -99,8 +99,7 @@ work to specific hardware.
 Configurable connection
 -----------------------
 
-Different protocols may have different connection lifecycle or connection management. The generic proxy provides additional options to let the developers
-of codec to configure the connection lifecycle and connection management.
+Different protocols may have different connection lifecycles or connection management. The generic proxy provides additional options to let codec developers configure the connection lifecycle and connection management.
 
 
 For example, the developers could configure the upstream connection be bound to the downstream connection or not. If the upstream connection is bound to
