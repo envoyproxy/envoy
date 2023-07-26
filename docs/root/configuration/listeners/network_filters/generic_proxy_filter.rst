@@ -102,9 +102,9 @@ Configurable connection
 Different protocols may have different connection lifecycles or connection management. The generic proxy provides additional options to let codec developers configure the connection lifecycle and connection management.
 
 
-For example, the developers could configure the upstream connection be bound to the downstream connection or not. If the upstream connection is bound to
-the downstream connection, the upstream connection will have same lifetime with the downstream connection. And the bound upstream connection will be
-used only by the requests come from related downstream connection. This is useful for the protocols that need to keep the connection state.
+For example, developers can configure whether the upstream connection is bound to the downstream connection or not. If the upstream connection is bound to
+the downstream connection, the upstream connection will have same lifetime as the downstream connection. The bound upstream connection will be
+used only by requests that come from the related downstream connection. This is useful for the protocols that need to keep the connection state.
 
 
 In addition, the developers could operate the downstream connection and upstream connection in the codec directly. This give the developers more control
