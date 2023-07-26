@@ -42,7 +42,7 @@ In the generic proxy, the codec is extended and could be configured by users, bu
 protocols. These different request/response data structures of different protocols need to be abstracted and managed in a common abstraction.
 
 
-An abstract class ``Request`` is defined to represent the request. The ``Request`` provides some virtual methods to get/set the request properties.
+An abstract ``Request`` class is defined to represent the request. The ``Request`` provides some virtual methods to get/set the request properties.
 Different protocols can extend the ``Request`` and implement the virtual methods to get/set the request properties in their own data structure.
 An abstract class ``Response`` is defined to represent the response. It is similar to ``Request``.
 
