@@ -16,6 +16,7 @@ namespace {
 
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 // This test suite runs the same tests against both H/1 and H/2 header validators.
 class HttpCommonValidationTest : public HeaderValidatorTest,
@@ -70,6 +71,29 @@ TEST_P(HttpCommonValidationTest, MalformedUrlEncodingRejectedWithOverride) {
 
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers), "uhv.invalid_url");
+}
+
+TEST_P(HttpCommonValidationTest, PathWithFragmentRejectedByDefault) {
+  TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                   {":path", "/path/with?query=and#fragment"},
+                                   {":authority", "envoy.com"},
+                                   {":method", "GET"}};
+  auto uhv = createUhv(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
+                             UhvResponseCodeDetail::get().FragmentInUrlPath);
+}
+
+TEST_P(HttpCommonValidationTest, FragmentStrippedFromPathWhenConfigured) {
+  TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                   {":path", "/path/with?query=and#fragment"},
+                                   {":authority", "envoy.com"},
+                                   {":method", "GET"}};
+  auto uhv = createUhv(fragment_in_path_allowed);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(headers.path(), "/path/with?query=and");
 }
 
 } // namespace

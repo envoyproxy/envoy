@@ -155,6 +155,8 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             config.common_http_protocol_options().headers_with_underscores_action()));
+    uhv_config.set_strip_fragment_from_path(!Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.http_reject_path_with_fragment"));
     legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
     legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
   }

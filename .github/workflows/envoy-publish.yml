@@ -12,7 +12,11 @@ on:
         description: "Ref for grouping PRs"
 
 concurrency:
-  group: ${{ github.event.inputs.head_ref || github.run_id }}-${{ github.workflow }}
+  group: |
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}
   cancel-in-progress: true
 
 permissions:
