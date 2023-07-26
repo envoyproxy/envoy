@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/router/router.h"
+
 #include "source/common/http/hash_policy.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/config_impl.h"
