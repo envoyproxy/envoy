@@ -4,6 +4,7 @@
 
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/path_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
@@ -46,6 +47,7 @@ constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithBackSlashAllowed = {
 
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
+using ::Envoy::Http::PathUtil;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
@@ -143,7 +145,7 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   // The validation mode controls whether uppercase letters are permitted.
   absl::string_view scheme = value.getStringView();
 
-  if (scheme != "http" && scheme != "https") {
+  if (!absl::EqualsIgnoreCase(scheme, "http") && !absl::EqualsIgnoreCase(scheme, "https")) {
     // TODO(#23313) - Honor config setting for mixed case.
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidScheme};
@@ -446,6 +448,10 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   }
 
   if (is_valid && iter != end && *iter == '#') {
+    if (!config_.strip_fragment_from_path()) {
+      return {HeaderValueValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().FragmentInUrlPath};
+    }
     // Validate the fragment component of the URI
     ++iter;
     for (; iter != end && is_valid; ++iter) {
@@ -569,6 +575,48 @@ void HeaderValidator::sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& h
     stats_.incDroppedHeadersWithUnderscores();
     header_map.remove(::Envoy::Http::LowerCaseString(name));
   }
+}
+
+void HeaderValidator::sanitizePathWithFragment(::Envoy::Http::RequestHeaderMap& header_map) {
+  auto fragment_pos = header_map.getPathValue().find('#');
+  if (fragment_pos != absl::string_view::npos) {
+    ASSERT(config_.strip_fragment_from_path());
+    // Check runtime override and throw away fragment from URI path
+    header_map.setPath(header_map.getPathValue().substr(0, fragment_pos));
+  }
+}
+
+PathNormalizer::PathNormalizationResult
+HeaderValidator::sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_map) {
+  if (!header_map.Path()) {
+    return PathNormalizer::PathNormalizationResult::success();
+  }
+  const auto escaped_slashes_action =
+      config_.uri_path_normalization_options().path_with_escaped_slashes_action();
+
+  if (escaped_slashes_action ==
+      HeaderValidatorConfig::UriPathNormalizationOptions::KEEP_UNCHANGED) {
+    return PathNormalizer::PathNormalizationResult::success();
+  }
+  // When path normalization is enabled decoding of slashes is done as part of the normalization
+  // function for performance.
+  auto escaped_slashes_result = PathUtil::unescapeSlashes(header_map);
+  if (escaped_slashes_result != PathUtil::UnescapeSlashesResult::FoundAndUnescaped) {
+    return PathNormalizer::PathNormalizationResult::success();
+  }
+  if (escaped_slashes_action ==
+      HeaderValidatorConfig::UriPathNormalizationOptions::REJECT_REQUEST) {
+    return {PathNormalizer::PathNormalizationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EscapedSlashesInPath};
+  } else if (escaped_slashes_action ==
+             HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_REDIRECT) {
+    return {PathNormalizer::PathNormalizationResult::Action::Redirect,
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+  } else {
+    ASSERT(escaped_slashes_action ==
+           HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_FORWARD);
+  }
+  return PathNormalizer::PathNormalizationResult::success();
 }
 
 } // namespace EnvoyDefault

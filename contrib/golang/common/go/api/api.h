@@ -88,6 +88,11 @@ CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int closeType);
 void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterUpstreamInfo(void* wrapper, int t, void* ret);
 
+// filter state
+CAPIStatus envoyGoFilterSetFilterState(void* wrapper, void* key, void* value, int state_type,
+                                       int life_span, int stream_sharing);
+CAPIStatus envoyGoFilterGetFilterState(void* wrapper, void* key, void* value);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
