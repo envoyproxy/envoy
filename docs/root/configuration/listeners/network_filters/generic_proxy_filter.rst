@@ -9,7 +9,7 @@ network filter, such as :ref:`Dubbo proxy <config_network_filters_dubbo_proxy>`,
 Developers may also implement their own protocol proxying by creating a new network filter.
 
 
-However, adding new network filter to support new protocol is not easy. The developers need to implement the codec to parse the binary, to implement the
+Adding a new network filter to support a new protocol is not easy. Developers need to implement the codec to parse the binary, to implement the
 stream management to handle request/response, to implement the connection management to handle connection lifecycle, etc.
 And there are lots of common features like route, L7 filter chain, tracing, metrics, logging, etc. that need to be implemented again and again in each
 new network filter.
