@@ -115,7 +115,7 @@ Example codec implementation
 ----------------------------
 
 The community has implemented a :ref:`dubbo codec <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` based on
-generic proxy. The dubbo codec is a good example to show how to implement a new codec for new protocol because its moderate complexity.
+generic proxy. The dubbo codec is a good example showing how to implement a new codec for new protocol because of its moderate complexity.
 
 
 You could find the dubbo codec implementation in ``contrib/generic_proxy/filters/network/source/codecs/dubbo`` directory. And you can configure the
