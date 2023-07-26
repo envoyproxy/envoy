@@ -1,0 +1,11 @@
+date: July 13, 2023
+
+bug_fixes:
+- area: original_dst
+  change: |
+    Fixes an issue with the ORIGINAL_DST cluster cleanup timer lifetime, which
+    can occur if the cluster is removed while the timer is armed.
+- area: http2
+  change: |
+    Fix memory leak in nghttp2 when scheduled requests are cancelled due to the ``GOAWAY`` frame being received from the
+    upstream service. Fix `CVE-2023-35945 <https://nvd.nist.gov/vuln/detail/CVE-2023-35945>`_.

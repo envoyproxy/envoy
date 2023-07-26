@@ -1006,7 +1006,12 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         resetStream();
       } else {
         sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
-        if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+        // Pre UHV HCM did not respect stream_error_on_invalid_http_message
+        // and only sent 400 when :path contained fragment or encoded slashes
+        // TODO(#28555): make these errors respect the stream_error_on_invalid_http_message
+        if (!response_encoder_->streamErrorOnInvalidHttpMessage() &&
+            failure_details != UhvResponseCodeDetail::get().FragmentInUrlPath &&
+            failure_details != UhvResponseCodeDetail::get().EscapedSlashesInPath) {
           connection_manager_.handleCodecError(failure_details);
         }
       }

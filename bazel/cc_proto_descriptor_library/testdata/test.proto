@@ -1,0 +1,12 @@
+syntax = "proto2";
+
+import "google/protobuf/any.proto";
+
+package testdata.dynamic_descriptors;
+
+message Foo {
+  optional string bar = 1;
+  optional google.protobuf.Any baz = 2;
+
+  extensions 10 to 20;
+}

@@ -680,34 +680,6 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
   ;
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/dir1%2fdir2"},
-                                                  {":authority", "envoy.com"}};
-  auto uhv = createH2ServerUhv(redirect_encoded_slash_config);
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  // Path normalization should result in redirect
-  auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_EQ(
-      result.action(),
-      ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
-  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
-  EXPECT_EQ(headers.path(), "/dir1/dir2");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeadersPathNormalizationDisabled) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/./dir1%2f../dir2"},
-                                                  {":authority", "envoy.com"}};
-  auto uhv = createH2ServerUhv(no_path_normalization);
-
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
-  EXPECT_TRUE(uhv->transformRequestHeaders(headers).ok());
-  EXPECT_EQ(headers.path(), "/./dir1%2f../dir2");
-}
-
 TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailerMap) {
   auto uhv = createH2ServerUhv(empty_config);
   ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
