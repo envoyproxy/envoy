@@ -506,9 +506,6 @@ new_features:
 - area: http
   change: |
     added OVERWRITE_IF_EXISTS header manipulation keyword to overwrite a header only when it exists before manipulation.
-- area: extension_discovery_service
-  change: |
-    added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
 - area: tls
   change: |
     Added FIPS compliant build for arm64.
