@@ -1003,6 +1003,9 @@ public:
   // HeaderMap
   bool operator==(const HeaderMap& rhs) const override { return header_map_->operator==(rhs); }
   bool operator!=(const HeaderMap& rhs) const override { return header_map_->operator!=(rhs); }
+
+  bool operator==(const TestHeaderMapImplBase& rhs) const { return header_map_->operator==(rhs); }
+  bool operator!=(const TestHeaderMapImplBase& rhs) const { return header_map_->operator!=(rhs); }
   void addViaMove(HeaderString&& key, HeaderString&& value) override {
     header_map_->addViaMove(std::move(key), std::move(value));
     header_map_->verifyByteSizeInternalForTest();

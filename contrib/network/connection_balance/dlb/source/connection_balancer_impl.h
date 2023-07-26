@@ -92,11 +92,17 @@ public:
 
   std::string name() const override { return "envoy.network.connection_balance.dlb"; }
 
+  // Log error info in warn level and fallback based on fallback policy.
+  Envoy::Network::ConnectionBalancerSharedPtr fallback(const std::string& message);
+
   // Init those only when Envoy start.
   int domain_id, ldb_pool_id, dir_pool_id, tx_queue_id;
+  // The default value is None.
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::FallbackPolicy
+      fallback_policy{};
 #ifndef DLB_DISABLED
   dlb_domain_hdl_t domain;
-  dlb_hdl_t dlb;
+  dlb_hdl_t dlb{};
   dlb_dev_cap_t cap;
 
   // Share those cross worker threads.

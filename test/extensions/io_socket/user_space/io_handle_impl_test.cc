@@ -493,7 +493,7 @@ TEST_F(IoHandleImplTest, WriteErrorAfterShutdown) {
   // Write after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
   auto result = io_handle_->write(buf);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
   EXPECT_EQ(10, buf.length());
 }
 
@@ -502,7 +502,7 @@ TEST_F(IoHandleImplTest, WriteErrorAfterClose) {
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
   auto result = io_handle_->write(buf);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 // Test writev return error code. Ignoring the side effect of event scheduling.
@@ -558,7 +558,7 @@ TEST_F(IoHandleImplTest, WritevErrorAfterShutdown) {
   // Writev after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
   auto result = io_handle_->writev(&slice, 1);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
@@ -567,7 +567,7 @@ TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
   auto result = io_handle_->writev(&slice, 1);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 TEST_F(IoHandleImplTest, WritevToPeer) {

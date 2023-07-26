@@ -45,6 +45,8 @@ public:
   MOCK_METHOD(void, envoyGoFilterOnUpstreamData,
               (void* w, GoUint64 dataSize, GoUint64 dataPtr, GoInt sliceNum, GoInt endOfStream));
   MOCK_METHOD(void, envoyGoFilterOnUpstreamEvent, (void* w, GoInt event));
+
+  MOCK_METHOD(void, envoyGoFilterOnSemaDec, (void* w));
 };
 
 } // namespace Dso

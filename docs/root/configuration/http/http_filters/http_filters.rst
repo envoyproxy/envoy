@@ -30,6 +30,7 @@ HTTP filters
   gcp_authn_filter
   geoip_filter
   golang_filter
+  grpc_field_extraction_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter
   grpc_json_transcoder_filter

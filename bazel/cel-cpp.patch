@@ -151,3 +151,18 @@ index b1623fc..d3d88d6 100644
      return absl::nullopt;
    }
  };
+diff --git a/base/function_result.h b/base/function_result.h
+index 9bc2d67..bf6110c 100644
+--- a/base/function_result.h
++++ b/base/function_result.h
+@@ -26,7 +26,10 @@ namespace cel {
+ // allows for lazy evaluation of expensive functions.
+ class FunctionResult final {
+  public:
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wdefaulted-function-deleted"
+   FunctionResult() = default;
++#pragma GCC diagnostic pop
+   FunctionResult(const FunctionResult&) = default;
+   FunctionResult(FunctionResult&&) = default;
+   FunctionResult& operator=(const FunctionResult&) = default;

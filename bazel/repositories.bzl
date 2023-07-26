@@ -192,6 +192,8 @@ def envoy_repo():
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
     external_http_archive("com_google_protoconverter")
+    external_http_archive("com_google_protofieldextraction")
+    external_http_archive("ocp")
     native.bind(
         name = "path_matcher",
         actual = "@grpc_httpjson_transcoding//src:path_matcher",
@@ -1130,7 +1132,11 @@ def _re2():
     )
 
 def _upb():
-    external_http_archive(name = "upb")
+    external_http_archive(
+        name = "upb",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:upb.patch"],
+    )
 
     native.bind(
         name = "upb_lib",

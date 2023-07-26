@@ -4787,5 +4787,37 @@ TEST_P(Http1ServerConnectionImplTest, ExtendedAsciiInHeaderName) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
+TEST_P(Http1ClientConnectionImplTest, Char22InHeaderValue) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "foo: \022\r\n"
+                             "\r\n");
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+}
+
+TEST_P(Http1ServerConnectionImplTest, Char22InHeaderValue) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _,
+                                      "http1.invalid_characters"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           "foo: \022\r\n"
+                           "\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+}
+
 } // namespace Http
 } // namespace Envoy

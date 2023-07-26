@@ -1247,7 +1247,7 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
-  const std::string yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 name: accesslog
 filter:
   grpc_status_filter:
@@ -1317,7 +1317,7 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterHttpCodes) {
-  const std::string yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 name: accesslog
 filter:
   grpc_status_filter:

@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   env:
-    uses: ./.github/workflows/env.yml
+    uses: ./.github/workflows/_env.yml
     secrets: inherit
 
   kotlintestsmac:

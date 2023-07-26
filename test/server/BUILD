@@ -259,6 +259,7 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "server_fuzz_test",
+    size = "large",
     srcs = ["server_fuzz_test.cc"],
     corpus = "server_corpus",
     deps = [
