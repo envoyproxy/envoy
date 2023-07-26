@@ -29,7 +29,7 @@ With the exception of the codec, all other modules are common and could be share
 
 
 Generic proxy is a network filter that could be used to implement new protocol proxying. An extension point is provided to let the users
-to configure specific codec. The developers only need to implement the codec to parse the binary and let users to configure the codec in the
+configure specific codec. The developers only need to implement the codec to parse the binary and let users configure the codec in the
 generic proxy. The generic proxy will handle the rest of work.
 
 
