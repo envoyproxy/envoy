@@ -38,8 +38,8 @@ Abstract request/response
 
 
 Abstraction of the request/response is the core of generic proxy. Different L7 protocols may have a different request/response data structure.
-But in the generic proxy, except the codec is extented and could be configured by users, other modules are common and shared by different
-protocols. So these different request/response data structures of different protocols need to be abstracted and managed in a common abstraction.
+In the generic proxy, the codec is extended and could be configured by users, but other modules are common and can be shared by different
+protocols. These different request/response data structures of different protocols need to be abstracted and managed in a common abstraction.
 
 
 An abstract class ``Request`` is defined to represent the request. The ``Request`` provides some virtual methods to get/set the request properties.
