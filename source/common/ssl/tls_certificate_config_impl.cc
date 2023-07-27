@@ -64,19 +64,39 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
           fmt::format("Certificate configuration can't have both pkcs12 and private_key_provider"));
     }
   } else {
-    if (config.has_private_key_provider()) {
+    if (config.has_private_key_provider_list()){
+      for(const auto& provider:config.private_key_provider_list().private_key_provider()){
+        private_key_method_ =
+          factory_context.sslContextManager()
+              .privateKeyMethodManager()
+              .createPrivateKeyMethodProvider(provider, factory_context);
+        if(private_key_method_->checkInitialized()){
+          break;
+        }else{
+          private_key_method_ = nullptr;
+        }
+      }
+    }
+    else if (config.has_private_key_provider()) {
       private_key_method_ =
           factory_context.sslContextManager()
               .privateKeyMethodManager()
               .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context);
+        if(!private_key_method_->checkInitialized()){
+          private_key_method_ = nullptr;
+        }
     }
     if (certificate_chain_.empty()) {
       throw EnvoyException(
           fmt::format("Failed to load incomplete certificate from {}: certificate chain not set",
                       certificate_chain_path_));
     }
-    if (private_key_.empty() && private_key_method_ == nullptr) {
-      if (config.has_private_key_provider()) {
+
+    bool fallback = config.has_private_key_provider_list()?config.private_key_provider_list().fallback():false;
+    if ((private_key_.empty()|| !fallback) && private_key_method_ == nullptr) {
+      if (config.has_private_key_provider_list()){
+        throw EnvoyException(fmt::format("Failed to load private key provider list."));
+      } else if (config.has_private_key_provider()) {
         throw EnvoyException(fmt::format("Failed to load private key provider: {}",
                                          config.private_key_provider().provider_name()));
       } else {

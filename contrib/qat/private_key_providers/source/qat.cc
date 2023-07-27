@@ -17,7 +17,7 @@ QatManager::QatManager(LibQatCryptoSharedPtr libqat) {
   libqat_ = libqat;
   CpaStatus status = libqat_->icpSalUserStart("SSL");
   if (status != CPA_STATUS_SUCCESS) {
-    throw EnvoyException("Failed to start QAT device.");
+    ENVOY_LOG(warn, "Failed to start QAT device.");
   }
 }
 

@@ -499,6 +499,8 @@ bool CryptoMbPrivateKeyMethodProvider::checkFips() {
   return false;
 }
 
+bool CryptoMbPrivateKeyMethodProvider::checkInitialized() { return initialized_; }
+
 Ssl::BoringSslPrivateKeyMethodSharedPtr
 CryptoMbPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
   return method_;
@@ -522,7 +524,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
       stats_(generateCryptoMbStats("cryptomb", factory_context.statsScope())) {
 
   if (!ipp->mbxIsCryptoMbApplicable(0)) {
-    throw EnvoyException("Multi-buffer CPU instructions not available.");
+    ENVOY_LOG(warn, "Multi-buffer CPU instructions not available.");
+    return;
   }
 
   std::chrono::milliseconds poll_delay =
@@ -619,6 +622,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     ENVOY_LOG(debug, "Created CryptoMb Queue for thread {}", d.name());
     return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp, d, stats_);
   });
+
+  initialized_ = true;
 }
 
 namespace {
