@@ -263,18 +263,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     ENVOY_LOG(trace, "Continuing (processing complete)");
     return FilterDataStatus::Continue;
   }
-  bool just_added_trailers = false;
-  Http::HeaderMap* new_trailers = nullptr;
-  if (end_stream && state.sendTrailers()) {
-    // We're at the end of the stream, but the filter wants to process trailers.
-    // According to the filter contract, this is the only place where we can
-    // add trailers, even if we will return right after this and process them
-    // later.
-    ENVOY_LOG(trace, "Creating new, empty trailers");
-    new_trailers = state.addTrailers();
-    state.setTrailersAvailable(true);
-    just_added_trailers = true;
-  }
+
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
     ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
     // We don't know what to do with the body until the response comes back.
@@ -423,21 +412,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::Continue;
     break;
   }
-  if (just_added_trailers) {
-    // If we get here, then we need to send the trailers message now
-    switch (openStream()) {
-    case StreamOpenState::Error:
-      return FilterDataStatus::StopIterationNoBuffer;
-    case StreamOpenState::IgnoreError:
-      return FilterDataStatus::Continue;
-    case StreamOpenState::Ok:
-      // Fall through
-      break;
-    }
-    sendTrailers(state, *new_trailers);
-    state.setPaused(true);
-    return FilterDataStatus::StopIterationAndBuffer;
-  }
+
   return result;
 }
 
