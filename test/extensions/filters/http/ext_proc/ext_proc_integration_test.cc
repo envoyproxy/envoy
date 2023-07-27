@@ -2230,7 +2230,6 @@ TEST_P(ExtProcIntegrationTest, ClientSendHeaderTrailerFilterConfigedSendAll) {
   processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   handleUpstreamRequest();
-  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
   verifyDownstreamResponse(*response, 200);
 }
 
