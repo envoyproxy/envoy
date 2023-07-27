@@ -518,7 +518,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   ecds_connection_.reset();
 }
 
-// Validate that a listener update should fail if the subscribed extension configuration make filter
+// Validate that a network filter update should fail if the subscribed extension configuration make filter
 // terminal but the filter position is not at the last position at filter chain.
 // There would be total of 2 filters in the chain: 'foo' and 'tcp_proxy' and both are marked
 // terminal.
