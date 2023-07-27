@@ -469,7 +469,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
-  EXPECT_CALL(*ssl_, sni()).Times(1).WillRepeatedly(ReturnRef(want_tls_session.sni()));
+  EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
 
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
