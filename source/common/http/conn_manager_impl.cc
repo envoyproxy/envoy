@@ -109,7 +109,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       time_source_(time_source), proxy_name_(StreamInfo::ProxyStatusUtils::makeProxyName(
                                      /*node_id=*/local_info_.node().id(),
                                      /*server_name=*/config_.serverName(),
-                                     /*proxy_status_config=*/config_.proxyStatusConfig())) {}
+                                     /*proxy_status_config=*/config_.proxyStatusConfig())),
+      refresh_rtt_after_request_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -300,10 +302,14 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.completeRequest();
 
-  // Set roundtrip time in connectionInfoSetter before OnStreamComplete
-  absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
-  if (t.has_value()) {
-    read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+  // If refresh rtt after request is required explicitly, then try to get rtt again set it into
+  // connection info.
+  if (refresh_rtt_after_request_) {
+    // Set roundtrip time in connectionInfoSetter before OnStreamComplete
+    absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
+    if (t.has_value()) {
+      read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+    }
   }
 
   stream.filter_manager_.onStreamComplete();
@@ -966,6 +972,7 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
     auto validation_result = header_validator_->validateRequestHeaders(*request_headers_);
     bool failure = !validation_result.ok();
     bool redirect = false;
+    bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
     std::string failure_details(validation_result.details());
     if (!failure) {
       auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
@@ -973,6 +980,11 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       redirect = transformation_result.action() ==
                  Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
       failure_details = std::string(transformation_result.details());
+      if (redirect && !is_grpc) {
+        connection_manager_.stats_.named_.downstream_rq_redirected_with_normalized_path_.inc();
+      } else if (failure) {
+        connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
+      }
     }
     if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
@@ -980,7 +992,6 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
                                ? Code::NotImplemented
                                : Code::BadRequest;
       absl::optional<Grpc::Status::GrpcStatus> grpc_status;
-      bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
       if (redirect && !is_grpc) {
         response_code = Code::TemporaryRedirect;
         modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
@@ -1000,7 +1011,12 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         resetStream();
       } else {
         sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
-        if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+        // Pre UHV HCM did not respect stream_error_on_invalid_http_message
+        // and only sent 400 when :path contained fragment or encoded slashes
+        // TODO(#28555): make these errors respect the stream_error_on_invalid_http_message
+        if (!response_encoder_->streamErrorOnInvalidHttpMessage() &&
+            failure_details != UhvResponseCodeDetail::get().FragmentInUrlPath &&
+            failure_details != UhvResponseCodeDetail::get().EscapedSlashesInPath) {
           connection_manager_.handleCodecError(failure_details);
         }
       }
@@ -1194,6 +1210,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
+#ifndef ENVOY_ENABLE_UHV
+  // In UHV mode path normalization is done in the UHV
   // Path sanitization should happen before any path access other than the above sanity check.
   const auto action =
       ConnectionManagerUtility::maybeNormalizePath(*request_headers_, connection_manager_.config_);
@@ -1219,6 +1237,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   ASSERT(action == ConnectionManagerUtility::NormalizePathAction::Continue);
+#endif
   auto optional_port = ConnectionManagerUtility::maybeNormalizeHost(
       *request_headers_, connection_manager_.config_, localPort());
   if (optional_port.has_value() &&

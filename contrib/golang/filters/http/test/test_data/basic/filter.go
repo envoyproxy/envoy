@@ -82,7 +82,7 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
 	body := fmt.Sprintf(msg, a...)
-	f.callbacks.SendLocalReply(500, body, nil, -1, "")
+	f.callbacks.SendLocalReply(500, body, nil, 0, "")
 	return api.LocalReply
 }
 
@@ -92,7 +92,7 @@ func (f *filter) sendLocalReply(phase string) api.StatusType {
 		"test-phase":   phase,
 	}
 	body := fmt.Sprintf("forbidden from go in %s\r\n", phase)
-	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
+	f.callbacks.SendLocalReply(403, body, headers, 0, "")
 	return api.LocalReply
 }
 
@@ -256,7 +256,7 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
 		header.Set("rsp-response-code-details", details)
 	}
-	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamHostAddress(); ok {
+	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamRemoteAddress(); ok {
 		header.Set("rsp-upstream-host", upstream_host_address)
 	}
 	if upstream_cluster_name, ok := f.callbacks.StreamInfo().UpstreamClusterName(); ok {
@@ -293,6 +293,11 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
 	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
 	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))
+	if name, ok := f.callbacks.StreamInfo().VirtualClusterName(); ok {
+		header.Set("rsp-virtual-cluster-name", name)
+	} else {
+		header.Set("rsp-virtual-cluster-name", "not found")
+	}
 
 	if f.panic == "encode-header" {
 		badcode()

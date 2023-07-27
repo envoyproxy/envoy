@@ -198,6 +198,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/types:variant",
     ],
 )
 
@@ -5471,7 +5472,10 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = [":quiche_common_platform_export"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@com_google_absl//absl/hash",
+    ],
 )
 
 envoy_cc_library(

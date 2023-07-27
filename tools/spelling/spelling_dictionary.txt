@@ -632,6 +632,7 @@ cryptographic
 cryptographically
 cstate
 cstring
+ctad
 ctor
 ctrl
 customizations
@@ -1208,6 +1209,7 @@ serv
 servercert
 setenv
 setsockopt
+sfixed
 sig
 sigaction
 sigactions
@@ -1217,6 +1219,7 @@ signalstack
 siloed
 sim
 sinked
+sint
 sizeof
 smatch
 snapshotted

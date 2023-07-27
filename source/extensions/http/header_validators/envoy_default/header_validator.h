@@ -212,6 +212,17 @@ protected:
   // behavior. See comments in the HeaderValidatorConfigOverrides declaration above for more
   // information.
   void encodeAdditionalCharactersInPath(::Envoy::Http::RequestHeaderMap& header_map);
+  /**
+   * Check if the :path header contains a fragment. If the fragment is found it is stripped from
+   * the :path.
+   */
+  void sanitizePathWithFragment(::Envoy::Http::RequestHeaderMap& header_map);
+
+  /**
+   * Decode percent-encoded slash characters based on configuration.
+   */
+  PathNormalizer::PathNormalizationResult
+  sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_map);
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

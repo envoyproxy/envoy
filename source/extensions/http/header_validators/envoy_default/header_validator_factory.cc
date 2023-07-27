@@ -12,10 +12,24 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::Protocol;
 
+namespace {
+
+HeaderValidatorConfig setHeaderValidatorConfigDefaults(const HeaderValidatorConfig& config) {
+  HeaderValidatorConfig new_config(config);
+  if (new_config.uri_path_normalization_options().path_with_escaped_slashes_action() ==
+      HeaderValidatorConfig::UriPathNormalizationOptions::IMPLEMENTATION_SPECIFIC_DEFAULT) {
+    new_config.mutable_uri_path_normalization_options()->set_path_with_escaped_slashes_action(
+        HeaderValidatorConfig::UriPathNormalizationOptions::KEEP_UNCHANGED);
+  }
+  return new_config;
+}
+
+} // namespace
+
 HeaderValidatorFactory::HeaderValidatorFactory(
     const HeaderValidatorConfig& config,
     Server::Configuration::ServerFactoryContext& server_context)
-    : config_(config), server_context_(server_context) {}
+    : config_(setHeaderValidatorConfigDefaults(config)), server_context_(server_context) {}
 
 ::Envoy::Http::ServerHeaderValidatorPtr
 HeaderValidatorFactory::createServerHeaderValidator(Protocol protocol,

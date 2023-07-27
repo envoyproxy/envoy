@@ -127,28 +127,23 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
   return options;
 }
 
-// Updates the health flags for an existing host to match the new host.
+// Updates the EDS health flags for an existing host to match the new host.
 // @param updated_host the new host to read health flag values from.
 // @param existing_host the host to update.
-// @param flag the health flag to update.
 // @return bool whether the flag update caused the host health to change.
-bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::HealthFlag flag) {
+bool updateEdsHealthFlag(const Host& updated_host, Host& existing_host) {
+  auto updated_eds_health_status = updated_host.edsHealthStatus();
+
   // Check if the health flag has changed.
-  if (existing_host.healthFlagGet(flag) != updated_host.healthFlagGet(flag)) {
-    // Keep track of the previous health value of the host.
-    const auto previous_health = existing_host.coarseHealth();
-
-    if (updated_host.healthFlagGet(flag)) {
-      existing_host.healthFlagSet(flag);
-    } else {
-      existing_host.healthFlagClear(flag);
-    }
-
-    // Rebuild if changing the flag affected the host health.
-    return previous_health != existing_host.coarseHealth();
+  if (updated_eds_health_status == existing_host.edsHealthStatus()) {
+    return false;
   }
 
-  return false;
+  const auto previous_health = existing_host.coarseHealth();
+  existing_host.setEdsHealthStatus(updated_eds_health_status);
+
+  // Rebuild if changing the flag affected the host health.
+  return previous_health != existing_host.coarseHealth();
 }
 
 // Converts a set of hosts into a HostVector, excluding certain hosts.
@@ -468,16 +463,21 @@ Host::CreateConnectionData HostImpl::createConnection(
 }
 
 void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
+  // Clear all old EDS health flags first.
+  HostImpl::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
+  HostImpl::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+
+  // Set the appropriate EDS health flag.
   switch (health_status) {
   case envoy::config::core::v3::UNHEALTHY:
     FALLTHRU;
   case envoy::config::core::v3::DRAINING:
     FALLTHRU;
   case envoy::config::core::v3::TIMEOUT:
-    healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+    HostImpl::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DEGRADED:
-    healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+    HostImpl::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
     break;
   default:
     break;
@@ -1231,7 +1231,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
-    filter_factories_.push_back(std::move(callback));
+    filter_factories_.push_back(network_config_provider_manager_.createStaticFilterConfigProvider(
+        callback, proto_config.name()));
   }
 
   if (http_protocol_options_) {
@@ -1342,8 +1343,12 @@ Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
-  for (const auto& factory : filter_factories_) {
-    factory(connection);
+  for (const auto& filter_config_provider : filter_factories_) {
+    auto config = filter_config_provider->config();
+    if (config.has_value()) {
+      Network::FilterFactoryCb& factory = config.value();
+      factory(connection);
+    }
   }
 }
 
@@ -2075,10 +2080,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         hosts_changed = true;
       }
 
-      hosts_changed |=
-          updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::FAILED_EDS_HEALTH);
-      hosts_changed |=
-          updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::DEGRADED_EDS_HEALTH);
+      hosts_changed |= updateEdsHealthFlag(*host, *existing_host->second);
 
       // Did metadata change?
       bool metadata_changed = true;
