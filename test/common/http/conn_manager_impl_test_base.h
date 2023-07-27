@@ -202,6 +202,8 @@ public:
   void expectUhvTrailerCheck(HeaderValidator::ValidationResult validation_result,
                              HeaderValidator::TransformationResult transformation_result,
                              bool expect_response = true);
+  // This method sets-up expectation that UHV will be called and provides real default UHV to
+  // validate headers.
   void expectCheckWithDefaultUhv();
 
   Envoy::Event::SimulatedTimeSystem test_time_;

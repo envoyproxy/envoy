@@ -287,7 +287,6 @@ void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
 
 void HttpConnectionManagerImplMixin::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
-  //  InSequence s;
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {

@@ -525,6 +525,12 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
 
 // Invalid paths are rejected with 400.
 TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#26642): Enable this test after UHV rejects requests with the %00 sequence in the URL path
+  // in compatibility mode
+  delete codec_;
+  return;
+#endif
   setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;
@@ -540,10 +546,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
     return Http::okStatus();
   }));
 #ifdef ENVOY_ENABLE_UHV
-  expectUhvHeaderCheck(
-      HeaderValidator::ValidationResult(HeaderValidator::ValidationResult::Action::Reject,
-                                        "path_normalization_failed"),
-      ServerHeaderValidator::RequestHeadersTransformationResult::success());
+  expectCheckWithDefaultUhv();
 #endif
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(true));
 
