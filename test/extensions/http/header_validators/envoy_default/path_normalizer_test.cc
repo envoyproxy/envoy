@@ -302,6 +302,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashesWithDecodeSlashes) 
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriDecodeSlashes) {
+  translate_backslash_to_slash_ = true;
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":path", "/dir1%2fdir2%2f/dir3%5Cdeleted%5C%2F..%2F%5cdir4"}};
 
@@ -333,6 +334,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRejectEncodedBackSlashes) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriRedirectEncodedSlashes) {
+  translate_backslash_to_slash_ = true;
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(redirect_encoded_slash_config);

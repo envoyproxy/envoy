@@ -420,37 +420,33 @@ HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeader
     }
   }
 
-  if (iter != end) {
+  if (iter != end && *iter == '?') {
     // Validate the query component of the URI
-    bool observed_fragment_start = *iter == '#';
     ++iter;
     for (; iter != end; ++iter) {
-      if (*iter == '#' && !observed_fragment_start) {
-        // There can only be at most one '#' character in URI to separate query and fragment.
-        observed_fragment_start = true;
-        continue;
+      const char ch = *iter;
+      if (ch == '#') {
+        break;
       }
 
-      if (!testCharInTable(allowed_query_fragment_characters, *iter)) {
+      if (!testCharInTable(allowed_query_fragment_characters, ch)) {
         return bad_path_result;
       }
     }
   }
 
-  if (is_valid && iter != end && *iter == '#') {
+  if (iter != end && *iter == '#') {
     if (!config_.strip_fragment_from_path()) {
       return {HeaderValueValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().FragmentInUrlPath};
     }
     // Validate the fragment component of the URI
     ++iter;
-    for (; iter != end && is_valid; ++iter) {
-      is_valid &= testCharInTable(::Envoy::Http::kUriQueryAndFragmentCharTable, *iter);
+    for (; iter != end; ++iter) {
+      if (!testCharInTable(allowed_query_fragment_characters, *iter)) {
+        return bad_path_result;
+      }
     }
-  }
-
-  if (!is_valid) {
-    return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   return HeaderValueValidationResult::success();

@@ -24,7 +24,6 @@ using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-
 PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config,
                                bool translate_backslash_to_slash)
     : config_(config), translate_backslash_to_slash_(translate_backslash_to_slash) {}
