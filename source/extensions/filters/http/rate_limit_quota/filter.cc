@@ -12,8 +12,8 @@ namespace RateLimitQuota {
 using ::envoy::type::v3::RateLimitStrategy;
 
 Http::FilterHeadersStatus
-RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
-                                      const RateLimitOnMatchAction& match_action) {
+RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
+                                                   const RateLimitOnMatchAction& match_action) {
   const auto& bucket_settings = match_action.bucketSettings();
   // The first matched request that doesn't have quota assignment from the RLQS server yet, so the
   // action is performed based on pre-configured strategy from no assignment behavior config.
@@ -104,7 +104,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   BucketId bucket_id = ret.value();
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // The request has been matched to the quota bucket for the first time.
-    return createNewBucket(bucket_id, match_action);
+    return createNewBucketAndSendReport(bucket_id, match_action);
   }
   // TODO(tyxia) Uncomment this section to finish the implementation and test.
   // else {
@@ -187,16 +187,6 @@ void RateLimitQuotaFilter::onQuotaResponse(RateLimitQuotaResponse&) {
   if (!initiating_call_) {
     callbacks_->continueDecoding();
   }
-  // TODO(tyxia) Remove!! The updates are performed on site
-  // We can perform other post-processing though
-  // for (auto action : response.bucket_action()) {
-  //   if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
-  //     ENVOY_LOG(error, "Received a Response whose bucket action is missing its bucket_id: ",
-  //               response.ShortDebugString());
-  //     continue;
-  //   }
-  //   (*quota_buckets_)[action.bucket_id()].bucket_action = BucketAction(action);
-  // }
 }
 
 void RateLimitQuotaFilter::onDestroy() {

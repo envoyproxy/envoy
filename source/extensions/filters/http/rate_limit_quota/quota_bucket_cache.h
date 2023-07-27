@@ -50,8 +50,9 @@ struct Bucket {
 
   ~Bucket() {
     // Close stream
-    // TODO(tyxia) filter test failure related to here.
-    rate_limit_client->closeStream();
+    if (rate_limit_client != nullptr) {
+      rate_limit_client->closeStream();
+    }
   }
 
   // TODO(tyxia) Each bucket owns the unique grpc client for sending the quota usage report

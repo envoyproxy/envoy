@@ -70,23 +70,52 @@ void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
                        /*end_stream=*/false);
 }
 
+// void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
+//   for (auto action : response->bucket_action()) {
+//     if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
+//       ENVOY_LOG(error, "Received a response, but bucket_id is missing : ",
+//                 response->ShortDebugString());
+//       continue;
+//     }
+//     // TODO(tyxia) Extend lifetime and store in the bucket.
+//     BucketId bucket_id = action.bucket_id();
+//     quota_buckets_[bucket_id]->bucket_action = std::make_unique<BucketAction>(std::move(action));
+//     // quota_buckets_[action.bucket_id()].bucket_action = std::move(action);
+//   }
+//   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
+//   callbacks_.onQuotaResponse(*response);
+// }
+
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-  for (auto action : response->bucket_action()) {
+  for (const auto& action : response->bucket_action()) {
     // TODO(tyxia) Uncomment this section to finish the implementation and test.
-    // if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
-    //   ENVOY_LOG(error, "Received a Response whose bucket action is missing its bucket_id: ",
-    //             response->ShortDebugString());
-    //   continue;
-    // }
-    // TODO(tyxia) Extend lifetime and store in the bucket.
+    if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
+      ENVOY_LOG(error,
+                "Received a response, but bucket_id is missing : ", response->ShortDebugString());
+      continue;
+    }
     BucketId bucket_id = action.bucket_id();
-    quota_buckets_[bucket_id]->bucket_action = std::make_unique<BucketAction>(std::move(action));
-    // quota_buckets_[action.bucket_id()].bucket_action = std::move(action);
+    if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
+      // TODO(tyxia) Allocate and extend lifetime to store in the bucket. We probably should not
+      // create new bucket when response is not matched. The new bucket here doesn't have essential
+      // elements like rate limiting client.
+
+      // std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
+      // new_bucket->action = std::make_unique<BucketAction>(std::move(action));
+      // quota_buckets_[bucket_id] = std::move(new_bucket);
+      ENVOY_LOG(error,
+                "Received a response, but but it is not matched any quota "
+                "cache entry: ",
+                response->ShortDebugString());
+    } else {
+      // quota_buckets_[bucket_id]->bucket_action =
+      //     std::make_unique<BucketAction>(std::move(action));
+      quota_buckets_[bucket_id]->bucket_action = std::make_unique<BucketAction>(action);
+    }
   }
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
   callbacks_.onQuotaResponse(*response);
 }
-
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
   if (stream_ != nullptr && !stream_closed_) {
