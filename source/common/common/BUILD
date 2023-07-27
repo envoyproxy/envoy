@@ -210,6 +210,7 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":base_logger_lib",
+        ":fmt_lib",
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
