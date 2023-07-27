@@ -44,23 +44,35 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   envoy::config::core::v3::Metadata metadata_context;
 
   // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_authz
-  // service.
+  // service. If metadata key is set in both the connection and request metadata then the value
+  // will be the request metadata value.
+  const auto& connection_metadata =
+      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
   const auto& request_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
-    if (const auto& metadata_it = request_metadata.find(context_key);
+    if (const auto metadata_it = request_metadata.find(context_key);
         metadata_it != request_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_metadata.find(context_key);
+               metadata_it != connection_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
 
   // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
-  // ext_authz service.
+  // ext_authz service. If metadata key is set in both the connection and request metadata then
+  // the value will be the request metadata value.
+  const auto& connection_typed_metadata =
+      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
   const auto& request_typed_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
   for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
-    if (const auto& metadata_it = request_typed_metadata.find(context_key);
+    if (const auto metadata_it = request_typed_metadata.find(context_key);
         metadata_it != request_typed_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_typed_metadata.find(context_key);
+               metadata_it != connection_typed_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }

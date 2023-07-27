@@ -59,7 +59,7 @@ protected:
   void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -500,8 +500,8 @@ TEST_F(OrderingTest, ResponseSomeDataComesFast) {
   sendResponseBodyReply();
 }
 
-// Add trailers to the request path
-TEST_F(OrderingTest, AddRequestTrailers) {
+// Processing mode send request trailer while client is not sending trailers.
+TEST_F(OrderingTest, ProcessingModeRequestTrailers) {
   initialize([](ExternalProcessor& cfg) {
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_trailer_mode(ProcessingMode::SEND);
@@ -517,15 +517,8 @@ TEST_F(OrderingTest, AddRequestTrailers) {
   Buffer::OwnedImpl req_buffer;
   expectBufferedRequest(req_buffer);
 
-  Http::TestRequestTrailerMapImpl response_trailers;
-
-  // Expect the trailers callback to be sent in line with decodeData
-  EXPECT_CALL(stream_delegate_, send(_, false));
-  EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).WillOnce(ReturnRef(response_trailers));
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_body_1, true));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_body_1, true));
   req_buffer.add(req_body_1);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  sendRequestTrailersReply();
 
   Buffer::OwnedImpl resp_body_1("Dummy response");
   Buffer::OwnedImpl resp_buffer;
@@ -1122,26 +1115,8 @@ TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartResponseTrailers) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 }
 
-// gRPC failure while opening stream with only response body enabled
-TEST_F(FastFailOrderingTest, GrpcErrorOnStartAddResponseTrailers) {
-  initialize([](ExternalProcessor& cfg) {
-    auto* pm = cfg.mutable_processing_mode();
-    pm->set_request_header_mode(ProcessingMode::SKIP);
-    pm->set_response_header_mode(ProcessingMode::SKIP);
-    pm->set_response_trailer_mode(ProcessingMode::SEND);
-  });
-
-  sendRequestHeadersGet(false);
-  sendResponseHeaders(false);
-  Buffer::OwnedImpl resp_body("Hello!");
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  Http::TestResponseTrailerMapImpl response_trailers;
-  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(response_trailers));
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_body, true));
-}
-
 // gRPC failure while opening stream with only response body enabled but errors ignored
-TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartAddResponseTrailers) {
+TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnNotSendResponseTrailer) {
   initialize([](ExternalProcessor& cfg) {
     cfg.set_failure_mode_allow(true);
     auto* pm = cfg.mutable_processing_mode();
@@ -1153,8 +1128,6 @@ TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartAddResponseTrailers) {
   sendRequestHeadersGet(false);
   sendResponseHeaders(false);
   Buffer::OwnedImpl resp_body("Hello!");
-  Http::TestResponseTrailerMapImpl response_trailers;
-  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(response_trailers));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
 }
 

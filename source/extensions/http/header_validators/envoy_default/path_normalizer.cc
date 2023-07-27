@@ -19,15 +19,10 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::envoy::extensions::http::header_validators::envoy_default::v3::
     HeaderValidatorConfig_UriPathNormalizationOptions;
 using ::Envoy::Http::HeaderUtility;
+using ::Envoy::Http::PathNormalizerResponseCodeDetail;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
-
-struct PathNormalizerResponseCodeDetailValues {
-  const std::string RedirectNormalized = "uhv.path_noramlization_redirect";
-};
-
-using PathNormalizerResponseCodeDetail = ConstSingleton<PathNormalizerResponseCodeDetailValues>;
 
 PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config) : config_(config) {}
 
@@ -92,7 +87,7 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     return {PercentDecodeResult::Decoded, ch};
   }
 
-  if (ch == '/') {
+  if (ch == '/' || ch == '\\') {
     // We decoded a slash character and how we handle it depends on the active configuration.
     switch (config_.uri_path_normalization_options().path_with_escaped_slashes_action()) {
     case HeaderValidatorConfig_UriPathNormalizationOptions::IMPLEMENTATION_SPECIFIC_DEFAULT:
@@ -274,7 +269,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
   return PathNormalizationResult::success();
@@ -342,7 +337,7 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
   path.resize(std::distance(begin, write));
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
   return PathNormalizationResult::success();

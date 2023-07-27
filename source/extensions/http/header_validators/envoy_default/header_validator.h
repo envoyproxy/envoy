@@ -169,6 +169,12 @@ protected:
    */
   void sanitizePathWithFragment(::Envoy::Http::RequestHeaderMap& header_map);
 
+  /**
+   * Decode percent-encoded slash characters based on configuration.
+   */
+  PathNormalizer::PathNormalizationResult
+  sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_map);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;

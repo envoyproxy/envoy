@@ -91,6 +91,8 @@ private:
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   const QuicConnectionIdGeneratorPtr connection_id_generator_;
   const QuicConnectionIdWorkerSelector select_connection_id_worker_;
+  // Latches envoy.reloadable_features.quic_reject_all at the beginning of each event loop.
+  bool reject_all_{false};
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
