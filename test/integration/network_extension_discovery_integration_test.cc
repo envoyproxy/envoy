@@ -294,7 +294,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
 
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
-  // Send 1st config update with TTL 1s, and have network filter drain 5 byteד of data.
+  // Send 1st config update with TTL 1s, and have network filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5, true);
   test_server_->waitForCounterGe(
       "extension_config_discovery.network_filter." + filter_name_ + ".config_reload", 1);
