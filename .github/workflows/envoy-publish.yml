@@ -1,15 +1,9 @@
 name: Publish & verify
 
 on:
-  # This runs untrusted code, do not expose secrets in the verify job
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: "Git SHA ref to checkout"
-      sha:
-        description: "Git SHA of commit HEAD (ie last commit of PR)"
-      head_ref:
-        description: "Ref for grouping PRs"
+  check_run:
+    types:
+    - completed
 
 concurrency:
   group: |
@@ -24,21 +18,22 @@ permissions:
 
 jobs:
   env:
-    if: |
-      ${{
-          github.repository == 'envoyproxy/envoy'
-          && (!contains(github.actor, '[bot]')
-              || github.actor == 'trigger-workflow-envoy[bot]'
-              || github.actor == 'trigger-release-envoy[bot]')
-      }}
+    if: ${{ github.repository == 'envoyproxy/envoy' &&  github.event.check_run.conclusion == 'success' && github.event.check_run.name == 'envoy-setec (Environment Repository)' }}
     uses: ./.github/workflows/_env.yml
     with:
       check_mobile_run: false
       prime_build_image: true
-      start_check_status: Verify/examples
+      is_pr: ${{ toJson(github.event.check_run.pull_requests) != '[]' && true || false }}
+      repo_sha: ${{ github.event.check_run.head_sha }}
+      repo_ref: >-
+        ${{ toJson(github.event.check_run.pull_requests) != '[]'
+            && format('refs/pull/{0}/merge', github.event.check_run.pull_requests[0].number)
+            || github.event.check_run.head_sha }}
+      start_check_status: >-
+        ${{ toJson(github.event.check_run.pull_requests) != '[]'
+            && 'Verify/examples'
+            || '' }}
       repo_ref: ${{ inputs.ref }}
-      repo_ref_sha: ${{ inputs.sha }}
-      repo_ref_name: ${{ inputs.head_ref }}
 
     permissions:
       contents: read

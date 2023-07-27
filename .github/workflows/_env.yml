@@ -20,6 +20,10 @@ on:
         type: string
         default: 41c5a05d708972d703661b702a63ef5060125c33
 
+      is_pr:
+        type: boolean
+        default: true
+
       check_mobile_run:
         type: boolean
         default: true
@@ -34,6 +38,10 @@ on:
       repo_ref:
         type: string
         default:
+      repo_sha:
+        type: string
+        default:
+
       repo_ref_sha:
         type: string
         default:
@@ -104,7 +112,6 @@ concurrency:
 
 jobs:
   repo:
-    if: github.repository == 'envoyproxy/envoy'
     runs-on: ubuntu-22.04
     outputs:
       build_image_ubuntu: ${{ steps.env.outputs.build_image_ubuntu }}
@@ -131,10 +138,13 @@ jobs:
       version_dev: ${{ steps.env.outputs.version_dev }}
       version_patch: ${{ steps.env.outputs.version_patch }}
     steps:
+
     - uses: actions/checkout@v3
       name: Checkout Envoy repository
       with:
+        ref: ${{ inputs.repo_ref }}
         fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
+
     - uses: ./.github/actions/env
       name: Generate environment variables
       id: env
@@ -167,14 +177,14 @@ jobs:
         fi
 
   check:
-    if: ${{ inputs.start_check_status && github.event_name != 'pull_request' }}
+    if: ${{ inputs.start_check_status && inputs.is_pr != false && github.event_name != 'pull_request' }}
     uses: ./.github/workflows/_workflow-start.yml
     permissions:
       contents: read
       statuses: write
     with:
       workflow_name: ${{ inputs.start_check_status }}
-      sha: ${{ inputs.repo_ref_sha }}
+      sha: ${{ inputs.repo_sha }}
 
   cache:
     if: ${{ inputs.prime_build_image }}
