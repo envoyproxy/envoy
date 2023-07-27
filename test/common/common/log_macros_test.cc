@@ -319,7 +319,7 @@ class FormatTest : public testing::Test {
 public:
   static void logMessageEscapeSequences() {
     ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test");
-  } // namespace Envoy
+  }
 };
 
 TEST_F(FormatTest, OutputUnescaped) {
