@@ -96,21 +96,14 @@ jobs:
       with:
         image_tag: ${{ inputs.cache_build_image }}
 
-    # If the run is "trusted" (ie has access to secrets) then it should
-    # **not** set the ref and should use the code of the calling context.
-    - if: ${{ inputs.repo_ref && inputs.trusted }}
-      run: |
-        echo '`repo_ref` should not be set for trusted CI runs'
-        exit 1
-
     - uses: actions/checkout@v3
       name: Checkout Envoy repository
       with:
         fetch-depth: ${{ inputs.repo_fetch_depth }}
         # WARNING: This allows untrusted code to run!!!
-        #  If this is set, then anything before or after in the job should be regarded as
+        #  If this is set to untrusted code, then anything before or after in the job should be regarded as
         #  compromised.
-        ref: ${{ ! inputs.trusted && inputs.repo_ref || '' }}
+        ref: ${{ inputs.repo_ref }}
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
 

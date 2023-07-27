@@ -12,17 +12,14 @@ inputs:
     type: string
     required: true
 
-  repo_ref:
-    type: string
+  trusted:
+    type: boolean
+    required: true
+
   repo_ref_sha:
     type: string
   repo_ref_name:
     type: string
-
-  trusted_bots:
-    type: string
-    default: |
-      trigger-release-envoy[bot]
 
   check_mobile_run:
     type: boolean
@@ -72,8 +69,6 @@ outputs:
     value: ${{ steps.context.outputs.repo_ref_sha_short }}
   repo_ref_title:
     value: ${{ steps.context.outputs.repo_ref_title }}
-  trusted:
-    value: ${{ steps.trusted.outputs.trusted }}
   version_dev:
     value: ${{ steps.context.outputs.version_dev }}
   version_patch:
@@ -87,37 +82,6 @@ runs:
     id: should_run
     name: 'Check what to run'
     run: ./mobile/tools/what_to_run.sh
-    shell: bash
-
-  - id: trusted
-    name: 'Check if its a trusted run'
-    run: |
-      TRUSTED=1
-      ACTOR="${{ github.actor }}"
-      if [[ "$ACTOR" =~ \[bot\] ]]; then
-          TRUSTED_BOT=
-          TRUSTED_BOTS=(${{ inputs.trusted_bots }})
-          for bot in ${TRUSTED_BOTS[@]}; do
-              if [[ "$bot" == "$ACTOR" ]]; then
-                  # Trusted bot account, ie non-PR
-                  TRUSTED_BOT=1
-                  break
-              fi
-          done
-          if [[ -z "$TRUSTED_BOT" ]]; then
-              echo "Not trusted bot account"
-              TRUSTED=
-          fi
-      fi
-      if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          echo "Not trusted pull_request event"
-          TRUSTED=
-      fi
-      if [[ -n "$TRUSTED" ]]; then
-          echo "trusted=true" >> "$GITHUB_OUTPUT"
-      else
-          echo "trusted=false" >> "$GITHUB_OUTPUT"
-      fi
     shell: bash
 
   - id: context
@@ -139,16 +103,14 @@ runs:
       fi
       echo "SET PR NUMBER: ${REF_PR_NUMBER}"
 
-      REF="${{ steps.trusted.outputs.trusted != 'true' && inputs.repo_ref || '' }}"
       REF_SHA=${{ inputs.repo_ref_sha || github.event.pull_request.head.sha || github.sha }}
       REF_SHA_SHORT="${REF_SHA:0:7}"
       REF_TITLE=(
-          "${{ steps.trusted.outputs.trusted == 'true' && 'postsubmit' || 'pr' }}/"
+          "${{ inputs.trusted == 'true' && 'postsubmit' || 'pr' }}/"
           "${REF_NAME}"
           "@${REF_SHA_SHORT}")
       REF_TITLE="$(printf %s "${REF_TITLE[@]}" $'\n')"
       {
-          echo "repo_ref=$REF"
           echo "repo_ref_name=$REF_NAME"
           echo "repo_ref_pr_number=$REF_PR_NUMBER"
           echo "repo_ref_sha=$REF_SHA"

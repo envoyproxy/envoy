@@ -41,6 +41,11 @@ on:
         type: string
         default:
 
+      trusted_bots:
+        type: string
+        default: |
+          trigger-release-envoy[bot]
+
     outputs:
       agent_ubuntu:
         value: ubuntu-22.04
@@ -75,8 +80,6 @@ on:
       mobile_tsan:
         value: ${{ jobs.repo.outputs.mobile_tsan }}
 
-      repo_ref:
-        value: ${{ jobs.repo.outputs.repo_ref }}
       repo_ref_name:
         value: ${{ jobs.repo.outputs.repo_ref_name }}
       repo_ref_sha:
@@ -122,38 +125,69 @@ jobs:
       mobile_ios_tests: ${{ steps.env.outputs.mobile_ios_tests }}
       mobile_release_validation: ${{ steps.env.outputs.mobile_release_validation }}
       mobile_tsan: ${{ steps.env.outputs.mobile_tsan }}
-      repo_ref: ${{ steps.env.outputs.repo_ref }}
       repo_ref_name: ${{ steps.env.outputs.repo_ref_name }}
       repo_ref_sha: ${{ steps.env.outputs.repo_ref_sha }}
       repo_ref_sha_short: ${{ steps.env.outputs.repo_ref_sha_short }}
       repo_ref_title: ${{ steps.env.outputs.repo_ref_title }}
-      trusted: ${{ steps.env.outputs.trusted }}
+      trusted: ${{ steps.trusted.outputs.trusted }}
       version_dev: ${{ steps.env.outputs.version_dev }}
       version_patch: ${{ steps.env.outputs.version_patch }}
     steps:
+    - id: trusted
+      name: 'Check if its a trusted run'
+      run: |
+        TRUSTED=1
+        ACTOR="${{ github.actor }}"
+        if [[ "$ACTOR" =~ \[bot\] ]]; then
+            TRUSTED_BOT=
+            TRUSTED_BOTS=(${{ inputs.trusted_bots }})
+            for bot in ${TRUSTED_BOTS[@]}; do
+                if [[ "$bot" == "$ACTOR" ]]; then
+                    # Trusted bot account, ie non-PR
+                    TRUSTED_BOT=1
+                    break
+                fi
+            done
+            if [[ -z "$TRUSTED_BOT" ]]; then
+                echo "Not trusted bot account"
+                TRUSTED=
+            fi
+        fi
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Not trusted pull_request event"
+            TRUSTED=
+        fi
+        if [[ -n "$TRUSTED" ]]; then
+            echo "trusted=true" >> "$GITHUB_OUTPUT"
+        else
+            echo "trusted=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - uses: actions/checkout@v3
       name: Checkout Envoy repository
       with:
+        # Only trusted runs should be allowed to check out specific commits
+        ref: ${{ ! steps.trusted.outputs.trusted == 'true' && inputs.repo_ref || '' }}
         fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
     - uses: ./.github/actions/env
       name: Generate environment variables
       id: env
       with:
         check_mobile_run: ${{ inputs.check_mobile_run }}
-        repo_ref: ${{ inputs.repo_ref }}
         repo_ref_name: ${{ inputs.repo_ref_name }}
         repo_ref_sha: ${{ inputs.repo_ref_sha }}
         build_image_repo: ${{ inputs.build_image_repo }}
         build_image_tag: ${{ inputs.build_image_tag }}
         build_image_mobile_sha: ${{ inputs.build_image_mobile_sha }}
         build_image_sha: ${{ inputs.build_image_sha }}
+        trusted: ${{ steps.trusted.outputs.trusted == 'true' && true || false }}
 
     - name: 'Print env'
       run: |
         echo "version_dev=${{ steps.env.outputs.version_dev }}"
         echo "version_patch=${{ steps.env.outputs.version_patch }}"
-        echo "trusted=${{ steps.env.outputs.trusted }}"
-        echo "repo_ref=${{ steps.env.outputs.repo_ref }}"
+        echo "trusted=${{ steps.trusted.outputs.trusted }}"
+        echo "repo_ref=${{ inputs.repo_ref }}"
         echo "repo_ref_name=${{ steps.env.outputs.repo_ref_name }}"
         echo "repo_ref_pr_number=${{ steps.env.outputs.repo_ref_pr_number }}"
         echo "repo_ref_sha=${{ steps.env.outputs.repo_ref_sha }}"

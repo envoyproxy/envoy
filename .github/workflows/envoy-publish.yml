@@ -53,8 +53,7 @@ jobs:
       build_image_ubuntu: ${{ needs.env.outputs.build_image_ubuntu }}
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       version_dev: ${{ needs.env.outputs.version_dev }}
-      given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
+      repo_ref: ${{ inputs.ref }}
     permissions:
       contents: write
 
@@ -65,5 +64,4 @@ jobs:
     - env
     with:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
-      given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ needs.env.outputs.trusted != 'true' && needs.env.outputs.repo_ref || '' }}
+      repo_ref: ${{ inputs.ref }}
