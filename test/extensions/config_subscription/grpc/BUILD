@@ -44,6 +44,7 @@ envoy_cc_test(
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:api_version_lib",
+        "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",

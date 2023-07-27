@@ -8,6 +8,7 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -1162,6 +1163,59 @@ TEST_F(GrpcMuxImplTest, AddRemoveSubscriptions) {
     expectSendMessage(type_url, {}, "2");
     EXPECT_CALL(*eds_resources_cache_, removeResource("y"));
   }
+}
+
+/**
+ * Tests the NullGrpcMuxImpl object to increase code-coverage.
+ */
+class NullGrpcMuxImplTest : public testing::Test {
+public:
+  NullGrpcMuxImplTest() {}
+  NullGrpcMuxImpl null_mux_;
+  NiceMock<MockSubscriptionCallbacks> callbacks_;
+};
+
+TEST_F(NullGrpcMuxImplTest, StartImplemented) { EXPECT_NO_THROW(null_mux_.start()); }
+
+TEST_F(NullGrpcMuxImplTest, PauseImplemented) {
+  ScopedResume scoped;
+  EXPECT_NO_THROW(scoped = null_mux_.pause("ignored"));
+}
+
+TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
+  ScopedResume scoped;
+  const std::vector<std::string> params = {"ignored", "another_ignored"};
+  EXPECT_NO_THROW(scoped = null_mux_.pause(params));
+}
+
+TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
+  EXPECT_ENVOY_BUG(null_mux_.requestOnDemandUpdate("type_url", {"for_update"}),
+                   "unexpected request for on demand update");
+}
+
+TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
+
+  EXPECT_THROW_WITH_REGEX(null_mux_.addWatch("type_url", {}, callbacks, resource_decoder, {}),
+                          EnvoyException, "ADS must be configured to support an ADS config source");
+}
+
+TEST_F(NullGrpcMuxImplTest, NoEdsResourcesCache) { EXPECT_EQ({}, null_mux_.edsResourcesCache()); }
+TEST_F(NullGrpcMuxImplTest, OnWriteableImplemented) { EXPECT_NO_THROW(null_mux_.onWriteable()); }
+TEST_F(NullGrpcMuxImplTest, OnStreamEstablishedImplemented) {
+  EXPECT_NO_THROW(null_mux_.onStreamEstablished());
+}
+TEST_F(NullGrpcMuxImplTest, OnEstablishmentFailureImplemented) {
+  EXPECT_NO_THROW(null_mux_.onEstablishmentFailure());
+}
+TEST_F(NullGrpcMuxImplTest, OnDiscoveryResponseImplemented) {
+  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response;
+  Stats::TestUtil::TestStore stats;
+  ControlPlaneStats cp_stats{Utility::generateControlPlaneStats(*stats.rootScope())};
+  EXPECT_NO_THROW(null_mux_.onDiscoveryResponse(std::move(response), cp_stats));
 }
 
 } // namespace
