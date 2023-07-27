@@ -50,8 +50,9 @@ public:
     EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
   }
 
-  void callHttpCheckAndValidateRequestAttributes(bool include_peer_certificate,
-                                                 const envoy::service::auth::v3::AttributeContext_TLSSession* want_tls_session) {
+  void callHttpCheckAndValidateRequestAttributes(
+      bool include_peer_certificate,
+      const envoy::service::auth::v3::AttributeContext_TLSSession* want_tls_session) {
     Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                                    {":path", "/bar"}};
     envoy::service::auth::v3::CheckRequest request;
@@ -68,8 +69,8 @@ public:
     CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
                                        std::move(metadata_context), request,
                                        /*max_request_bytes=*/0, /*pack_as_bytes=*/false,
-                                       include_peer_certificate, want_tls_session != nullptr, labels,
-                                       nullptr);
+                                       include_peer_certificate, want_tls_session != nullptr,
+                                       labels, nullptr);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -92,11 +93,9 @@ public:
       EXPECT_EQ(0, request.attributes().source().certificate().size());
     }
 
-    EXPECT_EQ(want_tls_session != nullptr,
-              request.attributes().has_tls_session());
+    EXPECT_EQ(want_tls_session != nullptr, request.attributes().has_tls_session());
     if (want_tls_session != nullptr) {
-      EXPECT_EQ(want_tls_session->sni(),
-                request.attributes().tls_session().sni());
+      EXPECT_EQ(want_tls_session->sni(), request.attributes().tls_session().sni());
     }
   }
 
@@ -447,9 +446,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
   want_tls_session.set_sni(sni_);
-  EXPECT_CALL(*ssl_, sni())
-      .Times(2)
-      .WillRepeatedly(ReturnRef(want_tls_session.sni()));
+  EXPECT_CALL(*ssl_, sni()).Times(2).WillRepeatedly(ReturnRef(want_tls_session.sni()));
 
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
@@ -459,27 +456,20 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(callbacks_, connection())
       .Times(4)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
-  connection_.stream_info_.downstream_connection_info_provider_
-      ->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_connection_info_provider_
-      ->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, protocol())
-      .Times(2)
-      .WillRepeatedly(ReturnPointee(&protocol_));
+  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
   EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
 
-  EXPECT_CALL(*ssl_, uriSanPeerCertificate())
-      .WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
-  EXPECT_CALL(*ssl_, sni())
-      .Times(1)
-      .WillRepeatedly(ReturnRef(want_tls_session.sni()));
+  EXPECT_CALL(*ssl_, sni()).Times(1).WillRepeatedly(ReturnRef(want_tls_session.sni()));
 
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
