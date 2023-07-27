@@ -309,6 +309,28 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
   processValidChloPacketAndInitializeFilters(true);
 }
 
+TEST_P(EnvoyQuicDispatcherTest, ForwardingCallbackIsCalledDuringHotRestart) {
+  const uint32_t input_worker_index = 12;
+  using Network::UdpRecvData;
+  testing::MockFunction<Network::HotRestartPacketForwardingFunction> mock_callback;
+  envoy_quic_dispatcher_.onHotRestarting(input_worker_index, mock_callback.AsStdFunction());
+
+  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                        ? quic::QuicIpAddress::Loopback4()
+                                        : quic::QuicIpAddress::Loopback6(),
+                                    54321);
+  EXPECT_CALL(
+      mock_callback,
+      Call(input_worker_index,
+           testing::Field(&UdpRecvData::addresses_,
+                          testing::Field(&UdpRecvData::LocalPeerAddresses::peer_,
+                                         testing::Pointee(testing::Property(
+                                             &Network::Address::Instance::asStringView,
+                                             testing::AnyOf(testing::Eq("127.0.0.1:54321"),
+                                                            testing::Eq("[::1]:54321"))))))));
+  processValidChloPacket(peer_addr);
+}
+
 TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
   Network::MockFilterChainManager filter_chain_manager;
   std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());

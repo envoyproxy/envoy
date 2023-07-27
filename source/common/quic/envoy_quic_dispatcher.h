@@ -75,12 +75,23 @@ public:
 
   void updateListenerConfig(Network::ListenerConfig& new_listener_config);
 
+  // Registers a function to intercept new connections. This can be called on the parent
+  // instance during hot restart to facilitate passing new connections to the new instance,
+  // while continuing to handle established, draining connections on the old instance.
+  void onHotRestarting(uint32_t worker_index, Network::HotRestartPacketForwardingFunction fn);
+
 protected:
   // quic::QuicDispatcher
   std::unique_ptr<quic::QuicSession> CreateQuicSession(
       quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
       const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
+
+  // quic::QuicDispatcher
+  // This override checks if the current instance is draining for hot restart, and if it
+  // is (and a packet failed to dispatch), we can forward that packet over a back channel RPC
+  // to the new instance.
+  bool OnFailedToDispatchPacket(const quic::ReceivedPacketInfo& received_packet_info) override;
 
 private:
   Network::ConnectionHandler& connection_handler_;
@@ -94,6 +105,7 @@ private:
   FilterChainToConnectionMap connections_by_filter_chain_;
   QuicDispatcherStats quic_stats_;
   QuicConnectionStats connection_stats_;
+  std::function<void(const Network::UdpRecvData& packet)> hot_restart_forward_packet_ = {};
 };
 
 } // namespace Quic

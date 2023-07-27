@@ -17,6 +17,9 @@
 namespace Envoy {
 namespace Network {
 
+using HotRestartPacketForwardingFunction =
+    std::function<void(uint32_t worker_index, const Network::UdpRecvData& packet)>;
+
 /**
  * Abstract connection handler.
  */
@@ -135,6 +138,12 @@ public:
      * Stop listening according to implementation's own definition.
      */
     virtual void shutdownListener() PURE;
+
+    /**
+     * Inject optional custom handling of UDP packets during hot restart.
+     * It is up to the implementation to capture and call the provided function.
+     */
+    virtual void onHotRestarting(HotRestartPacketForwardingFunction) {}
 
     /**
      * Update the listener config.

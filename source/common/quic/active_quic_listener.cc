@@ -156,6 +156,10 @@ void ActiveQuicListener::shutdownListener() {
   quic_dispatcher_->StopAcceptingNewConnections();
 }
 
+void ActiveQuicListener::onHotRestarting(Network::HotRestartPacketForwardingFunction fn) {
+  quic_dispatcher_->onHotRestarting(worker_index_, fn);
+}
+
 uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const {
   if (kernel_worker_routing_) {
     // The kernel has already routed the packet correctly. Make it stay on the current worker.

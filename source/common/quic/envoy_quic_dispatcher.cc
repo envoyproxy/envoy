@@ -126,6 +126,23 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   return quic_session;
 }
 
+bool EnvoyQuicDispatcher::OnFailedToDispatchPacket(
+    const quic::ReceivedPacketInfo& received_packet_info) {
+  if (hot_restart_forward_packet_ == nullptr) {
+    // If we're not hot restarting, do the default behavior.
+    return quic::QuicDispatcher::OnFailedToDispatchPacket(received_packet_info);
+  }
+  // We are hot restarting, forward the packet to the new instance.
+  Network::UdpRecvData packet;
+  packet.addresses_.local_ = quicAddressToEnvoyAddressInstance(received_packet_info.self_address);
+  packet.addresses_.peer_ = quicAddressToEnvoyAddressInstance(received_packet_info.peer_address);
+  packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(received_packet_info.packet.AsStringPiece());
+  packet.receive_time_ = MonotonicTime(
+      std::chrono::microseconds{received_packet_info.packet.receipt_time().ToDebuggingValue()});
+  hot_restart_forward_packet_(packet);
+  return true;
+}
+
 void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
     const Network::FilterChain* filter_chain) {
   auto iter = connections_by_filter_chain_.find(filter_chain);
@@ -146,6 +163,13 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
 
 void EnvoyQuicDispatcher::updateListenerConfig(Network::ListenerConfig& new_listener_config) {
   listener_config_ = &new_listener_config;
+}
+
+void EnvoyQuicDispatcher::onHotRestarting(uint32_t worker_index,
+                                          Network::HotRestartPacketForwardingFunction fn) {
+  hot_restart_forward_packet_ = [worker_index, fn](const Network::UdpRecvData& packet) {
+    fn(worker_index, packet);
+  };
 }
 
 } // namespace Quic

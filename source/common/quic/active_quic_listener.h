@@ -61,6 +61,7 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override;
   void resumeListening() override;
+  void onHotRestarting(Network::HotRestartPacketForwardingFunction fn) override;
   void shutdownListener() override;
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
