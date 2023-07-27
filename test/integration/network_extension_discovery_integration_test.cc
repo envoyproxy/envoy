@@ -208,7 +208,7 @@ public:
     std::string received_data;
     ASSERT_TRUE(
         fake_upstream_connection->waitForData(data_.size() - bytes_drained, &received_data));
-    const std::string expected_data = data_.substr(bytes_drained, std::string::npos);
+    const std::string expected_data = data_.substr(bytes_drained);
     EXPECT_EQ(expected_data, received_data);
     tcp_client->close();
   }
