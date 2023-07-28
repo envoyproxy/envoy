@@ -54,6 +54,8 @@ Network filters
 For downstream network filters, the discovery service configuration is: :ref:`dynamic filter
 re-configuration<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
 If the dynamic configuration is missing, the connection will be rejected until a valid config is updated.
+When a filter configuration updates, the new configuration will only apply to new connections, existing connections
+will keep using the older filter configuration.
 
 HTTP filters
 ^^^^^^^^^^^^

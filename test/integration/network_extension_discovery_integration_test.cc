@@ -25,8 +25,7 @@ class NetworkExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrat
                                                  public BaseIntegrationTest {
 public:
   NetworkExtensionDiscoveryIntegrationTest()
-      : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig()), filter_name_("foo"),
-        data_("HelloWorld"), port_name_("tcp") {
+      : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig()) {
     skip_tag_extraction_rule_check_ = true;
   }
 
@@ -247,9 +246,9 @@ public:
   }
 
   const uint32_t default_bytes_to_drain_{2};
-  const std::string filter_name_;
-  const std::string data_;
-  const std::string port_name_;
+  const std::string filter_name_ = "foo";
+  const std::string data_ = "HelloWorld";
+  const std::string port_name_ = "tcp";
   bool two_connections_{false};
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
@@ -518,10 +517,9 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   ecds_connection_.reset();
 }
 
-// Validate that a network filter update should fail if the subscribed extension configuration make filter
-// terminal but the filter position is not at the last position at filter chain.
-// There would be total of 2 filters in the chain: 'foo' and 'tcp_proxy' and both are marked
-// terminal.
+// Validate that a network filter update should fail if the subscribed extension configuration make
+// filter terminal but the filter position is not at the last position at filter chain. There would
+// be total of 2 filters in the chain: 'foo' and 'tcp_proxy' and both are marked terminal.
 TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilterChain) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addFilterChain();
