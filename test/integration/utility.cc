@@ -322,7 +322,8 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
 // This wrapper is needed to preserve the ServerFactoryContext for the lifetime of the
 // `real_factory_` as it stores the reference to the ServerFactoryContext.
 // TODO(yanavlasov): clean-up integration tests that needs this and remove UHV from
-// fake upstreams.
+// fake upstreams and test clients. This is a larger change due to test client codecs
+// needing to translate upgrade to extended CONNECT for H/2 and H/3.
 class FakeHeaderValidatorFactory : public Http::HeaderValidatorFactory {
 public:
   FakeHeaderValidatorFactory(absl::string_view config) {
