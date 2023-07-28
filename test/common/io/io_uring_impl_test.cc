@@ -11,6 +11,14 @@ namespace Envoy {
 namespace Io {
 namespace {
 
+class TestRequest: public Request {
+public:
+  TestRequest(int& data) : data_(data) {}
+  ~TestRequest() { data_ = -1; }
+
+  int& data_;
+};
+
 class IoUringImplTest : public ::testing::Test {
 public:
   IoUringImplTest() : api_(Api::createApiForTest()), should_skip_(!isIoUringSupported()) {
@@ -80,7 +88,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [this, &completions_nr](uint32_t) {
-        io_uring_->forEveryCompletion([&completions_nr](void*, int32_t res, bool) {
+        io_uring_->forEveryCompletion([&completions_nr](Request*, int32_t res, bool) {
           EXPECT_TRUE(res < 0);
           completions_nr++;
         });
@@ -110,21 +118,23 @@ TEST_F(IoUringImplTest, InjectCompletion) {
   os_fd_t event_fd = io_uring_->registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
   int32_t completions_nr = 0;
+  int data1 = 1;
+  TestRequest request(data1);
 
   auto file_event = dispatcher->createFileEvent(
       event_fd,
-      [this, &fd, &completions_nr](uint32_t) {
+      [this, &completions_nr](uint32_t) {
         io_uring_->forEveryCompletion(
-            [&fd, &completions_nr](void* user_data, int32_t res, bool injected) {
+            [&completions_nr](Request* user_data, int32_t res, bool injected) {
               EXPECT_TRUE(injected);
-              EXPECT_EQ(&fd, user_data);
+              EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
               EXPECT_EQ(-11, res);
               completions_nr++;
             });
       },
       trigger, Event::FileReadyType::Read);
 
-  io_uring_->injectCompletion(fd, &fd, -11);
+  io_uring_->injectCompletion(fd, &request, -11);
 
   file_event->activate(Event::FileReadyType::Read);
 
@@ -140,19 +150,23 @@ TEST_F(IoUringImplTest, NestInjectCompletion) {
   os_fd_t event_fd = io_uring_->registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
   int32_t completions_nr = 0;
+  int data1 = 1;
+  TestRequest request(data1);
+  int data2 = 2;
+  TestRequest request2(data2);
 
   auto file_event = dispatcher->createFileEvent(
       event_fd,
-      [this, &fd, &fd2, &completions_nr](uint32_t) {
+      [this, &fd2, &completions_nr, &request2](uint32_t) {
         io_uring_->forEveryCompletion(
-            [this, &fd, &fd2, &completions_nr](void* user_data, int32_t res, bool injected) {
+            [this, &fd2, &completions_nr, &request2](Request* user_data, int32_t res, bool injected) {
               EXPECT_TRUE(injected);
               if (completions_nr == 0) {
-                EXPECT_EQ(&fd, user_data);
+                EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
                 EXPECT_EQ(-11, res);
-                io_uring_->injectCompletion(fd2, &fd2, -22);
+                io_uring_->injectCompletion(fd2, &request2, -22);
               } else {
-                EXPECT_EQ(&fd2, user_data);
+                EXPECT_EQ(2, dynamic_cast<TestRequest*>(user_data)->data_);
                 EXPECT_EQ(-22, res);
               }
 
@@ -161,7 +175,7 @@ TEST_F(IoUringImplTest, NestInjectCompletion) {
       },
       trigger, Event::FileReadyType::Read);
 
-  io_uring_->injectCompletion(fd, &fd, -11);
+  io_uring_->injectCompletion(fd, &request, -11);
 
   file_event->activate(Event::FileReadyType::Read);
 
@@ -177,24 +191,28 @@ TEST_F(IoUringImplTest, RemoveInjectCompletion) {
   os_fd_t event_fd = io_uring_->registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
   int32_t completions_nr = 0;
+  int data1 = 1;
+  TestRequest request(data1);
+  int data2 = 2;
+  TestRequest* request2 = new TestRequest(data2);
 
   auto file_event = dispatcher->createFileEvent(
       event_fd,
-      [this, &fd, &completions_nr](uint32_t) {
+      [this, &completions_nr](uint32_t) {
         io_uring_->forEveryCompletion(
-            [&fd, &completions_nr](void* user_data, int32_t res, bool injected) {
+            [&completions_nr](Request* user_data, int32_t res, bool injected) {
               EXPECT_TRUE(injected);
-              EXPECT_EQ(&fd, user_data);
+              EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
               EXPECT_EQ(-11, res);
               completions_nr++;
             });
       },
       trigger, Event::FileReadyType::Read);
 
-  io_uring_->injectCompletion(fd, &fd, -11);
-  io_uring_->injectCompletion(fd2, &fd2, -22);
-  io_uring_->removeInjectedCompletion(
-      fd2, [fd2](void* user_data) { EXPECT_EQ(fd2, *reinterpret_cast<os_fd_t*>(user_data)); });
+  io_uring_->injectCompletion(fd, &request, -11);
+  io_uring_->injectCompletion(fd2, request2, -22);
+  io_uring_->removeInjectedCompletion(fd2);
+  EXPECT_EQ(-1, data2);
   file_event->activate(Event::FileReadyType::Read);
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -209,26 +227,31 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
   os_fd_t event_fd = io_uring_->registerEventfd();
   const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
   int32_t completions_nr = 0;
+  int data1 = 1;
+  TestRequest request(data1);
+  int data2 = 2;
+  TestRequest* request2 = new TestRequest(data2);
 
   auto file_event = dispatcher->createFileEvent(
       event_fd,
-      [this, &fd, &fd2, &completions_nr](uint32_t) {
+      [this, &fd2, &completions_nr, &data2](uint32_t) {
         io_uring_->forEveryCompletion(
-            [this, &fd, &fd2, &completions_nr](void* user_data, int32_t res, bool injected) {
+            [this, &fd2, &completions_nr, &data2](Request* user_data, int32_t res, bool injected) {
               EXPECT_TRUE(injected);
               if (completions_nr == 0) {
-                EXPECT_EQ(&fd, user_data);
+                EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
                 EXPECT_EQ(-11, res);
               } else {
-                io_uring_->removeInjectedCompletion(fd2, [](void*) {});
+                io_uring_->removeInjectedCompletion(fd2);
+                EXPECT_EQ(-1, data2);
               }
               completions_nr++;
             });
       },
       trigger, Event::FileReadyType::Read);
 
-  io_uring_->injectCompletion(fd, &fd, -11);
-  io_uring_->injectCompletion(fd2, &fd2, -22);
+  io_uring_->injectCompletion(fd, &request, -11);
+  io_uring_->injectCompletion(fd2, request2, -22);
 
   file_event->activate(Event::FileReadyType::Read);
 
@@ -265,7 +288,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [this, &completions_nr, d = dispatcher.get()](uint32_t) {
-        io_uring_->forEveryCompletion([&completions_nr](void*, int32_t res, bool) {
+        io_uring_->forEveryCompletion([&completions_nr](Request*, int32_t res, bool) {
           completions_nr++;
           EXPECT_EQ(res, strlen("test text"));
         });
@@ -312,23 +335,29 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [this, &completions_nr](uint32_t) {
-        io_uring_->forEveryCompletion([&completions_nr](void* user_data, int32_t res, bool) {
+        io_uring_->forEveryCompletion([&completions_nr](Request* user_data, int32_t res, bool) {
           EXPECT_TRUE(user_data != nullptr);
           EXPECT_EQ(res, 2);
           completions_nr++;
           // Note: generally events are not guaranteed to complete in the same order
           // we submit them, but for this case of reading from a single file it's ok
           // to expect the same order.
-          EXPECT_EQ(reinterpret_cast<int64_t>(user_data), completions_nr);
+          EXPECT_EQ(dynamic_cast<TestRequest*>(user_data)->data_, completions_nr);
         });
       },
       trigger, Event::FileReadyType::Read);
 
-  IoUringResult res = io_uring_->prepareReadv(fd, &iov1, 1, 0, reinterpret_cast<void*>(1));
+  int data1 = 1;
+  TestRequest request1(data1);
+  IoUringResult res = io_uring_->prepareReadv(fd, &iov1, 1, 0, &request1);
   EXPECT_EQ(res, IoUringResult::Ok);
-  res = io_uring_->prepareReadv(fd, &iov2, 1, 2, reinterpret_cast<void*>(2));
+  int data2 = 2;
+  TestRequest request2(data2);
+  res = io_uring_->prepareReadv(fd, &iov2, 1, 2, &request2);
   EXPECT_EQ(res, IoUringResult::Ok);
-  res = io_uring_->prepareReadv(fd, &iov3, 1, 4, reinterpret_cast<void*>(3));
+  int data3 = 3;
+  TestRequest request3(data3);
+  res = io_uring_->prepareReadv(fd, &iov3, 1, 4, &request3);
   // Expect the submission queue overflow.
   EXPECT_EQ(res, IoUringResult::Failed);
   res = io_uring_->submit();
@@ -348,7 +377,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   EXPECT_EQ(completions_nr, 2);
 
   // Check a new event gets handled in the next dispatcher run.
-  res = io_uring_->prepareReadv(fd, &iov3, 1, 4, reinterpret_cast<void*>(3));
+  res = io_uring_->prepareReadv(fd, &iov3, 1, 4, &request3);
   EXPECT_EQ(res, IoUringResult::Ok);
   res = io_uring_->submit();
   EXPECT_EQ(res, IoUringResult::Ok);

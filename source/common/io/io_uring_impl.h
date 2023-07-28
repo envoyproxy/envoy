@@ -13,11 +13,11 @@ namespace Io {
 bool isIoUringSupported();
 
 struct InjectedCompletion {
-  InjectedCompletion(os_fd_t fd, void* user_data, int32_t result)
+  InjectedCompletion(os_fd_t fd, Request* user_data, int32_t result)
       : fd_(fd), user_data_(user_data), result_(result) {}
 
   const os_fd_t fd_;
-  void* user_data_;
+  Request* user_data_;
   const int32_t result_;
 };
 
@@ -33,17 +33,17 @@ public:
   bool isEventfdRegistered() const override;
   void forEveryCompletion(const CompletionCb& completion_cb) override;
   IoUringResult prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
-                              void* user_data) override;
+                              Request* user_data) override;
   IoUringResult prepareConnect(os_fd_t fd, const Network::Address::InstanceConstSharedPtr& address,
-                               void* user_data) override;
+                               Request* user_data) override;
   IoUringResult prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
-                             void* user_data) override;
+                             Request* user_data) override;
   IoUringResult prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                              off_t offset, void* user_data) override;
-  IoUringResult prepareClose(os_fd_t fd, void* user_data) override;
+                              off_t offset, Request* user_data) override;
+  IoUringResult prepareClose(os_fd_t fd, Request* user_data) override;
   IoUringResult submit() override;
-  void injectCompletion(os_fd_t fd, void* user_data, int32_t result) override;
-  void removeInjectedCompletion(os_fd_t fd, InjectedCompletionUserDataReleasor releasor) override;
+  void injectCompletion(os_fd_t fd, Request* user_data, int32_t result) override;
+  void removeInjectedCompletion(os_fd_t fd) override;
 
 private:
   struct io_uring ring_ {};

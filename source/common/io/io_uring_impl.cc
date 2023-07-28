@@ -85,7 +85,7 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
 
   for (unsigned i = 0; i < count; ++i) {
     struct io_uring_cqe* cqe = cqes_[i];
-    completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res, false);
+    completion_cb(reinterpret_cast<Request*>(cqe->user_data), cqe->res, false);
   }
 
   io_uring_cq_advance(&ring_, count);
@@ -107,7 +107,7 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
 }
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
-                                         socklen_t* remote_addr_len, void* user_data) {
+                                         socklen_t* remote_addr_len, Request* user_data) {
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -120,7 +120,7 @@ IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_add
 
 IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
                                           const Network::Address::InstanceConstSharedPtr& address,
-                                          void* user_data) {
+                                          Request* user_data) {
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -132,7 +132,7 @@ IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
 }
 
 IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                                        off_t offset, void* user_data) {
+                                        off_t offset, Request* user_data) {
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -144,7 +144,7 @@ IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, 
 }
 
 IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                                         off_t offset, void* user_data) {
+                                         off_t offset, Request* user_data) {
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -155,7 +155,7 @@ IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs,
   return IoUringResult::Ok;
 }
 
-IoUringResult IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
+IoUringResult IoUringImpl::prepareClose(os_fd_t fd, Request* user_data) {
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -172,20 +172,19 @@ IoUringResult IoUringImpl::submit() {
   return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
 }
 
-void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) {
+void IoUringImpl::injectCompletion(os_fd_t fd, Request* user_data, int32_t result) {
   injected_completions_.emplace_back(fd, user_data, result);
   ENVOY_LOG(trace, "inject completion, fd = {}, req = {}, num injects = {}", fd,
             fmt::ptr(user_data), injected_completions_.size());
 }
 
-void IoUringImpl::removeInjectedCompletion(os_fd_t fd,
-                                           InjectedCompletionUserDataReleasor releasor) {
+void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
   ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
             injected_completions_.size());
-  injected_completions_.remove_if([fd, releasor](InjectedCompletion& completion) {
+  injected_completions_.remove_if([fd](InjectedCompletion& completion) {
     if (fd == completion.fd_) {
       // Release the user data before remove this completion.
-      releasor(completion.user_data_);
+      delete reinterpret_cast<Request*>(completion.user_data_);
     }
     return fd == completion.fd_;
   });
