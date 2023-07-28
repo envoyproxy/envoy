@@ -345,6 +345,12 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 }
 
+RequestDecoderHandlePtr ConnectionManagerImpl::newStreamHandle(ResponseEncoder& response_encoder,
+                                                               bool is_internally_created) {
+  RequestDecoder& decoder = newStream(response_encoder, is_internally_created);
+  return std::make_unique<ActiveStreamHandle>(static_cast<ActiveStream&>(decoder));
+}
+
 RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
                                                  bool is_internally_created) {
   TRACE_EVENT("core", "ConnectionManagerImpl::newStream");
@@ -365,8 +371,8 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
     response_encoder.getStream().setAccount(downstream_stream_account);
   }
 
-  ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
-                                              std::move(downstream_stream_account)));
+  auto new_stream = std::make_unique<ActiveStream>(
+      *this, response_encoder.getStream().bufferLimit(), std::move(downstream_stream_account));
 
   accumulated_requests_++;
   if (config_.maxRequestsPerConnection() > 0 &&
