@@ -19,6 +19,7 @@ jobs:
           && (github.event.schedule
               || !contains(github.actor, '[bot]'))
       }}
+    needs: env
     name: android_release_artifacts
     runs-on: ubuntu-22.04
     timeout-minutes: 120
