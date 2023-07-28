@@ -494,8 +494,8 @@ protected:
 
   virtual void refresh(uint32_t priority);
 
-  bool isSlowStartEnabled();
-  bool noHostsAreInSlowStart();
+  bool isSlowStartEnabled() const;
+  bool noHostsAreInSlowStart() const;
 
   virtual void recalculateHostsInSlowStart(const HostVector& hosts_added);
 
@@ -506,13 +506,12 @@ protected:
   // overload.
   const uint64_t seed_;
 
-  double applyAggressionFactor(double time_factor);
-  double applySlowStartFactor(double host_weight, const Host& host);
+  double applySlowStartFactor(double host_weight, const Host& host) const;
 
 private:
   friend class EdfLoadBalancerBasePeer;
   virtual void refreshHostSource(const HostsSource& source) PURE;
-  virtual double hostWeight(const Host& host) PURE;
+  virtual double hostWeight(const Host& host) const PURE;
   virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -526,7 +525,6 @@ private:
 protected:
   // Slow start related config
   const std::chrono::milliseconds slow_start_window_;
-  double aggression_{1.0};
   const absl::optional<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
   MonotonicTime latest_host_added_time_;
@@ -580,7 +578,7 @@ private:
     // index.
     peekahead_index_ = 0;
   }
-  double hostWeight(const Host& host) override {
+  double hostWeight(const Host& host) const override {
     if (!noHostsAreInSlowStart()) {
       return applySlowStartFactor(host.weight(), host);
     }
@@ -696,7 +694,7 @@ protected:
 
 private:
   void refreshHostSource(const HostsSource&) override {}
-  double hostWeight(const Host& host) override;
+  double hostWeight(const Host& host) const override;
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
