@@ -7,7 +7,6 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/connection.h"
 
@@ -335,7 +334,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
 // of extended CONNECT to upgrade, which is done by the codecs.
 class FakeHeaderValidatorFactory : public Http::HeaderValidatorFactory {
 public:
-  FakeHeaderValidatorFactory(absl::string_view config) : config_(loadConfig(config)) {}
+  FakeHeaderValidatorFactory(const HeaderValidatorConfig& config) : config_(config) {}
 
   Http::ServerHeaderValidatorPtr
   createServerHeaderValidator(Http::Protocol protocol, Http::HeaderValidatorStats& stats) override {
@@ -372,18 +371,11 @@ public:
   }
 
 private:
-  static HeaderValidatorConfig loadConfig(absl::string_view config) {
-    HeaderValidatorConfig proto_config;
-    Thread::SkipAsserts no_main_thread_asserts_in_yaml_parser;
-    TestUtility::loadFromYaml(std::string(config), proto_config);
-    return proto_config;
-  }
-
   const HeaderValidatorConfig config_;
 };
 
 Http::HeaderValidatorFactoryPtr
-IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] absl::string_view config) {
+IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] const HeaderValidatorConfig& config) {
 #ifdef ENVOY_ENABLE_UHV
   return std::make_unique<FakeHeaderValidatorFactory>(config);
 #else
