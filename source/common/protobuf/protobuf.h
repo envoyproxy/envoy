@@ -51,17 +51,18 @@ class MessageLiteDifferencer;
 // Google we have more than one protobuf implementation.
 
 namespace Protobuf {
-typedef ::google::protobuf::Closure Closure;
 
-using ::google::protobuf::BytesValue;
-using ::google::protobuf::Descriptor;
-using ::google::protobuf::DescriptorPool;
-using ::google::protobuf::DynamicCastToGenerated;
-using ::google::protobuf::DynamicMessageFactory;
-using ::google::protobuf::EnumValueDescriptor;
-using ::google::protobuf::FieldDescriptor;
-using ::google::protobuf::Map;
-using ::google::protobuf::UInt32Value;
+using Closure = ::google::protobuf::Closure;
+
+using ::google::protobuf::BytesValue;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Descriptor;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DescriptorPool;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DynamicCastToGenerated;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DynamicMessageFactory;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::EnumValueDescriptor;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FieldDescriptor;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Map;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::UInt32Value;  // NOLINT(misc-unused-using-decls)
 #ifdef ENVOY_ENABLE_FULL_PROTOS
 using ::google::protobuf::Message;
 using ReflectableMessage = ::google::protobuf::Message*;
@@ -80,41 +81,41 @@ template <typename T> T* DynamicCastToGenerated(Message* from) {
 using ReflectableMessage = std::unique_ptr<::google::protobuf::Message>;
 using uint32 = uint32_t;
 #endif
-using ::google::protobuf::DescriptorPoolDatabase;
-using ::google::protobuf::FileDescriptorProto;
-using ::google::protobuf::FileDescriptorSet;
-using ::google::protobuf::MessageFactory;
-using ::google::protobuf::MethodDescriptor;
-using ::google::protobuf::Reflection;
-using ::google::protobuf::RepeatedFieldBackInserter;
-using ::google::protobuf::RepeatedPtrField;
-using ::google::protobuf::RepeatedPtrFieldBackInserter;
-using ::google::protobuf::TextFormat;
+using ::google::protobuf::DescriptorPoolDatabase;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FileDescriptorProto;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FileDescriptorSet;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::MessageFactory;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::MethodDescriptor;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Reflection;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::RepeatedFieldBackInserter;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::RepeatedPtrField;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::RepeatedPtrFieldBackInserter;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::TextFormat;  // NOLINT(misc-unused-using-decls)
 
 namespace internal {
-using ::google::protobuf::internal::WireFormatLite;
+using ::google::protobuf::internal::WireFormatLite;  // NOLINT(misc-unused-using-decls)
 } // namespace internal
 
 namespace io {
-using ::google::protobuf::io::ArrayOutputStream;
-using ::google::protobuf::io::CodedInputStream;
-using ::google::protobuf::io::CodedOutputStream;
-using ::google::protobuf::io::StringOutputStream;
-using ::google::protobuf::io::ZeroCopyInputStream;
+using ::google::protobuf::io::ArrayOutputStream;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::CodedInputStream;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::CodedOutputStream;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::StringOutputStream;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::ZeroCopyInputStream;  // NOLINT(misc-unused-using-decls)
 } // namespace io
 
 namespace util {
-using ::google::protobuf::util::JsonStringToMessage;
-using ::google::protobuf::util::MessageToJsonString;
-using ::google::protobuf::util::NewTypeResolverForDescriptorPool;
+using ::google::protobuf::util::JsonStringToMessage;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::MessageToJsonString;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::NewTypeResolverForDescriptorPool;  // NOLINT(misc-unused-using-decls)
 #ifdef ENVOY_ENABLE_FULL_PROTOS
-using ::google::protobuf::util::MessageDifferencer;
+using ::google::protobuf::util::MessageDifferencer;  // NOLINT(misc-unused-using-decls)
 #else
 using MessageDifferencer = MessageLiteDifferencer;
 #endif
-using ::google::protobuf::util::JsonParseOptions;
-using ::google::protobuf::util::JsonPrintOptions;
-using ::google::protobuf::util::TimeUtil;
+using ::google::protobuf::util::JsonParseOptions;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::JsonPrintOptions;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::TimeUtil;  // NOLINT(misc-unused-using-decls)
 } // namespace util
 
 } // namespace Protobuf
@@ -141,15 +142,14 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 
 class MessageLiteDifferencer {
 public:
-  static bool Equals(const Protobuf::Message& message1, const Protobuf::Message& message2) {
-    return MessageUtil::hash(message1) == MessageUtil::hash(message2);
-  }
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  static bool Equals(const Protobuf::Message& message1, const Protobuf::Message& message2);
 
-  static bool Equivalent(const Protobuf::Message& message1, const Protobuf::Message& message2) {
-    return Equals(message1, message2);
-  }
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  static bool Equivalent(const Protobuf::Message& message1, const Protobuf::Message& message2);
 };
 
-typedef std::vector<std::unique_ptr<const Protobuf::Message>> ConstMessagePtrVector;
+using ConstMessagePtrVector = std::vector<std::unique_ptr<const
+        Protobuf::Message>>;
 
 } // namespace Envoy

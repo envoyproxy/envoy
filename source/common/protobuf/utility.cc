@@ -155,6 +155,16 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
   return HashUtil::xxHash64(text_format);
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+bool MessageLiteDifferencer::Equals(const Protobuf::Message& message1, const Protobuf::Message& message2) {
+  return MessageUtil::hash(message1) == MessageUtil::hash(message2);
+}
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+bool MessageLiteDifferencer::Equivalent(const Protobuf::Message& message1, const Protobuf::Message& message2) {
+  return Equals(message1, message2);
+}
+
 namespace {
 
 void checkForDeprecatedNonRepeatedEnumValue(
