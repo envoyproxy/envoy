@@ -263,8 +263,7 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
-  static const std::string struct_type =
-      ProtobufWkt::Struct::default_instance().GetTypeName();
+  static const std::string struct_type = ProtobufWkt::Struct::default_instance().GetTypeName();
   static const std::string typed_struct_type =
       xds::type::v3::TypedStruct::default_instance().GetTypeName();
   static const std::string legacy_typed_struct_type =

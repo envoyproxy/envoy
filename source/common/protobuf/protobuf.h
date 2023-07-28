@@ -10,6 +10,7 @@
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
+
 //#include "google/protobuf/json/json.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/repeated_field.h"
@@ -59,25 +60,22 @@ using ::google::protobuf::DynamicCastToGenerated;
 using ::google::protobuf::DynamicMessageFactory;
 using ::google::protobuf::EnumValueDescriptor;
 using ::google::protobuf::FieldDescriptor;
-using ::google::protobuf::UInt32Value;
 using ::google::protobuf::Map;
+using ::google::protobuf::UInt32Value;
 #ifdef ENVOY_ENABLE_FULL_PROTOS
 using ::google::protobuf::Message;
 using ReflectableMessage = ::google::protobuf::Message*;
 #else
 using Message = ::google::protobuf::MessageLite;
 
-template <typename T>
-const T* DynamicCastToGenerated(const Message* from) {
+template <typename T> const T* DynamicCastToGenerated(const Message* from) {
   return static_cast<const T*>(from);
 }
 
-template <typename T>
-T* DynamicCastToGenerated(Message* from) {
+template <typename T> T* DynamicCastToGenerated(Message* from) {
   const Message* message_const = from;
   return const_cast<T*>(DynamicCastToGenerated<T>(message_const));
 }
-
 
 using ReflectableMessage = std::unique_ptr<::google::protobuf::Message>;
 using uint32 = uint32_t;
@@ -88,38 +86,38 @@ using ::google::protobuf::FileDescriptorSet;
 using ::google::protobuf::MessageFactory;
 using ::google::protobuf::MethodDescriptor;
 using ::google::protobuf::Reflection;
+using ::google::protobuf::RepeatedFieldBackInserter;
 using ::google::protobuf::RepeatedPtrField;
 using ::google::protobuf::RepeatedPtrFieldBackInserter;
-using ::google::protobuf::RepeatedFieldBackInserter;
 using ::google::protobuf::TextFormat;
 
 namespace internal {
 using ::google::protobuf::internal::WireFormatLite;
-}  // namespace internal
+} // namespace internal
 
 namespace io {
-using ::google::protobuf::io::ZeroCopyInputStream;
 using ::google::protobuf::io::ArrayOutputStream;
-using ::google::protobuf::io::CodedOutputStream;
 using ::google::protobuf::io::CodedInputStream;
+using ::google::protobuf::io::CodedOutputStream;
 using ::google::protobuf::io::StringOutputStream;
-}  // namespace io
+using ::google::protobuf::io::ZeroCopyInputStream;
+} // namespace io
 
 namespace util {
-using ::google::protobuf::util::MessageToJsonString;
 using ::google::protobuf::util::JsonStringToMessage;
+using ::google::protobuf::util::MessageToJsonString;
 using ::google::protobuf::util::NewTypeResolverForDescriptorPool;
 #ifdef ENVOY_ENABLE_FULL_PROTOS
 using ::google::protobuf::util::MessageDifferencer;
 #else
 using MessageDifferencer = MessageLiteDifferencer;
 #endif
+using ::google::protobuf::util::JsonParseOptions;
 using ::google::protobuf::util::JsonPrintOptions;
 using ::google::protobuf::util::TimeUtil;
-using ::google::protobuf::util::JsonParseOptions;
-}  // namespace util
+} // namespace util
 
-}  // namespace Protobuf
+} // namespace Protobuf
 
 // Allows mapping from google::protobuf::util to other util libraries.
 namespace ProtobufUtil = google::protobuf::util;
@@ -142,7 +140,7 @@ using Int64 = int64_t;
 Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message);
 
 class MessageLiteDifferencer {
- public:
+public:
   static bool Equals(const Protobuf::Message& message1, const Protobuf::Message& message2) {
     return message1.SerializeAsString() == message2.SerializeAsString();
   }

@@ -97,6 +97,7 @@ cc_library(
         "test.cc",
     ],
     deps = [
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto_descriptor",
     ],
 )

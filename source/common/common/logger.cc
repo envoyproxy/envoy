@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
 

@@ -362,7 +362,7 @@ public:
    * instead of the inbuilt PackTo, as PackTo is not available with lite protos.
    *
    * @param any_message destination google.protobuf.Any.
-   * @param message source to pack fromo.
+   * @param message source to pack from.
    *
    * @throw EnvoyException if the message does not unpack.
    */

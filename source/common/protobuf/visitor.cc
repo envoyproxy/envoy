@@ -60,12 +60,13 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
       if (field->is_repeated()) {
         const int size = reflection->FieldSize(*reflectable_message, field);
         for (int j = 0; j < size; ++j) {
-          traverseMessageWorker(visitor, reflection->GetRepeatedMessage(*reflectable_message, field, j), parents,
-                                false, recurse_into_any);
+          traverseMessageWorker(visitor,
+                                reflection->GetRepeatedMessage(*reflectable_message, field, j),
+                                parents, false, recurse_into_any);
         }
       } else if (reflection->HasField(*reflectable_message, field)) {
-        traverseMessageWorker(visitor, reflection->GetMessage(*reflectable_message, field), parents, false,
-                              recurse_into_any);
+        traverseMessageWorker(visitor, reflection->GetMessage(*reflectable_message, field), parents,
+                              false, recurse_into_any);
       }
     }
   }

@@ -6,7 +6,7 @@ namespace Envoy {
 Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
   return const_cast<Protobuf::ReflectableMessage>(&message);
 }
-}  // namespace Envoy
+} // namespace Envoy
 
 #else
 
@@ -179,13 +179,16 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/type/v3/semantic_version_descriptor.pb.h"
 #include "envoy/type/v3/token_bucket_descriptor.pb.h"
 #include "envoy/watchdog/v3/abort_action_descriptor.pb.h"
-//#include "mobile/library/common/extensions/cert_validator/platform_bridge/platform_bridge_descriptor.pb.h"
+//#include
+//"mobile/library/common/extensions/cert_validator/platform_bridge/platform_bridge_descriptor.pb.h"
 //#include "mobile/library/common/extensions/filters/http/local_error/filter_descriptor.pb.h"
-//#include "mobile/library/common/extensions/filters/http/network_configuration/filter_descriptor.pb.h"
+//#include
+//"mobile/library/common/extensions/filters/http/network_configuration/filter_descriptor.pb.h"
 //#include "mobile/library/common/extensions/filters/http/platform_bridge/filter_descriptor.pb.h"
 //#include "mobile/library/common/extensions/filters/http/socket_tag/filter_descriptor.pb.h"
 //#include "mobile/library/common/extensions/key_value/platform/platform_descriptor.pb.h"
-//#include "mobile/library/common/extensions/retry/options/network_configuration/predicate_descriptor.pb.h"
+//#include
+//"mobile/library/common/extensions/retry/options/network_configuration/predicate_descriptor.pb.h"
 //#include "udpa/xds/type/v3/typed_struct_descriptor.pb.h"
 //#include "udpa/udpa/type/v1/typed_struct_descriptor.pb.h"
 
@@ -333,75 +336,115 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createReseria
 
       protobuf::reflection::envoy_extensions_access_loggers_stream_v3_stream::kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_clusters_dynamic_forward_proxy_v3_cluster::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_clusters_dynamic_forward_proxy_v3_cluster::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_common_dynamic_forward_proxy_v3_dns_cache::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_common_dynamic_forward_proxy_v3_dns_cache::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_common_matching_v3_extension_matcher::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_common_matching_v3_extension_matcher::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_compression_brotli_decompressor_v3_brotli::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_compression_brotli_decompressor_v3_brotli::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_compression_gzip_decompressor_v3_gzip::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_compression_gzip_decompressor_v3_gzip::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_early_data_v3_default_early_data_policy::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_early_data_v3_default_early_data_policy::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_common_dependency_v3_dependency::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_common_dependency_v3_dependency::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_common_matcher_action_v3_skip_action::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_common_matcher_action_v3_skip_action::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_http_alternate_protocols_cache_v3_alternate_protocols_cache::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_filters_http_alternate_protocols_cache_v3_alternate_protocols_cache::
+              kFileDescriptorInfo,
 
       protobuf::reflection::envoy_extensions_filters_http_buffer_v3_buffer::kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_http_decompressor_v3_decompressor::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_http_decompressor_v3_decompressor::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_http_dynamic_forward_proxy_v3_dynamic_forward_proxy::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_filters_http_dynamic_forward_proxy_v3_dynamic_forward_proxy::
+              kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_http_health_check_v3_health_check::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_http_health_check_v3_health_check::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_http_on_demand_v3_on_demand::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_http_on_demand_v3_on_demand::
+          kFileDescriptorInfo,
 
       protobuf::reflection::envoy_extensions_filters_http_router_v3_router::kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_http_upstream_codec_v3_upstream_codec::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_http_upstream_codec_v3_upstream_codec::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_listener_proxy_protocol_v3_proxy_protocol::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_listener_proxy_protocol_v3_proxy_protocol::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_network_http_connection_manager_v3_http_connection_manager::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_filters_network_http_connection_manager_v3_http_connection_manager::
+              kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_filters_udp_dns_filter_v3_dns_filter::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_udp_dns_filter_v3_dns_filter::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_http_header_formatters_preserve_case_v3_preserve_case::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_http_header_formatters_preserve_case_v3_preserve_case::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_http_header_validators_envoy_default_v3_header_validator::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_http_header_validators_envoy_default_v3_header_validator::
+              kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_http_original_ip_detection_xff_v3_xff::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_http_original_ip_detection_xff_v3_xff::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_load_balancing_policies_common_v3_common::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_load_balancing_policies_common_v3_common::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_load_balancing_policies_least_request_v3_least_request::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_load_balancing_policies_least_request_v3_least_request::
+              kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_load_balancing_policies_random_v3_random::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_load_balancing_policies_random_v3_random::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_load_balancing_policies_round_robin_v3_round_robin::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_load_balancing_policies_round_robin_v3_round_robin::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_matching_common_inputs_network_v3_network_inputs::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_matching_common_inputs_network_v3_network_inputs::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_network_dns_resolver_apple_v3_apple_dns_resolver::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_network_dns_resolver_apple_v3_apple_dns_resolver::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_network_dns_resolver_cares_v3_cares_dns_resolver::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_network_dns_resolver_cares_v3_cares_dns_resolver::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_network_dns_resolver_getaddrinfo_v3_getaddrinfo_dns_resolver::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_network_dns_resolver_getaddrinfo_v3_getaddrinfo_dns_resolver::
+              kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_network_socket_interface_v3_default_socket_interface::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_network_socket_interface_v3_default_socket_interface::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_path_match_uri_template_v3_uri_template_match::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_path_match_uri_template_v3_uri_template_match::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_path_rewrite_uri_template_v3_uri_template_rewrite::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_path_rewrite_uri_template_v3_uri_template_rewrite::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_quic_connection_id_generator_v3_envoy_deterministic_connection_id_generator::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_quic_connection_id_generator_v3_envoy_deterministic_connection_id_generator::
+              kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_quic_crypto_stream_v3_crypto_stream::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_quic_crypto_stream_v3_crypto_stream::
+          kFileDescriptorInfo,
 
       protobuf::reflection::envoy_extensions_quic_proof_source_v3_proof_source::kFileDescriptorInfo,
 
@@ -409,11 +452,15 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createReseria
 
       protobuf::reflection::envoy_extensions_request_id_uuid_v3_uuid::kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_transport_sockets_http_11_proxy_v3_upstream_http_11_connect::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_transport_sockets_http_11_proxy_v3_upstream_http_11_connect::
+              kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_transport_sockets_quic_v3_quic_transport::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_transport_sockets_quic_v3_quic_transport::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_transport_sockets_raw_buffer_v3_raw_buffer::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_transport_sockets_raw_buffer_v3_raw_buffer::
+          kFileDescriptorInfo,
 
       protobuf::reflection::envoy_extensions_transport_sockets_tls_v3_cert::kFileDescriptorInfo,
 
@@ -423,17 +470,23 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createReseria
 
       protobuf::reflection::envoy_extensions_transport_sockets_tls_v3_tls::kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_transport_sockets_tls_v3_tls_spiffe_validator_config::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_transport_sockets_tls_v3_tls_spiffe_validator_config::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_udp_packet_writer_v3_udp_default_writer_factory::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_udp_packet_writer_v3_udp_default_writer_factory::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_udp_packet_writer_v3_udp_gso_batch_writer_factory::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_udp_packet_writer_v3_udp_gso_batch_writer_factory::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_upstreams_http_generic_v3_generic_connection_pool::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_upstreams_http_generic_v3_generic_connection_pool::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_upstreams_http_v3_http_protocol_options::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_upstreams_http_v3_http_protocol_options::
+          kFileDescriptorInfo,
 
-      protobuf::reflection::envoy_extensions_upstreams_tcp_v3_tcp_protocol_options::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_upstreams_tcp_v3_tcp_protocol_options::
+          kFileDescriptorInfo,
 
       protobuf::reflection::envoy_service_cluster_v3_cds::kFileDescriptorInfo,
 
@@ -546,7 +599,7 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createReseria
     protobuf::reflection::third_party_udpa_udpa_type_v1_typed_struct::kFileDescriptorInfo,
       */
   };
-  for (const FileDescriptorInfo& descriptor: file_descriptors) {
+  for (const FileDescriptorInfo& descriptor : file_descriptors) {
     reserializer->loadFileDescriptors(descriptor);
   }
   return reserializer;
@@ -555,7 +608,8 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createReseria
 
 namespace Envoy {
 Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
-  static std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> reserializer = createReserializer();
+  static std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> reserializer =
+      createReserializer();
   return createDynamicMessage(*reserializer, message);
 }
 } // namespace Envoy

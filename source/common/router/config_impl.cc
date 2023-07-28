@@ -141,7 +141,10 @@ public:
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
                                           absl::string_view type_url) override {
     static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        createReflectableMessage(envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())->GetDescriptor()->full_name());
+        createReflectableMessage(
+            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
+            ->GetDescriptor()
+            ->full_name());
     if (type_url == request_header_input_name) {
       return absl::OkStatus();
     }

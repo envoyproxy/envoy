@@ -169,7 +169,8 @@ void checkForDeprecatedNonRepeatedEnumValue(
   Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
   bool default_value = !reflection->HasField(*reflectable_message, field);
 
-  const Protobuf::EnumValueDescriptor* enum_value_descriptor = reflection->GetEnum(*reflectable_message, field);
+  const Protobuf::EnumValueDescriptor* enum_value_descriptor =
+      reflection->GetEnum(*reflectable_message, field);
   if (!enum_value_descriptor->options().deprecated()) {
     return;
   }
@@ -246,17 +247,20 @@ public:
     }
 
     const auto& udpa_file_options =
-        reflectable_message->GetDescriptor()->file()->options().GetExtension(udpa::annotations::file_status);
+        reflectable_message->GetDescriptor()->file()->options().GetExtension(
+            udpa::annotations::file_status);
     const auto& xds_file_options =
-        reflectable_message->GetDescriptor()->file()->options().GetExtension(xds::annotations::v3::file_status);
+        reflectable_message->GetDescriptor()->file()->options().GetExtension(
+            xds::annotations::v3::file_status);
     if (udpa_file_options.work_in_progress() || xds_file_options.work_in_progress()) {
-      validation_visitor_.onWorkInProgress(
-          fmt::format("message '{}' is contained in proto file '{}' marked as work-in-progress. {}",
-                      message.GetTypeName(), reflectable_message->GetDescriptor()->file()->name(), WipWarning));
+      validation_visitor_.onWorkInProgress(fmt::format(
+          "message '{}' is contained in proto file '{}' marked as work-in-progress. {}",
+          message.GetTypeName(), reflectable_message->GetDescriptor()->file()->name(), WipWarning));
     }
 
     // Reject unknown fields.
-    const auto& unknown_fields = reflectable_message->GetReflection()->GetUnknownFields(*reflectable_message);
+    const auto& unknown_fields =
+        reflectable_message->GetReflection()->GetUnknownFields(*reflectable_message);
     if (!unknown_fields.empty()) {
       std::string error_msg;
       for (int n = 0; n < unknown_fields.field_count(); ++n) {
@@ -304,7 +308,8 @@ public:
     // PGV verification is itself recursive up to the point at which it hits an Any message. As
     // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
     // at which PGV would have stopped because it does not itself check within Any messages.
-    if (was_any_or_top_level && !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
+    if (was_any_or_top_level &&
+        !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
       ProtoExceptionUtil::throwProtoValidationException(err, *reflectable_message);
     }
   }
@@ -329,10 +334,9 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-  //if (!message.ParseFromCord(any_message.value())) {
+  // if (!message.ParseFromCord(any_message.value())) {
   if (!message.ParseFromString(any_message.value())) {
-    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                     message.GetTypeName(),
+    throw EnvoyException(fmt::format("Unable to unpack as {}: {}", message.GetTypeName(),
 #ifdef ENVOY_ENABLE_FULL_PROTOS
                                      any_message.DebugString()));
 #else
@@ -343,10 +347,9 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
 
 absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
                                           Protobuf::Message& message) {
-  //if (!message.ParseFromCord(any_message.value())) {
+  // if (!message.ParseFromCord(any_message.value())) {
   if (!message.ParseFromString(any_message.value())) {
-    return absl::InternalError(absl::StrCat("Unable to unpack as ",
-                                            message.GetTypeName(), ": ",
+    return absl::InternalError(absl::StrCat("Unable to unpack as ", message.GetTypeName(), ": ",
 #ifdef ENVOY_ENABLE_FULL_PROTOS
                                             any_message.DebugString()));
 #else
@@ -421,7 +424,8 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
 
   // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the
   // correct concrete type.
-  const std::string type_url(reflection->GetString(*reflectable_message, type_url_field_descriptor));
+  const std::string type_url(
+      reflection->GetString(*reflectable_message, type_url_field_descriptor));
   const std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
   const auto* concrete_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
@@ -450,13 +454,15 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
                 const Protobuf::FieldDescriptor* field_descriptor) {
         Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To unpack an `Any`, parse the serialized proto.
-        typed_message->ParseFromString(reflection->GetString(*reflectable_message, field_descriptor));
+        typed_message->ParseFromString(
+            reflection->GetString(*reflectable_message, field_descriptor));
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
         Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To repack an `Any`, reserialize its proto.
-        reflection->SetString(&(*reflectable_message), field_descriptor, typed_message->SerializeAsString());
+        reflection->SetString(&(*reflectable_message), field_descriptor,
+                              typed_message->SerializeAsString());
       });
 }
 
@@ -537,7 +543,8 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
       } else if (field_descriptor->is_repeated()) {
         const int field_size = reflection->FieldSize(*reflectable_message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
-          redact(reflection->MutableRepeatedMessage(&(*reflectable_message), field_descriptor, i), sensitive);
+          redact(reflection->MutableRepeatedMessage(&(*reflectable_message), field_descriptor, i),
+                 sensitive);
         }
       } else if (reflection->HasField(*reflectable_message, field_descriptor)) {
         redact(reflection->MutableMessage(&(*reflectable_message), field_descriptor), sensitive);
@@ -549,7 +556,8 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
         if (field_descriptor->is_repeated()) {
           const int field_size = reflection->FieldSize(*reflectable_message, field_descriptor);
           for (int i = 0; i < field_size; ++i) {
-            reflection->SetRepeatedString(&(*reflectable_message), field_descriptor, i, "[redacted]");
+            reflection->SetRepeatedString(&(*reflectable_message), field_descriptor, i,
+                                          "[redacted]");
           }
         } else if (reflection->HasField(*reflectable_message, field_descriptor)) {
           reflection->SetString(&(*reflectable_message), field_descriptor, "[redacted]");
