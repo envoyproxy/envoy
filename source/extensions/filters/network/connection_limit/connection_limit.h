@@ -87,6 +87,7 @@ public:
 
 private:
   void resetTimerState();
+  void onTimerComplete();
   const ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Event::TimerPtr delay_timer_ = nullptr;
