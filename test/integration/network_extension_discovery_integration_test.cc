@@ -107,6 +107,7 @@ public:
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
 
+    addEcdsCluster(std::string(EcdsClusterName));
     // Add a tcp_proxy network filter.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -119,16 +120,41 @@ public:
       filter->mutable_typed_config()->PackFrom(config);
     });
 
-    addEcdsCluster(std::string(EcdsClusterName));
+    // Use gRPC LDS instead of default file LDS.
+    use_lds_ = false;
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      lds_cluster->set_name("lds_cluster");
+      ConfigHelper::setHttp2(*lds_cluster);
+    });
+
     // Add 2nd cluster in case of two connections.
     if (two_connections_) {
       addEcdsCluster(std::string(Ecds2ClusterName));
     }
+
+    // Must be the last since it nukes static listeners.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+      listener_config_.set_name(listener_name_);
+      ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+      envoy::config::core::v3::GrpcService* grpc_service =
+          lds_api_config_source->add_grpc_services();
+      setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
+    });
+
     BaseIntegrationTest::initialize();
     registerTestServerPorts({port_name_});
   }
 
-  void resetEcdsConnection(FakeHttpConnectionPtr& connection) {
+  void resetConnection(FakeHttpConnectionPtr& connection) {
     if (connection != nullptr) {
       AssertionResult result = connection->close();
       RELEASE_ASSERT(result, result.message());
@@ -139,13 +165,16 @@ public:
   }
 
   ~NetworkExtensionDiscoveryIntegrationTest() override {
-    resetEcdsConnection(ecds_connection_);
-    resetEcdsConnection(ecds2_connection_);
+    resetConnection(ecds_connection_);
+    resetConnection(lds_connection_);
+    resetConnection(ecds2_connection_);
   }
 
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    // Create two extension config discovery upstreams (fake_upstreams_[1] and fake_upstreams_[2]).
+    // Create the extension config discovery upstream (fake_upstreams_[1]).
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // Create the listener config discovery upstream (fake_upstreams_[2]).
     addFakeUpstream(Http::CodecType::HTTP2);
     if (two_connections_) {
       addFakeUpstream(Http::CodecType::HTTP2);
@@ -162,11 +191,30 @@ public:
   }
 
   void waitXdsStream() {
+    // Wait for LDS stream.
+    auto& lds_upstream = getLdsFakeUpstream();
+    AssertionResult result = lds_upstream.waitForHttpConnection(*dispatcher_, lds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = lds_connection_->waitForNewStream(*dispatcher_, lds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    lds_stream_->startGrpcStream();
+
+    // Response with initial LDS.
+    sendLdsResponse("initial");
+
     waitForEcdsStream(getEcdsFakeUpstream(), ecds_connection_, ecds_stream_);
     if (two_connections_) {
       // Wait for 2nd ECDS stream.
       waitForEcdsStream(getEcds2FakeUpstream(), ecds2_connection_, ecds2_stream_);
     }
+  }
+
+  void sendLdsResponse(const std::string& version) {
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info(version);
+    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.add_resources()->PackFrom(listener_config_);
+    lds_stream_->sendGrpcMessage(response);
   }
 
   void sendXdsResponse(const std::string& name, const std::string& version, uint32_t bytes_to_drain,
@@ -199,7 +247,6 @@ public:
     test_server_->waitUntilListenersReady();
     test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
     EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
-
     IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
     ASSERT_TRUE(tcp_client->write(data_));
     FakeRawConnectionPtr fake_upstream_connection;
@@ -252,7 +299,14 @@ public:
   bool two_connections_{false};
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
-  FakeUpstream& getEcds2FakeUpstream() const { return *fake_upstreams_[2]; }
+  FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[2]; }
+  FakeUpstream& getEcds2FakeUpstream() const { return *fake_upstreams_[3]; }
+
+  // gRPC LDS set-up
+  envoy::config::listener::v3::Listener listener_config_;
+  std::string listener_name_{"testing-listener-0"};
+  FakeHttpConnectionPtr lds_connection_{nullptr};
+  FakeStreamPtr lds_stream_{nullptr};
 
   // gRPC two ECDS connections set-up.
   FakeHttpConnectionPtr ecds_connection_{nullptr};
@@ -270,6 +324,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicSuccess) {
   addDynamicFilter(filter_name_, false);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update to have filter drain 5 bytes of data.
@@ -291,6 +346,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   addDynamicFilter(filter_name_, false, false);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update with TTL 1s, and have network filter drain 5 bytes of data.
@@ -323,6 +379,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault)
   addDynamicFilter(filter_name_, false);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update with TTL 1s, and have network filter drain 5 bytes of data.
@@ -344,6 +401,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   addDynamicFilter(filter_name_, false, true);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update with invalid config (bytes_to_drain needs to be >=2).
@@ -360,6 +418,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   addDynamicFilter(filter_name_, false, false);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update with invalid config (drain_bytes has to >=2).
@@ -381,6 +440,8 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   addDynamicFilter(filter_name_, true);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+
   // Send data without send config update.
   sendDataVerifyResults(default_bytes_to_drain_);
 
@@ -396,6 +457,8 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicWithoutWarmingConfigFail) 
   addFilterChain();
   addDynamicFilter(filter_name_, true);
   initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
 
   // Send data without send config update.
   sendDataVerifyResults(default_bytes_to_drain_);
@@ -414,6 +477,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
   addDynamicFilter(filter_name_, false);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 3);
@@ -432,6 +496,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName) 
   addDynamicFilter("bar", false, true, false, true);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update.
@@ -451,17 +516,6 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName) 
   sendDataVerifyResults(9);
 }
 
-// Testing it works with two static network filter configuration.
-TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoStaticFilters) {
-  addFilterChain();
-  addStaticFilter("foo", 3);
-  addStaticFilter("bar", 5);
-  initialize();
-
-  // filter drain 3+5 bytes.
-  sendDataVerifyResults(8);
-}
-
 // Testing it works with mixed static/dynamic network filter configuration.
 TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
@@ -472,6 +526,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed)
   addStaticFilter("foobar", 2);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 3);
@@ -490,6 +545,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedDiffere
   addDynamicFilter(filter_name_, false);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 2);
@@ -509,6 +565,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   addDynamicFilter(filter_name_, false, true);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   test_server_.reset();
@@ -553,6 +610,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   addDynamicFilter(filter_name_, false);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send 1st config update to have network filter drain 5 bytes of data.
@@ -596,6 +654,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRemov
   addDynamicFilter(filter_name_, false, false);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   // Send config update with TTL 1s.
@@ -631,6 +690,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterTypeW
   addDynamicFilter("bar", false, true, false, true);
   initialize();
 
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse("foo", "1", 3);
@@ -677,6 +737,8 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithR
   addDynamicFilter("foo", true);
   addDynamicFilter("bar", false, true, false, true);
   initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse("foo", "1", 3);
@@ -699,6 +761,40 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithR
   test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config;
   filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_EQ(4, network_filter_config.bytes_to_drain());
+}
+
+TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyExistingConnection) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addFilterChain();
+  addDynamicFilter(filter_name_, false);
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send config update to have filter drain 5 bytes of data.
+  uint32_t bytes_to_drain = 5;
+  sendXdsResponse(filter_name_, "1", bytes_to_drain);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.network_filter." + filter_name_ + ".config_reload", 1);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
+
+  // Send 2nd config update to have filter drain 3 bytes of data.
+  sendXdsResponse(filter_name_, "2", 3);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.network_filter." + filter_name_ + ".config_reload", 2);
+
+  ASSERT_TRUE(tcp_client->write(data_));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string received_data;
+  // Expect drained bytes to be 5 as the 2nd config update was performed after new connection
+  // establishment.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data_.size() - bytes_to_drain, &received_data));
+  const std::string expected_data = data_.substr(bytes_to_drain);
+  EXPECT_EQ(expected_data, received_data);
+  tcp_client->close();
 }
 
 } // namespace
