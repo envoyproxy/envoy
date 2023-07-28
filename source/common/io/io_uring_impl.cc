@@ -108,6 +108,9 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
                                          socklen_t* remote_addr_len, Request* user_data) {
+  ENVOY_LOG(trace, "prepare close for fd = {}", fd);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -121,6 +124,9 @@ IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_add
 IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
                                           const Network::Address::InstanceConstSharedPtr& address,
                                           Request* user_data) {
+  ENVOY_LOG(trace, "prepare connect for fd = {}", fd);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -133,6 +139,9 @@ IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
 
 IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
                                         off_t offset, Request* user_data) {
+  ENVOY_LOG(trace, "prepare readv for fd = {}", fd);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -145,6 +154,9 @@ IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, 
 
 IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
                                          off_t offset, Request* user_data) {
+  ENVOY_LOG(trace, "prepare writev for fd = {}", fd);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
@@ -156,6 +168,9 @@ IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs,
 }
 
 IoUringResult IoUringImpl::prepareClose(os_fd_t fd, Request* user_data) {
+  ENVOY_LOG(trace, "prepare close for fd = {}", fd);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
     return IoUringResult::Failed;
