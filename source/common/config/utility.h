@@ -161,15 +161,6 @@ public:
   static void checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api);
 
   /**
-   * Check the grpc_services and cluster_names for API config sanity. Throws on error.
-   * @param api_config_source the config source to validate.
-   * @throws EnvoyException when an API config has the wrong number of gRPC
-   * services or cluster names, depending on expectations set by its API type.
-   */
-  static void
-  checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source);
-
-  /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param primary_clusters the API config source eligible clusters.
    * @param cluster_name the cluster name to validate.
