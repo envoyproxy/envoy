@@ -287,5 +287,25 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTestWithUniquePtrAsValue)
   map.reset();
 }
 
+TEST(InlineMapWith20InlineKey, MapCreationWillFinalizeTheDescriptor) {
+  InlineMapDescriptor<std::string> descriptor;
+
+  std::vector<InlineMapDescriptor<std::string>::Handle> handles;
+
+  // Create 20 inline keys.
+  for (size_t i = 0; i < 20; ++i) {
+    handles.push_back(descriptor.addInlineKey("key_" + std::to_string(i)));
+  }
+
+  // Add repeated inline keys will make no effect and return the same handle.
+  for (size_t i = 0; i < 20; ++i) {
+    EXPECT_EQ(handles[i], descriptor.addInlineKey("key_" + std::to_string(i)));
+  }
+
+  auto map = InlineMap<std::string, std::unique_ptr<std::string>>::create(descriptor);
+
+  EXPECT_TRUE(descriptor.finalized());
+}
+
 } // namespace
 } // namespace Envoy

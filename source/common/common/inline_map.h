@@ -496,7 +496,7 @@ private:
   // This is the underlay hash map for the dynamic map entries.
   DynamicHashMap dynamic_entries_;
 
-  // This is flags to indicate if the inline entries are valid.
+  // These are flags to indicate if the inline entries are valid.
   // TODO(wbpcode): this will add additional one time memory allocation when constructing inline
   // map. It is possible to use memory in the inline_entries_storage_ to store the flags in the
   // future.
