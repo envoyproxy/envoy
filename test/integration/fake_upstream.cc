@@ -359,12 +359,10 @@ namespace {
 // Fake upstream codec will not do path normalization, so the tests can observe
 // the path forwarded by Envoy.
 constexpr absl::string_view fake_upstream_header_validator_config = R"EOF(
-    name: envoy.http.header_validators.envoy_default
-    typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
-        uri_path_normalization_options:
-          skip_path_normalization: true
-          skip_merging_slashes: true
+    uri_path_normalization_options:
+      skip_path_normalization: true
+      skip_merging_slashes: true
+      path_with_escaped_slashes_action: KEEP_UNCHANGED
 )EOF";
 } // namespace
 
