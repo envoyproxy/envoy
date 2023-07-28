@@ -262,7 +262,7 @@ void Registry::setLogFormat(const std::string& log_format) {
 absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
 #ifndef ENVOY_ENABLE_YAML
   UNREFERENCED_PARAMETER(log_format_struct);
-  throw EnvoyException("JSON/YAML support compiled out");
+  return absl::UnimplementedError("JSON/YAML support compiled out");
 #else
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
