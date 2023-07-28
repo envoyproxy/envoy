@@ -91,17 +91,6 @@ envoy_cc_library(
     ],
 )
 
-cc_library(
-    name = "test_lib",
-    srcs = [
-        "test.cc",
-    ],
-    deps = [
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto_descriptor",
-    ],
-)
-
 envoy_cc_library(
     name = "create_reflectable_message_lib",
     srcs = [

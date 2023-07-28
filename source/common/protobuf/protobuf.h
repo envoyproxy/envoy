@@ -142,7 +142,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 class MessageLiteDifferencer {
 public:
   static bool Equals(const Protobuf::Message& message1, const Protobuf::Message& message2) {
-    return message1.SerializeAsString() == message2.SerializeAsString();
+    return MessageUtil::hash(message1) == MessageUtil::hash(message2);
   }
 
   static bool Equivalent(const Protobuf::Message& message1, const Protobuf::Message& message2) {
