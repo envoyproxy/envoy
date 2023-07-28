@@ -415,7 +415,8 @@ public:
   }
 
   /**
-   * Create an inline map with the given descriptor.
+   * Create an inline map with the given descriptor. If the descriptor is not finalized, it will be
+   * finalized before creating the inline map.
    * @param descriptor the descriptor that contains the inline keys.
    * @return the created inline map.
    */
