@@ -15,6 +15,7 @@ jobs:
               || !contains(github.actor, '[bot]'))
       }}
     name: android_release_artifacts
+    uses: ./.github/workflows/_env.yml
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     container:
