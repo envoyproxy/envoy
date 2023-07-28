@@ -269,7 +269,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
   return PathNormalizationResult::success();
@@ -337,7 +337,7 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
   path.resize(std::distance(begin, write));
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
   return PathNormalizationResult::success();
