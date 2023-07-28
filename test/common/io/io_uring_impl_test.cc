@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Io {
 namespace {
 
-class TestRequest: public Request {
+class TestRequest : public Request {
 public:
   TestRequest(int& data) : data_(data) {}
   ~TestRequest() { data_ = -1; }
@@ -158,20 +158,20 @@ TEST_F(IoUringImplTest, NestInjectCompletion) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [this, &fd2, &completions_nr, &request2](uint32_t) {
-        io_uring_->forEveryCompletion(
-            [this, &fd2, &completions_nr, &request2](Request* user_data, int32_t res, bool injected) {
-              EXPECT_TRUE(injected);
-              if (completions_nr == 0) {
-                EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
-                EXPECT_EQ(-11, res);
-                io_uring_->injectCompletion(fd2, &request2, -22);
-              } else {
-                EXPECT_EQ(2, dynamic_cast<TestRequest*>(user_data)->data_);
-                EXPECT_EQ(-22, res);
-              }
+        io_uring_->forEveryCompletion([this, &fd2, &completions_nr,
+                                       &request2](Request* user_data, int32_t res, bool injected) {
+          EXPECT_TRUE(injected);
+          if (completions_nr == 0) {
+            EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
+            EXPECT_EQ(-11, res);
+            io_uring_->injectCompletion(fd2, &request2, -22);
+          } else {
+            EXPECT_EQ(2, dynamic_cast<TestRequest*>(user_data)->data_);
+            EXPECT_EQ(-22, res);
+          }
 
-              completions_nr++;
-            });
+          completions_nr++;
+        });
       },
       trigger, Event::FileReadyType::Read);
 
