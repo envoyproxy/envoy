@@ -21,7 +21,8 @@ protected:
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
-    return std::make_unique<PathNormalizer>(typed_config, overrides_);
+    ConfigOverrides overrides(scoped_runtime_.loader().snapshot());
+    return std::make_unique<PathNormalizer>(typed_config, overrides);
   }
 
   static constexpr absl::string_view empty_config = "{}";
@@ -55,11 +56,10 @@ protected:
       skip_merging_slashes: true
     )EOF";
   TestScopedRuntime scoped_runtime_;
-  ConfigOverrides overrides_;
 };
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "x%7ex";
 
   auto normalizer = create(empty_config);
@@ -71,7 +71,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetNormalized) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%ffX";
 
   auto normalizer = create(empty_config);
@@ -99,7 +99,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetInvalid) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepNotSet) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(empty_config);
@@ -110,7 +110,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepNotSet) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepImplDefault) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(impl_specific_slash_handling_config);
@@ -121,7 +121,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepImplDefault) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepUnchanged) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(keep_encoded_slash_config);
@@ -132,7 +132,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepUnchanged) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRejectEncodedSlash) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(reject_encoded_slash_config);
@@ -143,7 +143,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRejectEncodedSlash) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRedirectEncodedSlash) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(redirect_encoded_slash_config);
@@ -155,7 +155,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRedirectEncodedSlash) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecodedEncodedSlash) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(decode_encoded_slash_config);
@@ -267,7 +267,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriMergeSlashes) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriPercentDecodeNormalized) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/%ff"}};
 
   auto normalizer = create(empty_config);
@@ -350,7 +350,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRedirectEncodedSlashes) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesDefault) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(empty_config);
@@ -362,7 +362,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesDefault) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesKept) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(keep_encoded_slash_config);
@@ -373,7 +373,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesKept) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesImplDefault) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2"}};
 
   auto normalizer = create(impl_specific_slash_handling_config);
@@ -483,7 +483,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormNotOptions) {
 }
 
 TEST_F(PathNormalizerTest, BackslashTranslatedToSlash) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path\\with/back\\/slash%5c"}};
@@ -496,7 +496,7 @@ TEST_F(PathNormalizerTest, BackslashTranslatedToSlash) {
 }
 
 TEST_F(PathNormalizerTest, BackslashPreservedWithOverride) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path\\with/back\\/slash%5c"}};
@@ -519,7 +519,7 @@ TEST_F(PathNormalizerTest, PreservePercentEncodedCaseByDefault) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePercentEncodedCase) {
-  overrides_.preserve_url_encoded_case_ = false;
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%Abdir2%3a%fF%5a"}};
 
   auto normalizer = create(empty_config);

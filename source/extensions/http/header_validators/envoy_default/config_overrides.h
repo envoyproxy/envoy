@@ -8,12 +8,11 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-class ConfigOverrides {
-public:
+struct ConfigOverrides {
   ConfigOverrides() = default;
-  ConfigOverrides(Server::Configuration::ServerFactoryContext& server_context)
-      : preserve_url_encoded_case_(server_context.runtime().snapshot().getBoolean(
-            "envoy.uhv.preserve_url_encoded_case", true)) {}
+  ConfigOverrides(const Envoy::Runtime::Snapshot& snapshot)
+      : preserve_url_encoded_case_(
+            snapshot.getBoolean("envoy.uhv.preserve_url_encoded_case", true)) {}
 
   // This flag enables preservation of the case of percent-encoded triplets in URL path for
   // compatibility with legacy path normalization.
@@ -26,7 +25,7 @@ public:
   // "envoy.uhv.preserve_url_encoded_case" runtime value. Note that the default value
   // will be changed to `false` in the future to make it easier to write path matchers that
   // look for percent-encoded triplets.
-  bool preserve_url_encoded_case_{true};
+  const bool preserve_url_encoded_case_{true};
 };
 
 } // namespace EnvoyDefault

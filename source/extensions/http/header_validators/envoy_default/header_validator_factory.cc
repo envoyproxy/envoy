@@ -34,7 +34,7 @@ HeaderValidatorFactory::HeaderValidatorFactory(
 ::Envoy::Http::ServerHeaderValidatorPtr
 HeaderValidatorFactory::createServerHeaderValidator(Protocol protocol,
                                                     ::Envoy::Http::HeaderValidatorStats& stats) {
-  ConfigOverrides config_overrides(server_context_);
+  ConfigOverrides config_overrides(server_context_.runtime().snapshot());
 
   switch (protocol) {
   case Protocol::Http3:
@@ -50,7 +50,7 @@ HeaderValidatorFactory::createServerHeaderValidator(Protocol protocol,
 ::Envoy::Http::ClientHeaderValidatorPtr
 HeaderValidatorFactory::createClientHeaderValidator(Protocol protocol,
                                                     ::Envoy::Http::HeaderValidatorStats& stats) {
-  ConfigOverrides config_overrides(server_context_);
+  ConfigOverrides config_overrides(server_context_.runtime().snapshot());
 
   switch (protocol) {
   case Protocol::Http3:
