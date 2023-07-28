@@ -87,7 +87,12 @@ function llvm_coverage() {
   llvm-cov export -instr-profile "${output_file}.data" -format=lcov \
       -ignore-filename-regex='.*external/.+' \
       -ignore-filename-regex='/tmp/.+' \
-      "${object_param[@]}" | sed 's#/proc/self/cwd/##' > "${output_file}"
+      "${object_param[@]}" | sed 's#/proc/self/cwd/##' > "${output_file}" || {
+
+      echo "COVERAGE FAILED ${output_file}"
+      df -h
+      free
+  }
 }
 
 # Generates a code coverage report in gcov intermediate text format by invoking
