@@ -357,6 +357,7 @@ envoy_cc_test_binary(
 envoy_sh_test(
     name = "hotrestart_test",
     size = "enormous",
+    coverage = False,
     srcs = select({
         "//bazel:disable_hot_restart_or_admin": [],
         "//conditions:default": ["hotrestart_test.sh"],
