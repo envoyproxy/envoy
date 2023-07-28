@@ -355,4 +355,3 @@ func (c *httpCApiImpl) HttpGetMetric(rr unsafe.Pointer, metricId uint32) uint64 
 	}
 	return value
 }
-
