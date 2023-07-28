@@ -7,6 +7,11 @@ on:
   - cron: "0 13 * * 1"
 
 jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    secrets: inherit
+
   android_release_artifacts:
     if: |
       ${{
@@ -15,7 +20,6 @@ jobs:
               || !contains(github.actor, '[bot]'))
       }}
     name: android_release_artifacts
-    uses: ./.github/workflows/_env.yml
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     container:
