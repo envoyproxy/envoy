@@ -87,11 +87,9 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "config_fuzz_test",
-    size = "enormous",
+    size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
-    shard_count = 8,
-    tags = ["cpu:16"],
     deps = [
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",

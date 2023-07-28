@@ -174,7 +174,7 @@ jobs:
       statuses: write
     with:
       workflow_name: ${{ inputs.start_check_status }}
-      sha: ${{ inputs.repo_ref }}
+      sha: ${{ inputs.repo_ref_sha }}
 
   cache:
     if: ${{ inputs.prime_build_image }}

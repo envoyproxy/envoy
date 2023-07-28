@@ -143,6 +143,8 @@ envoy_cc_library(
     deps = [
         ":macros",
         ":safe_memcpy_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 

@@ -76,7 +76,7 @@ envoy_cc_library(
         "http1_header_validator.h",
     ],
     visibility = [
-        "//test/common/http/http1:__subpackages__",
+        "//test/common/http:__subpackages__",
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
     ],
     deps = [

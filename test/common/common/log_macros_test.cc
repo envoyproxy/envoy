@@ -213,6 +213,23 @@ public:
       ENVOY_LOG_PERIODIC(error, 1s, "foo7 '{}'", evaluations()++);
     }
   }
+
+  void logOnceIf(bool condition) {
+    if (use_misc_macros_) {
+      ENVOY_LOG_ONCE_MISC_IF(error, condition, "foo8 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_ONCE_IF(error, condition, "foo8 '{}'", evaluations()++);
+    }
+  }
+
+  void logSomethingThriceIf(bool condition) {
+    if (use_misc_macros_) {
+      ENVOY_LOG_FIRST_N_MISC_IF(error, 3, condition, "foo9 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_FIRST_N_IF(error, 3, condition, "foo9 '{}'", evaluations()++);
+    }
+  }
+
   std::atomic<int32_t>& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<int32_t>); };
 
   const bool use_misc_macros_;
@@ -271,6 +288,26 @@ TEST_P(SparseLogMacrosTest, All) {
   // We shouldn't observe additional argument evaluations for log lines below the configured
   // log level.
   EXPECT_EQ(29, evaluations());
+
+  spamCall([this]() { logSomethingThriceIf(false); }, kNumThreads);
+  // As the condition was false the logs didn't evaluate.
+  EXPECT_EQ(29, evaluations());
+  spamCall([this]() { logOnceIf(false); }, kNumThreads);
+  // As the condition was false the logs didn't evaluate.
+  EXPECT_EQ(29, evaluations());
+
+  spamCall([this]() { logOnceIf(true); }, kNumThreads);
+  // First call evaluates.
+  EXPECT_EQ(30, evaluations());
+
+  // First and last call evaluates as the condition holds.
+  logSomethingThriceIf(true);
+  logSomethingThriceIf(false);
+  logSomethingThriceIf(true);
+  EXPECT_EQ(32, evaluations());
+  spamCall([this]() { logSomethingThriceIf(true); }, kNumThreads);
+  // Only one remaining log was left.
+  EXPECT_EQ(33, evaluations());
 }
 
 TEST(RegistryTest, LoggerWithName) {
