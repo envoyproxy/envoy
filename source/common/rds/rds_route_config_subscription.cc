@@ -57,7 +57,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     return;
   }
   const auto& route_config = resources[0].get().resource();
-  Protobuf::ReflectableMessage reflectable_config = CreateReflectableMessage(route_config);
+  Protobuf::ReflectableMessage reflectable_config = createReflectableMessage(route_config);
   if (reflectable_config->GetDescriptor()->full_name() !=
       route_config_provider_manager_.protoTraits().resourceType()) {
     throw EnvoyException(fmt::format("Unexpected {} configuration type (expecting {}): {}",

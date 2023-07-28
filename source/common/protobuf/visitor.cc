@@ -46,7 +46,7 @@ void traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& 
       throw EnvoyException(fmt::format("Invalid type_url '{}' during traversal", target_type_url));
     }
   }
-  Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(message);
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
   const Protobuf::Descriptor* descriptor = reflectable_message->GetDescriptor();
   const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {

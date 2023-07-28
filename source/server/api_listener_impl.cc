@@ -49,7 +49,7 @@ HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& co
     : ApiListenerImplBase(config, server, name) {
   if (config.api_listener().api_listener().type_url() ==
       absl::StrCat("type.googleapis.com/",
-                   CreateReflectableMessage(envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager::default_instance())
+                   createReflectableMessage(envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager::default_instance())
                    ->GetDescriptor()->full_name())) {
     auto typed_config = MessageUtil::anyConvertAndValidate<
         envoy::extensions::filters::network::http_connection_manager::v3::

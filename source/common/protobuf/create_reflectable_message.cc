@@ -3,7 +3,7 @@
 #ifdef ENVOY_ENABLE_FULL_PROTOS
 
 namespace Envoy {
-Protobuf::ReflectableMessage CreateReflectableMessage(const Protobuf::Message& message) {
+Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
   return const_cast<Protobuf::ReflectableMessage>(&message);
 }
 }  // namespace Envoy
@@ -547,16 +547,16 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createReseria
       */
   };
   for (const FileDescriptorInfo& descriptor: file_descriptors) {
-    reserializer->LoadFileDescriptors(descriptor);
+    reserializer->loadFileDescriptors(descriptor);
   }
   return reserializer;
 }
 } // namespace
 
 namespace Envoy {
-Protobuf::ReflectableMessage CreateReflectableMessage(const Protobuf::Message& message) {
+Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
   static std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> reserializer = createReserializer();
-  return CreateDynamicMessage(*reserializer, message);
+  return createDynamicMessage(*reserializer, message);
 }
 } // namespace Envoy
 #endif

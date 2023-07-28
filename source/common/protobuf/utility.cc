@@ -166,7 +166,7 @@ void checkForDeprecatedNonRepeatedEnumValue(
     return;
   }
 
-  Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(message);
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
   bool default_value = !reflection->HasField(*reflectable_message, field);
 
   const Protobuf::EnumValueDescriptor* enum_value_descriptor = reflection->GetEnum(*reflectable_message, field);
@@ -199,7 +199,7 @@ public:
       : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
   void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
-    Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(message);
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     absl::string_view filename = filenameFromPath(field.file()->name());
 
@@ -236,7 +236,7 @@ public:
 
   void onMessage(const Protobuf::Message& message,
                  absl::Span<const Protobuf::Message* const> parents, bool) override {
-    Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(message);
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()
             ->options()
             .GetExtension(xds::annotations::v3::message_status)
@@ -299,7 +299,7 @@ class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
                  bool was_any_or_top_level) override {
-    Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(message);
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     std::string err;
     // PGV verification is itself recursive up to the point at which it hits an Any message. As
     // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
@@ -398,7 +398,7 @@ using Transform = std::function<void(Protobuf::Message*, const Protobuf::Reflect
 bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
                   absl::string_view opaque_type_name, Transform unpack, Transform repack) {
   // Ensure this message has the opaque type we're expecting.
-  Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(*message);
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
   const auto* opaque_descriptor = reflectable_message->GetDescriptor();
   if (opaque_descriptor->full_name() != opaque_type_name) {
     return false;
@@ -448,13 +448,13 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
       message, ancestor_is_sensitive, "google.protobuf.Any",
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
-        Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(*message);
+        Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To unpack an `Any`, parse the serialized proto.
         typed_message->ParseFromString(reflection->GetString(*reflectable_message, field_descriptor));
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
-        Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(*message);
+        Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To repack an `Any`, reserialize its proto.
         reflection->SetString(&(*reflectable_message), field_descriptor, typed_message->SerializeAsString());
       });
@@ -503,7 +503,7 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
     return;
   }
 
-  Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(*message);
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
   const auto* descriptor = reflectable_message->GetDescriptor();
   const auto* reflection = reflectable_message->GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
@@ -522,7 +522,7 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
         for (int i = 0; i < field_size; ++i) {
           Protobuf::Message* map_pair_base =
               reflection->MutableRepeatedMessage(&(*reflectable_message), field_descriptor, i);
-          Protobuf::ReflectableMessage map_pair = CreateReflectableMessage(*map_pair_base);
+          Protobuf::ReflectableMessage map_pair = createReflectableMessage(*map_pair_base);
           auto* value_field_desc = map_pair->GetDescriptor()->FindFieldByName("value");
           if (sensitive && (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
                             value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_BYTES)) {

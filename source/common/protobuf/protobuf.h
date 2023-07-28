@@ -115,7 +115,6 @@ using ::google::protobuf::util::MessageDifferencer;
 using MessageDifferencer = MessageLiteDifferencer;
 #endif
 using ::google::protobuf::util::JsonPrintOptions;
-using ::google::protobuf::util::Status;
 using ::google::protobuf::util::TimeUtil;
 using ::google::protobuf::util::JsonParseOptions;
 }  // namespace util
@@ -140,7 +139,7 @@ using Int64 = int64_t;
 
 } // namespace ProtobufTypes
 
-Protobuf::ReflectableMessage CreateReflectableMessage(const Protobuf::Message& message);
+Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message);
 
 class MessageLiteDifferencer {
  public:

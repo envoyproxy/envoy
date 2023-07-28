@@ -463,7 +463,7 @@ public:
    */
   static inline std::string getStringField(const Protobuf::Message& message,
                                            const std::string& field_name) {
-    Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(message);
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     const Protobuf::Descriptor* descriptor = reflectable_message->GetDescriptor();
     const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();

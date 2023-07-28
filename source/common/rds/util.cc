@@ -10,7 +10,7 @@ ProtobufTypes::MessagePtr cloneProto(ProtoTraits& proto_traits, const Protobuf::
 }
 
 std::string resourceName(ProtoTraits& proto_traits, const Protobuf::Message& rc) {
-  Protobuf::ReflectableMessage reflectable_message = CreateReflectableMessage(rc);
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(rc);
   const Protobuf::FieldDescriptor* field =
       reflectable_message->GetDescriptor()->FindFieldByNumber(proto_traits.resourceNameFieldNumber());
   if (!field) {
