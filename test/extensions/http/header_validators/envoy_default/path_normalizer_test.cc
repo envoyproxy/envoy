@@ -301,12 +301,13 @@ TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashesWithDecodeSlashes) 
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriDecodeSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%2f/dir3"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "/dir1%2fdir2%2f/dir3%5Cdeleted%5C%2F..%2F%5cdir4"}};
 
   auto normalizer = create(decode_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/dir2/dir3");
+  EXPECT_EQ(headers.path(), "/dir1/dir2/dir3/dir4");
   EXPECT_TRUE(result.ok());
 }
 
@@ -320,35 +321,46 @@ TEST_F(PathNormalizerTest, NormalizePathUriRejectEncodedSlashes) {
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
+TEST_F(PathNormalizerTest, NormalizePathUriRejectEncodedBackSlashes) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%5Cdir2"}};
+
+  auto normalizer = create(reject_encoded_slash_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
 TEST_F(PathNormalizerTest, NormalizePathUriRedirectEncodedSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(redirect_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Redirect);
-  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
-  EXPECT_EQ(headers.path(), "/dir1/dir2");
+  EXPECT_EQ(result.details(), "uhv.path_normalization_redirect");
+  EXPECT_EQ(headers.path(), "/dir1/dir2/dir3");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesDefault) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_TRUE(result.ok());
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2");
+  // By default slashes are not decoded
+  EXPECT_EQ(headers.path(), "/dir1%2Fdir2%5Cdir3");
 }
 
-TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesKeep) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2"}};
+TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesKept) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(keep_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_TRUE(result.ok());
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2");
+  EXPECT_EQ(headers.path(), "/dir1%2Fdir2%5Cdir3");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesImplDefault) {

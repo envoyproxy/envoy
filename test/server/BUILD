@@ -259,11 +259,9 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "server_fuzz_test",
-    size = "enormous",
+    size = "large",
     srcs = ["server_fuzz_test.cc"],
     corpus = "server_corpus",
-    shard_count = 8,
-    tags = ["cpu:16"],
     deps = [
         "//source/common/thread_local:thread_local_lib",
         "//source/server:server_lib",

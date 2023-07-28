@@ -96,7 +96,7 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
     ASSERT_TRUE(http_api_listener != nullptr);
 
     ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
-    auto& stream_decoder = http_api_listener->newStream(stream_encoder_);
+    auto stream_decoder = http_api_listener->newStreamHandle(stream_encoder_);
 
     // The AutonomousUpstream responds with 200 OK and a body of 10 bytes.
     // In the http1 codec the end stream is encoded with encodeData and 0 bytes.
@@ -106,7 +106,7 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
     EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
 
     // Send a headers-only request
-    stream_decoder.decodeHeaders(
+    stream_decoder->get()->decodeHeaders(
         Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         true);
@@ -136,10 +136,10 @@ TEST_P(ApiListenerIntegrationTest, DestroyWithActiveStreams) {
     ASSERT_TRUE(http_api_listener != nullptr);
 
     ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
-    auto& stream_decoder = http_api_listener->newStream(stream_encoder_);
+    auto stream_decoder = http_api_listener->newStreamHandle(stream_encoder_);
 
     // Send a headers-only request
-    stream_decoder.decodeHeaders(
+    stream_decoder->get()->decodeHeaders(
         Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         false);
@@ -184,7 +184,7 @@ TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
     ASSERT_TRUE(http_api_listener != nullptr);
 
     ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
-    auto& stream_decoder = http_api_listener->newStream(stream_encoder_);
+    auto stream_decoder = http_api_listener->newStreamHandle(stream_encoder_);
 
     // The AutonomousUpstream responds with 200 OK and a body of 10 bytes.
     // In the http1 codec the end stream is encoded with encodeData and 0 bytes.
@@ -194,7 +194,7 @@ TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
     EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
 
     // Send a headers-only request
-    stream_decoder.decodeHeaders(
+    stream_decoder->get()->decodeHeaders(
         Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         true);

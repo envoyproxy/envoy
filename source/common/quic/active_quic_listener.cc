@@ -95,7 +95,7 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
-  if (enabled_.has_value() && !enabled_.value().enabled()) {
+  if ((enabled_.has_value() && !enabled_.value().enabled()) || reject_all_) {
     return;
   }
 
@@ -127,6 +127,19 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
 void ActiveQuicListener::onReadReady() {
   if (enabled_.has_value() && !enabled_.value().enabled()) {
     ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_->name());
+    return;
+  }
+  const bool reject_all =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_reject_all");
+  if (reject_all != reject_all_) {
+    reject_all_ = reject_all;
+    if (reject_all_) {
+      ENVOY_LOG(trace, "Quic listener {}: start rejecting traffic.", config_->name());
+    } else {
+      ENVOY_LOG(trace, "Quic listener {}: start accepting traffic.", config_->name());
+    }
+  }
+  if (reject_all_) {
     return;
   }
 

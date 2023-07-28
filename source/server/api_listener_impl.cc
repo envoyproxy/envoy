@@ -38,10 +38,10 @@ HttpApiListener::ApiListenerWrapper::~ApiListenerWrapper() {
   read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-Http::RequestDecoder&
-HttpApiListener::ApiListenerWrapper::newStream(Http::ResponseEncoder& response_encoder,
-                                               bool is_internally_created) {
-  return http_connection_manager_->newStream(response_encoder, is_internally_created);
+Http::RequestDecoderHandlePtr
+HttpApiListener::ApiListenerWrapper::newStreamHandle(Http::ResponseEncoder& response_encoder,
+                                                     bool is_internally_created) {
+  return http_connection_manager_->newStreamHandle(response_encoder, is_internally_created);
 }
 
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
