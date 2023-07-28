@@ -51,6 +51,11 @@ void Filter::resetTimerState() {
   }
 }
 
+void Filter::onTimerComplete() {
+  resetTimerState();
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
   if (is_rejected_) {
     return Network::FilterStatus::StopIteration;
@@ -79,10 +84,8 @@ Network::FilterStatus Filter::onNewConnection() {
     // Delay rejection provides a better DoS protection for Envoy.
     absl::optional<std::chrono::milliseconds> duration = config_->delay();
     if (duration.has_value() && duration.value() > std::chrono::milliseconds(0)) {
-      delay_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-        resetTimerState();
-        read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-      });
+      delay_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+          [this]() -> void { onTimerComplete(); });
       delay_timer_->enableTimer(duration.value());
     } else {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
