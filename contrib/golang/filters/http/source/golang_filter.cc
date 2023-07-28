@@ -1,6 +1,7 @@
 #include "contrib/golang/filters/http/source/golang_filter.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -1234,6 +1235,154 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
   return id;
 }
 
+void Filter::defineMetricCommon(uint32_t metric_type, absl::string_view name, uint32_t* metric_id) {
+  auto type = static_cast<MetricType>(metric_type);
+
+  Stats::StatNameManagedStorage storage(name, config_->metricStore().scope_->symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  if (type == MetricType::Counter) {
+    auto id = config_->metricStore().nextCounterMetricId();
+    auto c = &config_->metricStore().scope_->counterFromStatName(stat_name);
+    config_->metricStore().counters_.emplace(id, c);
+    *metric_id = id;
+  } else if (type == MetricType::Gauge) {
+    auto id = config_->metricStore().nextGaugeMetricId();
+    auto g = &config_->metricStore().scope_->gaugeFromStatName(
+        stat_name, Stats::Gauge::ImportMode::Accumulate);
+    config_->metricStore().gauges_.emplace(id, g);
+    *metric_id = id;
+  } else { // (type == MetricType::Histogram) {
+    auto id = config_->metricStore().nextHistogramMetricId();
+    auto h = &config_->metricStore().scope_->histogramFromStatName(
+        stat_name, Stats::Histogram::Unit::Unspecified);
+    config_->metricStore().histograms_.emplace(id, h);
+    *metric_id = id;
+  }
+}
+
+void Filter::incrementMetricCommon(uint32_t metric_id, int64_t offset) {
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = config_->metricStore().counters_.find(metric_id);
+    if (it != config_->metricStore().counters_.end()) {
+      if (offset > 0) {
+        it->second->add(offset);
+      }
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = config_->metricStore().gauges_.find(metric_id);
+    if (it != config_->metricStore().gauges_.end()) {
+      if (offset > 0) {
+        it->second->add(offset);
+      } else {
+        it->second->sub(-offset);
+      }
+    }
+  }
+}
+
+void Filter::getMetricCommon(uint32_t metric_id, uint64_t* value) {
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = config_->metricStore().counters_.find(metric_id);
+    if (it != config_->metricStore().counters_.end()) {
+      *value = it->second->value();
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = config_->metricStore().gauges_.find(metric_id);
+    if (it != config_->metricStore().gauges_.end()) {
+      *value = it->second->value();
+    }
+  }
+}
+
+CAPIStatus Filter::defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (metric_type > static_cast<uint32_t>(MetricType::Max)) {
+    return CAPIStatus::CAPIValueNotFound;
+  }
+
+  if (state.isThreadSafe()) {
+    defineMetricCommon(metric_type, name, metric_id);
+  } else {
+    auto name_str = std::string(name);
+    auto weak_ptr = weak_from_this();
+    state.getDispatcher().post([this, metric_type, weak_ptr, name_str, metric_id] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        defineMetricCommon(metric_type, name_str, metric_id);
+        dynamic_lib_->envoyGoRequestSemaDec(req_);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in defineMetric");
+      }
+    });
+    return CAPIStatus::CAPIYield;
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus Filter::incrementMetric(uint32_t metric_id, int64_t offset) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (state.isThreadSafe()) {
+    incrementMetricCommon(metric_id, offset);
+  } else {
+    auto weak_ptr = weak_from_this();
+    state.getDispatcher().post([this, weak_ptr, metric_id, offset] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        incrementMetricCommon(metric_id, offset);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in incrementMetric");
+      }
+    });
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus Filter::getMetric(uint32_t metric_id, uint64_t* value) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (state.isThreadSafe()) {
+    getMetricCommon(metric_id, value);
+  } else {
+    auto weak_ptr = weak_from_this();
+    state.getDispatcher().post([this, weak_ptr, metric_id, value] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        getMetricCommon(metric_id, value);
+        dynamic_lib_->envoyGoRequestSemaDec(req_);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in getMetric");
+      }
+    });
+    return CAPIStatus::CAPIYield;
+  }
+  return CAPIStatus::CAPIOK;
+}
+
 /*** FilterConfig ***/
 
 FilterConfig::FilterConfig(
@@ -1242,7 +1391,8 @@ FilterConfig::FilterConfig(
     Server::Configuration::FactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
-      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib) {
+      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
+      metric_store_(context.threadLocal().allocateSlot()) {
   ENVOY_LOG(debug, "initializing golang filter config");
 
   std::string buf;
@@ -1257,6 +1407,11 @@ FilterConfig::FilterConfig(
                                      proto_config.library_id(), proto_config.library_path()));
   }
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
+
+  metric_store_->set([&context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    auto metric_store = std::make_shared<MetricStore>(context.scope().createScope(""));
+    return metric_store;
+  });
 };
 
 FilterConfig::~FilterConfig() {

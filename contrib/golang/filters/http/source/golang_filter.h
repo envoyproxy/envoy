@@ -22,6 +22,38 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
 
+enum class MetricType {
+  Counter = 0,
+  Gauge = 1,
+  Histogram = 2,
+  Max = 2,
+};
+
+class MetricStore : public ThreadLocal::ThreadLocalObject {
+public:
+  MetricStore(Stats::ScopeSharedPtr scope) : scope_(scope) {}
+
+  static const uint32_t kMetricTypeMask = 0x3;
+  static const uint32_t kMetricIdIncrement = 0x4;
+
+  uint32_t nextCounterMetricId() { return next_counter_metric_id_ += kMetricIdIncrement; }
+  uint32_t nextGaugeMetricId() { return next_gauge_metric_id_ += kMetricIdIncrement; }
+  uint32_t nextHistogramMetricId() { return next_histogram_metric_id_ += kMetricIdIncrement; }
+
+  absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
+  absl::flat_hash_map<uint32_t, Stats::Gauge*> gauges_;
+  absl::flat_hash_map<uint32_t, Stats::Histogram*> histograms_;
+
+  Stats::ScopeSharedPtr scope_;
+
+private:
+  uint32_t next_counter_metric_id_ = static_cast<uint32_t>(MetricType::Counter);
+  uint32_t next_gauge_metric_id_ = static_cast<uint32_t>(MetricType::Gauge);
+  uint32_t next_histogram_metric_id_ = static_cast<uint32_t>(MetricType::Histogram);
+};
+
+using MetricStoreSharedPtr = std::shared_ptr<MetricStore>;
+
 /**
  * Configuration for the HTTP golang extension filter.
  */
@@ -37,6 +69,7 @@ public:
   const std::string& pluginName() const { return plugin_name_; }
   uint64_t getConfigId();
   GolangFilterStats& stats() { return stats_; }
+  MetricStore& metricStore() { return metric_store_->getTyped<MetricStore>(); }
 
 private:
   const std::string plugin_name_;
@@ -48,6 +81,7 @@ private:
 
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
+  ThreadLocal::SlotPtr metric_store_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -189,6 +223,13 @@ public:
   CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
                                   int life_span, int stream_sharing);
   CAPIStatus getStringFilterState(absl::string_view key, GoString* value_str);
+
+  void defineMetricCommon(uint32_t metric_type, absl::string_view name, uint32_t* metric_id);
+  void incrementMetricCommon(uint32_t metric_id, int64_t offset);
+  void getMetricCommon(uint32_t metric_id, uint64_t* value);
+  CAPIStatus defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id);
+  CAPIStatus incrementMetric(uint32_t metric_id, int64_t offset);
+  CAPIStatus getMetric(uint32_t metric_id, uint64_t* value);
 
 private:
   bool hasDestroyed() {

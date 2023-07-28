@@ -260,6 +260,8 @@ typed_config:
     EXPECT_EQ("go_state_test_value",
               getHeader(upstream_request_->headers(), "go-state-test-header-key"));
 
+    EXPECT_EQ("2", getHeader(upstream_request_->headers(), "go-metric-test-header-key"));
+
     // original header: x-test-header-0
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-test-header-0"));
 

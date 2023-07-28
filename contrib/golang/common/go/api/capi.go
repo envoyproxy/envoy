@@ -52,6 +52,10 @@ type HttpCAPI interface {
 
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	HttpGetStringFilterState(r unsafe.Pointer, key string) string
+
+	HttpDefineMetric(r unsafe.Pointer, metricType uint32, name string) uint32
+	HttpIncrementMetric(r unsafe.Pointer, metricId uint32, offset int64)
+	HttpGetMetric(r unsafe.Pointer, metricId uint32) uint64
 }
 
 type NetworkCAPI interface {

@@ -133,6 +133,12 @@ func (r *httpRequest) Finalize(reason int) {
 	cAPI.HttpFinalize(unsafe.Pointer(r.req), reason)
 }
 
+func (r *httpRequest) Metric() api.Metric {
+	return &metric{
+		request: r,
+	}
+}
+
 type streamInfo struct {
 	request *httpRequest
 }
@@ -235,4 +241,20 @@ func (f *filterState) SetString(key, value string, stateType api.StateType, life
 
 func (f *filterState) GetString(key string) string {
 	return cAPI.HttpGetStringFilterState(unsafe.Pointer(f.request), key)
+}
+
+type metric struct {
+	request *httpRequest
+}
+
+func (m *metric) DefineMetric(metricType uint32, name string) uint32 {
+	return cAPI.HttpDefineMetric(unsafe.Pointer(m.request), metricType, name)
+}
+
+func (m *metric) IncrementMetric(metricId uint32, offset int64) {
+	cAPI.HttpIncrementMetric(unsafe.Pointer(m.request), metricId, offset)
+}
+
+func (m *metric) GetMetric(metricId uint32) uint64 {
+	return cAPI.HttpGetMetric(unsafe.Pointer(m.request), metricId)
 }

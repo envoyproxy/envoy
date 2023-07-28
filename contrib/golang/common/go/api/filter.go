@@ -134,6 +134,7 @@ type FilterCallbacks interface {
 	RecoverPanic()
 	Log(level LogType, msg string)
 	LogLevel() LogType
+	Metric() Metric
 	// TODO add more for filter callbacks
 }
 
@@ -204,4 +205,10 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+type Metric interface {
+	DefineMetric(metricType uint32, name string) uint32
+	IncrementMetric(metricId uint32, offset int64)
+	GetMetric(metricId uint32) uint64
 }

@@ -259,6 +259,31 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value
                                      });
 }
 
+CAPIStatus envoyGoFilterHttpDefineMetric(void* r, uint32_t metric_type, void* name,
+                                         void* metric_id) {
+  return envoyGoFilterHandlerWrapper(
+      r, [metric_type, name, metric_id](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto name_str = referGoString(name);
+        auto metric_id_int = reinterpret_cast<uint32_t*>(metric_id);
+        return filter->defineMetric(metric_type, name_str, metric_id_int);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpIncrementMetric(void* r, uint32_t metric_id, int64_t offset) {
+  return envoyGoFilterHandlerWrapper(
+      r, [metric_id, offset](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        return filter->incrementMetric(metric_id, offset);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpGetMetric(void* r, uint32_t metric_id, void* value) {
+  return envoyGoFilterHandlerWrapper(
+      r, [metric_id, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto value_int = reinterpret_cast<uint64_t*>(value);
+        return filter->getMetric(metric_id, value_int);
+      });
+}
+
 #ifdef __cplusplus
 }
 #endif

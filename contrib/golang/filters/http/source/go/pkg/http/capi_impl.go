@@ -319,3 +319,40 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 
 	return strings.Clone(value)
 }
+
+func (c *httpCApiImpl) HttpDefineMetric(rr unsafe.Pointer, metricType uint32, name string) uint32 {
+	r := (*httpRequest)(rr)
+	var value uint32
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpDefineMetric(unsafe.Pointer(r.req), C.uint32_t(metricType), unsafe.Pointer(&name), unsafe.Pointer(&value))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+	return value
+}
+
+func (c *httpCApiImpl) HttpIncrementMetric(rr unsafe.Pointer, metricId uint32, offset int64) {
+	r := (*httpRequest)(rr)
+	res := C.envoyGoFilterHttpIncrementMetric(unsafe.Pointer(r.req), C.uint32_t(metricId), C.int64_t(offset))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetMetric(rr unsafe.Pointer, metricId uint32) uint64 {
+	r := (*httpRequest)(rr)
+	var value uint64
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetMetric(unsafe.Pointer(r.req), C.uint32_t(metricId), unsafe.Pointer(&value))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+	return value
+}
+

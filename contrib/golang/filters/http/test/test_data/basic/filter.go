@@ -139,6 +139,11 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	val := fs.GetString("go_state_test_key")
 	header.Add("go-state-test-header-key", val)
 
+	metric_id := f.callbacks.Metric().DefineMetric(0, "test-metric")
+	f.callbacks.Metric().IncrementMetric(metric_id, 2)
+	value := f.callbacks.Metric().GetMetric(metric_id)
+	header.Add("go-metric-test-header-key", strconv.FormatUint(value, 10))
+
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
 	}
