@@ -307,5 +307,20 @@ TEST(InlineMapWith20InlineKey, MapCreationWillFinalizeTheDescriptor) {
   EXPECT_TRUE(descriptor.finalized());
 }
 
+TEST(InlineMapWith3InlineKey, TestInlineKeysAsString) {
+  InlineMapDescriptor<std::string> descriptor;
+  // Create 3 inline keys.
+  for (size_t i = 0; i < 3; ++i) {
+    descriptor.addInlineKey("key_" + std::to_string(i));
+  }
+
+  descriptor.finalize();
+
+  EXPECT_EQ(descriptor.inlineKeysAsString(), "key_0,key_1,key_2");
+  EXPECT_EQ(descriptor.inlineKeysAsString(", "), "key_0, key_1, key_2");
+  EXPECT_EQ(descriptor.inlineKeysAsString(" | "), "key_0 | key_1 | key_2");
+  EXPECT_EQ(descriptor.inlineKeysAsString("-"), "key_0-key_1-key_2");
+}
+
 } // namespace
 } // namespace Envoy

@@ -388,7 +388,9 @@ public:
 
   ~InlineMap() { clear(); }
 
-  // Override operator [] to support the normal key assignment.
+  /**
+   * Override operator [] to support the dynamic key assignment.
+   */
   template <class GetKey> Value& operator[](const GetKey& key) {
     if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       // This key is registered as inline key and try to add the value to the inline array.
@@ -402,7 +404,9 @@ public:
     }
   }
 
-  // Override operator [] to support the handle of inline key assignment.
+  /**
+   * Override operator [] to support the inline handle assignment.
+   */
   Value& operator[](Handle handle) {
     if (!inlineEntryValid(handle.inlineId())) {
       resetInlineMapEntry(handle.inlineId(), Value());
@@ -410,21 +414,26 @@ public:
     return inline_entries_[handle.inlineId()];
   }
 
-  static std::unique_ptr<InlineMap> create(TypedInlineMapDescriptor& registry) {
-    if (!registry.finalized()) {
-      // Call finalize() to make sure that the registry is finalized and no any new inline
+  /**
+   * Create an inline map with the given descriptor.
+   * @param descriptor the descriptor that contains the inline keys.
+   * @return the created inline map.
+   */
+  static std::unique_ptr<InlineMap> create(TypedInlineMapDescriptor& descriptor) {
+    if (!descriptor.finalized()) {
+      // Call finalize() to make sure that the descriptor is finalized and no any new inline
       // keys could be registered.
-      registry.finalize();
+      descriptor.finalize();
     }
 
-    return std::unique_ptr<InlineMap>(new ((registry.inlineKeysNum() * sizeof(Value)))
-                                          InlineMap(registry));
+    return std::unique_ptr<InlineMap>(new ((descriptor.inlineKeysNum() * sizeof(Value)))
+                                          InlineMap(descriptor));
   }
 
 private:
   friend class InlineMapDescriptor<Key>;
 
-  InlineMap(TypedInlineMapDescriptor& registry) : descriptor_(registry) {
+  InlineMap(TypedInlineMapDescriptor& descriptor) : descriptor_(descriptor) {
     // Initialize the inline entries to nullptr.
     uint64_t inline_keys_num = descriptor_.inlineKeysNum();
     inline_entries_valid_.resize(inline_keys_num, false);
@@ -489,7 +498,7 @@ private:
     inline_entries_valid_[inline_entry_id] = flag;
   }
 
-  // This is the reference of the registry that the inline map created by. This is used to
+  // This is the reference of the descriptor that the inline map created by. This is used to
   // validate the inline handle validity and get the inline key set.
   const TypedInlineMapDescriptor& descriptor_;
 
