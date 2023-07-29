@@ -18,6 +18,7 @@ cc_library(
     name = "vpp_vcl",
     srcs = [
         "external/libsvm.a",
+        "external/libvlibapi.a",
         "external/libvlibmemoryclient.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
@@ -50,6 +51,7 @@ envoy_cmake(
         "libvppcom.a",
         "libvppinfra.a",
         "libsvm.a",
+        "libvlibapi.a",
         "libvlibmemoryclient.a",
     ],
     postfix_script = """
@@ -71,6 +73,7 @@ genrule(
     name = "build_files",
     outs = [
         "external/libsvm.a",
+        "external/libvlibapi.a",
         "external/libvlibmemoryclient.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
