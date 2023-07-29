@@ -280,9 +280,9 @@ private:
 
   /**
    * Decrypts given cipher text using the provided private key.
-   * @param 2 (void*)  pointer to the private key
-   * @param 5 (string) cipher text string
-   * @param 6 (int)    length of cipher text
+   * @param 1 (void*)  pointer to the private key
+   * @param 2 (string) cipher text string
+   * @param 3 (int)    length of the cipher text
    * @return (bool, string) If the first element is true, the second element contains the plain text
    * message upon successful decryption of the given cipher text; otherwise, the second element
    * contains the error message returned by the decryption function.
@@ -291,9 +291,9 @@ private:
 
   /**
    * Encrypts given plaintext using the provided public key.
-   * @param 2 (void*)  pointer to the public key
-   * @param 5 (string) plaintext string
-   * @param 6 (int)    length of plaintext
+   * @param 1 (void*)  pointer to the public key
+   * @param 2 (string) plaintext string
+   * @param 3 (int)    length of the plaintext
    * @return (bool, string) If the first element is true, the second element contains the cipher
    * text upon successful encryption of the given plaintext message; otherwise, the second element
    * contains the error message returned by the encryption function.
