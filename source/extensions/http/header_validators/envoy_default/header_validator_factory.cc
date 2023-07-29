@@ -34,13 +34,12 @@ HeaderValidatorFactory::HeaderValidatorFactory(
 ::Envoy::Http::ServerHeaderValidatorPtr
 HeaderValidatorFactory::createServerHeaderValidator(Protocol protocol,
                                                     ::Envoy::Http::HeaderValidatorStats& stats) {
-  HeaderValidatorConfigOverrides config_overrides{server_context_.runtime().snapshot().getBoolean(
-      "envoy.uhv.allow_non_compliant_characters_in_path", true)};
+  ConfigOverrides config_overrides(server_context_.runtime().snapshot());
+
   switch (protocol) {
   case Protocol::Http3:
-  case Protocol::Http2: {
+  case Protocol::Http2:
     return std::make_unique<ServerHttp2HeaderValidator>(config_, protocol, stats, config_overrides);
-  }
   case Protocol::Http11:
   case Protocol::Http10:
     return std::make_unique<ServerHttp1HeaderValidator>(config_, protocol, stats, config_overrides);
@@ -51,8 +50,8 @@ HeaderValidatorFactory::createServerHeaderValidator(Protocol protocol,
 ::Envoy::Http::ClientHeaderValidatorPtr
 HeaderValidatorFactory::createClientHeaderValidator(Protocol protocol,
                                                     ::Envoy::Http::HeaderValidatorStats& stats) {
-  HeaderValidatorConfigOverrides config_overrides{server_context_.runtime().snapshot().getBoolean(
-      "envoy.uhv.allow_non_compliant_characters_in_path", true)};
+  ConfigOverrides config_overrides(server_context_.runtime().snapshot());
+
   switch (protocol) {
   case Protocol::Http3:
   case Protocol::Http2:

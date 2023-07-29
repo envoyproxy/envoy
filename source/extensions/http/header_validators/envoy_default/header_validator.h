@@ -6,6 +6,7 @@
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/http/header_validators/envoy_default/config_overrides.h"
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
 #include "absl/container/node_hash_map.h"
@@ -57,7 +58,7 @@ public:
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
       ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
-      const HeaderValidatorConfigOverrides& config_overrides);
+      const ConfigOverrides& config_overrides);
   virtual ~HeaderValidator() = default;
 
   using HeaderEntryValidationResult = ::Envoy::Http::HeaderValidator::RejectResult;
@@ -227,7 +228,7 @@ protected:
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;
-  const HeaderValidatorConfigOverrides config_overrides_;
+  const ConfigOverrides config_overrides_;
   const ::Envoy::Http::HeaderValues& header_values_;
   ::Envoy::Http::HeaderValidatorStats& stats_;
   const PathNormalizer path_normalizer_;

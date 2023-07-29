@@ -3,6 +3,8 @@
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/header_validator.h"
 
+#include "source/extensions/http/header_validators/envoy_default/config_overrides.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -14,7 +16,7 @@ public:
   PathNormalizer(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      bool translate_backslash_to_slash);
+      const ConfigOverrides& config_overrides);
 
   using PathNormalizationResult = ::Envoy::Http::HeaderValidator::RejectOrRedirectResult;
 
@@ -89,8 +91,7 @@ private:
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
-
-  const bool translate_backslash_to_slash_{false};
+  const ConfigOverrides config_overrides_;
 };
 
 using PathNormalizerPtr = std::unique_ptr<PathNormalizer>;

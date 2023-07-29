@@ -46,6 +46,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "config_overrides",
+    hdrs = [
+        "config_overrides.h",
+    ],
+    visibility = [
+        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
+    ],
+    deps = [
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "path_normalizer",
     srcs = [
         "path_normalizer.cc",
@@ -59,6 +72,7 @@ envoy_cc_library(
     ],
     deps = [
         ":character_tables",
+        ":config_overrides",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//source/common/http:header_utility_lib",

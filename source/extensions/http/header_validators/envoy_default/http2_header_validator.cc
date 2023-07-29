@@ -47,7 +47,7 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
                                            ::Envoy::Http::HeaderValidatorStats& stats,
-                                           const HeaderValidatorConfigOverrides& config_overrides)
+                                           const ConfigOverrides& config_overrides)
     : HeaderValidator(config, protocol, stats, config_overrides),
       request_header_validator_map_{
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},

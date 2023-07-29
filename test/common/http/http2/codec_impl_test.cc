@@ -405,11 +405,10 @@ public:
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
-    Extensions::Http::HeaderValidators::EnvoyDefault::HeaderValidatorConfigOverrides
-        config_overrides{false};
     header_validator_ = std::make_unique<
         Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator>(
-        header_validator_config_, Protocol::Http2, server_->http2CodecStats(), config_overrides);
+        header_validator_config_, Protocol::Http2, server_->http2CodecStats(),
+        header_validator_config_overrides_);
     request_decoder_.setHeaderValidator(header_validator_.get());
 #endif
   }
@@ -460,6 +459,8 @@ public:
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
   ServerHeaderValidatorPtr header_validator_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,

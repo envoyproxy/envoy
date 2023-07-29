@@ -27,9 +27,9 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_,
-                                             HeaderValidatorConfigOverrides{false});
+    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_, overrides_);
   }
+  ConfigOverrides overrides_;
 };
 
 TEST_F(BaseHeaderValidatorTest, ValidateMethodPermissive) {

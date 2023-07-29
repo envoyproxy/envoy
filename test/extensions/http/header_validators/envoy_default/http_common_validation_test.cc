@@ -29,14 +29,12 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    HeaderValidatorConfigOverrides config_overrides{scoped_runtime_.loader().snapshot().getBoolean(
-        "envoy.uhv.allow_non_compliant_characters_in_path", true)};
     if (GetParam() == Protocol::Http11) {
       return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
-                                                          config_overrides);
+                                                          overrides_);
     }
     return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_,
-                                                        config_overrides);
+                                                        overrides_);
   }
 
   void validateAllCharacters(absl::string_view path,
@@ -61,6 +59,7 @@ protected:
   }
 
   TestScopedRuntime scoped_runtime_;
+  ConfigOverrides overrides_;
 };
 
 std::string protocolTestParamsToString(const ::testing::TestParamInfo<Protocol>& params) {

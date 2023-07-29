@@ -25,8 +25,8 @@ using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config,
-                               bool translate_backslash_to_slash)
-    : config_(config), translate_backslash_to_slash_(translate_backslash_to_slash) {}
+                               const ConfigOverrides& config_overrides)
+    : config_(config), config_overrides_(config_overrides) {}
 
 PathNormalizer::DecodedOctet
 PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
@@ -57,8 +57,7 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     return {PercentDecodeResult::Invalid};
   }
 
-  const bool preserve_case =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_preserve_url_encoded_case");
+  const bool preserve_case = config_overrides_.preserve_url_encoded_case_;
 
   char ch = '\0';
   // Normalize and decode the octet

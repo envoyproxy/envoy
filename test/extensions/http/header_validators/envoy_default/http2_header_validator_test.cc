@@ -30,10 +30,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    HeaderValidatorConfigOverrides config_overrides{scoped_runtime_.loader().snapshot().getBoolean(
-        "envoy.uhv.allow_non_compliant_characters_in_path", true)};
     return std::make_unique<ServerHttp2HeaderValidator>(typed_config, Protocol::Http2, stats_,
-                                                        config_overrides);
+                                                        overrides_);
   }
 
   ::Envoy::Http::ClientHeaderValidatorPtr createH2ClientUhv(absl::string_view config_yaml) {
@@ -41,10 +39,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    HeaderValidatorConfigOverrides config_overrides{scoped_runtime_.loader().snapshot().getBoolean(
-        "envoy.uhv.allow_non_compliant_characters_in_path", true)};
     return std::make_unique<ClientHttp2HeaderValidator>(typed_config, Protocol::Http2, stats_,
-                                                        config_overrides);
+                                                        overrides_);
   }
 
   std::unique_ptr<Http2HeaderValidator> createH2BaseUhv(absl::string_view config_yaml) {
@@ -52,10 +48,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    HeaderValidatorConfigOverrides config_overrides{scoped_runtime_.loader().snapshot().getBoolean(
-        "envoy.uhv.allow_non_compliant_characters_in_path", true)};
     return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stats_,
-                                                  config_overrides);
+                                                  overrides_);
   }
 
   TestRequestHeaderMapImpl makeGoodRequestHeaders() {
@@ -68,6 +62,7 @@ protected:
   }
 
   TestScopedRuntime scoped_runtime_;
+  ConfigOverrides overrides_;
 };
 
 TEST_F(Http2HeaderValidatorTest, GoodHeadersAccepted) {

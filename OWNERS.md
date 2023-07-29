@@ -73,6 +73,8 @@ without further review.
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
 * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (nezdolik@spotify.com)
+* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 
 In addition to the permanent Envoy security team, we have additional temporary
 contributors to envoy-setec and relevant Slack channels from:

@@ -229,11 +229,10 @@ public:
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
-    Extensions::Http::HeaderValidators::EnvoyDefault::HeaderValidatorConfigOverrides
-        config_overrides{false};
     header_validator_ = std::make_unique<
         Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
-        header_validator_config_, Protocol::Http11, http1CodecStats(), config_overrides);
+        header_validator_config_, Protocol::Http11, http1CodecStats(),
+        header_validator_config_overrides_);
   }
 
 protected:
@@ -244,6 +243,8 @@ protected:
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
   ServerHeaderValidatorPtr header_validator_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
