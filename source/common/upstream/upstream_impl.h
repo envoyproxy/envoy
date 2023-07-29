@@ -501,9 +501,7 @@ public:
   // 2. If has_local_locality is true, then the locality of all entries in hosts
   //    must be equal to the current envoy's locality.
   HostsPerLocalityImpl(const HostVector& hosts, bool has_local_locality = false)
-      : HostsPerLocalityImpl(std::vector<HostVector>({hosts}), has_local_locality) {
-    assertLocalityOrderingInvariant();
-  }
+      : HostsPerLocalityImpl(std::vector<HostVector>({hosts}), has_local_locality) {}
 
   // Multiple localities constructor
   //
@@ -517,7 +515,6 @@ public:
   HostsPerLocalityImpl(std::vector<HostVector>&& locality_hosts, bool has_local_locality)
       : local_(has_local_locality), hosts_per_locality_(std::move(locality_hosts)) {
     ASSERT(!has_local_locality || !hosts_per_locality_.empty());
-    assertLocalityOrderingInvariant();
   }
 
   bool hasLocalLocality() const override { return local_; }
@@ -532,9 +529,6 @@ public:
   }
 
 private:
-  // Assert sorted order and no duplicate buckets for the same locality.
-  void assertLocalityOrderingInvariant();
-
   // Does an entry exist for the local locality?
   bool local_{};
   // The first entry is for local hosts in the local locality.

@@ -5343,6 +5343,87 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
   cluster->info()->createFilterChain(manager);
 }
 
+class PriorityStateManagerTest : public Event::TestUsingSimulatedTime,
+                                 public testing::Test,
+                                 public UpstreamImplTestBase {};
+
+TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
+  server_context_.local_info_.node_.mutable_locality()->CopyFrom(zone_a);
+
+  // Construct cluster to use for updates
+  const std::string cluster_yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - locality:
+              zone: B
+            lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 80
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(cluster_yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  StaticClusterImpl cluster(cluster_config, factory_context);
+  cluster.initialize([] {});
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // Make priority state manager and fill it with the initial state of the cluster and the added
+  // hosts
+  PriorityStateManager priority_state_manager(cluster, server_context_.local_info_, nullptr);
+
+  auto current_hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  HostVector hosts_added{makeTestHost(cluster.info(), "tcp://127.0.0.1:81", simTime(), zone_b),
+                         makeTestHost(cluster.info(), "tcp://127.0.0.1:82", simTime(), zone_a)};
+
+  envoy::config::endpoint::v3::LocalityLbEndpoints zone_a_endpoints;
+  zone_a_endpoints.mutable_locality()->CopyFrom(zone_a);
+  envoy::config::endpoint::v3::LocalityLbEndpoints zone_b_endpoints =
+      cluster_config.load_assignment().endpoints()[0];
+
+  priority_state_manager.initializePriorityFor(zone_b_endpoints);
+  priority_state_manager.registerHostForPriority(hosts_added[0], zone_b_endpoints);
+  priority_state_manager.registerHostForPriority(
+      cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], zone_b_endpoints);
+
+  priority_state_manager.initializePriorityFor(zone_a_endpoints);
+  priority_state_manager.registerHostForPriority(hosts_added[1], zone_a_endpoints);
+
+  // Update the cluster's priority set with the added hosts
+  priority_state_manager.updateClusterPrioritySet(
+      0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, absl::nullopt,
+      absl::nullopt);
+
+  // Check that the P=0 host set has the added hosts, and the expected HostsPerLocality state
+  const HostVector& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  const HostsPerLocality& hosts_per_locality =
+      cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
+
+  EXPECT_EQ(3UL, hosts.size());
+  EXPECT_EQ(true, hosts_per_locality.hasLocalLocality());
+  EXPECT_EQ(2UL, hosts_per_locality.get().size());
+
+  EXPECT_EQ(1UL, hosts_per_locality.get()[0].size());
+  EXPECT_EQ(zone_a, hosts_per_locality.get()[0][0]->locality());
+
+  EXPECT_EQ(2UL, hosts_per_locality.get()[1].size());
+  EXPECT_EQ(zone_b, hosts_per_locality.get()[1][0]->locality());
+  EXPECT_EQ(zone_b, hosts_per_locality.get()[1][1]->locality());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
