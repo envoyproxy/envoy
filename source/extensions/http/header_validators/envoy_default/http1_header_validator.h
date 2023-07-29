@@ -13,7 +13,8 @@ public:
   Http1HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const ConfigOverrides& config_overrides);
 
   ::Envoy::Http::HeaderValidator::ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map);
@@ -75,8 +76,9 @@ public:
   ServerHttp1HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
-      : Http1HeaderValidator(config, protocol, stats) {}
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const ConfigOverrides& config_overrides)
+      : Http1HeaderValidator(config, protocol, stats, config_overrides) {}
 
   ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override {
@@ -123,8 +125,9 @@ public:
   ClientHttp1HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats)
-      : Http1HeaderValidator(config, protocol, stats) {}
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const ConfigOverrides& config_overrides)
+      : Http1HeaderValidator(config, protocol, stats, config_overrides) {}
 
   ValidationResult
   validateRequestHeaders(const ::Envoy::Http::RequestHeaderMap& header_map) override {

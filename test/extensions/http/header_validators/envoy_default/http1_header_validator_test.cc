@@ -28,7 +28,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                        overrides_);
   }
 
   ClientHttp1HeaderValidatorPtr createH1Client(absl::string_view config_yaml) {
@@ -36,7 +37,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ClientHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    return std::make_unique<ClientHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                        overrides_);
   }
 
   TestRequestHeaderMapImpl makeGoodRequestHeaders() {
@@ -49,6 +51,7 @@ protected:
   }
 
   TestScopedRuntime scoped_runtime_;
+  ConfigOverrides overrides_;
 };
 
 TEST_F(Http1HeaderValidatorTest, GoodHeadersAccepted) {

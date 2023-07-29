@@ -28,12 +28,15 @@ protected:
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
     if (GetParam() == Protocol::Http11) {
-      return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+      return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                          overrides_);
     }
-    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_);
+    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_,
+                                                        overrides_);
   }
 
   TestScopedRuntime scoped_runtime_;
+  ConfigOverrides overrides_;
 };
 
 std::string protocolTestParamsToString(const ::testing::TestParamInfo<Protocol>& params) {
