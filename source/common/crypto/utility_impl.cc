@@ -11,6 +11,12 @@ namespace Envoy {
 namespace Common {
 namespace Crypto {
 
+struct EVP_PKEY_CTX_deleter {
+  void operator()(EVP_PKEY_CTX* ctx) const { EVP_PKEY_CTX_free(ctx); }
+};
+
+using EVP_PKEY_CTX_ptr = std::unique_ptr<EVP_PKEY_CTX, EVP_PKEY_CTX_deleter>;
+
 std::vector<uint8_t> UtilityImpl::getSha256Digest(const Buffer::Instance& buffer) {
   std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
   bssl::ScopedEVP_MD_CTX ctx;
@@ -45,29 +51,26 @@ const EncryptionDecryptionOutput UtilityImpl::decrypt(CryptoObject& key,
   }
 
   // Step 2: initialize EVP_PKEY_CTX
-  EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(pkey, nullptr);
-  int ok = EVP_PKEY_decrypt_init(ctx);
+  EVP_PKEY_CTX_ptr ctx(EVP_PKEY_CTX_new(pkey, nullptr));
+  int ok = EVP_PKEY_decrypt_init(ctx.get());
   if (!ok) {
-    EVP_PKEY_CTX_free(ctx);
     return {false, "failed to initialize private key for decryption"};
   }
 
   // Step 3: decrypt cipher text
   size_t plaintext_size;
-  ok = EVP_PKEY_decrypt(ctx, nullptr, &plaintext_size, cipher_text.data(), cipher_text.size());
+  ok =
+      EVP_PKEY_decrypt(ctx.get(), nullptr, &plaintext_size, cipher_text.data(), cipher_text.size());
   if (!ok) {
-    EVP_PKEY_CTX_free(ctx);
     return {false, "failed to get plaintext size"};
   }
 
   std::vector<uint8_t> plaintext(plaintext_size);
-  ok = EVP_PKEY_decrypt(ctx, plaintext.data(), &plaintext_size, cipher_text.data(),
+  ok = EVP_PKEY_decrypt(ctx.get(), plaintext.data(), &plaintext_size, cipher_text.data(),
                         cipher_text.size());
 
   // Step 4: check result
   std::string p_text(plaintext.begin(), plaintext.begin() + plaintext_size);
-
-  EVP_PKEY_CTX_free(ctx);
   if (ok == 1) {
     return {true, p_text};
   }
@@ -85,29 +88,25 @@ const EncryptionDecryptionOutput UtilityImpl::encrypt(CryptoObject& key,
   }
 
   // Step 2: initialize EVP_PKEY_CTX
-  EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(pkey, nullptr);
-  int ok = EVP_PKEY_encrypt_init(ctx);
+  EVP_PKEY_CTX_ptr ctx(EVP_PKEY_CTX_new(pkey, nullptr));
+  int ok = EVP_PKEY_encrypt_init(ctx.get());
   if (!ok) {
-    EVP_PKEY_CTX_free(ctx);
     return {false, "failed to initialize public key for encryption"};
   }
 
   // Step 3: encrypt plaintext
   size_t cipher_text_size;
-  ok = EVP_PKEY_encrypt(ctx, nullptr, &cipher_text_size, plaintext.data(), plaintext.size());
+  ok = EVP_PKEY_encrypt(ctx.get(), nullptr, &cipher_text_size, plaintext.data(), plaintext.size());
   if (!ok) {
-    EVP_PKEY_CTX_free(ctx);
     return {false, "failed to get cipher text size"};
   }
 
   std::vector<uint8_t> cipher_text(cipher_text_size);
-  ok = EVP_PKEY_encrypt(ctx, cipher_text.data(), &cipher_text_size, plaintext.data(),
+  ok = EVP_PKEY_encrypt(ctx.get(), cipher_text.data(), &cipher_text_size, plaintext.data(),
                         plaintext.size());
 
   // Step 4: check result
   std::string p_text(cipher_text.begin(), cipher_text.begin() + cipher_text_size);
-
-  EVP_PKEY_CTX_free(ctx);
   if (ok == 1) {
     return {true, p_text};
   }
