@@ -1,8 +1,8 @@
 diff --git src/CMakeLists.txt src/CMakeLists.txt
-index 4be247333..230c667ff 100644
+index fb4463e33..de1ef8990 100644
 --- src/CMakeLists.txt
 +++ src/CMakeLists.txt
-@@ -40,12 +40,8 @@ include(cmake/ccache.cmake)
+@@ -31,12 +31,8 @@ include(cmake/ccache.cmake)
  ##############################################################################
  # VPP Version
  ##############################################################################
@@ -13,11 +13,11 @@ index 4be247333..230c667ff 100644
 -  OUTPUT_STRIP_TRAILING_WHITESPACE
 -)
 +
-+set(VPP_VERSION 22.02-rc0~385-g7c3275e84)
++set(VPP_VERSION 23.06-release)
  string(REPLACE "-" ";" VPP_LIB_VERSION ${VPP_VERSION})
  list(GET VPP_LIB_VERSION 0 VPP_LIB_VERSION)
  
-@@ -188,8 +184,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+@@ -215,8 +211,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
    find_package(OpenSSL)
    set(SUBDIRS
      vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
@@ -28,7 +28,7 @@ index 4be247333..230c667ff 100644
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
    set(SUBDIRS vppinfra)
 diff --git src/cmake/ccache.cmake src/cmake/ccache.cmake
-index 058a0f3d8..30dcb0c15 100644
+index a7b395bc6..d6a4c5b30 100644
 --- src/cmake/ccache.cmake
 +++ src/cmake/ccache.cmake
 @@ -14,7 +14,7 @@
@@ -41,7 +41,7 @@ index 058a0f3d8..30dcb0c15 100644
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
 diff --git src/cmake/library.cmake src/cmake/library.cmake
-index ad4adfcab..0051bca10 100644
+index 45b3944eb..b1dcc56e1 100644
 --- src/cmake/library.cmake
 +++ src/cmake/library.cmake
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
@@ -53,8 +53,35 @@ index ad4adfcab..0051bca10 100644
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
  
    if(VPP_LIB_VERSION)
+diff --git src/tools/vppapigen/CMakeLists.txt src/tools/vppapigen/CMakeLists.txt
+index 04ebed548..bfabc3a67 100644
+--- src/tools/vppapigen/CMakeLists.txt
++++ src/tools/vppapigen/CMakeLists.txt
+@@ -11,22 +11,6 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-find_package(
+-  Python3
+-  REQUIRED
+-  COMPONENTS Interpreter
+-)
+-
+-execute_process(
+-  COMMAND ${Python3_EXECUTABLE} -c "import ply"
+-  RESULT_VARIABLE _rv
+-  OUTPUT_QUIET
+-)
+-
+-if (NOT ${_rv} EQUAL 0)
+-  message( FATAL_ERROR "The \"ply\" Python3 package is not installed.")
+-endif()
+-
+ install(
+   FILES vppapigen.py
+   RENAME vppapigen
 diff --git src/tools/vppapigen/vppapigen.py src/tools/vppapigen/vppapigen.py
-index 8415c28fb..a017d9fc6 100755
+index 2b0ce9999..f28a17302 100755
 --- src/tools/vppapigen/vppapigen.py
 +++ src/tools/vppapigen/vppapigen.py
 @@ -7,6 +7,13 @@ import logging
@@ -70,15 +97,15 @@ index 8415c28fb..a017d9fc6 100755
 +
  import ply.lex as lex
  import ply.yacc as yacc
-
+ 
 diff --git src/vcl/CMakeLists.txt src/vcl/CMakeLists.txt
-index e6d8f98ff..600ef4d5f 100644
+index 610b422d1..c5e6f8ca8 100644
 --- src/vcl/CMakeLists.txt
 +++ src/vcl/CMakeLists.txt
-@@ -30,6 +30,8 @@ add_vpp_library(vppcom
-   api_headers
- )
-
+@@ -35,6 +35,8 @@ if (LDP_HAS_GNU_SOURCE)
+   add_compile_definitions(HAVE_GNU_SOURCE)
+ endif(LDP_HAS_GNU_SOURCE)
+ 
 +file(COPY vppcom.h DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 +
  add_vpp_library(vcl_ldpreload
