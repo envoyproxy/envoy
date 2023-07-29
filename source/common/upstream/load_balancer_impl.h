@@ -362,6 +362,26 @@ private:
     LocalityResidual
   };
 
+  struct LocalityPercentages {
+    // The percentage of local hosts in each combined locality.
+    // A locality has an entry in this list if and only if it has a non-zero host count in either
+    // the local or upstream set.
+    // The percentage corresponding to the current envoy's local locality is always first.
+    // Percentage is stored as integer number and scaled by 10000 multiplier for better precision.
+    std::vector<uint64_t> local_percentage;
+    // The percentage of upstream hosts in each combined locality.
+    // A locality has an entry in this list if and only if it has a non-zero host count in either
+    // the local or upstream set.
+    // The percentage corresponding to the current envoy's local locality is always first.
+    // Percentage is stored as integer number and scaled by 10000 multiplier for better precision.
+    std::vector<uint64_t> upstream_percentage;
+    // Map from indices in the upstream localities to indices in the combined percentage lists.
+    // There is an entry for an upstream locality index if and only if
+    // the upstream locality has at least one host.
+    std::map<uint64_t, uint64_t> upstream_to_percentage_index;
+  };
+  using LocalityPercentagesPtr = std::unique_ptr<LocalityPercentages>;
+
   /**
    * Increase per_priority_state_ to at least priority_set.hostSetsPerPriority().size()
    */
@@ -380,11 +400,12 @@ private:
   uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set) const;
 
   /**
-   * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
-   * The result is stored as integer number and scaled by 10000 multiplier for better precision.
-   * Caller is responsible for allocation/de-allocation of `ret`.
+   * @return combined per-locality information about percentages of local/upstream hosts in each
+   * locality. See LocalityPercentages for more details.
    */
-  void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
+  LocalityPercentagesPtr
+  calculateLocalityPercentages(const HostsPerLocality& local_hosts_per_locality,
+                               const HostsPerLocality& upstream_hosts_per_locality);
 
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
