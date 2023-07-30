@@ -129,14 +129,12 @@ INSTANTIATE_TEST_SUITE_P(
     GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
     Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
 
-// TODO(tyxia) google-gRPC start pointer is not null.
 TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
   initializeConfig(/*valid_rlqs_server=*/false);
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
                                                                   {"group", "envoy"}};
-  // TODO(tyxia) Here is the key to fix envoy_grpc memory issue.
   sendClientRequest(&custom_headers);
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_,
                                                          std::chrono::milliseconds(25000)));
