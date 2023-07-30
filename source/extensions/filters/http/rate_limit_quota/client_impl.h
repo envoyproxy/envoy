@@ -36,11 +36,11 @@ public:
                       Server::Configuration::FactoryContext& context,
                       // TODO(tyxia) life time, filter itself destroyed but client is
                       // stored in the cached. need to outlived filter object!!
-                      RateLimitQuotaCallbacks& callbacks, BucketsContainer& quota_buckets,
+                      RateLimitQuotaCallbacks* callbacks, BucketsContainer& quota_buckets,
                       RateLimitQuotaUsageReports& usage_reports)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)),
-        callbacks_(callbacks), quota_buckets_(quota_buckets), reports_(usage_reports) {}
+        callbacks_(callbacks), quota_buckets_(quota_buckets), quota_usage_reports_(usage_reports) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 
@@ -58,6 +58,8 @@ public:
   void closeStream() override;
   // Send the usage report to RLQS server
   void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id) override;
+  // Filter notifies the client that it is being destroyed.
+  void notifyFilterDestroy() override { callbacks_ = nullptr; }
 
 private:
   // Store the client as the bare object since there is no ownership transfer involved.
@@ -72,10 +74,10 @@ private:
   // The TLS should be same but filter is different now how about storage it in the TLS then??? How
   // about the client and filter class have the pointer points to the same TLS object Then we don't
   // even need the callback to update it then!!!
-  RateLimitQuotaCallbacks& callbacks_;
+  RateLimitQuotaCallbacks* callbacks_ = nullptr;
   // Don't take ownership here and these objects are stored in TLS.
   BucketsContainer& quota_buckets_;
-  RateLimitQuotaUsageReports& reports_;
+  RateLimitQuotaUsageReports& quota_usage_reports_;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
@@ -85,7 +87,7 @@ using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
 inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service,
-                      RateLimitQuotaCallbacks& callbacks, BucketsContainer& quota_buckets,
+                      RateLimitQuotaCallbacks* callbacks, BucketsContainer& quota_buckets,
                       RateLimitQuotaUsageReports& quota_usage_reports) {
   return std::make_unique<RateLimitClientImpl>(grpc_service, context, callbacks, quota_buckets,
                                                quota_usage_reports);

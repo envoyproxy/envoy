@@ -31,14 +31,18 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
   // }
   // Allocate new bucket.
   std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
-  // Create the gRPC client.
-  new_bucket->rate_limit_client = createRateLimitClient(
-      factory_context_, config_->rlqs_server(), *this, quota_buckets_, quota_usage_reports_);
+
+  // Create the gRPC client if it has not been created.
+  if (client_.rate_limit_client == nullptr) {
+    client_.rate_limit_client = createRateLimitClient(factory_context_, config_->rlqs_server(),
+                                                      this, quota_buckets_, quota_usage_reports_);
+  }
+
   // It can not be nullptr based on current implementation.
-  ASSERT(new_bucket->rate_limit_client != nullptr);
+  ASSERT(client_.rate_limit_client != nullptr);
 
   // Start the streaming on the first request.
-  auto status = new_bucket->rate_limit_client->startStream(callbacks_->streamInfo());
+  auto status = client_.rate_limit_client->startStream(callbacks_->streamInfo());
   if (!status.ok()) {
     ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
     return Envoy::Http::FilterHeadersStatus::Continue;
@@ -46,28 +50,27 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
 
   initiating_call_ = true;
 
+  // Send the usage report to RLQS server immediately on the first time when the request is
+  // matched.l
+  client_.rate_limit_client->sendUsageReport(config_->domain(), bucket_id);
+
   // Store the bucket into the quota bucket container.
   quota_buckets_[bucket_id] = std::move(new_bucket);
 
-  // Send the usage report to RLQS server immediately on the first time when the request is
-  // matched.
-  // TODO(tyxia) Due to the lifetime concern of the bucket_id, I switch from pointer to
-  // absl::optional
-  quota_buckets_[bucket_id]->rate_limit_client->sendUsageReport(config_->domain(), bucket_id);
+  // // Set up the quota usage report method that sends the reports the RLS server periodically.
+  // quota_buckets_[bucket_id]->send_reports_timer =
+  //     // TODO(tyxia) Timer should be on localThread dispatcher !!!
+  //     // decode callback's dispatcher ----- worker thread dispatcher!!!!
+  //     callbacks_->dispatcher().createTimer([&bucket_id, this]() -> void {
+  //       // No `BucketID` is provided (i.e., absl::nullopt) in periodical reports for quota usage.
+  //       quota_buckets_[bucket_id]->rate_limit_client->sendUsageReport(config_->domain(),
+  //                                                                     absl::nullopt);
+  //     });
 
-  // Set up the quota usage report method that sends the reports the RLS server periodically.
-  quota_buckets_[bucket_id]->send_reports_timer =
-      // TODO(tyxia) Timer should be on localThread dispatcher !!!
-      // decode callback's dispatcher ----- worker thread dispatcher!!!!
-      callbacks_->dispatcher().createTimer([&bucket_id, this]() -> void {
-        // No `BucketID` is provided (i.e., absl::nullopt) in periodical reports for quota usage.
-        quota_buckets_[bucket_id]->rate_limit_client->sendUsageReport(config_->domain(),
-                                                                      absl::nullopt);
-      });
+  ASSERT(client_.send_reports_timer != nullptr);
   // Set the reporting interval.
   const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
-  quota_buckets_[bucket_id]->send_reports_timer->enableTimer(
-      std::chrono::milliseconds(reporting_interval));
+  client_.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
 
   initiating_call_ = false;
   // TODO(tyxia) Do we need to stop here???
@@ -108,8 +111,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   }
   // TODO(tyxia) Uncomment this section to finish the implementation and test.
   // else {
-  // Found the cached bucket entry.
-  // First, get the quota assignment (if exists) from the cached bucket action.
+  // // Found the cached bucket entry.
+  // // First, get the quota assignment (if exists) from the cached bucket action.
   // if (quota_buckets_[bucket_id].bucket_action.has_quota_assignment_action()) {
   //   auto rate_limit_strategy =
   //       quota_buckets_[bucket_id].bucket_action.quota_assignment_action().rate_limit_strategy();

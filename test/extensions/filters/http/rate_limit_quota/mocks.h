@@ -30,6 +30,8 @@ public:
   MOCK_METHOD(void, closeStream, ());
   MOCK_METHOD(void, sendUsageReport,
               (absl::string_view, absl::optional<envoy::service::rate_limit_quota::v3::BucketId>));
+
+  MOCK_METHOD(void, notifyFilterDestroy, ());
 };
 
 } // namespace RateLimitQuota

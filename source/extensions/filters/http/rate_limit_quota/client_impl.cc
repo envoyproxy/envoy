@@ -9,16 +9,16 @@ namespace RateLimitQuota {
 
 RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_view domain,
                                                                  const BucketId& bucket_id) {
-  // ASSERT(reports_ != nullptr);
+  // ASSERT(quota_usage_reports_ != nullptr);
   // TODO(tyxia) Domain is provided by filter configuration whose lifetime is tied with HCM. This
   // means that domain name has same lifetime as TLS because TLS is created by factory context. In
-  // other words, there is only one domain name throughout the whole lifetime of `reports_`. (i.e.,
-  // no need for container/map).
-  if (reports_.domain().empty()) {
+  // other words, there is only one domain name throughout the whole lifetime of
+  // `quota_usage_reports_`. (i.e., no need for container/map).
+  if (quota_usage_reports_.domain().empty()) {
     // Set the domain name in the first report.
-    reports_.set_domain(std::string(domain));
+    quota_usage_reports_.set_domain(std::string(domain));
     // Add the usage report.
-    auto* usage = reports_.add_bucket_quota_usages();
+    auto* usage = quota_usage_reports_.add_bucket_quota_usages();
     *usage->mutable_bucket_id() = bucket_id;
     // TODO(tyxia) 1) Keep track of the time
     usage->mutable_time_elapsed()->set_seconds(0);
@@ -31,7 +31,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
   }
   // If the cached report exists.
   else {
-    RateLimitQuotaUsageReports& cached_report = reports_;
+    RateLimitQuotaUsageReports& cached_report = quota_usage_reports_;
     bool updated = false;
     // TODO(tyxia) That will be better if it can be a map
     for (int idx = 0; idx < cached_report.bucket_quota_usages_size(); ++idx) {
@@ -49,13 +49,13 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
     }
     // New bucket in this report(i.e., No updates has been performed.)
     if (updated == false) {
-      auto* usage = reports_.add_bucket_quota_usages();
+      auto* usage = quota_usage_reports_.add_bucket_quota_usages();
       *usage->mutable_bucket_id() = bucket_id;
       usage->mutable_time_elapsed()->set_seconds(0);
       usage->set_num_requests_allowed(1);
     }
   }
-  return reports_;
+  return quota_usage_reports_;
 }
 
 void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
@@ -66,29 +66,12 @@ void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
   // buildUsageReport is called).
   // TODO(tyxia) end_stream means send and close.
   stream_->sendMessage(bucket_id.has_value() ? buildUsageReport(domain, bucket_id.value())
-                                             : reports_,
+                                             : quota_usage_reports_,
                        /*end_stream=*/false);
 }
 
-// void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-//   for (auto action : response->bucket_action()) {
-//     if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
-//       ENVOY_LOG(error, "Received a response, but bucket_id is missing : ",
-//                 response->ShortDebugString());
-//       continue;
-//     }
-//     // TODO(tyxia) Extend lifetime and store in the bucket.
-//     BucketId bucket_id = action.bucket_id();
-//     quota_buckets_[bucket_id]->bucket_action = std::make_unique<BucketAction>(std::move(action));
-//     // quota_buckets_[action.bucket_id()].bucket_action = std::move(action);
-//   }
-//   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
-//   callbacks_.onQuotaResponse(*response);
-// }
-
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
   for (const auto& action : response->bucket_action()) {
-    // TODO(tyxia) Uncomment this section to finish the implementation and test.
     if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
       ENVOY_LOG(error,
                 "Received a response, but bucket_id is missing : ", response->ShortDebugString());
@@ -114,7 +97,10 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
     }
   }
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
-  callbacks_.onQuotaResponse(*response);
+  // This doesn't work for periodical response as filter has been destroyed.
+  if (callbacks_ != nullptr) {
+    callbacks_->onQuotaResponse(*response);
+  }
 }
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.

@@ -37,6 +37,8 @@ public:
   virtual void
   sendUsageReport(absl::string_view domain,
                   absl::optional<envoy::service::rate_limit_quota::v3::BucketId> bucket_id) PURE;
+
+  virtual void notifyFilterDestroy() PURE;
 };
 
 } // namespace RateLimitQuota

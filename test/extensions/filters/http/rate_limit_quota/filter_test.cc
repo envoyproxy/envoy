@@ -29,36 +29,6 @@ using ::Envoy::StatusHelpers::StatusIs;
 using Server::Configuration::MockFactoryContext;
 using ::testing::NiceMock;
 
-// TODO(tyxia) CEL matcher config to be used later.
-// constexpr char CelMatcherConfig[] = R"EOF(
-//     matcher_list:
-//       matchers:
-//         # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
-//         predicate:
-//           single_predicate:
-//             input:
-//               typed_config:
-//                 "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
-//                 header_name: environment
-//             custom_match:
-//               typed_config:
-//                 '@type': type.googleapis.com/xds.type.matcher.v3.CelMatcher
-//                 expr_match:
-//                   # Shortened for illustration purposes. Here should be parsed CEL expression:
-//                   # request.headers['user_group'] == 'admin'
-//                   parsed_expr: {}
-//         on_match:
-//           action:
-//             name: rate_limit_quota
-//             typed_config:
-//               "@type":
-//               type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-//               bucket_id_builder:
-//                 bucket_id_builder:
-//                   "name":
-//                       string_value: "prod"
-//   )EOF";
-
 enum class MatcherConfigType {
   Valid,
   Invalid,
@@ -70,7 +40,7 @@ enum class MatcherConfigType {
 
 class FilterTest : public testing::Test {
 public:
-  FilterTest() {
+  FilterTest() : thread_local_client_(dispatcher_, filter_config_) {
     // Add the grpc service config.
     TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
@@ -115,8 +85,8 @@ public:
 
   void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
-    filter_ =
-        std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, bucket_cache_, reports_);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, bucket_cache_,
+                                                     quota_usage_reports_, thread_local_client_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -175,9 +145,11 @@ public:
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
-  // TODO(tyxia) No need for TLS storage???
+  // TODO(tyxia) No need for TLS storage
   BucketsContainer bucket_cache_;
-  RateLimitQuotaUsageReports reports_;
+  RateLimitQuotaUsageReports quota_usage_reports_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  ThreadLocalClient thread_local_client_;
 };
 
 TEST_F(FilterTest, EmptyMatcherConfig) {

@@ -51,9 +51,9 @@ public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
                        BucketsContainer& quota_buckets,
-                       RateLimitQuotaUsageReports& quota_usage_reports)
+                       RateLimitQuotaUsageReports& quota_usage_reports, ThreadLocalClient& client)
       : config_(std::move(config)), factory_context_(factory_context),
-        quota_buckets_(quota_buckets), quota_usage_reports_(quota_usage_reports) {
+        quota_buckets_(quota_buckets), quota_usage_reports_(quota_usage_reports), client_(client) {
     createMatcher();
   }
 
@@ -76,7 +76,13 @@ public:
     return *data_ptr_;
   }
 
-  ~RateLimitQuotaFilter() override = default;
+  ~RateLimitQuotaFilter() override {
+    // Notify the client that has been destroyed and its callback which is pointer to this pointer
+    // can not be used anymore.
+    if (client_.rate_limit_client != nullptr) {
+      client_.rate_limit_client->notifyFilterDestroy();
+    }
+  }
 
 private:
   // Create the matcher factory and matcher.
@@ -96,6 +102,7 @@ private:
   // Don't take ownership here and these objects are stored in TLS.
   BucketsContainer& quota_buckets_;
   RateLimitQuotaUsageReports& quota_usage_reports_;
+  ThreadLocalClient& client_;
 
   bool initiating_call_{};
 };
