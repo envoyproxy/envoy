@@ -40,4 +40,22 @@ envoy_cc_test(
         ],
         "//conditions:default": [],
     }),
+)
 
+envoy_cc_test(
+    name = "io_uring_worker_impl_integration_test",
+    srcs = select({
+        "//bazel:linux": ["io_uring_worker_impl_integration_test.cc"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//envoy/api:os_sys_calls_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//test/test_common:test_time_lib",
+    ] + select({
+        "//bazel:linux": [
+            "//source/common/io:io_uring_worker_lib",
+        ],
+        "//conditions:default": [],
+    }),
+)

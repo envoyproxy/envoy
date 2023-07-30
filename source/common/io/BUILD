@@ -33,4 +33,4 @@ envoy_cc_library(
         "//envoy/common/io:io_uring_interface",
         "//source/common/common:linked_object",
     ],
-
+)
