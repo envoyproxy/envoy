@@ -47,7 +47,6 @@ TEST_F(RateLimitClientTest, SendUsageReport) {
   test_client.client_->closeStream();
 }
 
-// TODO(tyxia) Test more in this sub-test!!!
 TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
   ASSERT_NE(test_client.stream_callbacks_, nullptr);

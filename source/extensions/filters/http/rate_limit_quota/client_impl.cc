@@ -21,6 +21,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
     auto* usage = quota_usage_reports_.add_bucket_quota_usages();
     *usage->mutable_bucket_id() = bucket_id;
     // TODO(tyxia) 1) Keep track of the time
+    // It is better to be last report time and current time.
     usage->mutable_time_elapsed()->set_seconds(0);
     // TODO(tyxia) 2) Set the value of requests allowed and denied.
     // This is requests allowed and denied for this bucket which contains many requests.
@@ -98,14 +99,15 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
   }
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
   // This doesn't work for periodical response as filter has been destroyed.
-  if (callbacks_ != nullptr) {
-    callbacks_->onQuotaResponse(*response);
+  if (rlqs_callbacks_ != nullptr) {
+    rlqs_callbacks_->onQuotaResponse(*response);
   }
 }
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
   if (stream_ != nullptr && !stream_closed_) {
     // TODO(tyxia) Google_grpc from onRemoteClose will call here because stream_ not null.
+    // but stream_closed_ is true which prevent it.
     stream_->closeStream();
     stream_closed_ = true;
     stream_->resetStream();

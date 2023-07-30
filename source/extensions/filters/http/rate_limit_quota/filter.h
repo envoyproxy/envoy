@@ -26,9 +26,6 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 
 using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
-using FilterConfig =
-    envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
-using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
 using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
     BucketAction::QuotaAssignmentAction;
 

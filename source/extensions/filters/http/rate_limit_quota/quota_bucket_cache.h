@@ -67,20 +67,16 @@ struct Bucket {
 using BucketsContainer =
     absl::node_hash_map<BucketId, std::unique_ptr<Bucket>, BucketIdHash, BucketIdEqual>;
 
-using FilterConfig =
-    envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
-using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
-
-struct ThreadLocalClient {
+struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota> {
   ThreadLocalClient(Envoy::Event::Dispatcher& event_dispatcher,
                     FilterConfigConstSharedPtr filter_config)
       : dispatcher(event_dispatcher), config(std::move(filter_config)) {
+    // Create the quota usage report method that sends the reports the RLS server periodically.
     send_reports_timer = dispatcher.createTimer([this] {
       if (rate_limit_client != nullptr) {
         rate_limit_client->sendUsageReport(config->domain(), absl::nullopt);
       } else {
-        // TODO(tyxia) Change it to ENVOY BUG
-        std::cout << "tyxia_null_rate_limit_client\n";
+        ENVOY_LOG(error, "Rate limit client has been destroyed; no periodical report send");
       }
     });
   }
@@ -91,8 +87,6 @@ struct ThreadLocalClient {
   // // Default move constructor and assignment.
   // ThreadLocalClient(ThreadLocalClient&& client) = default;
   // ThreadLocalClient& operator=(ThreadLocalClient&& client) = default;
-
-  // TODO(tyxia) Memory issue probably because this never hit?? can try again now.
   ~ThreadLocalClient() {
     if (rate_limit_client != nullptr) {
       rate_limit_client->closeStream();

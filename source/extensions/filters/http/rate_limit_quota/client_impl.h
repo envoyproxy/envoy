@@ -34,32 +34,31 @@ class RateLimitClientImpl : public RateLimitClient,
 public:
   RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
                       Server::Configuration::FactoryContext& context,
-                      // TODO(tyxia) life time, filter itself destroyed but client is
-                      // stored in the cached. need to outlived filter object!!
                       RateLimitQuotaCallbacks* callbacks, BucketsContainer& quota_buckets,
                       RateLimitQuotaUsageReports& usage_reports)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)),
-        callbacks_(callbacks), quota_buckets_(quota_buckets), quota_usage_reports_(usage_reports) {}
+        rlqs_callbacks_(callbacks), quota_buckets_(quota_buckets),
+        quota_usage_reports_(usage_reports) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
+  // Build the usage report (i.e., the request sent to RLQS server).
+  RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain, const BucketId& bucket_id);
 
-  // RawAsyncStreamCallbacks
+  // RawAsyncStreamCallbacks methods;
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
-  // Build the usage report (i.e., the request sent to RLQS server).
-  RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain, const BucketId& bucket_id);
-
-  // RateLimitClient
+  // RateLimitClient methods.
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
   void closeStream() override;
   // Send the usage report to RLQS server
   void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id) override;
-  // Filter notifies the client that it is being destroyed.
-  void notifyFilterDestroy() override { callbacks_ = nullptr; }
+  // Notify the rate limit client that the filter itself has been destroyed. i.e., the filter
+  // callback can not be used anymore.
+  void notifyFilterDestroy() override { rlqs_callbacks_ = nullptr; }
 
 private:
   // Store the client as the bare object since there is no ownership transfer involved.
@@ -74,8 +73,8 @@ private:
   // The TLS should be same but filter is different now how about storage it in the TLS then??? How
   // about the client and filter class have the pointer points to the same TLS object Then we don't
   // even need the callback to update it then!!!
-  RateLimitQuotaCallbacks* callbacks_ = nullptr;
-  // Don't take ownership here and these objects are stored in TLS.
+  RateLimitQuotaCallbacks* rlqs_callbacks_ = nullptr;
+  // Reference to objects that are stored in TLS cache. They outlive the filter.
   BucketsContainer& quota_buckets_;
   RateLimitQuotaUsageReports& quota_usage_reports_;
 };

@@ -45,14 +45,8 @@ public:
       return;
     }
     reset_callbacks_started_ = true;
-    int i = 0;
     for (StreamCallbacks* callbacks : callbacks_) {
       if (callbacks) {
-        ++i;
-        // if (i >= 2) {
-        //   // TODO(tyxia) Second callback is the problem!!!
-        //   continue;
-        // }
         callbacks->onResetStream(reason, absl::string_view());
       }
     }

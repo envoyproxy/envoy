@@ -36,7 +36,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":client_lib",
+        ":client_interface",
         ":rate_limit_quota",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
@@ -50,6 +50,7 @@ envoy_cc_library(
     deps = [
         "//envoy/grpc:status",
         "//envoy/stream_info:stream_info_interface",
+        "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
     ],
 )

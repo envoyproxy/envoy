@@ -57,18 +57,8 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
   // Store the bucket into the quota bucket container.
   quota_buckets_[bucket_id] = std::move(new_bucket);
 
-  // // Set up the quota usage report method that sends the reports the RLS server periodically.
-  // quota_buckets_[bucket_id]->send_reports_timer =
-  //     // TODO(tyxia) Timer should be on localThread dispatcher !!!
-  //     // decode callback's dispatcher ----- worker thread dispatcher!!!!
-  //     callbacks_->dispatcher().createTimer([&bucket_id, this]() -> void {
-  //       // No `BucketID` is provided (i.e., absl::nullopt) in periodical reports for quota usage.
-  //       quota_buckets_[bucket_id]->rate_limit_client->sendUsageReport(config_->domain(),
-  //                                                                     absl::nullopt);
-  //     });
-
   ASSERT(client_.send_reports_timer != nullptr);
-  // Set the reporting interval.
+  // Set the reporting interval and enable the timer.
   const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
   client_.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
 
@@ -193,10 +183,7 @@ void RateLimitQuotaFilter::onQuotaResponse(RateLimitQuotaResponse&) {
 }
 
 void RateLimitQuotaFilter::onDestroy() {
-  // TODO(tyxia) Clean up resource. Should close on quota bucket destroy.
-  // for (auto& bucket : quota_buckets_) {
-  //     bucket.second.rate_limit_client->closeStream();
-  // }
+  // TODO(tyxia) Clean up resource. rate limit clients should be closed at TLS.
 }
 
 } // namespace RateLimitQuota

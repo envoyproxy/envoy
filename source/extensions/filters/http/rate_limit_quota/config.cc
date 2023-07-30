@@ -4,7 +4,8 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
+// #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
