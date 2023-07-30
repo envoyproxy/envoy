@@ -1232,52 +1232,40 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, GoString* value_str
     activation_response_trailers_ = dynamic_cast<const Http::ResponseTrailerMap*>(trailers_);
   }
 
-  if (state.isThreadSafe()) {
+  static constexpr auto getStringPropertyInCurrentThread = [this, &state, path, value_str]() {
     const StreamInfo::StreamInfo& info = state.streamInfo();
     activation_info_ = &info;
 
     CAPIStatus status = getStringPropertyInternal(path, &req_->strValue);
-    if (status != CAPIStatus::CAPIOK) {
-      return status;
+    if (status == CAPIStatus::CAPIOK) {
+      value_str->p = req_->strValue.data();
+      value_str->n = req_->strValue.length();
     }
-    value_str->p = req_->strValue.data();
-    value_str->n = req_->strValue.length();
-  } else {
-    auto weak_ptr = weak_from_this();
-    state.getDispatcher().post([this, &state, weak_ptr, path, value_str, rc] {
-      if (!weak_ptr.expired() && !hasDestroyed()) {
-        const StreamInfo::StreamInfo& info = state.streamInfo();
-        activation_info_ = &info;
+    return status;
+  };
 
-        CAPIStatus status = getStringPropertyInternal(path, &req_->strValue);
-        if (status == CAPIStatus::CAPIOK) {
-          value_str->p = req_->strValue.data();
-          value_str->n = req_->strValue.length();
-        }
-        *rc = status;
+  if (state.isThreadSafe()) {
+    return getStringPropertyInCurrentThread();
+  } 
 
-        dynamic_lib_->envoyGoRequestSemaDec(req_);
-      } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in getStringProperty");
-      }
-    });
-    return CAPIStatus::CAPIYield;
-  }
-  return CAPIStatus::CAPIOK;
+  auto weak_ptr = weak_from_this();
+  state.getDispatcher().post([this, &state, weak_ptr, path, value_str, rc] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      *rc = getStringPropertyInCurrentThread();
+      dynamic_lib_->envoyGoRequestSemaDec(req_);
+    } else {
+      ENVOY_LOG(info, "golang filter has gone or destroyed in getStringProperty");
+    }
+  });
+  return CAPIStatus::CAPIYield;
 }
 
 absl::optional<google::api::expr::runtime::CelValue> Filter::findValue(absl::string_view name,
                                                                        Protobuf::Arena* arena) {
-  auto value = StreamActivation::FindValue(name, arena);
-  // we don't need to call resetActivation as activation_xx_ is overridden when we get property
-
-  if (value) {
-    return value;
-  }
-
   // as we already support getting/setting FilterState, we don't need to implement
   // getProperty with non-attribute name & setProperty which actually work on FilterState
-  return {};
+  return StreamActivation::FindValue(name, arena);
+  // we don't need to call resetActivation as activation_xx_ is overridden when we get property
 }
 
 CAPIStatus Filter::getStringPropertyInternal(absl::string_view path, std::string* result) {
