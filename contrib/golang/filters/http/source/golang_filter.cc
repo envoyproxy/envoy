@@ -1246,7 +1246,7 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, GoString* value_str
 
   if (state.isThreadSafe()) {
     return getStringPropertyInCurrentThread();
-  } 
+  }
 
   auto weak_ptr = weak_from_this();
   state.getDispatcher().post([this, &state, weak_ptr, path, value_str, rc] {
