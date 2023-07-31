@@ -914,10 +914,9 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_FALSE(response->complete());
   codec_client_->close();
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
@@ -1280,15 +1279,15 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // omit required authority header to invoke EnvoyQuicServerStream::resetStream
+  // omit required authority header to invoke EnvoyQuicServerStream::onStreamError
   auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"}, {":path", "/dynamo/url"}, {":scheme", "http"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
   codec_client_->close();
-  ASSERT_TRUE(response->complete());
 
   std::string log = waitForAccessLog(access_log_name_);
   std::vector<std::string> metrics = absl::StrSplit(log, ',');
@@ -1297,7 +1296,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
   EXPECT_EQ(/* REQUEST_DURATION */ metrics.at(2), "-");
   EXPECT_EQ(/* RESPONSE_DURATION */ metrics.at(3), "-");
-  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "400");
+  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "0");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
