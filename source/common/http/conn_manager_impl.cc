@@ -111,12 +111,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                      /*server_name=*/config_.serverName(),
                                      /*proxy_status_config=*/config_.proxyStatusConfig())),
       refresh_rtt_after_request_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {
-  ENVOY_LOG_ONCE_IF(
-      trace, accept_new_http_stream_ == nullptr,
-      "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
-      "found. Is it configured?");
-}
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
