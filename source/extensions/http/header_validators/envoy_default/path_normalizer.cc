@@ -238,7 +238,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     redirect |= result.action() == PathNormalizationResult::Action::Redirect;
   }
 
-  if (translate_backslash_to_slash_) {
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
     translateBackToForwardSlashes(path);
   }
 
