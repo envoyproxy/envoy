@@ -1192,9 +1192,9 @@ snowballstemmer==2.2.0 \
     --hash=sha256:09b16deb8547d3412ad7b590689584cd0fe25ec8db3be37788be3810cbf19cb1 \
     --hash=sha256:c8e1716e83cc398ae16824e5572ae04e0d9fc2c6b985fb0f900f5f0c96ecba1a
     # via sphinx
-sphinx==7.1.0 \
-    --hash=sha256:8f336d0221c3beb23006b3164ed1d46db9cebcce9cb41cdb9c5ecd4bcc509be0 \
-    --hash=sha256:9bdfb5a2b28351d4fdf40a63cd006dbad727f793b243e669fc950d7116c634af
+sphinx==7.1.1 \
+    --hash=sha256:4e6c5ea477afa0fb90815210fd1312012e1d7542589ab251ac9b53b7c0751bce \
+    --hash=sha256:59b8e391f0768a96cd233e8300fe7f0a8dc2f64f83dc2a54336a9a84f428ff4e
     # via
     #   -r requirements.in
     #   envoy-docs-sphinx-runner
