@@ -13,6 +13,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: extension_discovery_service
+  change: |
+    added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
 - area: lua
   change: |
     added three new functions :ref:`importPrivateKey <config_http_filters_lua_stream_handle_api_import_private_key>` to
