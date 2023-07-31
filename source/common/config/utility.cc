@@ -27,25 +27,6 @@ std::string Utility::truncateGrpcStatusMessage(absl::string_view error_message) 
                      error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
 }
 
-void Utility::translateApiConfigSource(
-    const std::string& cluster, uint32_t refresh_delay_ms, const std::string& api_type,
-    envoy::config::core::v3::ApiConfigSource& api_config_source) {
-  // TODO(junr03): document the option to chose an api type once we have created
-  // stronger constraints around v2.
-  if (api_type == ApiType::get().Grpc) {
-    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    envoy::config::core::v3::GrpcService* grpc_service = api_config_source.add_grpc_services();
-    grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
-  } else {
-    ASSERT(api_type == ApiType::get().Rest);
-    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
-    api_config_source.add_cluster_names(cluster);
-  }
-
-  api_config_source.mutable_refresh_delay()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
-}
-
 Upstream::ClusterConstOptRef Utility::checkCluster(absl::string_view error_prefix,
                                                    absl::string_view cluster_name,
                                                    Upstream::ClusterManager& cm,
