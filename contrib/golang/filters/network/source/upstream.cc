@@ -44,8 +44,8 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
 }
 
 UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_lib,
-                           Event::Dispatcher* dispatcher)
-    : dynamic_lib_(dynamic_lib), dispatcher_(dispatcher), addr_(addr) {
+                           unsigned long long int goConnID, Event::Dispatcher* dispatcher)
+    : dynamic_lib_(dynamic_lib), goConnID_(goConnID), dispatcher_(dispatcher), addr_(addr) {
   if (dispatcher_ == nullptr) {
     DispatcherStore& store = dispatcherStore();
     Thread::LockGuard guard(store.lock_);
@@ -121,7 +121,7 @@ void UpstreamConn::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
   conn_->addUpstreamCallbacks(*this);
   remote_addr_ = conn_->connection().connectionInfoProvider().directRemoteAddress()->asString();
 
-  dynamic_lib_->envoyGoFilterOnUpstreamConnectionReady(wrapper_);
+  dynamic_lib_->envoyGoFilterOnUpstreamConnectionReady(wrapper_, goConnID_);
 }
 
 void UpstreamConn::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
@@ -133,7 +133,8 @@ void UpstreamConn::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
     handler_ = nullptr;
   }
 
-  dynamic_lib_->envoyGoFilterOnUpstreamConnectionFailure(wrapper_, static_cast<int>(reason));
+  dynamic_lib_->envoyGoFilterOnUpstreamConnectionFailure(wrapper_, static_cast<int>(reason),
+                                                         goConnID_);
 }
 
 void UpstreamConn::onEvent(Network::ConnectionEvent event) {
