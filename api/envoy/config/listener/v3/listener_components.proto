@@ -45,7 +45,6 @@ message Filter {
     // Configuration source specifier for an extension configuration discovery
     // service. In case of a failure and without the default configuration, the
     // listener closes the connections.
-    // [#not-implemented-hide:]
     core.v3.ExtensionConfigSource config_discovery = 5;
   }
 }
