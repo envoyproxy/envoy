@@ -57,21 +57,12 @@ private:
   std::unique_ptr<Http::ResponseTrailerMap> trailers_;
 };
 
-// We capture the values from encoder_callbacks, and the callbacks as lambdas, so
-// that we don't have to keep checking whether the filter has been deleted.
-// When the filter *is* deleted, we simply replace all the callback lambdas with no-op.
 CacheInsertQueue::CacheInsertQueue(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
                                    InsertContextPtr insert_context, AbortInsertCallback abort)
     : dispatcher_(encoder_callbacks.dispatcher()), insert_context_(std::move(insert_context)),
       low_watermark_bytes_(encoder_callbacks.encoderBufferLimit() / 2),
       high_watermark_bytes_(encoder_callbacks.encoderBufferLimit()),
-      under_low_watermark_callback_([&encoder_callbacks]() {
-        encoder_callbacks.onEncoderFilterBelowWriteBufferLowWatermark();
-      }),
-      over_high_watermark_callback_([&encoder_callbacks]() {
-        encoder_callbacks.onEncoderFilterAboveWriteBufferHighWatermark();
-      }),
-      abort_callback_(abort) {}
+      encoder_callbacks_(encoder_callbacks), abort_callback_(abort) {}
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                      const ResponseMetadata& metadata, bool end_stream) {
@@ -94,9 +85,11 @@ void CacheInsertQueue::insertBody(const Buffer::Instance& chunk, bool end_stream
     size_t sz = chunk.length();
     queue_size_bytes_ += sz;
     chunks_.push_back(std::make_unique<CacheInsertChunkBody>(chunk, end_stream));
-    if (!sent_watermark_ && queue_size_bytes_ > high_watermark_bytes_) {
-      over_high_watermark_callback_();
-      sent_watermark_ = true;
+    if (!watermarked_ && queue_size_bytes_ > high_watermark_bytes_) {
+      if (encoder_callbacks_.has_value()) {
+        encoder_callbacks_.value().get().onEncoderFilterAboveWriteBufferHighWatermark();
+      }
+      watermarked_ = true;
     }
   } else {
     insert_context_->insertBody(
@@ -131,25 +124,26 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
     }
     ASSERT(queue_size_bytes_ >= sz, "queue can't be emptied by more than its size");
     queue_size_bytes_ -= sz;
-    if (sent_watermark_ && queue_size_bytes_ <= low_watermark_bytes_) {
-      under_low_watermark_callback_();
-      sent_watermark_ = false;
+    if (watermarked_ && queue_size_bytes_ <= low_watermark_bytes_) {
+      if (encoder_callbacks_.has_value()) {
+        encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
+      }
+      watermarked_ = false;
     }
     if (!ready) {
       // canceled by cache; unwatermark if necessary, inform the filter if
       // it's still around, and delete the queue.
-      if (sent_watermark_) {
-        under_low_watermark_callback_();
+      if (watermarked_ && encoder_callbacks_.has_value()) {
+        encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
       }
+      abort_callback_();
       chunks_.clear();
       self_ownership_.reset();
-      abort_callback_();
       return;
     }
     if (end_stream) {
       ASSERT(chunks_.empty(), "ending a stream with the queue not empty is a bug");
-      ASSERT(!sent_watermark_,
-             "being over the high watermark when the queue is empty makes no sense");
+      ASSERT(!watermarked_, "being over the high watermark when the queue is empty makes no sense");
       self_ownership_.reset();
       return;
     }
@@ -167,7 +161,8 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
 
 void CacheInsertQueue::takeOwnershipOfYourself(std::unique_ptr<CacheInsertQueue> self) {
   // Disable all the callbacks, they're going to have nowhere to go.
-  abort_callback_ = under_low_watermark_callback_ = over_high_watermark_callback_ = []() {};
+  abort_callback_ = []() {};
+  encoder_callbacks_.reset();
   if (chunks_.empty() && !chunk_in_flight_) {
     // If the queue is already empty we can just let it be destroyed immediately.
     return;

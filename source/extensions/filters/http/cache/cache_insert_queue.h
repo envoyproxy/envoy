@@ -32,12 +32,11 @@ private:
   Event::Dispatcher& dispatcher_;
   const InsertContextPtr insert_context_;
   const size_t low_watermark_bytes_, high_watermark_bytes_;
-  UnderLowWatermarkCallback under_low_watermark_callback_;
-  OverHighWatermarkCallback over_high_watermark_callback_;
+  OptRef<Http::StreamEncoderFilterCallbacks> encoder_callbacks_;
   AbortInsertCallback abort_callback_;
   std::deque<std::unique_ptr<CacheInsertChunk>> chunks_;
   size_t queue_size_bytes_ = 0;
-  bool sent_watermark_ = false;
+  bool watermarked_ = false;
   bool chunk_in_flight_ = false;
   // True if end_stream has been queued. If the queue gets handed ownership
   // of itself before the end is in sight then it might as well quit since
