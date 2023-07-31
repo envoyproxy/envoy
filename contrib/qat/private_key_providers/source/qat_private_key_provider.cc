@@ -356,6 +356,10 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
 
   ASSERT(manager_);
 
+  if(!manager_->checkQatDevice()){
+    return;
+  }
+
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 5));
 

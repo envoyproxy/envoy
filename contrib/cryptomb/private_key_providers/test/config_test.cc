@@ -74,6 +74,7 @@ TEST_F(CryptoMbConfigTest, CreateRsa1024) {
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
   EXPECT_EQ(false, provider->checkFips());
+  EXPECT_EQ(provider->checkInitialized(), true);
   Ssl::BoringSslPrivateKeyMethodSharedPtr method = provider->getBoringSslPrivateKeyMethod();
   EXPECT_NE(nullptr, method);
 
@@ -96,7 +97,9 @@ TEST_F(CryptoMbConfigTest, CreateRsa2048) {
         private_key: { "filename": "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-2048.pem" }
 )EOF";
 
-  EXPECT_NE(nullptr, createWithConfig(yaml));
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(provider->checkInitialized(), true);
 }
 
 TEST_F(CryptoMbConfigTest, CreateRsa2048WithExponent3) {
@@ -266,6 +269,7 @@ TEST_F(CryptoMbConfigTest, CreateOneMillisecondPollDelay) {
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(provider->checkInitialized(), true);
   CryptoMbPrivateKeyMethodProvider* cryptomb_provider =
       dynamic_cast<CryptoMbPrivateKeyMethodProvider*>(provider.get());
   EXPECT_EQ(cryptomb_provider->getPollDelayForTest(), std::chrono::microseconds(1000));
@@ -282,6 +286,7 @@ TEST_F(CryptoMbConfigTest, CreateTwoMillisecondPollDelay) {
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(provider->checkInitialized(), true);
   CryptoMbPrivateKeyMethodProvider* cryptomb_provider =
       dynamic_cast<CryptoMbPrivateKeyMethodProvider*>(provider.get());
   EXPECT_EQ(cryptomb_provider->getPollDelayForTest(), std::chrono::microseconds(2000));
