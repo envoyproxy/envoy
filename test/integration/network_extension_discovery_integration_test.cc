@@ -763,7 +763,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithR
   EXPECT_EQ(4, network_filter_config.bytes_to_drain());
 }
 
-TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyExistingConnection) {
+TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyToExistingConnection) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addFilterChain();
   addDynamicFilter(filter_name_, false);
