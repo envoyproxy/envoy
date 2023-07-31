@@ -309,8 +309,8 @@ TEST_F(CryptoMbConfigTest, CreateNotSupportedInstructionSet) {
         poll_delay: 0.02s
         )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml, false), EnvoyException,
-                            "Multi-buffer CPU instructions not available.");
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml, false);
+  EXPECT_EQ(provider->checkInitialized(), false);
 }
 
 } // namespace CryptoMb
