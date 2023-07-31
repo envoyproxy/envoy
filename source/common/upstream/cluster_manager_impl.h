@@ -409,8 +409,6 @@ protected:
    * CIO to deferred instantiating clusters on workers until they are used.
    */
   struct ClusterInitializationObject {
-    ClusterInitializationObject(const ClusterInitializationObject& other) = default;
-    ClusterInitializationObject& operator=(const ClusterInitializationObject& other) = default;
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,

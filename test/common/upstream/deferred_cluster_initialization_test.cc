@@ -123,6 +123,7 @@ class StaticClusterTest : public DeferredClusterInitializationTest {};
 
 INSTANTIATE_TEST_SUITE_P(UseCustomClusterType, StaticClusterTest, testing::Bool());
 
+// Test that bootstrap static clusters are deferred initialized.
 TEST_P(StaticClusterTest, BootstrapStaticClustersAreDeferredInitialized) {
   const std::string yaml = R"EOF(
     static_resources:
@@ -156,6 +157,7 @@ TEST_P(StaticClusterTest, BootstrapStaticClustersAreDeferredInitialized) {
   EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
 }
 
+// Test that cds cluster are deferred initialized.
 TEST_P(StaticClusterTest, CdsStaticClustersAreDeferredInitialized) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:
@@ -208,6 +210,7 @@ TEST_P(StaticClusterTest, CdsStaticClustersAreDeferredInitialized) {
   EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
 }
 
+// Test that we can merge deferred cds cluster configuration.
 TEST_P(StaticClusterTest, MergeStaticCdsClusterUpdates) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:
@@ -289,6 +292,7 @@ TEST_P(StaticClusterTest, MergeStaticCdsClusterUpdates) {
   }
 }
 
+// Test that an active deferred cds cluster can get updated after initialization.
 TEST_P(StaticClusterTest, ActiveClusterGetsUpdated) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:
@@ -369,6 +373,7 @@ TEST_P(StaticClusterTest, ActiveClusterGetsUpdated) {
   }
 }
 
+// Test that removed deferred cds clusters have their cluster initialization object removed.
 TEST_P(StaticClusterTest, RemoveDeferredCluster) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:
@@ -446,6 +451,7 @@ protected:
 // well.
 INSTANTIATE_TEST_SUITE_P(UseCustomClusterType, EdsTest, testing::ValuesIn({false}));
 
+// Test that hosts can be added to deferred initialized eds cluster.
 TEST_P(EdsTest, ShouldMergeAddingHosts) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:
@@ -510,6 +516,7 @@ TEST_P(EdsTest, ShouldMergeAddingHosts) {
                                  {1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000}));
 }
 
+// Test that removed hosts do not appear when initializing a deferred eds cluster.
 TEST_P(EdsTest, ShouldNotHaveRemovedHosts) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:
@@ -582,6 +589,7 @@ TEST_P(EdsTest, ShouldNotHaveRemovedHosts) {
       hostsInHostsVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts(), {1000, 2000}));
 }
 
+// Test that removed hosts that were added again appear when initializing a deferred eds cluster.
 TEST_P(EdsTest, ShouldHaveHostThatWasAddedAfterRemoval) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:
@@ -658,6 +666,7 @@ TEST_P(EdsTest, ShouldHaveHostThatWasAddedAfterRemoval) {
                                  {1000, 2000, 3000}));
 }
 
+// Test merging multiple priorities for a deferred eds cluster.
 TEST_P(EdsTest, MultiplePrioritiesShouldMergeCorrectly) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:
@@ -730,6 +739,7 @@ TEST_P(EdsTest, MultiplePrioritiesShouldMergeCorrectly) {
   EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[2]->hosts().empty());
 }
 
+// Test updating an initialized deferred eds cluster.
 TEST_P(EdsTest, ActiveClusterGetsUpdated) {
   const std::string bootstrap_yaml = R"EOF(
     static_resources:

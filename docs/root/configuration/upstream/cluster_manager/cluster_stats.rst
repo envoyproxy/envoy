@@ -37,7 +37,7 @@ cluster manager statistics tree rooted at
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  clusters_inflated, Gauge, Number of clusters the worker has initialized. If using cluster deferral this number should be <= cluster_added.
+  clusters_inflated, Gauge, Number of clusters the worker has initialized. If using cluster deferral this number should be <= (cluster_added - clusters_removed).
 
 .. _config_cluster_stats:
 

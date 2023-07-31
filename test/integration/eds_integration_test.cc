@@ -806,6 +806,7 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   cleanupUpstreamAndDownstream();
 }
 
+// Test that a deferred EDS cluster can get created inline for a request.
 TEST_P(EdsIntegrationTest, DataplaneTrafficForDeferredCluster) {
   if (!deferred_cluster_creation_) {
     GTEST_SKIP() << "Test depends on deferred cluster creation. Skipping.";
@@ -830,7 +831,6 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficForDeferredCluster) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
-  response.reset();
   test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
 
   const auto& active_cluster_map =
@@ -843,6 +843,8 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficForDeferredCluster) {
   }
 }
 
+// Test that a deferred EDS cluster that was created inline can get EDS updates
+// and receive traffic after the update.
 TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
   if (!deferred_cluster_creation_) {
     GTEST_SKIP() << "Test depends on deferred cluster creation. Skipping.";

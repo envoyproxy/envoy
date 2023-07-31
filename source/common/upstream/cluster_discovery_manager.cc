@@ -9,7 +9,7 @@ namespace Upstream {
 
 namespace {
 
-using ClusterAddedCb = std::function<void(const std::string&)>;
+using ClusterAddedCb = std::function<void(absl::string_view)>;
 
 class ClusterCallbacks : public ClusterUpdateCallbacks {
 public:
@@ -30,7 +30,7 @@ private:
 ClusterDiscoveryManager::ClusterDiscoveryManager(
     std::string thread_name, ClusterLifecycleCallbackHandler& lifecycle_callbacks_handler)
     : thread_name_(std::move(thread_name)) {
-  callbacks_ = std::make_unique<ClusterCallbacks>([this](const std::string& cluster_name) {
+  callbacks_ = std::make_unique<ClusterCallbacks>([this](absl::string_view cluster_name) {
     ENVOY_LOG(trace,
               "cm cdm: starting processing cluster name {} (status {}) from cluster lifecycle "
               "callback in {}",

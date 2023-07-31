@@ -1705,8 +1705,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
   auto entry = thread_local_clusters_.find(name);
   // The if should only be possible if deferred cluster creation is enabled.
   if (entry == thread_local_clusters_.end()) {
-    ASSERT(parent_.deferred_cluster_creation_,
-           "Cannot find ThreadLocalCluster, but deferred cluster creation is disabled.");
+    ASSERT(
+        parent_.deferred_cluster_creation_,
+        fmt::format("Cannot find ThreadLocalCluster {}, but deferred cluster creation is disabled.",
+                    name));
     ASSERT(thread_local_deferred_clusters_.find(name) != thread_local_deferred_clusters_.end(),
            "Cluster with removed host is neither deferred or inflated!");
     return;
