@@ -361,6 +361,7 @@ envoy_sh_test(
         "//conditions:default": ["hotrestart_test.sh"],
     }),
     cc_binary = [":hotrestart_main"],
+    coverage = False,
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
