@@ -107,7 +107,7 @@ genrule(
         --build_file=$(location //tools/type_whisperer:api_build_file) \
         --protoprinted=$(location //tools/protoprint:protoprinted) \
     """,
-    exec_tools = [
+    tools = [
         ":format_api",
         ":xformed",
         "//tools/type_whisperer:api_build_file",
