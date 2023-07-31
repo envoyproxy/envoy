@@ -183,6 +183,13 @@ void SslSocket::resumeHandshake() {
 Network::Connection& SslSocket::connection() const { return callbacks_->connection(); }
 
 void SslSocket::onSuccess(SSL* ssl) {
+  if (SSL_is_server(ssl) && SSL_session_reused(ssl) &&
+      SSL_get_verify_mode(ssl) != SSL_VERIFY_NONE) {
+    // SSL_CTX_set_reverify_on_resume() is not respected for servers. Invoke the verify callback
+    // directly here in order to populate the certificate validation status.
+    uint8_t unused_alert;
+    ContextImpl::customVerifyCallback(ssl, &unused_alert);
+  }
   ctx_->logHandshake(ssl);
   if (callbacks_->connection().streamInfo().upstreamInfo()) {
     callbacks_->connection()

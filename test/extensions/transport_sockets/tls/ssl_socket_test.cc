@@ -3453,6 +3453,26 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
 namespace {
 
+/**
+ * Verifies additional SSL connection info expectations.
+ */
+class SslExpectations {
+public:
+  SslExpectations& setExpectedPeerCertificateValidated(bool expected_peer_certificate_validated) {
+    expected_peer_certificate_validated_ = expected_peer_certificate_validated;
+    return *this;
+  }
+
+  void verify(const Ssl::ConnectionInfoConstSharedPtr ssl) const {
+    if (expected_peer_certificate_validated_.has_value()) {
+      EXPECT_EQ(expected_peer_certificate_validated_.value(), ssl->peerCertificateValidated());
+    }
+  }
+
+private:
+  absl::optional<bool> expected_peer_certificate_validated_{};
+};
+
 // Test connecting with a client to server1, then trying to reuse the session on server2
 void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::vector<std::string>& server_names1,
@@ -3460,7 +3480,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::vector<std::string>& server_names2,
                                  const std::string& client_ctx_yaml, bool expect_reuse,
                                  const Network::Address::IpVersion ip_version,
-                                 const uint32_t expected_lifetime_hint = 0) {
+                                 const uint32_t expected_lifetime_hint = 0,
+                                 const SslExpectations& server_expectations = {}) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
 
@@ -3584,7 +3605,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   // first, so always wait until both have happened.
   size_t connect_count = 0;
   auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
-                              expect_reuse]() {
+                              expect_reuse, &server_expectations]() {
     connect_count++;
     if (connect_count == 2) {
       if (expect_reuse) {
@@ -3593,6 +3614,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       } else {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
       }
+      server_expectations.verify(server_connection->ssl());
       client_connection->close(Network::ConnectionCloseType::NoFlush);
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       dispatcher->exit();
@@ -3767,8 +3789,10 @@ TEST_P(SslSocketTest, TicketSessionResumptionWithClientCA) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
 )EOF";
 
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(true);
+
   testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
-                              version_);
+                              version_, 0, server_expectations);
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionRotateKey) {
@@ -3922,10 +3946,12 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentVerifyCertHash) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
 )EOF";
 
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(true);
+
   testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml1, {}, client_ctx_yaml, true,
-                              version_);
+                              version_, 0, server_expectations);
   testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, false,
-                              version_);
+                              version_, 0, server_expectations);
 }
 
 // Sessions cannot be resumed even though the server certificates are the same,
@@ -3975,10 +4001,12 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentVerifyCertSpki) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
 )EOF";
 
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(true);
+
   testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml1, {}, client_ctx_yaml, true,
-                              version_);
+                              version_, 0, server_expectations);
   testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, false,
-                              version_);
+                              version_, 0, server_expectations);
 }
 
 // Sessions cannot be resumed even though the server certificates are the same,
@@ -4027,10 +4055,12 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentMatchSAN) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
 )EOF";
 
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(true);
+
   testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml1, {}, client_ctx_yaml, true,
-                              version_);
+                              version_, 0, server_expectations);
   testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, false,
-                              version_);
+                              version_, 0, server_expectations);
 }
 
 // Sessions can be resumed because the server certificates are different but the CN/SANs and
@@ -4136,6 +4166,97 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
 
   testTicketSessionResumption(server_ctx_yaml1, {}, server_ctx_yaml2, {}, client_ctx_yaml, false,
                               version_);
+}
+
+TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedNoClientCertificate) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+)EOF";
+
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(false);
+
+  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
+                              version_, 0, server_expectations);
+}
+
+TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedInvalidClientCertificate) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(false);
+
+  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
+                              version_, 0, server_expectations);
+}
+
+TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedValidClientCertificate) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+)EOF";
+
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(true);
+
+  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
+                              version_, 0, server_expectations);
 }
 
 TEST_P(SslSocketTest, StatelessSessionResumptionDisabled) {

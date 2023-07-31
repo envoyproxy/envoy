@@ -102,6 +102,7 @@ public:
 
 protected:
   friend class ContextImplPeer;
+  friend class SslSocket;
 
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);
