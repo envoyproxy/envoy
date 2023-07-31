@@ -1162,7 +1162,6 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   for (auto& per_priority : params.per_priority_update_params_) {
     const auto& host_set =
         cm_cluster.cluster().prioritySet().hostSetsPerPriority()[per_priority.priority_];
-    // These are provided by the host_set -- how does this change?
     per_priority.update_hosts_params_ = HostSetImpl::updateHostsParams(*host_set);
     per_priority.locality_weights_ = host_set->localityWeights();
     per_priority.weighted_priority_health_ = host_set->weightedPriorityHealth();
@@ -1197,8 +1196,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
       // Invoke similar logic of onClusterAddOrUpdate.
       ThreadLocalClusterCommand command = [&cluster_manager,
                                            cluster_name = info->name()]() -> ThreadLocalCluster& {
-        ASSERT(cluster_manager->initializeClusterInlineIfExists(cluster_name) != nullptr);
-        return *cluster_manager->thread_local_clusters_[cluster_name];
+        auto* cluster_entry = cluster_manager->initializeClusterInlineIfExists(cluster_name);
+        ASSERT(cluster_entry != nullptr);
+        return *cluster_entry;
       };
       for (auto cb_it = cluster_manager->update_callbacks_.begin();
            cb_it != cluster_manager->update_callbacks_.end();) {
