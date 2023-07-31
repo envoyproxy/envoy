@@ -1110,7 +1110,7 @@ typed_config:
 
   for (const auto& [flag_strings, response_flag] :
        StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
-    UNREFERENCED_PARAMETER(flag_strings.short_string_);
+    UNREFERENCED_PARAMETER(flag_strings);
 
     TestStreamInfo stream_info(time_source_);
     stream_info.setResponseFlag(response_flag);
