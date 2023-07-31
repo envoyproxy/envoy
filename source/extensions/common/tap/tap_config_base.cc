@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/matcher/matcher.h"
 
@@ -85,6 +86,17 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   case ProtoOutputSink::OutputSinkTypeCase::kFilePerTap:
     sink_ = std::make_unique<FilePerTapSink>(sinks[0].file_per_tap());
     sink_to_use_ = sink_.get();
+    break;
+  case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kCustomSink:
+    auto* tap_sink_factory =
+        Envoy::Config::Utility::getFactory<TapSinkFactory>(sinks[0].custom_sink());
+    // TapSinkFactory* const tap_sink_factory =
+    //     Registry::FactoryRegistry<TapSinkFactory>::getFactory(sinks[0].custom_sink().typed_config().type_url());
+    // auto config =
+    // Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(), NULL,
+    // tap_sink_factory);
+    tap_sink_factory.createSinkPtr(sinks[0].custom_sink());
+    PANIC("not implemented");
     break;
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc:
     PANIC("not implemented");

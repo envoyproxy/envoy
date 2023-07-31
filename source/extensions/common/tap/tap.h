@@ -78,6 +78,22 @@ public:
 using SinkPtr = std::unique_ptr<Sink>;
 
 /**
+ * Abstract tap sink factory. Produces a factory that can instantiate SinkPtr objects
+ */
+class TapSinkFactory {
+public:
+  virtual ~TapSinkFactory() = default;
+
+  /**
+   * @return a new tap SinkPtr
+   */
+  virtual SinkPtr createSinkPtr(const Protobuf::Message& config,
+                                Server::Configuration::FactoryContext& context) PURE;
+};
+
+using TapSinkFactoryPtr = std::unique_ptr<TapSinkFactory>;
+
+/**
  * Generic configuration for a tap extension (filter, transport socket, etc.).
  */
 class ExtensionConfig {
