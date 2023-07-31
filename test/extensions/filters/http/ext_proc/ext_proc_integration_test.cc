@@ -976,6 +976,34 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
   EXPECT_EQ("Hello, World!", response->body());
 }
 
+TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndUpdateContentLengthOnResponse) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  // Should get just one message with the body
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
+        auto* header_add = header_mut->add_set_headers();
+
+        header_add->mutable_header()->set_key("content-length");
+        header_add->mutable_header()->set_value("13");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(response->headers().getContentLengthValue(), "13");
+  EXPECT_EQ("Hello, World!", response->body());
+}
+
 // Test the filter with a response body callback enabled that uses
 // partial buffering. We should still be able to change headers.
 TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered) {

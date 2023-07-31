@@ -228,10 +228,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       if (common_response.has_body_mutation()) {
         ENVOY_LOG(debug, "Applying body response to buffered data. State = {}",
                   static_cast<int>(callback_state_));
-        // if (headers_ != nullptr) {
-        //   // Always reset the content length here to prevent later problems.
-        //   headers_->removeContentLength();
-        // }
         modifyBufferedData([&common_response](Buffer::Instance& data) {
           MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
         });
