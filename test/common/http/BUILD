@@ -238,6 +238,7 @@ envoy_cc_test_library(
         "//source/common/http:context_lib",
         "//source/common/tracing:custom_tag_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",

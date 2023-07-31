@@ -45,6 +45,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "config_overrides",
+    hdrs = [
+        "config_overrides.h",
+    ],
+    visibility = [
+        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
+    ],
+    deps = [
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "path_normalizer",
     srcs = [
         "path_normalizer.cc",
@@ -58,6 +71,7 @@ envoy_cc_library(
     ],
     deps = [
         ":character_tables",
+        ":config_overrides",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//source/common/http:header_utility_lib",
@@ -76,7 +90,7 @@ envoy_cc_library(
         "http1_header_validator.h",
     ],
     visibility = [
-        "//test/common/http/http1:__subpackages__",
+        "//test/common/http:__subpackages__",
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
     ],
     deps = [
@@ -133,6 +147,7 @@ envoy_cc_library(
         ":http1_header_validator",
         ":http2_header_validator",
         "//envoy/http:header_validator_interface",
+        "//envoy/server:factory_context_interface",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )

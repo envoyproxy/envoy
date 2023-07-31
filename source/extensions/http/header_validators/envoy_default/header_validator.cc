@@ -4,6 +4,7 @@
 
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/path_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
@@ -46,14 +47,17 @@ constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithBackSlashAllowed = {
 
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
+using ::Envoy::Http::PathUtil;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                 ::Envoy::Http::HeaderValidatorStats& stats)
-    : config_(config), protocol_(protocol), header_values_(::Envoy::Http::Headers::get()),
-      stats_(stats), path_normalizer_(config) {}
+                                 ::Envoy::Http::HeaderValidatorStats& stats,
+                                 const ConfigOverrides& config_overrides)
+    : config_(config), protocol_(protocol), config_overrides_(config_overrides),
+      header_values_(::Envoy::Http::Headers::get()), stats_(stats),
+      path_normalizer_(config, config_overrides) {}
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateMethodHeader(const HeaderString& value) {
@@ -582,6 +586,39 @@ void HeaderValidator::sanitizePathWithFragment(::Envoy::Http::RequestHeaderMap& 
     // Check runtime override and throw away fragment from URI path
     header_map.setPath(header_map.getPathValue().substr(0, fragment_pos));
   }
+}
+
+PathNormalizer::PathNormalizationResult
+HeaderValidator::sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_map) {
+  if (!header_map.Path()) {
+    return PathNormalizer::PathNormalizationResult::success();
+  }
+  const auto escaped_slashes_action =
+      config_.uri_path_normalization_options().path_with_escaped_slashes_action();
+
+  if (escaped_slashes_action ==
+      HeaderValidatorConfig::UriPathNormalizationOptions::KEEP_UNCHANGED) {
+    return PathNormalizer::PathNormalizationResult::success();
+  }
+  // When path normalization is enabled decoding of slashes is done as part of the normalization
+  // function for performance.
+  auto escaped_slashes_result = PathUtil::unescapeSlashes(header_map);
+  if (escaped_slashes_result != PathUtil::UnescapeSlashesResult::FoundAndUnescaped) {
+    return PathNormalizer::PathNormalizationResult::success();
+  }
+  if (escaped_slashes_action ==
+      HeaderValidatorConfig::UriPathNormalizationOptions::REJECT_REQUEST) {
+    return {PathNormalizer::PathNormalizationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EscapedSlashesInPath};
+  } else if (escaped_slashes_action ==
+             HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_REDIRECT) {
+    return {PathNormalizer::PathNormalizationResult::Action::Redirect,
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+  } else {
+    ASSERT(escaped_slashes_action ==
+           HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_FORWARD);
+  }
+  return PathNormalizer::PathNormalizationResult::success();
 }
 
 } // namespace EnvoyDefault

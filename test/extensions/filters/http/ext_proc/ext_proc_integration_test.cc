@@ -1038,9 +1038,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersAndTrailersOnResponse) {
   EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-modified-trailers", "xxx"));
 }
 
-// Test the filter using a configuration that processes response trailers, and process an upstream
-// response that has no trailers, so add them.
-TEST_P(ExtProcIntegrationTest, AddTrailersOnResponse) {
+// Test the filter using a configuration that sends response headers and trailers,
+// and process an upstream response that has no trailers.
+TEST_P(ExtProcIntegrationTest, NoTrailersOnResponseWithModeSendHeaderTrailer) {
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -1048,31 +1048,22 @@ TEST_P(ExtProcIntegrationTest, AddTrailersOnResponse) {
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   handleUpstreamRequest();
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  processResponseTrailersMessage(*grpc_upstreams_[0], false,
-                                 [](const HttpTrailers&, TrailersResponse& resp) {
-                                   auto* trailer_mut = resp.mutable_header_mutation();
-                                   auto* trailer_add = trailer_mut->add_set_headers();
-                                   trailer_add->mutable_header()->set_key("x-modified-trailers");
-                                   trailer_add->mutable_header()->set_value("xxx");
-                                   return true;
-                                 });
 
   verifyDownstreamResponse(*response, 200);
-  ASSERT_TRUE(response->trailers());
-  EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-modified-trailers", "xxx"));
 }
 
-// Test the filter using a configuration that processes response trailers, and process an upstream
-// response that has no trailers, but when the time comes, don't actually add anything.
-TEST_P(ExtProcIntegrationTest, AddTrailersOnResponseJustKidding) {
+// Test the filter using a configuration that sends response body and trailers, and process
+// an upstream response that has no trailers.
+TEST_P(ExtProcIntegrationTest, NoTrailersOnResponseWithModeSendBodyTrailer) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   handleUpstreamRequest();
-  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -2680,6 +2671,39 @@ TEST_P(ExtProcIntegrationTest, HeaderMutationResultSizeFailWithResponseTrailer) 
   // Prior response headers have already been sent. The stream is reset.
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
+}
+
+// Test the case that client doesn't send trailer and the  ext_proc filter config
+// processing mode is set to send trailer.
+TEST_P(ExtProcIntegrationTest, ClientNoTrailerProcessingModeSendTrailer) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  // Client send data with end_stream set to true.
+  codec_client_->sendData(*request_encoder_, 10, true);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders& headers, HeadersResponse&) {
+                                 EXPECT_FALSE(headers.end_of_stream());
+                                 return true;
+                               });
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    return true;
+  });
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
 }
 
 } // namespace Envoy

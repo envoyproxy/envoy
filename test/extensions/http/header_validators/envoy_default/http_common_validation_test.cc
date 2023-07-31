@@ -28,12 +28,15 @@ protected:
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
     if (GetParam() == Protocol::Http11) {
-      return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+      return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                          overrides_);
     }
-    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_);
+    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_,
+                                                        overrides_);
   }
 
   TestScopedRuntime scoped_runtime_;
+  ConfigOverrides overrides_;
 };
 
 std::string protocolTestParamsToString(const ::testing::TestParamInfo<Protocol>& params) {
@@ -94,6 +97,74 @@ TEST_P(HttpCommonValidationTest, FragmentStrippedFromPathWhenConfigured) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   EXPECT_EQ(headers.path(), "/path/with?query=and");
+}
+
+TEST_P(HttpCommonValidationTest, ValidateRequestHeaderMapRedirectPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%2fdir2%5Cdir3%2F..%5Cdir4"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(redirect_encoded_slash_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  // Path normalization should result in redirect
+  auto result = uhv->transformRequestHeaders(headers);
+  EXPECT_EQ(
+      result.action(),
+      ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
+  EXPECT_EQ(result.details(), "uhv.path_normalization_redirect");
+  // By default decoded backslash (%5C) is converted to forward slash.
+  EXPECT_EQ(headers.path(), "/dir1/dir2/dir4");
+}
+
+TEST_P(HttpCommonValidationTest, ValidateRequestHeadersNoPathNormalization) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%2fdir2%5C.."},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(no_path_normalization);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  auto result = uhv->transformRequestHeaders(headers);
+  // Even with path normalization tuned off, the path_with_escaped_slashes_action option
+  // still takes effect.
+  EXPECT_EQ(
+      result.action(),
+      ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
+  EXPECT_EQ(headers.path(), "/dir1/dir2\\..");
+}
+
+TEST_P(HttpCommonValidationTest, NoPathNormalizationNoSlashDecoding) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%2Fdir2%5cdir3"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(no_path_normalization_no_decoding_slashes);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  auto result = uhv->transformRequestHeaders(headers);
+  EXPECT_ACCEPT(result);
+  EXPECT_EQ(headers.path(), "/dir1%2Fdir2%5cdir3");
+}
+
+TEST_P(HttpCommonValidationTest, NoPathNormalizationDecodeSlashesAndForward) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%2Fdir2%5c../dir3"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(decode_slashes_and_forward);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  auto result = uhv->transformRequestHeaders(headers);
+  EXPECT_ACCEPT(result);
+  EXPECT_EQ(headers.path(), "/dir1/dir2\\../dir3");
+}
+
+TEST_P(HttpCommonValidationTest, RejectEncodedSlashes) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%2Fdir2%5c../dir3"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(reject_encoded_slashes);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers),
+                             "uhv.escaped_slashes_in_url_path");
 }
 
 } // namespace

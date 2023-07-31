@@ -32,7 +32,7 @@ const static bool should_log = false;
 const static bool should_log = true;
 #endif
 
-// TODO: find out a way for extensions to register new logger IDs
+// TODO: find a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
   FUNCTION(alternate_protocols_cache)                                                              \

@@ -100,8 +100,7 @@ TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreserved) {
 // Without the `uhv_preserve_url_encoded_case` override UHV changes all percent encoded
 // sequences to use uppercase characters.
 TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreservedWithUhvOverride) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.uhv_preserve_url_encoded_case",
-                                    "false");
+  config_helper_.addRuntimeOverride("envoy.uhv.preserve_url_encoded_case", "false");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });

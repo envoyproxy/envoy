@@ -46,8 +46,9 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  *
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stats),
+                                           ::Envoy::Http::HeaderValidatorStats& stats,
+                                           const ConfigOverrides& config_overrides)
+    : HeaderValidator(config, protocol, stats, config_overrides),
       request_header_validator_map_{
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
           {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
@@ -433,6 +434,13 @@ ServerHttp2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeader
     auto path_result = path_normalizer_.normalizePathUri(header_map);
     if (!path_result.ok()) {
       return path_result;
+    }
+  } else {
+    // Path normalization includes sanitization of encoded slashes for performance reasons.
+    // If normalization is disabled, sanitize encoded slashes here
+    auto result = sanitizeEncodedSlashes(header_map);
+    if (!result.ok()) {
+      return result;
     }
   }
 
