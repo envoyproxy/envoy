@@ -191,16 +191,16 @@ extern void envoyGoFilterOnDownstreamEvent(void* f,
 
 // go:linkname envoyGoFilterOnUpstreamConnectionReady
 // github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnUpstreamConnectionReady
-extern void envoyGoFilterOnUpstreamConnectionReady(
-    void* f,
-    GoUint64 envoyConnID, // NOLINT(readability-identifier-naming)
-    GoUint64 configID);   // NOLINT(readability-identifier-naming)
+extern void
+envoyGoFilterOnUpstreamConnectionReady(void* f,
+                                       GoUint64 connID); // NOLINT(readability-identifier-naming)
 
 // go:linkname envoyGoFilterOnUpstreamConnectionFailure
 // github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnUpstreamConnectionFailure
 extern void
 envoyGoFilterOnUpstreamConnectionFailure(void* f,
-                                         GoInt reason); // NOLINT(readability-identifier-naming)
+                                         GoInt reason,     // NOLINT(readability-identifier-naming)
+                                         GoUint64 connID); // NOLINT(readability-identifier-naming)
 
 // go:linkname envoyGoFilterOnUpstreamData
 // github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnUpstreamData
