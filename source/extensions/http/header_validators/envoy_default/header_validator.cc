@@ -53,9 +53,11 @@ using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                 ::Envoy::Http::HeaderValidatorStats& stats)
-    : config_(config), protocol_(protocol), header_values_(::Envoy::Http::Headers::get()),
-      stats_(stats), path_normalizer_(config) {}
+                                 ::Envoy::Http::HeaderValidatorStats& stats,
+                                 const ConfigOverrides& config_overrides)
+    : config_(config), protocol_(protocol), config_overrides_(config_overrides),
+      header_values_(::Envoy::Http::Headers::get()), stats_(stats),
+      path_normalizer_(config, config_overrides) {}
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateMethodHeader(const HeaderString& value) {
