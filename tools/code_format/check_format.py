@@ -39,11 +39,6 @@ class FormatConfig:
         return paths.get_buildifier()
 
     @cached_property
-    def buildozer_path(self) -> str:
-        """Path to the buildozer binary."""
-        return paths.get_buildozer()
-
-    @cached_property
     def clang_format_path(self) -> str:
         """Path to the clang-format binary."""
         return os.getenv("CLANG_FORMAT", "clang-format-14")
@@ -210,7 +205,7 @@ class FormatChecker:
         st = os.stat(os.path.expandvars(executable))
         return bool(st.st_mode & stat.S_IXOTH)
 
-    # Check whether all needed external tools (clang-format, buildifier, buildozer) are
+    # Check whether all needed external tools (clang-format, buildifier) are
     # available.
     def check_tools(self):
         error_messages = []
@@ -256,7 +251,6 @@ class FormatChecker:
                         path, name, var, var, name, name, name))
 
         check_bazel_tool('buildifier', self.config.buildifier_path, 'BUILDIFIER_BIN')
-        check_bazel_tool('buildozer', self.config.buildozer_path, 'BUILDOZER_BIN')
 
         return error_messages
 
