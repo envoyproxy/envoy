@@ -110,8 +110,8 @@ genrule(
     tools = [
         ":format_api",
         ":xformed",
-        "//tools/type_whisperer:api_build_file",
         "//tools/protoprint:protoprinted",
+        "//tools/type_whisperer:api_build_file",
     ],
 )
 
