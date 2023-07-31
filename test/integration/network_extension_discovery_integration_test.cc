@@ -366,6 +366,9 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
     tcp_client->waitForDisconnect();
   }
 
+  // The extension_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.network_extension_config_missing", 1);
+
   // Reinstate the configuration.
   sendXdsResponse(filter_name_, "1", 3);
   test_server_->waitForCounterGe(
@@ -432,6 +435,9 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   if (result) {
     tcp_client->waitForDisconnect();
   }
+
+  // The extension_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.network_extension_config_missing", 1);
 }
 
 TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
@@ -600,6 +606,9 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEnd
   if (result) {
     tcp_client->waitForDisconnect();
   }
+
+  // The extension_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.network_extension_config_missing", 1);
 }
 
 // Basic ECDS config dump test with one filter.

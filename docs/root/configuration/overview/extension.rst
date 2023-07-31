@@ -88,3 +88,4 @@ configuration, rooted at listener.<address> (or listener.<stat_prefix>. if stat_
   :widths: 1, 1, 2
 
   extension_config_missing, Counter, Total connections closed due to missing listener filter extension configuration
+  network_extension_config_missing, Counter, Total connections closed due to missing network filter extension configuration
