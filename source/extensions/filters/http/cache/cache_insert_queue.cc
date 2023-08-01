@@ -136,9 +136,9 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
       if (watermarked_ && encoder_callbacks_.has_value()) {
         encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
       }
-      abort_callback_();
       chunks_.clear();
       self_ownership_.reset();
+      abort_callback_();
       return;
     }
     if (end_stream) {
