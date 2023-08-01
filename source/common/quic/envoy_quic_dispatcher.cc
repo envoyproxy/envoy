@@ -167,9 +167,13 @@ void EnvoyQuicDispatcher::updateListenerConfig(Network::ListenerConfig& new_list
 
 void EnvoyQuicDispatcher::onHotRestarting(uint32_t worker_index,
                                           Network::HotRestartPacketForwardingFunction fn) {
-  hot_restart_forward_packet_ = [worker_index, fn](const Network::UdpRecvData& packet) {
-    fn(worker_index, packet);
-  };
+  if (fn) {
+    hot_restart_forward_packet_ = [worker_index, fn](const Network::UdpRecvData& packet) {
+      fn(worker_index, packet);
+    };
+  } else {
+    hot_restart_forward_packet_ = nullptr;
+  }
 }
 
 } // namespace Quic

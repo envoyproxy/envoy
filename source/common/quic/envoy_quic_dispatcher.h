@@ -78,6 +78,8 @@ public:
   // Registers a function to intercept new connections. This can be called on the parent
   // instance during hot restart to facilitate passing new connections to the new instance,
   // while continuing to handle established, draining connections on the old instance.
+  //
+  // May be passed a nullptr function to reset to default behavior.
   void onHotRestarting(uint32_t worker_index, Network::HotRestartPacketForwardingFunction fn);
 
 protected:
