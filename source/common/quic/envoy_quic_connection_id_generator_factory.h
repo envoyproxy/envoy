@@ -41,9 +41,8 @@ public:
   /**
    * Returns a function to retrieve the worker index associated with a QUIC packet; the same
    * principle as the BPF program above, but for contexts where BPF is unavailable.
-   * @param concurrency the total number of worker threads.
    */
-  virtual QuicConnectionIdWorkerSelector connectionIdWorkerSelector() PURE;
+  virtual QuicConnectionIdWorkerSelector getCompatibleConnectionIdWorkerSelector() PURE;
 };
 
 using EnvoyQuicConnectionIdGeneratorFactoryPtr =

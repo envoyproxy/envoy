@@ -86,7 +86,7 @@ class EnvoyDeterministicConnectionIdGeneratorFactoryTest : public ::testing::Tes
 public:
   EnvoyDeterministicConnectionIdGeneratorFactoryTest() {
     EnvoyDeterministicConnectionIdGeneratorFactory factory;
-    worker_selector_ = factory.connectionIdWorkerSelector();
+    worker_selector_ = factory.getCompatibleConnectionIdWorkerSelector();
   }
 
 protected:

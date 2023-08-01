@@ -337,7 +337,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
       packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
       proof_source_factory_.value(),
       quic_cid_generator_factory_->createQuicConnectionIdGenerator(worker_index),
-      quic_cid_generator_factory_->connectionIdWorkerSelector());
+      quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector());
 }
 Network::ConnectionHandler::ActiveUdpListenerPtr
 ActiveQuicListenerFactory::createActiveQuicListener(
