@@ -7,28 +7,34 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-class CacheInsertChunk {
+// Representation of a piece of data to be sent to a cache for writing.
+class CacheInsertFragment {
 public:
-  // Sends a chunk to the cache.
+  // Sends a fragment to the cache.
   // on_complete is called when the cache completes the operation.
-  virtual void send(InsertContext& context,
-                    std::function<void(bool ready, bool end_stream, size_t sz)> on_complete) PURE;
+  virtual void
+  send(InsertContext& context,
+       std::function<void(bool cache_success, bool end_stream, size_t sz)> on_complete) PURE;
 
-  virtual ~CacheInsertChunk() = default;
+  virtual ~CacheInsertFragment() = default;
 };
 
-class CacheInsertChunkBody : public CacheInsertChunk {
+// A CacheInsertFragment containing some amount of http response body data.
+// The size of a fragment is equal to the size of the buffer arriving at
+// CacheFilter::encodeData.
+class CacheInsertFragmentBody : public CacheInsertFragment {
 public:
-  CacheInsertChunkBody(const Buffer::Instance& buffer, bool end_stream)
+  CacheInsertFragmentBody(const Buffer::Instance& buffer, bool end_stream)
       : buffer_(buffer), end_stream_(end_stream) {}
 
-  void send(InsertContext& context,
-            std::function<void(bool ready, bool end_stream, size_t sz)> on_complete) override {
+  void
+  send(InsertContext& context,
+       std::function<void(bool cache_success, bool end_stream, size_t sz)> on_complete) override {
     size_t sz = buffer_.length();
     context.insertBody(
         std::move(buffer_),
-        [on_complete, end_stream = end_stream_, sz](bool ready) {
-          on_complete(ready, end_stream, sz);
+        [on_complete, end_stream = end_stream_, sz](bool cache_success) {
+          on_complete(cache_success, end_stream, sz);
         },
         end_stream_);
   }
@@ -38,19 +44,22 @@ private:
   const bool end_stream_;
 };
 
-class CacheInsertChunkTrailers : public CacheInsertChunk {
+// A CacheInsertFragment containing the full trailers of the response.
+class CacheInsertFragmentTrailers : public CacheInsertFragment {
 public:
-  explicit CacheInsertChunkTrailers(const Http::ResponseTrailerMap& trailers)
+  explicit CacheInsertFragmentTrailers(const Http::ResponseTrailerMap& trailers)
       : trailers_(Http::ResponseTrailerMapImpl::create()) {
     Http::ResponseTrailerMapImpl::copyFrom(*trailers_, trailers);
   }
 
-  void send(InsertContext& context,
-            std::function<void(bool ready, bool end_stream, size_t sz)> on_complete) override {
+  void
+  send(InsertContext& context,
+       std::function<void(bool cache_success, bool end_stream, size_t sz)> on_complete) override {
     // While zero isn't technically true for the size of trailers, it doesn't
     // matter at this point because watermarks after the stream is complete
     // aren't useful.
-    context.insertTrailers(*trailers_, [on_complete](bool ready) { on_complete(ready, true, 0); });
+    context.insertTrailers(
+        *trailers_, [on_complete](bool cache_success) { on_complete(cache_success, true, 0); });
   }
 
 private:
@@ -66,25 +75,24 @@ CacheInsertQueue::CacheInsertQueue(Http::StreamEncoderFilterCallbacks& encoder_c
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                      const ResponseMetadata& metadata, bool end_stream) {
-  if (end_stream) {
-    end_stream_queued_ = true;
-  }
+  end_stream_queued_ = end_stream;
   // While zero isn't technically true for the size of headers, headers are
   // typically excluded from the stream buffer limit.
   insert_context_->insertHeaders(
       response_headers, metadata,
-      [this, end_stream](bool ready) { onChunkComplete(ready, end_stream, 0); }, end_stream);
-  chunk_in_flight_ = true;
+      [this, end_stream](bool cache_success) { onFragmentComplete(cache_success, end_stream, 0); },
+      end_stream);
+  fragment_in_flight_ = true;
 }
 
-void CacheInsertQueue::insertBody(const Buffer::Instance& chunk, bool end_stream) {
+void CacheInsertQueue::insertBody(const Buffer::Instance& fragment, bool end_stream) {
   if (end_stream) {
     end_stream_queued_ = true;
   }
-  if (chunk_in_flight_) {
-    size_t sz = chunk.length();
+  if (fragment_in_flight_) {
+    size_t sz = fragment.length();
     queue_size_bytes_ += sz;
-    chunks_.push_back(std::make_unique<CacheInsertChunkBody>(chunk, end_stream));
+    fragments_.push_back(std::make_unique<CacheInsertFragmentBody>(fragment, end_stream));
     if (!watermarked_ && queue_size_bytes_ > high_watermark_bytes_) {
       if (encoder_callbacks_.has_value()) {
         encoder_callbacks_.value().get().onEncoderFilterAboveWriteBufferHighWatermark();
@@ -93,30 +101,33 @@ void CacheInsertQueue::insertBody(const Buffer::Instance& chunk, bool end_stream
     }
   } else {
     insert_context_->insertBody(
-        Buffer::OwnedImpl(chunk),
-        [this, end_stream](bool ready) { onChunkComplete(ready, end_stream, 0); }, end_stream);
-    chunk_in_flight_ = true;
+        Buffer::OwnedImpl(fragment),
+        [this, end_stream](bool cache_success) {
+          onFragmentComplete(cache_success, end_stream, 0);
+        },
+        end_stream);
+    fragment_in_flight_ = true;
   }
 }
 
 void CacheInsertQueue::insertTrailers(const Http::ResponseTrailerMap& trailers) {
   end_stream_queued_ = true;
-  if (chunk_in_flight_) {
-    chunks_.push_back(std::make_unique<CacheInsertChunkTrailers>(trailers));
+  if (fragment_in_flight_) {
+    fragments_.push_back(std::make_unique<CacheInsertFragmentTrailers>(trailers));
   } else {
-    insert_context_->insertTrailers(trailers,
-                                    [this](bool ready) { onChunkComplete(ready, true, 0); });
-    chunk_in_flight_ = true;
+    insert_context_->insertTrailers(
+        trailers, [this](bool cache_success) { onFragmentComplete(cache_success, true, 0); });
+    fragment_in_flight_ = true;
   }
 }
 
-void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
+void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, size_t sz) {
   // If the cache implementation is asynchronous, this may be called from whatever
   // thread that cache implementation runs on. Therefore, we post it to the
   // dispatcher to be certain any callbacks and updates are called on the filter's
   // thread (and therefore we don't have to mutex-guard anything).
-  dispatcher_.post([this, ready, end_stream, sz]() {
-    chunk_in_flight_ = false;
+  dispatcher_.post([this, cache_success, end_stream, sz]() {
+    fragment_in_flight_ = false;
     if (aborting_) {
       // Parent filter was destroyed, so we can quit this operation.
       self_ownership_.reset();
@@ -130,40 +141,40 @@ void CacheInsertQueue::onChunkComplete(bool ready, bool end_stream, size_t sz) {
       }
       watermarked_ = false;
     }
-    if (!ready) {
+    if (!cache_success) {
       // canceled by cache; unwatermark if necessary, inform the filter if
       // it's still around, and delete the queue.
       if (watermarked_ && encoder_callbacks_.has_value()) {
         encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
       }
-      chunks_.clear();
+      fragments_.clear();
       self_ownership_.reset();
       abort_callback_();
       return;
     }
     if (end_stream) {
-      ASSERT(chunks_.empty(), "ending a stream with the queue not empty is a bug");
+      ASSERT(fragments_.empty(), "ending a stream with the queue not empty is a bug");
       ASSERT(!watermarked_, "being over the high watermark when the queue is empty makes no sense");
       self_ownership_.reset();
       return;
     }
-    if (!chunks_.empty()) {
-      // If there's more in the queue, push the next chunk to the cache.
-      auto chunk = std::move(chunks_.front());
-      chunks_.pop_front();
-      chunk_in_flight_ = true;
-      chunk->send(*insert_context_, [this](bool ready, bool end_stream, size_t sz) {
-        onChunkComplete(ready, end_stream, sz);
+    if (!fragments_.empty()) {
+      // If there's more in the queue, push the next fragment to the cache.
+      auto fragment = std::move(fragments_.front());
+      fragments_.pop_front();
+      fragment_in_flight_ = true;
+      fragment->send(*insert_context_, [this](bool cache_success, bool end_stream, size_t sz) {
+        onFragmentComplete(cache_success, end_stream, sz);
       });
     }
   });
 }
 
-void CacheInsertQueue::takeOwnershipOfYourself(std::unique_ptr<CacheInsertQueue> self) {
+void CacheInsertQueue::setSelfOwned(std::unique_ptr<CacheInsertQueue> self) {
   // Disable all the callbacks, they're going to have nowhere to go.
   abort_callback_ = []() {};
   encoder_callbacks_.reset();
-  if (chunks_.empty() && !chunk_in_flight_) {
+  if (fragments_.empty() && !fragment_in_flight_) {
     // If the queue is already empty we can just let it be destroyed immediately.
     return;
   }

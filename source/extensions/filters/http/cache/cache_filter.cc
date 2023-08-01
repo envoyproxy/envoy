@@ -43,7 +43,14 @@ void CacheFilter::onDestroy() {
     lookup_->onDestroy();
   }
   if (insert_queue_ != nullptr) {
-    insert_queue_->takeOwnershipOfYourself(std::move(insert_queue_));
+    // The filter can complete and be destroyed while there is still data being
+    // written to the cache. In this case the filter hands ownership of the
+    // queue to itself, which cancels all the callbacks to the filter, but allows
+    // the queue to complete any write operations before deleting itself.
+    //
+    // In the case that the queue is already empty, or in a state which cannot
+    // complete, setSelfOwned will provoke the queue to abort the write operation.
+    insert_queue_->setSelfOwned(std::move(insert_queue_));
     insert_queue_.reset();
   }
 }
@@ -138,8 +145,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     auto insert_context = cache_->makeInsertContext(std::move(lookup_), *encoder_callbacks_);
     if (insert_context != nullptr) {
       // The callbacks passed to CacheInsertQueue are all called through the dispatcher,
-      // so they're thread-safe, and onDestroy will prevent them from being called via
-      // giving the queue ownership of itself, so they're also filter-destruction-safe.
+      // so they're thread-safe. During CacheFilter::onDestroy the queue is given ownership
+      // of itself and all the callbacks are cancelled, so they are also filter-destruction-safe.
       insert_queue_ =
           std::make_unique<CacheInsertQueue>(*encoder_callbacks_, std::move(insert_context),
                                              // Cache aborted callback.

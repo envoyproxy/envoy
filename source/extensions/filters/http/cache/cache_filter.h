@@ -131,9 +131,10 @@ private:
   // being cancelled.
   InsertStatus insertStatus() const;
 
+  // insert_queue_ ownership may be passed to the queue itself during
+  // CacheFilter::onDestroy, allowing the insert queue to outlive the filter
+  // while the necessary cache write operations complete.
   std::unique_ptr<CacheInsertQueue> insert_queue_;
-  std::function<void(bool ready)> makeChunkCompleteCallback(bool end_stream);
-  std::function<void(bool ready, bool end_stream)> chunk_complete_callback_;
   TimeSource& time_source_;
   OptRef<HttpCache> cache_;
   LookupContextPtr lookup_;
