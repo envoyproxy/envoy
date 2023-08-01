@@ -5,10 +5,6 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: http3/quic
-  change: |
-    EnvoyQuicConnectionIdGeneratorFactory gained a new function ``connectionIdWorkerSelector``. Extensions
-    implementing this factory will need to have an implementation of this function added.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
