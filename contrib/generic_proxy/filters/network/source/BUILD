@@ -131,3 +131,16 @@ envoy_cc_library(
         "//envoy/upstream:thread_local_cluster_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "access_log_base_lib",
+    srcs = [
+        "access_log_base.cc",
+    ],
+    hdrs = [
+        "access_log_base.h",
+    ],
+    deps = [
+        "//envoy/access_log:access_log",
+    ]
+)

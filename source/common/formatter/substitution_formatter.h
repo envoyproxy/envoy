@@ -499,6 +499,7 @@ public:
 private:
   FieldExtractorPtr field_extractor_;
 
+public:
   using FieldExtractorLookupTbl =
       absl::flat_hash_map<absl::string_view,
                           std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
