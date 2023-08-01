@@ -127,7 +127,7 @@ class AggregateIntegrationTest
       public HttpIntegrationTest {
 public:
   AggregateIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, version_, config()),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam()), config()),
         deferred_cluster_creation_(std::get<1>(GetParam())) {
     use_lds_ = false;
   }
