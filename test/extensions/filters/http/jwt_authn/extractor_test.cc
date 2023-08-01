@@ -144,7 +144,7 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
 }
 
 // Test extracting JWT as Bearer token from the default header location: "Authorization" -
-// using an actual (correctly-formatted) JWT but token is invalid, like: GoodToken + " .jjjj"
+// using an actual (correctly-formatted) JWT but token is invalid, like: GoodToken + "\s.jjjj"
 // expected to get all token include characters after the space:
 TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWTEndedWithSpaceAndMoreCharachters) {
   std::string chars_after_space = ".jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj";
