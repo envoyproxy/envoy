@@ -187,4 +187,55 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsAllowed) {
   ASSERT_TRUE(response->waitForEndStream());
 }
 
+// Without the `envoy.uhv.reject_percent_00` override UHV rejects requests with the %00
+// sequence.
+TEST_P(DownstreamUhvIntegrationTest, RejectPercent00) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/path%00/to/something"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamUhvIntegrationTest, UhvAllowsPercent00WithOverride) {
+  config_helper_.addRuntimeOverride("envoy.uhv.reject_percent_00", "false");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/path%00/to/something"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+#ifdef ENVOY_ENABLE_UHV
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%00/to/something");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+#else
+  // In legacy mode %00 in URL path always causes request to be rejected
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+#endif
+}
+
 } // namespace Envoy

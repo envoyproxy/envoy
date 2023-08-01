@@ -177,6 +177,19 @@ protected:
   PathNormalizer::PathNormalizationResult
   sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_map);
 
+  /**
+   * Transform URL path according to configuration (i.e. apply path normalization).
+   */
+  PathNormalizer::PathNormalizationResult
+  transformUrlPath(::Envoy::Http::RequestHeaderMap& header_map);
+
+  /**
+   * Check for presence of %00 sequence based on configuration.
+   * Reject request if %00 sequence was found.
+   */
+  HeaderValueValidationResult
+  checkForPercent00InUrlPath(const ::Envoy::Http::RequestHeaderMap& header_map);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;
