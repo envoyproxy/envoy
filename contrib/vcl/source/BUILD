@@ -82,7 +82,7 @@ genrule(
         && find . -name "*.a" | xargs -I{} cp -a {} $$EXTERNAL_DIR \
         && find . -name "vppcom.h" | xargs -I{} cp -a {} $$EXTERNAL_DIR
     """,
-    exec_tools = [":build"],
+    tools = [":build"],
 )
 
 envoy_cc_library(
