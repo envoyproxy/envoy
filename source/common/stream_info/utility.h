@@ -87,7 +87,6 @@ public:
   constexpr static absl::string_view UPSTREAM_PROTOCOL_ERROR_FULL = "UpstreamProtocolError";
   constexpr static absl::string_view NO_CLUSTER_FOUND_FULL = "NoClusterFound";
   constexpr static absl::string_view OVERLOAD_MANAGER_FULL = "OverloadManagerTerminated";
-  constexpr static absl::string_view DNS_FAIL_FULL = "DnsResolutionFailed";
 
   static constexpr std::array ALL_RESPONSE_STRINGS_FLAGS{
       FlagStringsAndEnum{{FAILED_LOCAL_HEALTH_CHECK, FAILED_LOCAL_HEALTH_CHECK_FULL},
@@ -136,7 +135,6 @@ public:
                          ResponseFlag::UpstreamProtocolError},
       FlagStringsAndEnum{{NO_CLUSTER_FOUND, NO_CLUSTER_FOUND_FULL}, ResponseFlag::NoClusterFound},
       FlagStringsAndEnum{{OVERLOAD_MANAGER, OVERLOAD_MANAGER_FULL}, ResponseFlag::OverloadManager},
-      FlagStringsAndEnum{{DNS_FAIL, DNS_FAIL_FULL}, ResponseFlag::DnsResolutionFailed},
   };
 
 private:
