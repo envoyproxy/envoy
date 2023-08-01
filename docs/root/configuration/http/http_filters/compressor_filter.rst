@@ -57,14 +57,16 @@ By *default* request compression is disabled, but when enabled it will be *skipp
 
 - A request does **not** contain a ``content-type`` value that matches one of the selected
   mime-types, which default to the following:
-    - ``application/javascript``
-    - ``application/json``
-    - ``application/xhtml+xml``
-    - ``image/svg+xml``
-    - ``text/css``
-    - ``text/html``
-    - ``text/plain``
-    - ``text/xml``
+
+  - ``application/javascript``
+  - ``application/json``
+  - ``application/xhtml+xml``
+  - ``image/svg+xml``
+  - ``text/css``
+  - ``text/html``
+  - ``text/plain``
+  - ``text/xml``
+
 - A request does **not** contain a ``content-length`` header.
 - A request contains a ``content-encoding`` header.
 - A request contains a ``transfer-encoding`` header whose value includes a known
@@ -84,16 +86,18 @@ By *default* response compression is enabled, but it will be *skipped* when:
 - A response contains a ``cache-control```` header whose value includes ``no-transform``.
 - A response contains a ``transfer-encoding```` header whose value includes a known
   compression name.
-- A response does **not** contain a ``content-type```` value that matches one of the selected
+- A response does **not** contain a ``content-type`` value that matches one of the selected
   mime-types, which default to:
-    - ``application/javascript``
-    - ``application/json``
-    - ``application/xhtml+xml``
-    - ``image/svg+xml``
-    - ``text/css``
-    - ``text/html``
-    - ``text/plain``
-    - ``text/xml``
+
+  - ``application/javascript``
+  - ``application/json``
+  - ``application/xhtml+xml``
+  - ``image/svg+xml``
+  - ``text/css``
+  - ``text/html``
+  - ``text/plain``
+  - ``text/xml``
+
 - A response does **not** contain a ``content-length`` or ``transfer-encoding`` headers.
 - Response size is smaller than 30 bytes (only applicable when ``transfer-encoding``
   is not chunked).

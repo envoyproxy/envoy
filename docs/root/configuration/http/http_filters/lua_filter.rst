@@ -28,10 +28,10 @@ Currently supported high level features
 
 .. note::
 
-It is expected that this list will expand over time as the filter is used in production.
-The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
-safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
-API.
+  It is expected that this list will expand over time as the filter is used in production.
+  The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
+  safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
+  API.
 
 * Inspection of headers, body, and trailers while streaming in either the request flow, response
   flow, or both.
