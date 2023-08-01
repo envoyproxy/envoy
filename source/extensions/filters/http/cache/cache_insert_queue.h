@@ -39,9 +39,9 @@ private:
   bool watermarked_ = false;
   bool chunk_in_flight_ = false;
   // True if end_stream has been queued. If the queue gets handed ownership
-  // of itself before the end is in sight then it might as well quit since
+  // of itself before the end is in sight then it might as well abort since
   // it's not going to get a complete entry.
-  bool end_in_sight_ = false;
+  bool end_stream_queued_ = false;
   // If the filter was deleted while !end_in_sight, aborting_ is set to true;
   // when the next chunk completes (or cancels), the queue is destroyed.
   bool aborting_ = false;

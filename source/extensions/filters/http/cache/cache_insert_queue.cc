@@ -67,7 +67,7 @@ CacheInsertQueue::CacheInsertQueue(Http::StreamEncoderFilterCallbacks& encoder_c
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                      const ResponseMetadata& metadata, bool end_stream) {
   if (end_stream) {
-    end_in_sight_ = true;
+    end_stream_queued_ = true;
   }
   // While zero isn't technically true for the size of headers, headers are
   // typically excluded from the stream buffer limit.
@@ -79,7 +79,7 @@ void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_hea
 
 void CacheInsertQueue::insertBody(const Buffer::Instance& chunk, bool end_stream) {
   if (end_stream) {
-    end_in_sight_ = true;
+    end_stream_queued_ = true;
   }
   if (chunk_in_flight_) {
     size_t sz = chunk.length();
@@ -100,7 +100,7 @@ void CacheInsertQueue::insertBody(const Buffer::Instance& chunk, bool end_stream
 }
 
 void CacheInsertQueue::insertTrailers(const Http::ResponseTrailerMap& trailers) {
-  end_in_sight_ = true;
+  end_stream_queued_ = true;
   if (chunk_in_flight_) {
     chunks_.push_back(std::make_unique<CacheInsertChunkTrailers>(trailers));
   } else {
@@ -167,7 +167,7 @@ void CacheInsertQueue::takeOwnershipOfYourself(std::unique_ptr<CacheInsertQueue>
     // If the queue is already empty we can just let it be destroyed immediately.
     return;
   }
-  if (!end_in_sight_) {
+  if (!end_stream_queued_) {
     // If the queue can't be completed we can abort early but we need to wait for
     // any callback-in-flight to complete before destroying the queue.
     aborting_ = true;
