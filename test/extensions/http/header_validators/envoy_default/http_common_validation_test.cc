@@ -346,6 +346,28 @@ TEST_P(HttpCommonValidationTest, RejectEncodedSlashes) {
                              "uhv.escaped_slashes_in_url_path");
 }
 
+TEST_P(HttpCommonValidationTest, RejectPercent00ByDefault) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%00dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(empty_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers), "uhv.percent_00_in_url_path");
+}
+
+TEST_P(HttpCommonValidationTest, AllowPercent00WithOverride) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.reject_percent_00", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%00dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(empty_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(headers.path(), "/dir1%00dir2");
+}
+
 } // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators

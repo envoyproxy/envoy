@@ -364,21 +364,9 @@ ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeader
   sanitizeContentLength(header_map);
   sanitizeHeadersWithUnderscores(header_map);
   sanitizePathWithFragment(header_map);
-  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
-    auto path_result = path_normalizer_.normalizePathUri(header_map);
-    if (!path_result.ok()) {
-      return path_result;
-    }
-    if (config_overrides_.allow_non_compliant_characters_in_path_) {
-      encodeAdditionalCharactersInPath(header_map);
-    }
-  } else {
-    // Path normalization includes sanitization of encoded slashes for performance reasons.
-    // If normalization is disabled, sanitize encoded slashes here
-    auto result = sanitizeEncodedSlashes(header_map);
-    if (!result.ok()) {
-      return result;
-    }
+  auto path_result = transformUrlPath(header_map);
+  if (!path_result.ok()) {
+    return path_result;
   }
   return ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::success();
 }
