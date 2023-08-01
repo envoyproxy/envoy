@@ -825,9 +825,9 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
       const uint16_t tls_version = SSL_version(client_ssl_socket);
       if (SSL3_VERSION <= tls_version && tls_version <= TLS1_2_VERSION) {
-        // Prior to TLS 1.3, one should be able to resume the session. With TLS
-        // 1.3, tickets come after the handshake and the SSL_SESSION on the
-        // client is a dummy object.
+        // With TLS 1.3, the session returned by SSL_get_session() is a dummy
+        // object and is not resumable, even if the actual session is
+        // resumable.
         SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
         EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
       }
@@ -3473,6 +3473,12 @@ private:
   absl::optional<bool> expected_peer_certificate_validated_{};
 };
 
+static bssl::UniquePtr<SSL_SESSION> last_ssl_session;
+static int updateLastSslSession(SSL*, SSL_SESSION* session) {
+  last_ssl_session.reset(session);
+  return 1; // to indicate that we take ownership of the session
+}
+
 // Test connecting with a client to server1, then trying to reuse the session on server2
 void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::vector<std::string>& server_names1,
@@ -3531,16 +3537,28 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager,
                                             *client_stats_store.rootScope());
+  Network::TransportSocketPtr client_socket =
+      ssl_socket_factory.createTransportSocket(nullptr, nullptr);
+
+  // For TLS v1.3, we need to set a session callback in order to access a
+  // real session object. (And for this to work with TLS v1.2 as well, the
+  // session callback must be set before the handshake occurs.)
+  SSL* client_ssl = dynamic_cast<const SslSocket*>(client_socket.get())->rawSslForTest();
+  SSL_CTX_sess_set_new_cb(SSL_get_SSL_CTX(client_ssl), updateLastSslSession);
+
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket1->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+      std::move(client_socket), nullptr, nullptr);
+
+  std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
+  client_connection->addReadFilter(client_read_filter);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
-  SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_connection_callbacks1;
   StreamInfo::StreamInfoImpl stream_info(time_system, nullptr);
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -3551,26 +3569,44 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                 : server_ssl_socket_factory2;
         server_connection = dispatcher->createServerConnection(
             std::move(socket), tsf.createDownstreamTransportSocket(), stream_info);
+        server_connection->addConnectionCallbacks(server_connection_callbacks1);
+        // For TLS v1.3, we need to write some application data in order to
+        // flush the pending session tickets.
+        Buffer::OwnedImpl data("hello");
+        server_connection->write(data, false);
       }));
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        const SslHandshakerImpl* ssl_socket =
-            dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
-        ssl_session = SSL_get1_session(ssl_socket->ssl());
-        EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
-        if (expected_lifetime_hint) {
-          auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
-          EXPECT_TRUE(lifetime_hint <= expected_lifetime_hint);
-        }
+  EXPECT_CALL(*client_read_filter, onNewConnection())
+      .WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(server_connection_callbacks1, onEvent(Network::ConnectionEvent::Connected));
+
+  last_ssl_session.reset(nullptr);
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+
+  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> Network::FilterStatus {
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
-        dispatcher->exit();
+        return Network::FilterStatus::Continue;
       }));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+
+  EXPECT_CALL(server_connection_callbacks1, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher->exit(); }));
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
+
+  // Remove the session callback and take ownership of the last session.
+  SSL_CTX_sess_set_new_cb(SSL_get_SSL_CTX(client_ssl), nullptr);
+  SSL_SESSION* ssl_session = last_ssl_session.release();
+  ASSERT_TRUE(ssl_session != nullptr);
+
+  EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+  if (expected_lifetime_hint) {
+    auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
+    EXPECT_TRUE(lifetime_hint <= expected_lifetime_hint);
+  }
 
   EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
@@ -3586,7 +3622,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   client_connection->connect();
 
-  Network::MockConnectionCallbacks server_connection_callbacks;
+  Network::MockConnectionCallbacks server_connection_callbacks2;
   StreamInfo::StreamInfoImpl stream_info2(time_system, nullptr);
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -3597,7 +3633,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                 : server_ssl_socket_factory2;
         server_connection = dispatcher->createServerConnection(
             std::move(socket), tsf.createDownstreamTransportSocket(), stream_info2);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
+        server_connection->addConnectionCallbacks(server_connection_callbacks2);
       }));
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
@@ -3608,7 +3644,17 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                               expect_reuse, &server_expectations]() {
     connect_count++;
     if (connect_count == 2) {
-      if (expect_reuse) {
+      const SslHandshakerImpl* server_ssl_socket =
+          dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+      SSL* server_ssl = server_ssl_socket->ssl();
+
+      const SslHandshakerImpl* client_ssl_socket =
+          dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+      SSL* client_ssl = client_ssl_socket->ssl();
+
+      EXPECT_EQ(expect_reuse, SSL_session_reused(server_ssl));
+      EXPECT_EQ(expect_reuse, SSL_session_reused(client_ssl));
+      if (expect_reuse && SSL_version(server_ssl) <= TLS1_2_VERSION) {
         EXPECT_NE(EMPTY_STRING, server_connection->ssl()->sessionId());
         EXPECT_EQ(server_connection->ssl()->sessionId(), client_connection->ssl()->sessionId());
       } else {
@@ -3621,12 +3667,12 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
     }
   };
 
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+  EXPECT_CALL(server_connection_callbacks2, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_connection_callbacks2, onEvent(Network::ConnectionEvent::LocalClose));
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
 
@@ -4185,14 +4231,33 @@ TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedNoClientCertificate)
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
 )EOF";
 
-  const std::string client_ctx_yaml = R"EOF(
+  const std::string client_ctx_tls12_yaml = R"EOF(
   common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+)EOF";
+
+  const std::string client_ctx_tls13_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
 )EOF";
 
   auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(false);
 
-  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
-                              version_, 0, server_expectations);
+  {
+    SCOPED_TRACE("TLS v1.2");
+    testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_tls12_yaml,
+                                true, version_, 0, server_expectations);
+  }
+
+  {
+    SCOPED_TRACE("TLS v1.3");
+    testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_tls13_yaml,
+                                true, version_, 0, server_expectations);
+  }
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedInvalidClientCertificate) {
@@ -4212,19 +4277,43 @@ TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedInvalidClientCertifi
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
 )EOF";
 
-  const std::string client_ctx_yaml = R"EOF(
+  const std::string client_ctx_tls12_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
       certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+)EOF";
+
+  const std::string client_ctx_tls13_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
 )EOF";
 
   auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(false);
 
-  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
-                              version_, 0, server_expectations);
+  {
+    SCOPED_TRACE("TLS v1.2");
+    testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_tls12_yaml,
+                                true, version_, 0, server_expectations);
+  }
+
+  {
+    SCOPED_TRACE("TLS v1.3");
+    testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_tls13_yaml,
+                                true, version_, 0, server_expectations);
+  }
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedValidClientCertificate) {
@@ -4244,19 +4333,43 @@ TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedValidClientCertifica
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
 )EOF";
 
-  const std::string client_ctx_yaml = R"EOF(
+  const std::string client_ctx_tls12_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
       certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+)EOF";
+
+  const std::string client_ctx_tls13_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
 )EOF";
 
   auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(true);
 
-  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
-                              version_, 0, server_expectations);
+  {
+    SCOPED_TRACE("TLS v1.2");
+    testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_tls12_yaml,
+                                true, version_, 0, server_expectations);
+  }
+
+  {
+    SCOPED_TRACE("TLS v1.3");
+    testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_tls13_yaml,
+                                true, version_, 0, server_expectations);
+  }
 }
 
 TEST_P(SslSocketTest, StatelessSessionResumptionDisabled) {
