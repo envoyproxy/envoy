@@ -671,6 +671,9 @@ HeaderValidator::transformUrlPath(::Envoy::Http::RequestHeaderMap& header_map) {
     if (!percent_00_result.ok()) {
       return {PathNormalizer::PathNormalizationResult::Action::Reject, percent_00_result.details()};
     }
+    if (config_overrides_.allow_non_compliant_characters_in_path_) {
+      encodeAdditionalCharactersInPath(header_map);
+    }
   } else {
     // Path normalization includes sanitization of encoded slashes for performance reasons.
     // If normalization is disabled, sanitize encoded slashes here

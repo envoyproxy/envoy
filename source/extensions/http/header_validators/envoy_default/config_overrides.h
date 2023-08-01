@@ -14,7 +14,8 @@ struct ConfigOverrides {
       : reject_percent_00_(snapshot.getBoolean("envoy.uhv.reject_percent_00", true)),
         preserve_url_encoded_case_(
             snapshot.getBoolean("envoy.uhv.preserve_url_encoded_case", true)),
-        allow_non_compliant_characters_in_path_(snapshot.getBoolean("envoy.uhv.allow_non_compliant_characters_in_path", true)) {}
+        allow_non_compliant_characters_in_path_(
+            snapshot.getBoolean("envoy.uhv.allow_non_compliant_characters_in_path", true)) {}
 
   // This flag enables check for the %00 sequence in the URL path. If this sequence is
   // found request is rejected as invalid. This check requires path normalization to be
@@ -41,9 +42,9 @@ struct ConfigOverrides {
   // look for percent-encoded triplets.
   const bool preserve_url_encoded_case_{true};
 
-  // This flag enables validation of the :path header charcter set compatible with legacy Envoy codecs.
-  // When this flag is false header validator checks the URL path in accordance with
-  // the https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC.
+  // This flag enables validation of the :path header character set compatible with legacy Envoy
+  // codecs. When this flag is false header validator checks the URL path in accordance with the
+  // https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC.
   //
   // This option currently is `true` by default and can be overridden using the
   // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value. Note that the default value
@@ -55,10 +56,15 @@ struct ConfigOverrides {
   // HTTP/2 and HTTP/3 protocols: all characters allowed for HTTP/1, space, TAB, all extended ASCII
   // (>= 0x80)
   //
+  // NOTE: the " < > [ ] ^ ` { } \ | characters are not explicitly prohibited by the RFC-3986, they
+  // are just not part of any defined set. # is only allowed as a fragment separator. Extended
+  // ASCII, space, TAB are prohibited.
+  //
   // In addition when this flag is true AND path normalization is enabled, Envoy will do the
   // following:
-  // 1. all additionally allowed characters with the exception of the [] and \ characters are percent
-  // encoded in the path segment of the URL only. These characters in query or fragment will remain unencoded.
+  // 1. all additionally allowed characters with the exception of the [] and \ characters are
+  // percent encoded in the path segment of the URL only. These characters in query or fragment will
+  // remain unencoded.
   // 2. \ character is translated to / in path segment.
   //
   // This option provides backward compatibility with the existing (pre header validator) Envoy

@@ -483,7 +483,8 @@ TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormNotOptions) {
 }
 
 TEST_F(PathNormalizerTest, BackslashTranslatedToSlashByDefault) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path\\with/back\\/slash%5c?key=val\\ue"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "/path\\with/back\\/slash%5c?key=val\\ue"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);

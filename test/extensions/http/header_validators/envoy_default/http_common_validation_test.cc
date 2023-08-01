@@ -4,7 +4,8 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
-#include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
+#include "test/extensions/http/header_validators/envoy_default/header_validator_utils.h"
+#include "test/mocks/http/header_validator.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -21,7 +22,7 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 // This test suite runs the same tests against both H/1 and H/2 header validators.
-class HttpCommonValidationTest : public HeaderValidatorTest,
+class HttpCommonValidationTest : public HeaderValidatorUtils,
                                  public testing::TestWithParam<Protocol> {
 protected:
   ::Envoy::Http::ServerHeaderValidatorPtr createUhv(absl::string_view config_yaml) {
@@ -38,29 +39,7 @@ protected:
                                                         overrides);
   }
 
-  void validateAllCharacters(absl::string_view path,
-                             absl::string_view additionally_allowed_characters) {
-    auto uhv = createUhv(fragment_in_path_allowed);
-
-    for (uint32_t ascii = 0x0; ascii <= 0xff; ++ascii) {
-      std::string copy(path);
-      copy[12] = static_cast<char>(ascii);
-      HeaderString invalid_value{};
-      setHeaderStringUnvalidated(invalid_value, copy);
-      ::Envoy::Http::TestRequestHeaderMapImpl headers{
-          {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
-      headers.addViaMove(HeaderString(absl::string_view(":path")), std::move(invalid_value));
-      if (::Envoy::Http::testCharInTable(kPathHeaderCharTable, static_cast<char>(ascii)) ||
-          absl::StrContains(additionally_allowed_characters, static_cast<char>(ascii))) {
-        EXPECT_ACCEPT(uhv->validateRequestHeaders(headers)) << " for character " << static_cast<char>(ascii) << " " << ascii;
-      } else {
-        auto result = uhv->validateRequestHeaders(headers);
-        EXPECT_REJECT(result) << " for character " << static_cast<char>(ascii) << " "  << ascii;
-        EXPECT_EQ(result.details(), "uhv.invalid_url") << " for character " << static_cast<char>(ascii) << " "  << ascii;
-      }
-    }
-  }
-
+  ::testing::NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
   TestScopedRuntime scoped_runtime_;
 };
 
@@ -158,101 +137,23 @@ TEST_P(HttpCommonValidationTest, BackslashInPathIsRejectedWithOverride) {
 // rejected.
 TEST_P(HttpCommonValidationTest, PathCharacterSetValidation) {
   scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
+  auto uhv = createUhv(fragment_in_path_allowed);
   // ? and # start query and fragment
   // validateAllCharacters modifies 12th character in the `path` parameter
-  validateAllCharacters("/path/with/additional/characters", "?#");
+  validateAllCharactersInUrlPath(*uhv, "/path/with/additional/characters", "?#");
 }
 
 TEST_P(HttpCommonValidationTest, QueryCharacterSetValidation) {
   scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
   // # starts fragment
-  validateAllCharacters("/query?key=additional/characters", "?#");
+  auto uhv = createUhv(fragment_in_path_allowed);
+  validateAllCharactersInUrlPath(*uhv, "/query?key=additional/characters", "?#");
 }
 
 TEST_P(HttpCommonValidationTest, FragmentCharacterSetValidation) {
   scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
-  validateAllCharacters("/q?k=v#fragment/additional/characters", "?");
-}
-
-// The AdditionalCharacters* tests validate behavior with respect to allowing additional characters
-// in URL path common to all protocols. These characters are: "<>[]^`{}\| 
-TEST_P(HttpCommonValidationTest, AdditionalCharactersInPathAllowed) {
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
-  constexpr absl::string_view additionally_allowed_characters = R"str("<>[]^`{}\|)str";
-  validateAllCharacters("/path/with/additional/characters",
-                        absl::StrCat("?#", additionally_allowed_characters));
-
-  auto uhv = createUhv(empty_config);
-
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{
-      {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}, {":path",
-  absl::StrCat("/path/with", additionally_allowed_characters)}};
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  // Note that \ is translated to / and [] remain unencoded
-  EXPECT_EQ(headers.path(), "/path/with%22%3C%3E[]%5E%60%7B%7D/%7C");
-}
-
-TEST_P(HttpCommonValidationTest, AdditionalCharactersInPathAllowedWithoutPathNormalization) {
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
-  auto uhv = createUhv(no_path_normalization);
-
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{
-      {":scheme", "https"},
-      {":authority", "envoy.com"},
-      {":method", "GET"},
-      {":path", R"EOF(/some/path/with"<>[]^`{}\|/characters)EOF"}};
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  // Note that \ is translated to / and [] remain unencoded
-  EXPECT_EQ(headers.path(), "/some/path/with\"<>[]^`{}\\|/characters");
-}
-
-TEST_P(HttpCommonValidationTest, AdditionalCharactersInQueryAllowed) {
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
-  auto uhv = createUhv(empty_config);
-
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{
-      {":scheme", "https"},
-      {":authority", "envoy.com"},
-      {":method", "GET"},
-      {":path", R"EOF(/some/path/with?value="<>[]^`{}\|/characters)EOF"}};
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/some/path/with?value=\"<>[]^`{}\\|/characters");
-}
-
-TEST_P(HttpCommonValidationTest, AdditionalCharactersInFragmentAllowed) {
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
   auto uhv = createUhv(fragment_in_path_allowed);
-
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{
-      {":scheme", "https"},
-      {":authority", "envoy.com"},
-      {":method", "GET"},
-      {":path", R"EOF(/some/path/with?value=aaa#"<>[]^`{}\|/characters)EOF"}};
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/some/path/with?value=aaa");
-}
-
-// With the allow_non_compliant_characters_in_path set to false a request with URL path with the
-// "<>[]^`{}\| additional characters is rejected.
-TEST_P(HttpCommonValidationTest, AdditionalCharactersInPathRejected) {
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
-  auto uhv = createUhv(empty_config);
-  constexpr absl::string_view additional_characters = R"EOF("<>[]^`{}\|)EOF";
-
-  for (char c : additional_characters) {
-    std::string path("/path/with/additional/characters");
-    path[12] = c;
-    HeaderString invalid_value{};
-    setHeaderStringUnvalidated(invalid_value, path);
-    ::Envoy::Http::TestRequestHeaderMapImpl headers{
-        {":scheme", "https"}, {":authority", "envoy.com"}, {":method", "GET"}};
-    headers.addViaMove(HeaderString(absl::string_view(":path")), std::move(invalid_value));
-    EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
-  }
+  validateAllCharactersInUrlPath(*uhv, "/q?k=v#fragment/additional/characters", "?");
 }
 
 TEST_P(HttpCommonValidationTest, PathWithFragmentRejectedByDefault) {
