@@ -772,7 +772,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithR
   EXPECT_EQ(4, network_filter_config.bytes_to_drain());
 }
 
-TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyExistingConnection) {
+TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyToExistingConnection) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addFilterChain();
   addDynamicFilter(filter_name_, false);
@@ -788,6 +788,8 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyExistin
       "extension_config_discovery.network_filter." + filter_name_ + ".config_reload", 1);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   // Send 2nd config update to have filter drain 3 bytes of data.
   sendXdsResponse(filter_name_, "2", 3);
@@ -795,8 +797,6 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyExistin
       "extension_config_discovery.network_filter." + filter_name_ + ".config_reload", 2);
 
   ASSERT_TRUE(tcp_client->write(data_));
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string received_data;
   // Expect drained bytes to be 5 as the 2nd config update was performed after new connection
   // establishment.

@@ -82,7 +82,7 @@ void envoyGoFilterDownstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterDownstreamInfo(void* wrapper, int t, void* ret);
 
 // upstream
-void* envoyGoFilterUpstreamConnect(void* libraryID, void* addr);
+void* envoyGoFilterUpstreamConnect(void* libraryID, void* addr, unsigned long long int connID);
 CAPIStatus envoyGoFilterUpstreamWrite(void* wrapper, void* buffers, int buffersNum, int endStream);
 CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int closeType);
 void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);
