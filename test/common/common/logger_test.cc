@@ -473,6 +473,10 @@ public:
 
   void logMessageWithConnection() { ENVOY_CONN_LOG(info, "fake message {}", connection_, "val"); }
 
+  void logEventWithConnection() {
+    ENVOY_CONN_LOG_EVENT(info, "test_event", "fake message {}", connection_, "val");
+  }
+
   void logMessageWithStream() { ENVOY_STREAM_LOG(info, "fake message {}", stream_, "val"); }
 
   void logTaggedMessageWithConnection(std::map<std::string, std::string>& tags) {
@@ -558,6 +562,24 @@ TEST(TaggedLogTest, TestConnLog) {
 
   ClassForTaggedLog object;
   object.logMessageWithConnection();
+}
+
+TEST(TaggedLogTest, TestConnEventLog) {
+  Envoy::Logger::Registry::setLogFormat("%v");
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        // Using the mock connection write a log, skipping it.
+        EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"200\"] fake message val"));
+      }));
+
+  EXPECT_CALL(sink, logWithStableName("test_event", "info", "filter",
+                                      "[Tags: \"ConnectionId\":\"200\"] fake message val"));
+  ClassForTaggedLog object;
+  object.logEventWithConnection();
 }
 
 TEST(TaggedLogTest, TestTaggedStreamLog) {
