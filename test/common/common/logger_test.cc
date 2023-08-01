@@ -582,6 +582,33 @@ TEST(TaggedLogTest, TestConnEventLog) {
   object.logEventWithConnection();
 }
 
+TEST(TaggedLogTest, TestConnEventLogWithJsonFormat) {
+  ProtobufWkt::Struct log_struct;
+  (*log_struct.mutable_fields())["Level"].set_string_value("%l");
+  (*log_struct.mutable_fields())["Message"].set_string_value("%j");
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  EXPECT_TRUE(Envoy::Logger::Registry::setJsonLogFormat(log_struct).ok());
+  EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        // Using the mock connection write a log, skipping it.
+        EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
+        EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
+      }));
+
+  EXPECT_CALL(sink, logWithStableName("test_event", "info", "filter",
+                                      "[Tags: \"ConnectionId\":\"200\"] fake message val"));
+  ClassForTaggedLog object;
+  object.logEventWithConnection();
+}
+
 TEST(TaggedLogTest, TestTaggedStreamLog) {
   Envoy::Logger::Registry::setLogFormat("%v");
   MockLogSink sink(Envoy::Logger::Registry::getSink());
