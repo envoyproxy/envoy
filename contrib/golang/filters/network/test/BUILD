@@ -45,7 +45,6 @@ envoy_cc_test(
     deps = [
         "//contrib/golang/common/dso/test:dso_mocks",
         "//contrib/golang/filters/network/source:upstream",
-        "//source/common/network:filter_state_dst_address_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
