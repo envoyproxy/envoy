@@ -149,7 +149,7 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
 TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWTEndedWithSpaceAndMoreCharachters) {
   std::string chars_after_space = "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj";
   std::string concatenated = std::string(GoodToken) + " ." + chars_after_space;
-  constchar* valid_token_with_space_and_chars = concatenated.c_str();
+  const char* valid_token_with_space_and_chars = concatenated.c_str();
 
   autoheaders = TestRequestHeaderMapImpl{
       {absl::StrCat("Authorization"), absl::StrCat("Bearer ", valid_token_with_space_and_chars)}};
