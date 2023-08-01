@@ -6,6 +6,8 @@
 #include "envoy/tcp/conn_pool.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/network/filter_state_dst_address.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,6 +26,9 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
 
     SlotPtrContainer& slot_ptr_container = slotPtrContainer();
     slot_ptr_container.slot_ = tls.allocateSlot();
+
+    TimeSourceContainer& time_source_container = timeSourceContainer();
+    time_source_container.time_source_ = &context.timeSource();
 
     Thread::ThreadId main_thread_id = context.api().threadFactory().currentThreadId();
     slot_ptr_container.slot_->set(
@@ -53,8 +58,14 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
     ASSERT(!store.dispatchers_.empty());
     dispatcher_ = &store.dispatchers_[store.dispatcher_idx_++ % store.dispatchers_.size()].get();
   }
-  header_map_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
-      {{Http::Headers::get().EnvoyOriginalDstHost, addr}});
+  stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
+      *timeSourceContainer().time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info_->filterState()->setData(
+      Network::DestinationAddress::key(),
+      std::make_shared<Network::DestinationAddress>(
+          Network::Utility::parseInternetAddressAndPort(addr, false)),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
+      StreamInfo::StreamSharingMayImpactPooling::None);
 }
 
 void UpstreamConn::connect() {
