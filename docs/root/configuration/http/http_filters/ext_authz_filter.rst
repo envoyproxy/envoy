@@ -4,7 +4,7 @@ External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz``.
-* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
 
 The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
 HTTP request is authorized or not.
@@ -162,7 +162,7 @@ Statistics
 ----------
 .. _config_http_filters_ext_authz_stats:
 
-The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_authz.* namespace.
+The HTTP filter outputs statistics in the ``cluster.<route target cluster>.ext_authz.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
