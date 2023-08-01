@@ -120,5 +120,30 @@ static Registry::RegisterFactory<TestDrainerNetworkFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     drainer_register_;
 
+class TestDrainerUpstreamNetworkFilterConfigFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  std::string name() const override { return "envoy.test.test_drainer_upstream_network_filter"; }
+
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::CommonFactoryContext& context) override {
+    const auto& config = MessageUtil::downcastAndValidate<
+        const test::integration::filters::TestDrainerNetworkFilterConfig&>(
+        proto_config, context.messageValidationVisitor());
+    return [config](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<TestDrainerNetworkFilter>(config));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+};
+
+static Registry::RegisterFactory<TestDrainerUpstreamNetworkFilterConfigFactory,
+                                 Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
+    upstream_drainer_register_;
+
 } // namespace
 } // namespace Envoy
