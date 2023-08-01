@@ -579,3 +579,18 @@ envoy_pch_library(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "inline_map",
+    hdrs = [
+        "inline_map.h",
+    ],
+    external_deps = [
+        "abseil_node_hash_set",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/common:utility_lib",
+    ],
+)

@@ -328,7 +328,8 @@ void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
       .WillOnce(InvokeWithoutArgs([this]() {
         auto header_validator = std::make_unique<
             Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
-            header_validator_config_, Protocol::Http11, header_validator_stats_);
+            header_validator_config_, Protocol::Http11, header_validator_stats_,
+            header_validator_config_overrides_);
 
         return header_validator;
       }));
