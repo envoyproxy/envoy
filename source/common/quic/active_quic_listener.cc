@@ -47,6 +47,7 @@ ActiveQuicListener::ActiveQuicListener(
       connection_id_generator_(std::move(cid_generator)),
       select_connection_id_worker_(std::move(worker_selector)) {
   ASSERT(!GetQuicFlag(quic_header_size_limit_includes_overhead));
+  ASSERT(select_connection_id_worker_ != nullptr);
 
   enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
 
