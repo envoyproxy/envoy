@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: xds
+  change: |
+    Set the lower bound of :ref:`fill_rate <envoy_v3_api_field_config.core.v3.RateLimitSettings.fill_rate>`
+    to once per year. Values lower than once per year will automatically be set to that value.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
