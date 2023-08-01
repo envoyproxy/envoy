@@ -421,9 +421,9 @@ protected:
         LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
-    ClusterInfoConstSharedPtr cluster_info_;
-    LoadBalancerFactorySharedPtr load_balancer_factory_;
-    HostMapConstSharedPtr cross_priority_host_map_;
+    const ClusterInfoConstSharedPtr cluster_info_;
+    const LoadBalancerFactorySharedPtr load_balancer_factory_;
+    const HostMapConstSharedPtr cross_priority_host_map_;
   };
 
   using ClusterInitializationObjectConstSharedPtr =

@@ -1356,7 +1356,9 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
              "Cluster Initialization Object should apply hosts "
              "removed updates to hosts_added vector!");
 
-      // TODO(kbaichoo): replace with a more efficient algorithm
+      // TODO(kbaichoo): replace with a more efficient algorithm. For example
+      // if the EDS cluster exposed the LoadAssignment we could just merge by
+      // overwriting hosts_added.
       if (!update.hosts_removed_.empty()) {
         // Remove all hosts to be removed from the old host_added.
         auto& host_added = priority_state.hosts_added_;
@@ -1383,7 +1385,6 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
-  // No implications for CIO, this would just be drained...as such no issue?
   tls_.runOnAllThreads([host](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     cluster_manager->onHostHealthFailure(host);
   });
