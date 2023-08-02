@@ -15,11 +15,11 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
-#include "envoy/extensions/upstream/local_address_selector/v3/default_local_address_selector.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
@@ -332,8 +332,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
             *local_address_selector_config, false);
   } else {
     // Create the default local address selector if one was not specified.
-    envoy::extensions::upstream::local_address_selector::v3::DefaultLocalAddressSelector
-        default_config;
+    envoy::config::upstream::local_address_selector::v3::DefaultLocalAddressSelector default_config;
     envoy::config::core::v3::TypedExtensionConfig typed_extension;
     typed_extension.mutable_typed_config()->PackFrom(default_config);
     local_address_selector_factory =

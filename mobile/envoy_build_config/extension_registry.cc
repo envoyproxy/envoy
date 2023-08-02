@@ -36,7 +36,6 @@
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/config.h"
-#include "source/extensions/upstream/local_address_selector/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER

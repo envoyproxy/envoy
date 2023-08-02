@@ -1,4 +1,4 @@
-#include "source/extensions/upstream/local_address_selector/default_local_address_selector.h"
+#include "source/common/upstream/default_local_address_selector.h"
 
 #include <string>
 
@@ -9,6 +9,28 @@
 
 namespace Envoy {
 namespace Upstream {
+
+namespace {
+constexpr absl::string_view kDefaultLocalAddressSelectorName =
+    "envoy.upstream.local_address_selector.default_local_address_selector";
+
+Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
+    const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  Network::ConnectionSocket::OptionsSharedPtr connection_options =
+      std::make_shared<Network::ConnectionSocket::Options>();
+
+  if (options) {
+    *connection_options = *options;
+    Network::Socket::appendOptions(connection_options, local_address_options);
+  } else {
+    *connection_options = *local_address_options;
+  }
+
+  return connection_options;
+}
+
+} // namespace
 
 DefaultUpstreamLocalAddressSelector::DefaultUpstreamLocalAddressSelector(
     std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
@@ -77,21 +99,22 @@ UpstreamLocalAddress DefaultUpstreamLocalAddressSelector::getUpstreamLocalAddres
       combineConnectionSocketOptions(upstream_local_addresses_[0].socket_options_, socket_options)};
 }
 
-Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
-    const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  Network::ConnectionSocket::OptionsSharedPtr connection_options =
-      std::make_shared<Network::ConnectionSocket::Options>();
-
-  if (options) {
-    *connection_options = *options;
-    Network::Socket::appendOptions(connection_options, local_address_options);
-  } else {
-    *connection_options = *local_address_options;
-  }
-
-  return connection_options;
+std::string DefaultUpstreamLocalAddressSelectorFactory::name() const {
+  return std::string(kDefaultLocalAddressSelectorName);
 }
+
+UpstreamLocalAddressSelectorConstSharedPtr
+DefaultUpstreamLocalAddressSelectorFactory::createLocalAddressSelector(
+    std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
+    absl::optional<std::string> cluster_name) const {
+  return std::make_shared<DefaultUpstreamLocalAddressSelector>(upstream_local_addresses,
+                                                               cluster_name);
+}
+
+/**
+ * Static registration for the default local address selector. @see RegisterFactory.
+ */
+REGISTER_FACTORY(DefaultUpstreamLocalAddressSelectorFactory, UpstreamLocalAddressSelectorFactory);
 
 } // namespace Upstream
 } // namespace Envoy

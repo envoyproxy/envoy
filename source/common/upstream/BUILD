@@ -393,6 +393,7 @@ envoy_cc_library(
     srcs = ["upstream_impl.cc"],
     deps = [
         ":cluster_factory_lib",
+        ":default_local_address_selector",
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":upstream_includes",
@@ -401,9 +402,9 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "//source/common/stats:deferred_creation",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/upstream/local_address_selector/v3:pkg_cc_proto",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:dns_interface",
@@ -428,7 +429,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/server:transport_socket_config_lib",
-        "//source/extensions/upstream/local_address_selector:config",
     ],
 )
 
@@ -566,5 +566,27 @@ envoy_cc_library(
         "//envoy/init:manager_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "default_local_address_selector",
+    srcs = [
+        "default_local_address_selector.cc",
+    ],
+    hdrs = [
+        "default_local_address_selector.h",
+    ],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//envoy/network:socket_interface",
+        "//envoy/registry",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/network:resolver_lib",
+        "//source/common/network:socket_option_factory_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
 )

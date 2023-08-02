@@ -156,7 +156,6 @@ extensions/filters/common/original_src @klarose @mattklein123
 # Core upstream code
 extensions/upstreams/http @alyssawilk @mattklein123
 extensions/upstreams/tcp @alyssawilk @ggreenway @mattklein123
-extensions/upstream/local_address_selector @alyssawilk @mattklein123
 # OAuth2
 extensions/filters/http/oauth2 @derekargueta @mattklein123
 # HTTP Local Rate Limit

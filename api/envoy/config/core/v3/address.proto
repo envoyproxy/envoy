@@ -162,11 +162,9 @@ message BindConfig {
   repeated SocketAddress additional_source_addresses = 4
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // The name of the custom local address selector. This must have been
-  // registered with Envoy. If this is empty, the default (i.e.
+  // Custom local address selector to override the default (i.e.
   // :ref:`DefaultLocalAddressSelector
-  // <envoy_v3_api_msg_extensions.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`)
-  // applies.
+  // <envoy_v3_api_msg_extensions.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`).
   // [#extension-category: envoy.upstream.local_address_selector]
   TypedExtensionConfig local_address_selector = 6;
 }

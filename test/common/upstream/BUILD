@@ -761,3 +761,18 @@ envoy_cc_benchmark_binary(
         "//source/common/upstream:scheduler_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "default_local_address_selector_test",
+    size = "small",
+    srcs = ["default_local_address_selector_test.cc"],
+    deps = [
+        "//envoy/common:base_includes",
+        "//envoy/network:socket_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:default_local_address_selector",
+        "//test/test_common:utility_lib",
+    ],
+)
