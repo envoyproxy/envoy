@@ -178,7 +178,6 @@ void OwnedImpl::drainImpl(uint64_t size) {
   // Make sure to drain any zero byte fragments that might have been added as
   // sentinels for flushed data.
   while (!slices_.empty() && slices_.front().dataSize() == 0) {
-    ENVOY_LOG_MISC(trace, "OwnedImpl::drainImpl pop");
     slices_.pop_front();
   }
 }

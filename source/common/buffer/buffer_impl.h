@@ -406,7 +406,7 @@ protected:
    * coalescing with another slice, we do not transfer over their account. */
   BufferMemoryAccountSharedPtr account_;
 
-  /** releasor for the BufferFragement */
+  /** The releasor for the BufferFragment */
   std::function<void()> releasor_;
 };
 
