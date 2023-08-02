@@ -652,7 +652,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter response_flags_format("RESPONSE_FLAGS_FULL");
+    StreamInfoFormatter response_flags_format("RESPONSE_FLAGS_LONG");
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
         .WillByDefault(Return(true));
     EXPECT_EQ("LocalReset",

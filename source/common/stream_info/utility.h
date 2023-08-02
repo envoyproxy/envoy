@@ -55,86 +55,86 @@ public:
   constexpr static absl::string_view OVERLOAD_MANAGER = "OM";
   constexpr static absl::string_view DNS_FAIL = "DF";
 
-  constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION_FULL =
+  constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION_LONG =
       "DownstreamConnectionTermination";
-  constexpr static absl::string_view FAILED_LOCAL_HEALTH_CHECK_FULL = "FailedLocalHealthCheck";
-  constexpr static absl::string_view NO_HEALTHY_UPSTREAM_FULL = "NoHealthyUpstream";
-  constexpr static absl::string_view UPSTREAM_REQUEST_TIMEOUT_FULL = "UpstreamRequestTimeout";
-  constexpr static absl::string_view LOCAL_RESET_FULL = "LocalReset";
-  constexpr static absl::string_view UPSTREAM_REMOTE_RESET_FULL = "UpstreamRemoteReset";
-  constexpr static absl::string_view UPSTREAM_CONNECTION_FAILURE_FULL = "UpstreamConnectionFailure";
-  constexpr static absl::string_view UPSTREAM_CONNECTION_TERMINATION_FULL =
+  constexpr static absl::string_view FAILED_LOCAL_HEALTH_CHECK_LONG = "FailedLocalHealthCheck";
+  constexpr static absl::string_view NO_HEALTHY_UPSTREAM_LONG = "NoHealthyUpstream";
+  constexpr static absl::string_view UPSTREAM_REQUEST_TIMEOUT_LONG = "UpstreamRequestTimeout";
+  constexpr static absl::string_view LOCAL_RESET_LONG = "LocalReset";
+  constexpr static absl::string_view UPSTREAM_REMOTE_RESET_LONG = "UpstreamRemoteReset";
+  constexpr static absl::string_view UPSTREAM_CONNECTION_FAILURE_LONG = "UpstreamConnectionFailure";
+  constexpr static absl::string_view UPSTREAM_CONNECTION_TERMINATION_LONG =
       "UpstreamConnectionTermination";
-  constexpr static absl::string_view UPSTREAM_OVERFLOW_FULL = "UpstreamOverflow";
-  constexpr static absl::string_view UPSTREAM_RETRY_LIMIT_EXCEEDED_FULL =
+  constexpr static absl::string_view UPSTREAM_OVERFLOW_LONG = "UpstreamOverflow";
+  constexpr static absl::string_view UPSTREAM_RETRY_LIMIT_EXCEEDED_LONG =
       "UpstreamRetryLimitExceeded";
-  constexpr static absl::string_view NO_ROUTE_FOUND_FULL = "NoRouteFound";
-  constexpr static absl::string_view DELAY_INJECTED_FULL = "DelayInjected";
-  constexpr static absl::string_view FAULT_INJECTED_FULL = "FaultInjected";
-  constexpr static absl::string_view RATE_LIMITED_FULL = "RateLimited";
-  constexpr static absl::string_view UNAUTHORIZED_EXTERNAL_SERVICE_FULL =
+  constexpr static absl::string_view NO_ROUTE_FOUND_LONG = "NoRouteFound";
+  constexpr static absl::string_view DELAY_INJECTED_LONG = "DelayInjected";
+  constexpr static absl::string_view FAULT_INJECTED_LONG = "FaultInjected";
+  constexpr static absl::string_view RATE_LIMITED_LONG = "RateLimited";
+  constexpr static absl::string_view UNAUTHORIZED_EXTERNAL_SERVICE_LONG =
       "UnauthorizedExternalService";
-  constexpr static absl::string_view RATELIMIT_SERVICE_ERROR_FULL = "RateLimitServiceError";
-  constexpr static absl::string_view STREAM_IDLE_TIMEOUT_FULL = "StreamIdleTimeout";
-  constexpr static absl::string_view INVALID_ENVOY_REQUEST_HEADERS_FULL =
+  constexpr static absl::string_view RATELIMIT_SERVICE_ERROR_LONG = "RateLimitServiceError";
+  constexpr static absl::string_view STREAM_IDLE_TIMEOUT_LONG = "StreamIdleTimeout";
+  constexpr static absl::string_view INVALID_ENVOY_REQUEST_HEADERS_LONG =
       "InvalidEnvoyRequestHeaders";
-  constexpr static absl::string_view DOWNSTREAM_PROTOCOL_ERROR_FULL = "DownstreamProtocolError";
-  constexpr static absl::string_view UPSTREAM_MAX_STREAM_DURATION_REACHED_FULL =
+  constexpr static absl::string_view DOWNSTREAM_PROTOCOL_ERROR_LONG = "DownstreamProtocolError";
+  constexpr static absl::string_view UPSTREAM_MAX_STREAM_DURATION_REACHED_LONG =
       "UpstreamMaxStreamDurationReached";
-  constexpr static absl::string_view RESPONSE_FROM_CACHE_FILTER_FULL = "ResponseFromCacheFilter";
-  constexpr static absl::string_view NO_FILTER_CONFIG_FOUND_FULL = "NoFilterConfigFound";
-  constexpr static absl::string_view DURATION_TIMEOUT_FULL = "DurationTimeout";
-  constexpr static absl::string_view UPSTREAM_PROTOCOL_ERROR_FULL = "UpstreamProtocolError";
-  constexpr static absl::string_view NO_CLUSTER_FOUND_FULL = "NoClusterFound";
-  constexpr static absl::string_view OVERLOAD_MANAGER_FULL = "OverloadManagerTerminated";
+  constexpr static absl::string_view RESPONSE_FROM_CACHE_FILTER_LONG = "ResponseFromCacheFilter";
+  constexpr static absl::string_view NO_FILTER_CONFIG_FOUND_LONG = "NoFilterConfigFound";
+  constexpr static absl::string_view DURATION_TIMEOUT_LONG = "DurationTimeout";
+  constexpr static absl::string_view UPSTREAM_PROTOCOL_ERROR_LONG = "UpstreamProtocolError";
+  constexpr static absl::string_view NO_CLUSTER_FOUND_LONG = "NoClusterFound";
+  constexpr static absl::string_view OVERLOAD_MANAGER_LONG = "OverloadManagerTerminated";
 
   static constexpr std::array ALL_RESPONSE_STRINGS_FLAGS{
-      FlagStringsAndEnum{{FAILED_LOCAL_HEALTH_CHECK, FAILED_LOCAL_HEALTH_CHECK_FULL},
+      FlagStringsAndEnum{{FAILED_LOCAL_HEALTH_CHECK, FAILED_LOCAL_HEALTH_CHECK_LONG},
                          ResponseFlag::FailedLocalHealthCheck},
-      FlagStringsAndEnum{{NO_HEALTHY_UPSTREAM, NO_HEALTHY_UPSTREAM_FULL},
+      FlagStringsAndEnum{{NO_HEALTHY_UPSTREAM, NO_HEALTHY_UPSTREAM_LONG},
                          ResponseFlag::NoHealthyUpstream},
-      FlagStringsAndEnum{{UPSTREAM_REQUEST_TIMEOUT, UPSTREAM_REQUEST_TIMEOUT_FULL},
+      FlagStringsAndEnum{{UPSTREAM_REQUEST_TIMEOUT, UPSTREAM_REQUEST_TIMEOUT_LONG},
                          ResponseFlag::UpstreamRequestTimeout},
-      FlagStringsAndEnum{{LOCAL_RESET, LOCAL_RESET_FULL}, ResponseFlag::LocalReset},
-      FlagStringsAndEnum{{UPSTREAM_REMOTE_RESET, UPSTREAM_REMOTE_RESET_FULL},
+      FlagStringsAndEnum{{LOCAL_RESET, LOCAL_RESET_LONG}, ResponseFlag::LocalReset},
+      FlagStringsAndEnum{{UPSTREAM_REMOTE_RESET, UPSTREAM_REMOTE_RESET_LONG},
                          ResponseFlag::UpstreamRemoteReset},
-      FlagStringsAndEnum{{UPSTREAM_CONNECTION_FAILURE, UPSTREAM_CONNECTION_FAILURE_FULL},
+      FlagStringsAndEnum{{UPSTREAM_CONNECTION_FAILURE, UPSTREAM_CONNECTION_FAILURE_LONG},
                          ResponseFlag::UpstreamConnectionFailure},
-      FlagStringsAndEnum{{UPSTREAM_CONNECTION_TERMINATION, UPSTREAM_CONNECTION_TERMINATION_FULL},
+      FlagStringsAndEnum{{UPSTREAM_CONNECTION_TERMINATION, UPSTREAM_CONNECTION_TERMINATION_LONG},
                          ResponseFlag::UpstreamConnectionTermination},
-      FlagStringsAndEnum{{UPSTREAM_OVERFLOW, UPSTREAM_OVERFLOW_FULL},
+      FlagStringsAndEnum{{UPSTREAM_OVERFLOW, UPSTREAM_OVERFLOW_LONG},
                          ResponseFlag::UpstreamOverflow},
-      FlagStringsAndEnum{{NO_ROUTE_FOUND, NO_ROUTE_FOUND_FULL}, ResponseFlag::NoRouteFound},
-      FlagStringsAndEnum{{DELAY_INJECTED, DELAY_INJECTED_FULL}, ResponseFlag::DelayInjected},
-      FlagStringsAndEnum{{FAULT_INJECTED, FAULT_INJECTED_FULL}, ResponseFlag::FaultInjected},
-      FlagStringsAndEnum{{RATE_LIMITED, RATE_LIMITED_FULL}, ResponseFlag::RateLimited},
-      FlagStringsAndEnum{{UNAUTHORIZED_EXTERNAL_SERVICE, UNAUTHORIZED_EXTERNAL_SERVICE_FULL},
+      FlagStringsAndEnum{{NO_ROUTE_FOUND, NO_ROUTE_FOUND_LONG}, ResponseFlag::NoRouteFound},
+      FlagStringsAndEnum{{DELAY_INJECTED, DELAY_INJECTED_LONG}, ResponseFlag::DelayInjected},
+      FlagStringsAndEnum{{FAULT_INJECTED, FAULT_INJECTED_LONG}, ResponseFlag::FaultInjected},
+      FlagStringsAndEnum{{RATE_LIMITED, RATE_LIMITED_LONG}, ResponseFlag::RateLimited},
+      FlagStringsAndEnum{{UNAUTHORIZED_EXTERNAL_SERVICE, UNAUTHORIZED_EXTERNAL_SERVICE_LONG},
                          ResponseFlag::UnauthorizedExternalService},
-      FlagStringsAndEnum{{RATELIMIT_SERVICE_ERROR, RATELIMIT_SERVICE_ERROR_FULL},
+      FlagStringsAndEnum{{RATELIMIT_SERVICE_ERROR, RATELIMIT_SERVICE_ERROR_LONG},
                          ResponseFlag::RateLimitServiceError},
       FlagStringsAndEnum{
-          {DOWNSTREAM_CONNECTION_TERMINATION, DOWNSTREAM_CONNECTION_TERMINATION_FULL},
+          {DOWNSTREAM_CONNECTION_TERMINATION, DOWNSTREAM_CONNECTION_TERMINATION_LONG},
           ResponseFlag::DownstreamConnectionTermination},
-      FlagStringsAndEnum{{UPSTREAM_RETRY_LIMIT_EXCEEDED, UPSTREAM_RETRY_LIMIT_EXCEEDED_FULL},
+      FlagStringsAndEnum{{UPSTREAM_RETRY_LIMIT_EXCEEDED, UPSTREAM_RETRY_LIMIT_EXCEEDED_LONG},
                          ResponseFlag::UpstreamRetryLimitExceeded},
-      FlagStringsAndEnum{{STREAM_IDLE_TIMEOUT, STREAM_IDLE_TIMEOUT_FULL},
+      FlagStringsAndEnum{{STREAM_IDLE_TIMEOUT, STREAM_IDLE_TIMEOUT_LONG},
                          ResponseFlag::StreamIdleTimeout},
-      FlagStringsAndEnum{{INVALID_ENVOY_REQUEST_HEADERS, INVALID_ENVOY_REQUEST_HEADERS_FULL},
+      FlagStringsAndEnum{{INVALID_ENVOY_REQUEST_HEADERS, INVALID_ENVOY_REQUEST_HEADERS_LONG},
                          ResponseFlag::InvalidEnvoyRequestHeaders},
-      FlagStringsAndEnum{{DOWNSTREAM_PROTOCOL_ERROR, DOWNSTREAM_PROTOCOL_ERROR_FULL},
+      FlagStringsAndEnum{{DOWNSTREAM_PROTOCOL_ERROR, DOWNSTREAM_PROTOCOL_ERROR_LONG},
                          ResponseFlag::DownstreamProtocolError},
       FlagStringsAndEnum{
-          {UPSTREAM_MAX_STREAM_DURATION_REACHED, UPSTREAM_MAX_STREAM_DURATION_REACHED_FULL},
+          {UPSTREAM_MAX_STREAM_DURATION_REACHED, UPSTREAM_MAX_STREAM_DURATION_REACHED_LONG},
           ResponseFlag::UpstreamMaxStreamDurationReached},
-      FlagStringsAndEnum{{RESPONSE_FROM_CACHE_FILTER, RESPONSE_FROM_CACHE_FILTER_FULL},
+      FlagStringsAndEnum{{RESPONSE_FROM_CACHE_FILTER, RESPONSE_FROM_CACHE_FILTER_LONG},
                          ResponseFlag::ResponseFromCacheFilter},
-      FlagStringsAndEnum{{NO_FILTER_CONFIG_FOUND, NO_FILTER_CONFIG_FOUND_FULL},
+      FlagStringsAndEnum{{NO_FILTER_CONFIG_FOUND, NO_FILTER_CONFIG_FOUND_LONG},
                          ResponseFlag::NoFilterConfigFound},
-      FlagStringsAndEnum{{DURATION_TIMEOUT, DURATION_TIMEOUT_FULL}, ResponseFlag::DurationTimeout},
-      FlagStringsAndEnum{{UPSTREAM_PROTOCOL_ERROR, UPSTREAM_PROTOCOL_ERROR_FULL},
+      FlagStringsAndEnum{{DURATION_TIMEOUT, DURATION_TIMEOUT_LONG}, ResponseFlag::DurationTimeout},
+      FlagStringsAndEnum{{UPSTREAM_PROTOCOL_ERROR, UPSTREAM_PROTOCOL_ERROR_LONG},
                          ResponseFlag::UpstreamProtocolError},
-      FlagStringsAndEnum{{NO_CLUSTER_FOUND, NO_CLUSTER_FOUND_FULL}, ResponseFlag::NoClusterFound},
-      FlagStringsAndEnum{{OVERLOAD_MANAGER, OVERLOAD_MANAGER_FULL}, ResponseFlag::OverloadManager},
+      FlagStringsAndEnum{{NO_CLUSTER_FOUND, NO_CLUSTER_FOUND_LONG}, ResponseFlag::NoClusterFound},
+      FlagStringsAndEnum{{OVERLOAD_MANAGER, OVERLOAD_MANAGER_LONG}, ResponseFlag::OverloadManager},
   };
 
 private:
