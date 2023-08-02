@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.generic_proxy.v3;
 
 import "contrib/envoy/extensions/filters/network/generic_proxy/v3/route.proto";
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
@@ -23,7 +24,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Generic proxy.
 // [#extension: envoy.filters.network.generic_proxy]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message GenericProxy {
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -51,6 +52,9 @@ message GenericProxy {
 
   // Tracing configuration for the generic proxy.
   http_connection_manager.v3.HttpConnectionManager.Tracing tracing = 6;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>` emitted by generic proxy.
+  repeated config.accesslog.v3.AccessLog access_log = 7;
 }
 
 message GenericRds {

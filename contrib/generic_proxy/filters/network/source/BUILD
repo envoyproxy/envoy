@@ -133,14 +133,69 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "access_log_base_lib",
-    srcs = [
-        "access_log_base.cc",
+    name = "formatter_base_lib",
+    hdrs = [
+        "formatter_base.h",
     ],
+    deps = [
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "formatter_impl_base_lib",
+    hdrs = [
+        "formatter_impl_base.h",
+    ],
+    deps = [
+        ":formatter_base_lib",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/config:datasource_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/formatter:substitution_formatter_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "access_log_base_lib",
     hdrs = [
         "access_log_base.h",
     ],
     deps = [
-        "//envoy/access_log:access_log",
-    ]
+        "//envoy/access_log:access_log_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "file_access_log_base_lib",
+    hdrs = [
+        "file_access_log_base.h",
+    ],
+    deps = [
+        ":access_log_base_lib",
+        ":formatter_impl_base_lib",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "access_log_lib",
+    srcs = [
+        "access_log.cc",
+    ],
+    hdrs = [
+        "access_log.h",
+    ],
+    deps = [
+        ":access_log_base_lib",
+        ":file_access_log_base_lib",
+        ":formatter_base_lib",
+        ":formatter_impl_base_lib",
+        "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
+    ],
 )

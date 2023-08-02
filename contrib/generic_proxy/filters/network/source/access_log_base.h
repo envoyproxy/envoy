@@ -3,9 +3,9 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "envoy/server/factory_context.h"
 #include "source/common/config/utility.h"
 
 #include "absl/strings/string_view.h"

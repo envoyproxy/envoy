@@ -52,11 +52,12 @@ public:
                    Rds::RouteConfigProviderSharedPtr route_config_provider,
                    std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
                    Tracing::ConnectionManagerTracingConfigPtr tracing_config,
+                   std::vector<GenericProxyAccessLogInstanceSharedPtr>&& access_logs,
                    Envoy::Server::Configuration::FactoryContext& context)
       : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
         route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
         drain_decision_(context.drainDecision()), tracer_(std::move(tracer)),
-        tracing_config_(std::move(tracing_config)) {}
+        tracing_config_(std::move(tracing_config)), access_logs_(std::move(access_logs)) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
@@ -70,6 +71,9 @@ public:
   }
   OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const override {
     return makeOptRefFromPtr<const Tracing::ConnectionManagerTracingConfig>(tracing_config_.get());
+  }
+  const std::vector<GenericProxyAccessLogInstanceSharedPtr>& accessLogs() const override {
+    return access_logs_;
   }
 
   // FilterChainFactory
@@ -95,6 +99,8 @@ private:
 
   Tracing::TracerSharedPtr tracer_;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
+
+  std::vector<GenericProxyAccessLogInstanceSharedPtr> access_logs_;
 };
 
 class ActiveStream : public FilterChainManager,

@@ -4,13 +4,12 @@
 
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
 
-#include "contrib/generic_proxy/filters/network/source/formatter_base.h"
-
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 
 #include "absl/strings/str_format.h"
+#include "contrib/generic_proxy/filters/network/source/formatter_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,7 +47,7 @@ private:
 template <class FormatterContext>
 class PlainNumberFormatterProvider : public FormatterProvider<FormatterContext> {
 public:
-  PlainNumberFormatterProvider(double num);
+  PlainNumberFormatterProvider(double num) { num_.set_number_value(num); }
 
   // FormatterProvider
   absl::optional<std::string> format(const FormatterContext&,
@@ -63,6 +62,39 @@ public:
 
 private:
   ProtobufWkt::Value num_;
+};
+
+template <class FormatterContext>
+class StringValueFormatterProvider : public FormatterProvider<FormatterContext> {
+public:
+  using ValueExtractor = std::function<absl::optional<std::string>(const FormatterContext&,
+                                                                   const StreamInfo::StreamInfo&)>;
+
+  StringValueFormatterProvider(ValueExtractor f, absl::optional<size_t> max_length = absl::nullopt)
+      : value_extractor_(f), max_length_(max_length) {}
+
+  // GenericProxyFormatterProvider
+  absl::optional<std::string> format(const FormatterContext& context,
+                                     const StreamInfo::StreamInfo& stream_info) const override {
+    auto optional_str = value_extractor_(context, stream_info);
+    if (!optional_str) {
+      return absl::nullopt;
+    }
+    if (max_length_.has_value()) {
+      if (optional_str->length() > max_length_.value()) {
+        optional_str->resize(max_length_.value());
+      }
+    }
+    return optional_str;
+  }
+  ProtobufWkt::Value formatValue(const FormatterContext& context,
+                                 const StreamInfo::StreamInfo& stream_info) const override {
+    return ValueUtil::optionalStringValue(format(context, stream_info));
+  }
+
+private:
+  ValueExtractor value_extractor_;
+  absl::optional<size_t> max_length_;
 };
 
 template <class FormatterContext>
@@ -90,7 +122,7 @@ public:
   // FormatterProvider
   absl::optional<std::string> format(const FormatterContext&,
                                      const StreamInfo::StreamInfo& info) const override {
-    field_extractor_->extract(info);
+    return field_extractor_->extract(info);
   }
   ProtobufWkt::Value formatValue(const FormatterContext&,
                                  const StreamInfo::StreamInfo& info) const override {
@@ -103,7 +135,7 @@ private:
 
 template <class FormatterContext> class SubstitutionFormatParser {
 public:
-  std::vector<FormatterProviderPtr<FormatterContext>>
+  static std::vector<FormatterProviderPtr<FormatterContext>>
   parse(absl::string_view format, const CommandParsers<FormatterContext>& command_parsers) {
     std::string current_token;
     std::vector<FormatterProviderPtr<FormatterContext>> formatters;
@@ -256,7 +288,7 @@ public:
   }
 
 private:
-  const absl::string_view empty_value_string_;
+  const std::string empty_value_string_;
   std::vector<FormatterProviderPtr<FormatterContext>> providers_;
 };
 
@@ -413,7 +445,7 @@ private:
       }
 
       const auto str = provider->format(context, stream_info);
-      return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
+      return ValueUtil::stringValue(str.value_or(empty_value_));
     }
     // Multiple providers forces string output.
     std::string str;
@@ -528,13 +560,13 @@ public:
 
     switch (config.format_case()) {
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
-      return std::make_unique<FormatterImpl>(config.text_format(), config.omit_empty_values(),
-                                             commands_ref.get());
+      return std::make_unique<FormatterImpl<FormatterContext>>(
+          config.text_format(), config.omit_empty_values(), commands_ref.get());
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat:
-      return std::make_unique<JsonFormatterImpl>(config.json_format(), true,
-                                                 config.omit_empty_values(), commands_ref.get());
+      return std::make_unique<JsonFormatterImpl<FormatterContext>>(
+          config.json_format(), true, config.omit_empty_values(), commands_ref.get());
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
-      return std::make_unique<FormatterImpl>(
+      return std::make_unique<FormatterImpl<FormatterContext>>(
           Config::DataSource::read(config.text_format_source(), true, context.api()), false,
           commands_ref.get());
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::FORMAT_NOT_SET:
@@ -551,7 +583,7 @@ public:
   static FormatterPtr<FormatterContext>
   createJsonFormatter(const ProtobufWkt::Struct& struct_format, bool preserve_types,
                       bool omit_empty_values) {
-    return std::make_unique<JsonFormatterImpl>(
+    return std::make_unique<JsonFormatterImpl<FormatterContext>>(
         struct_format, preserve_types, omit_empty_values,
         BuiltInCommandParsers<FormatterContext>::commandParsers());
   }

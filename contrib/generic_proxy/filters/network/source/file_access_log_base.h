@@ -1,23 +1,22 @@
 #pragma once
 
-#include "contrib/generic_proxy/filters/network/source/access_log_base.h"
-#include "contrib/generic_proxy/filters/network/source/formatter_impl_base.h"
-
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.validate.h"
+
+#include "contrib/generic_proxy/filters/network/source/access_log_base.h"
+#include "contrib/generic_proxy/filters/network/source/formatter_impl_base.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-template <class FormatterContext>
-class FileAccessLogImpl : public AccessLogInstance<FormatterContext> {
+template <class FormatterContext> class FileAccessLog : public AccessLogInstance<FormatterContext> {
 public:
-  FileAccessLogImpl(const Filesystem::FilePathAndType& access_log_file_info,
-                    AccessLogFilterPtr<FormatterContext>&& filter,
-                    FormatterPtr<FormatterContext>&& formatter,
-                    AccessLog::AccessLogManager& log_manager)
+  FileAccessLog(const Filesystem::FilePathAndType& access_log_file_info,
+                AccessLogFilterPtr<FormatterContext>&& filter,
+                FormatterPtr<FormatterContext>&& formatter,
+                AccessLog::AccessLogManager& log_manager)
       : filter_(std::move(filter)), formatter_(std::move(formatter)) {
     log_file_ = log_manager.createAccessLog(access_log_file_info);
   }
@@ -92,7 +91,7 @@ public:
     }
 
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, typed_config.path()};
-    return std::make_shared<FileAccessLogImpl<FormatterContext>>(
+    return std::make_shared<FileAccessLog<FormatterContext>>(
         file_info, std::move(filter), std::move(formatter), context.accessLogManager());
   }
 

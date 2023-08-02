@@ -3,6 +3,7 @@
 #include "envoy/tracing/trace_config.h"
 #include "envoy/tracing/tracer.h"
 
+#include "contrib/generic_proxy/filters/network/source/access_log.h"
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
@@ -45,6 +46,11 @@ public:
    * @return connection manager tracing config.
    */
   virtual OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const PURE;
+
+  /**
+   * @return const std::vector<GenericProxyAccessLogInstanceSharedPtr>& access logs.
+   */
+  virtual const std::vector<GenericProxyAccessLogInstanceSharedPtr>& accessLogs() const PURE;
 };
 
 } // namespace GenericProxy

@@ -114,10 +114,6 @@ public:
 
 template <class FormatterContext> class BuiltInCommandParsers {
 public:
-  static CommandParserSharedPtr<FormatterContext>
-  parseCommandParser(const std::string& command, const std::string& subcommand,
-                     absl::optional<size_t>& max_length);
-
   static void addCommandParser(CommandParserSharedPtr<FormatterContext> parser) {
     mutableCommandParsers().push_back(parser);
   }
@@ -139,7 +135,8 @@ template <class FormatterContext> struct BuiltInCommandPaserRegister {
 };
 
 #define REGISTER_BUILT_IN_COMMAND_PARSER(context, parser)                                          \
-  static BuiltInCommandPaserRegister<context> register_##context##_##parser(parser);
+  static BuiltInCommandPaserRegister<context> register_##context##_##parser{                       \
+      std::make_shared<parser>()};
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

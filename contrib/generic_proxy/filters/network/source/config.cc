@@ -96,6 +96,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
   auto factories = factoriesFromProto(proto_config.codec_config(), context);
   std::shared_ptr<ProxyFactory> custom_proxy_factory = std::move(factories.second);
 
+  // Tracing configuration.
   Tracing::TracerSharedPtr tracer;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config;
   if (proto_config.has_tracing()) {
@@ -106,11 +107,19 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
         context.direction(), proto_config.tracing());
   }
 
+  // Access log configuration.
+  std::vector<GenericProxyAccessLogInstanceSharedPtr> access_logs;
+  for (const auto& access_log : proto_config.access_log()) {
+    GenericProxyAccessLogInstanceSharedPtr current_access_log =
+        GenericProxyAccessLogInstanceFactory::fromProto(access_log, context);
+    access_logs.push_back(current_access_log);
+  }
+
   const FilterConfigSharedPtr config = std::make_shared<FilterConfigImpl>(
       proto_config.stat_prefix(), std::move(factories.first),
       routeConfigProviderFromProto(proto_config, context, *route_config_provider_manager),
       filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context),
-      std::move(tracer), std::move(tracing_config), context);
+      std::move(tracer), std::move(tracing_config), std::move(access_logs), context);
 
   return [route_config_provider_manager, tracer_manager, config, &context,
           custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {
