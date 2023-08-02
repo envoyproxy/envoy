@@ -53,9 +53,11 @@ using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                 ::Envoy::Http::HeaderValidatorStats& stats)
-    : config_(config), protocol_(protocol), header_values_(::Envoy::Http::Headers::get()),
-      stats_(stats), path_normalizer_(config) {}
+                                 ::Envoy::Http::HeaderValidatorStats& stats,
+                                 const ConfigOverrides& config_overrides)
+    : config_(config), protocol_(protocol), config_overrides_(config_overrides),
+      header_values_(::Envoy::Http::Headers::get()), stats_(stats),
+      path_normalizer_(config, config_overrides) {}
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateMethodHeader(const HeaderString& value) {
@@ -617,6 +619,41 @@ HeaderValidator::sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_
            HeaderValidatorConfig::UriPathNormalizationOptions::UNESCAPE_AND_FORWARD);
   }
   return PathNormalizer::PathNormalizationResult::success();
+}
+
+PathNormalizer::PathNormalizationResult
+HeaderValidator::transformUrlPath(::Envoy::Http::RequestHeaderMap& header_map) {
+  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
+    auto path_result = path_normalizer_.normalizePathUri(header_map);
+    if (!path_result.ok()) {
+      return path_result;
+    }
+    auto percent_00_result = checkForPercent00InUrlPath(header_map);
+    if (!percent_00_result.ok()) {
+      return {PathNormalizer::PathNormalizationResult::Action::Reject, percent_00_result.details()};
+    }
+  } else {
+    // Path normalization includes sanitization of encoded slashes for performance reasons.
+    // If normalization is disabled, sanitize encoded slashes here
+    auto result = sanitizeEncodedSlashes(header_map);
+    if (!result.ok()) {
+      return result;
+    }
+  }
+  return PathNormalizer::PathNormalizationResult::success();
+}
+
+HeaderValidator::HeaderValueValidationResult
+HeaderValidator::checkForPercent00InUrlPath(const ::Envoy::Http::RequestHeaderMap& header_map) {
+  if (!header_map.Path() || !config_overrides_.reject_percent_00_) {
+    return HeaderValueValidationResult::success();
+  }
+  if (absl::StrContains(header_map.getPathValue(), "%00")) {
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().Percent00InPath};
+  }
+
+  return HeaderValueValidationResult::success();
 }
 
 } // namespace EnvoyDefault

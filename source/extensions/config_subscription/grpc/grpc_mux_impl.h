@@ -7,6 +7,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/config/custom_config_validators.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -20,6 +21,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
@@ -44,7 +46,7 @@ public:
               bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
               BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate,
-              const std::string& target_xds_authority);
+              EdsResourcesCachePtr eds_resources_cache, const std::string& target_xds_authority);
 
   ~GrpcMuxImpl() override;
 
@@ -70,6 +72,10 @@ public:
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
+  }
+
+  EdsResourcesCacheOptRef edsResourcesCache() override {
+    return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
   void handleDiscoveryResponse(
@@ -99,17 +105,29 @@ private:
                      SubscriptionCallbacks& callbacks,
                      OpaqueResourceDecoderSharedPtr resource_decoder, const std::string& type_url,
                      GrpcMuxImpl& parent, const SubscriptionOptions& options,
-                     const LocalInfo::LocalInfo& local_info)
+                     const LocalInfo::LocalInfo& local_info,
+                     EdsResourcesCacheOptRef eds_resources_cache)
         : callbacks_(callbacks), resource_decoder_(resource_decoder), type_url_(type_url),
           parent_(parent), subscription_options_(options), local_info_(local_info),
-          watches_(parent.apiStateFor(type_url).watches_) {
+          watches_(parent.apiStateFor(type_url).watches_),
+          eds_resources_cache_(eds_resources_cache) {
       updateResources(resources);
+      // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
+      ASSERT(
+          !eds_resources_cache_.has_value() ||
+          (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()));
     }
 
     ~GrpcMuxWatchImpl() override {
       watches_.erase(iter_);
       if (!resources_.empty()) {
         parent_.queueDiscoveryRequest(type_url_);
+        if (eds_resources_cache_.has_value()) {
+          // All resources are to be removed, so remove them from the cache.
+          for (const auto& resource_name : resources_) {
+            eds_resources_cache_->removeResource(resource_name);
+          }
+        }
       }
     }
 
@@ -131,7 +149,12 @@ private:
 
   private:
     void updateResources(const absl::flat_hash_set<std::string>& resources) {
-      resources_.clear();
+      // Finding the list of removed resources by keeping the current resources
+      // set until the end the function and computing the diff.
+      // Temporarily keep the resources prior to the update to find which ones
+      // were removed.
+      std::set<std::string> previous_resources;
+      previous_resources.swap(resources_);
       std::transform(
           resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()),
           [this](const std::string& resource_name) -> std::string {
@@ -148,6 +171,16 @@ private:
             }
             return resource_name;
           });
+      if (eds_resources_cache_.has_value()) {
+        // Compute the removed resources and remove them from the cache.
+        std::vector<std::string> removed_resources;
+        std::set_difference(previous_resources.begin(), previous_resources.end(),
+                            resources_.begin(), resources_.end(),
+                            std::back_inserter(removed_resources));
+        for (const auto& resource_name : removed_resources) {
+          eds_resources_cache_->removeResource(resource_name);
+        }
+      }
       // move this watch to the beginning of the list
       iter_ = watches_.emplace(watches_.begin(), this);
     }
@@ -157,6 +190,8 @@ private:
     const LocalInfo::LocalInfo& local_info_;
     WatchList& watches_;
     WatchList::iterator iter_;
+    // Optional cache for the specific ClusterLoadAssignments of this watch.
+    EdsResourcesCacheOptRef eds_resources_cache_;
   };
 
   // Per muxed API state.
@@ -212,6 +247,7 @@ private:
   CustomConfigValidatorsPtr config_validators_;
   XdsConfigTrackerOptRef xds_config_tracker_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
+  EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
   bool first_stream_request_;
 

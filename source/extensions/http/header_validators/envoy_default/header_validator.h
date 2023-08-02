@@ -6,6 +6,7 @@
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/http/header_validators/envoy_default/config_overrides.h"
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
 #include "absl/container/node_hash_map.h"
@@ -25,7 +26,8 @@ public:
   HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats,
+      const ConfigOverrides& config_overrides);
   virtual ~HeaderValidator() = default;
 
   using HeaderEntryValidationResult = ::Envoy::Http::HeaderValidator::RejectResult;
@@ -175,9 +177,23 @@ protected:
   PathNormalizer::PathNormalizationResult
   sanitizeEncodedSlashes(::Envoy::Http::RequestHeaderMap& header_map);
 
+  /**
+   * Transform URL path according to configuration (i.e. apply path normalization).
+   */
+  PathNormalizer::PathNormalizationResult
+  transformUrlPath(::Envoy::Http::RequestHeaderMap& header_map);
+
+  /**
+   * Check for presence of %00 sequence based on configuration.
+   * Reject request if %00 sequence was found.
+   */
+  HeaderValueValidationResult
+  checkForPercent00InUrlPath(const ::Envoy::Http::RequestHeaderMap& header_map);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;
+  const ConfigOverrides config_overrides_;
   const ::Envoy::Http::HeaderValues& header_values_;
   ::Envoy::Http::HeaderValidatorStats& stats_;
   const PathNormalizer path_normalizer_;

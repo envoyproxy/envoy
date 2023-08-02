@@ -27,10 +27,13 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
+    ConfigOverrides overrides(scoped_runtime_.loader().snapshot());
     if (GetParam() == Protocol::Http11) {
-      return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+      return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                          overrides);
     }
-    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_);
+    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, GetParam(), stats_,
+                                                        overrides);
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -162,6 +165,28 @@ TEST_P(HttpCommonValidationTest, RejectEncodedSlashes) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers),
                              "uhv.escaped_slashes_in_url_path");
+}
+
+TEST_P(HttpCommonValidationTest, RejectPercent00ByDefault) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%00dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(empty_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers), "uhv.percent_00_in_url_path");
+}
+
+TEST_P(HttpCommonValidationTest, AllowPercent00WithOverride) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.reject_percent_00", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%00dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createUhv(empty_config);
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(headers.path(), "/dir1%00dir2");
 }
 
 } // namespace

@@ -64,15 +64,17 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           *stats_store_.rootScope(), rate_limit_settings_, local_info_, true,
           std::move(config_validators_), std::move(backoff_strategy),
-          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
+          /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
+          /*eds_resources_cache=*/nullptr);
     } else {
       mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *method_descriptor_, *stats_store_.rootScope(), rate_limit_settings_, true,
           std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
-          /*xds_resources_delegate=*/
-          XdsResourcesDelegateOptRef(),
+          /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
+          /*eds_resources_cache=*/nullptr,
           /*target_xds_authority=*/"");
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
