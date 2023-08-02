@@ -54,6 +54,7 @@ namespace Protobuf {
 
 using Closure = ::google::protobuf::Closure;
 
+using ::google::protobuf::Arena;                  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::BytesValue;             // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Descriptor;             // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPool;         // NOLINT(misc-unused-using-decls)
@@ -64,6 +65,7 @@ using ::google::protobuf::FieldDescriptor;        // NOLINT(misc-unused-using-de
 using ::google::protobuf::FieldMask;              // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Map;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::UInt32Value;            // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Type;                   // NOLINT(misc-unused-using-decls)
 #ifdef ENVOY_ENABLE_FULL_PROTOS
 using ::google::protobuf::Message;
 using ReflectableMessage = ::google::protobuf::Message*;
@@ -102,6 +104,7 @@ namespace io {
 using ::google::protobuf::io::ArrayOutputStream;   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::CodedInputStream;    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::CodedOutputStream;   // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::OstreamOutputStream; // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::StringOutputStream;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::ZeroCopyInputStream; // NOLINT(misc-unused-using-decls)
 } // namespace io
