@@ -393,7 +393,6 @@ TEST_F(CacheFilterTest, WatermarkEventsAreSentIfCacheBlocksStreamAndLimitExceede
   EXPECT_CALL(*mock_insert_context, onDestroy());
   EXPECT_CALL(*mock_lookup_context, onDestroy());
   {
-    // Create filter for request 1.
     CacheFilterSharedPtr filter = makeFilter(mock_http_cache);
 
     testDecodeRequestMiss(filter);
@@ -423,6 +422,72 @@ TEST_F(CacheFilterTest, WatermarkEventsAreSentIfCacheBlocksStreamAndLimitExceede
     filter->onStreamComplete();
     EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
     EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::InsertSucceeded));
+  }
+}
+
+TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
+  request_headers_.setHost("CacheHitWithBody");
+  const std::string body1 = "abcde";
+  const std::string body2 = "fghij";
+  // Set the buffer limit to 2 bytes to ensure we send watermark events.
+  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
+  MockHttpCache mock_http_cache;
+  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  auto mock_insert_context = std::make_unique<MockInsertContext>();
+  EXPECT_CALL(mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(mock_http_cache, makeInsertContext(_, _))
+      .WillOnce([&](LookupContextPtr&&,
+                    Http::StreamEncoderFilterCallbacks&) -> std::unique_ptr<InsertContext> {
+        return std::move(mock_insert_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    cb(LookupResult{});
+  });
+  EXPECT_CALL(*mock_insert_context, insertHeaders(_, _, _, false))
+      .WillOnce([&](const Http::ResponseHeaderMap&, const ResponseMetadata&,
+                    InsertCallback insert_complete, bool) { insert_complete(true); });
+  InsertCallback captured_insert_body_callback;
+  // The first time insertBody is called, block until the test is ready to call it.
+  // Cache aborts, so there is no second call.
+  EXPECT_CALL(*mock_insert_context, insertBody(_, _, false))
+      .WillOnce([&](const Buffer::Instance&, InsertCallback ready_for_next_chunk, bool) {
+        EXPECT_THAT(captured_insert_body_callback, IsNull());
+        captured_insert_body_callback = ready_for_next_chunk;
+      });
+  EXPECT_CALL(*mock_insert_context, onDestroy());
+  EXPECT_CALL(*mock_lookup_context, onDestroy());
+  {
+    CacheFilterSharedPtr filter = makeFilter(mock_http_cache, false);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response.
+    response_headers_.setContentLength(body1.size() + body2.size());
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    // The insertHeaders callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    EXPECT_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
+    // Write the body in two pieces - the first one should exceed the watermark and
+    // send a high watermark event.
+    Buffer::OwnedImpl body1buf(body1);
+    Buffer::OwnedImpl body2buf(body2);
+    EXPECT_EQ(filter->encodeData(body1buf, false), Http::FilterDataStatus::Continue);
+    EXPECT_EQ(filter->encodeData(body2buf, true), Http::FilterDataStatus::Continue);
+    ASSERT_THAT(captured_insert_body_callback, NotNull());
+    // When the filter is destroyed, a low watermark event should be sent.
+    EXPECT_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
+    filter->onDestroy();
+    filter.reset();
+    captured_insert_body_callback(false);
+    // The cache insertBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 }
 

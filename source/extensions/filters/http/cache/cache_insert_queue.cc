@@ -171,6 +171,11 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
 }
 
 void CacheInsertQueue::setSelfOwned(std::unique_ptr<CacheInsertQueue> self) {
+  // If we sent a high watermark event, this is our last chance to unset it on the
+  // stream, so we'd better do so.
+  if (watermarked_) {
+    encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+  }
   // Disable all the callbacks, they're going to have nowhere to go.
   abort_callback_ = []() {};
   encoder_callbacks_.reset();
