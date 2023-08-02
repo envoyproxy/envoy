@@ -56,13 +56,12 @@ private:
 
 MATCHER_P2(FactoryFunctionsReturnWorkerId, packet, expected_id, "") {
   uint32_t id = arg.worker_selector_(*packet, 0xffffffff);
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
+  // TODO: run the bpf program, something like the below. The headers we have in the docker
+  //       container don't seem to provide `bpf()` or `bpf_prog_run()`.
+#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__) &&                                     \
+    defined(TODO_TEST_FOR_BPF_PROG_RUN_SUPPORT)
   std::string bytes = packet->toString();
-  // TODO: run the bpf program, something like the below. The headers we have don't
-  //       seem to provide bpf() or bpf_prog_run().
-  // uint32_t bpf_id = bpf_prog_run(arg.bpf_prog_, bytes.c_str());
-  uint32_t bpf_id = expected_id;
-  std::cout << "warning: fake verifying bpf program, matcher is a work in progress" << std::endl;
+  uint32_t bpf_id = bpf_prog_run(arg.bpf_prog_, bytes.c_str());
 #else
   uint32_t bpf_id = expected_id_;
   std::cout << "warning: not verifying bpf program due to lacking system support" << std::endl;
