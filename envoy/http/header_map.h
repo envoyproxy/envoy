@@ -107,7 +107,7 @@ public:
 
   // This flag allows disabling the check for the NUL, CR and LF characters in the
   // header names or values in the DEBUG builds to prevent the `ASSERT(valid())` in the
-  // from HeaderString constructor from failing the test.
+  // HeaderString constructor from failing tests.
   static bool disable_validation_for_tests_;
 };
 
