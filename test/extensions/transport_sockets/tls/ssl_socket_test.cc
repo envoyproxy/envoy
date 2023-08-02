@@ -3479,6 +3479,147 @@ static int updateLastSslSession(SSL*, SSL_SESSION* session) {
   return 1; // to indicate that we take ownership of the session
 }
 
+// Test connecting with a client to the same server twice.
+void testStatefulSessionResumption(const std::string& server_ctx_yaml,
+                                   const std::vector<std::string>& server_names,
+                                   const std::string& client_ctx_yaml,
+                                   const Network::Address::IpVersion ip_version,
+                                   const SslExpectations& server_expectations = {}) {
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(*time_system);
+
+  Stats::TestUtil::TestStore server_stats_store;
+  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
+  NiceMock<Runtime::MockLoader> runtime;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      server_factory_context;
+  ON_CALL(server_factory_context.server_context_, api()).WillByDefault(ReturnRef(*server_api));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  auto server_cfg =
+      std::make_unique<ServerContextConfigImpl>(server_tls_context, server_factory_context);
+
+  ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
+                                                   *server_stats_store.rootScope(), server_names);
+
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(ip_version));
+  NiceMock<Network::MockTcpListenerCallbacks> callbacks;
+  Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
+  NiceMock<Network::MockListenerConfig> listener_config;
+  Network::ListenerPtr listener =
+      dispatcher->createListener(socket, callbacks, runtime, listener_config);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+
+  Stats::TestUtil::TestStore client_stats_store;
+  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      client_factory_context;
+  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+
+  auto client_cfg =
+      std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
+  ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager,
+                                            *client_stats_store.rootScope());
+  Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+      ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  client_connection->connect();
+
+  SSL_SESSION* ssl_session = nullptr;
+  Network::ConnectionPtr server_connection;
+  StreamInfo::StreamInfoImpl stream_info(time_system, nullptr);
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher->createServerConnection(std::move(socket),
+            server_ssl_socket_factory.createDownstreamTransportSocket(), stream_info);
+      }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+    .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      const SslHandshakerImpl* ssl_socket =
+          dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+      ssl_session = SSL_get1_session(ssl_socket->ssl());
+      EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+      client_connection->close(Network::ConnectionCloseType::NoFlush);
+      server_connection->close(Network::ConnectionCloseType::NoFlush);
+      dispatcher->exit();
+    }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+
+  dispatcher->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
+  EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
+
+  client_connection = dispatcher->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+      ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  const SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+  SSL_set_session(ssl_socket->ssl(), ssl_session);
+  SSL_SESSION_free(ssl_session);
+
+  client_connection->connect();
+
+  Network::MockConnectionCallbacks server_connection_callbacks;
+  StreamInfo::StreamInfoImpl stream_info2(time_system, nullptr);
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher->createServerConnection(std::move(socket),
+            server_ssl_socket_factory.createDownstreamTransportSocket(), stream_info2);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+      }));
+  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+  // Different tests have different order of whether client or server gets Connected event
+  // first, so always wait until both have happened.
+  size_t connect_count = 0;
+  auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
+                              &server_expectations]() {
+    connect_count++;
+    if (connect_count == 2) {
+      const SslHandshakerImpl* server_ssl_socket =
+          dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+      SSL* server_ssl = server_ssl_socket->ssl();
+
+      const SslHandshakerImpl* client_ssl_socket =
+          dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+      SSL* client_ssl = client_ssl_socket->ssl();
+
+      EXPECT_TRUE(SSL_session_reused(server_ssl));
+      EXPECT_TRUE(SSL_session_reused(client_ssl));
+      EXPECT_NE(EMPTY_STRING, server_connection->ssl()->sessionId());
+      EXPECT_EQ(server_connection->ssl()->sessionId(), client_connection->ssl()->sessionId());
+
+      server_expectations.verify(server_connection->ssl());
+      client_connection->close(Network::ConnectionCloseType::NoFlush);
+      server_connection->close(Network::ConnectionCloseType::NoFlush);
+      dispatcher->exit();
+    }
+  };
+
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+
+  dispatcher->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(1UL, server_stats_store.counter("ssl.session_reused").value());
+  EXPECT_EQ(1UL, client_stats_store.counter("ssl.session_reused").value());
+}
+
 // Test connecting with a client to server1, then trying to reuse the session on server2
 void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::vector<std::string>& server_names1,
@@ -4370,6 +4511,91 @@ TEST_P(SslSocketTest, TicketSessionResumptionAcceptUntrustedValidClientCertifica
     testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_tls13_yaml,
                                 true, version_, 0, server_expectations);
   }
+}
+
+TEST_P(SslSocketTest, StatefulSessionResumptionAcceptUntrustedNoClientCertificate) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+  disable_stateless_session_resumption: true
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+)EOF";
+
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(false);
+
+  testStatefulSessionResumption(server_ctx_yaml, {}, client_ctx_yaml, version_,
+                                server_expectations);
+}
+
+TEST_P(SslSocketTest, StatefulSessionResumptionAcceptUntrustedInvalidClientCertificate) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+  disable_stateless_session_resumption: true
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(false);
+
+  testStatefulSessionResumption(server_ctx_yaml, {}, client_ctx_yaml, version_,
+                                server_expectations);
+}
+
+TEST_P(SslSocketTest, StatefulSessionResumptionAcceptUntrustedValidClientCertificate) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+  disable_stateless_session_resumption: true
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+)EOF";
+
+  auto server_expectations = SslExpectations().setExpectedPeerCertificateValidated(true);
+
+  testStatefulSessionResumption(server_ctx_yaml, {}, client_ctx_yaml, version_,
+                                server_expectations);
 }
 
 TEST_P(SslSocketTest, StatelessSessionResumptionDisabled) {
