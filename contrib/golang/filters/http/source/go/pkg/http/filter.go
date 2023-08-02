@@ -244,7 +244,7 @@ type httpConfig struct {
 func (c *httpConfig) DefineMetric(metricType uint32, name string) api.Metric {
 	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), metricType, name)
 	return &metric{
-		config: c,
+		config:   c,
 		metricId: id,
 	}
 }

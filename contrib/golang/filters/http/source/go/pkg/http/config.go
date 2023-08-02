@@ -73,7 +73,7 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 				config: c,
 			}
 			parsedConfig, err = configParser.Parse(&any, http_config)
-	    }
+		}
 		if err != nil {
 			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
 			return 0
