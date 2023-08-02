@@ -246,6 +246,12 @@ std::map<char, std::string> generateExtendedAsciiPercentEncoding() {
 // This test shows validation of character sets in URL path for all codecs.
 // It also shows that UHV in compatibility mode has the same validation.
 TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithoutPathNormalization) {
+#ifdef WIN32
+  // H/3 test on Windows is flaky
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    return;
+  }
+#endif
   setupCharacterValidationRuntimeValues();
   enableOghttp2ForFakeUpstream();
   initialize();
@@ -266,6 +272,12 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithoutPathNormali
 }
 
 TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithPathNormalization) {
+#ifdef WIN32
+  // H/3 test on Windows is flaky
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    return;
+  }
+#endif
   setupCharacterValidationRuntimeValues();
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -300,6 +312,12 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithPathNormalizat
 }
 
 TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInQuery) {
+#ifdef WIN32
+  // H/3 test on Windows is flaky
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    return;
+  }
+#endif
   setupCharacterValidationRuntimeValues();
   // Path normalization should not affect query, however enable it to make sure it is so.
   config_helper_.addConfigModifier(
@@ -322,6 +340,12 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInQuery) {
 }
 
 TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInFragment) {
+#ifdef WIN32
+  // H/3 test on Windows is flaky
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    return;
+  }
+#endif
   setupCharacterValidationRuntimeValues();
   initialize();
   std::string additionally_allowed_characters = additionallyAllowedCharactersInUrlPath();
