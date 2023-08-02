@@ -61,6 +61,7 @@ using ::google::protobuf::DynamicCastToGenerated;  // NOLINT(misc-unused-using-d
 using ::google::protobuf::DynamicMessageFactory;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::EnumValueDescriptor;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldDescriptor;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FieldMask;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Map;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::UInt32Value;  // NOLINT(misc-unused-using-decls)
 #ifdef ENVOY_ENABLE_FULL_PROTOS
@@ -88,6 +89,7 @@ using ::google::protobuf::MessageFactory;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::MethodDescriptor;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Reflection;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedFieldBackInserter;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::RepeatedField;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrField;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrFieldBackInserter;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::TextFormat;  // NOLINT(misc-unused-using-decls)
@@ -117,6 +119,9 @@ using ::google::protobuf::util::JsonParseOptions;  // NOLINT(misc-unused-using-d
 using ::google::protobuf::util::JsonPrintOptions;  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::util::TimeUtil;  // NOLINT(misc-unused-using-decls)
 } // namespace util
+
+using uint32 = uint32_t;
+using int32 = int32_t;
 
 } // namespace Protobuf
 
