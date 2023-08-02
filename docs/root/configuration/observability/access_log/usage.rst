@@ -455,7 +455,7 @@ The following command operators are supported:
   the descriptions do not apply. %RESPONSE_FLAGS% will outout a short string. %RESPONSE_FLAGS% will outout a Pascal case string.
   Possible values are:
 
-  HTTP and TCP
+HTTP and TCP
 
 .. csv-table::
   :header: Long name, Short name, Description
@@ -469,7 +469,7 @@ The following command operators are supported:
   **NoClusterFound**, **NC**, Upstream cluster not found.
   **DurationTimeout**, **DT**, When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
 
-  HTTP only
+HTTP only
 
 .. csv-table::
   :header: Long name, Short name, Description
@@ -494,8 +494,8 @@ The following command operators are supported:
   **OverloadManagerTerminated**, **OM**, Overload Manager terminated the request.
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
 
-  UDP
-    Not implemented ("-").
+UDP
+  Not implemented ("-").
 
 %ROUTE_NAME%
   HTTP/TCP
