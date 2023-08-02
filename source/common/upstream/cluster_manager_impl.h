@@ -428,9 +428,8 @@ protected:
 
   using ClusterInitializationObjectConstSharedPtr =
       std::shared_ptr<const ClusterInitializationObject>;
-  // The string_view uses the underlying string of the ClusterInitializationObject cluster_info.
   using ClusterInitializationMap =
-      absl::flat_hash_map<absl::string_view, ClusterInitializationObjectConstSharedPtr>;
+      absl::flat_hash_map<std::string, ClusterInitializationObjectConstSharedPtr>;
 
   /**
    * An implementation of an on-demand CDS handle. It forwards the discovery request to the cluster

@@ -184,7 +184,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   if (useDeferredCluster()) {
     test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
   } else {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 2);
+    EXPECT_EQ(
+        test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value(), 2);
   }
 
   // Tell Envoy that cluster_1 is gone.
@@ -219,7 +220,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // the DiscoveryResponse describing cluster_1 that we sent. Again, 2 includes CDS server.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
   if (useDeferredCluster()) {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+    EXPECT_EQ(
+        test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value(), 0);
   } else {
     test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 2);
   }
