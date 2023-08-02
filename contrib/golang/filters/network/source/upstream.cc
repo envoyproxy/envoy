@@ -27,9 +27,6 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
     SlotPtrContainer& slot_ptr_container = slotPtrContainer();
     slot_ptr_container.slot_ = tls.allocateSlot();
 
-    TimeSourceContainer& time_source_container = timeSourceContainer();
-    time_source_container.time_source_ = &context.timeSource();
-
     Thread::ThreadId main_thread_id = context.api().threadFactory().currentThreadId();
     slot_ptr_container.slot_->set(
         [&context, main_thread_id,
@@ -59,7 +56,7 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
     dispatcher_ = &store.dispatchers_[store.dispatcher_idx_++ % store.dispatchers_.size()].get();
   }
   stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
-      *timeSourceContainer().time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
+      dispatcher_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info_->filterState()->setData(
       Network::DestinationAddress::key(),
       std::make_shared<Network::DestinationAddress>(
