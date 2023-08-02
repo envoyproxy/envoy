@@ -65,16 +65,20 @@ TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
       input.c_str(), input.size(),
       [this](const void*, size_t, const BufferFragmentImpl*) { release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
+  ENVOY_LOG_MISC(trace, "########## -1");
   buffer.addBufferFragment(frag);
   EXPECT_EQ(2048, buffer.length());
 
+  ENVOY_LOG_MISC(trace, "########## 0");
   buffer.drain(2000);
   EXPECT_EQ(48, buffer.length());
   EXPECT_FALSE(release_callback_called_);
 
+  ENVOY_LOG_MISC(trace, "########## 1");
   buffer.drain(48);
   EXPECT_EQ(0, buffer.length());
   EXPECT_TRUE(release_callback_called_);
+  ENVOY_LOG_MISC(trace, "########## 2");
 }
 
 TEST_F(OwnedImplTest, AddEmptyFragment) {
@@ -667,10 +671,10 @@ TEST_F(OwnedImplTest, LinearizeDrainTracking) {
   testing::MockFunction<void()> done_tracker;
   EXPECT_CALL(tracker1, Call());
   EXPECT_CALL(drain_tracker, Call(3 * LargeChunk + 108 * SmallChunk, 16384));
-  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
   EXPECT_CALL(tracker2, Call());
-  EXPECT_CALL(release_callback_tracker2, Call(_, _, _));
+  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
   EXPECT_CALL(tracker3, Call());
+  EXPECT_CALL(release_callback_tracker2, Call(_, _, _));
   EXPECT_CALL(drain_tracker, Call(2 * LargeChunk + 107 * SmallChunk, 16384));
   EXPECT_CALL(drain_tracker, Call(LargeChunk + 106 * SmallChunk, 16384));
   EXPECT_CALL(tracker4, Call());

@@ -90,7 +90,7 @@ public:
       : capacity_(fragment.size()), storage_(nullptr),
         base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
         reservable_(fragment.size()) {
-    addDrainTracker([&fragment]() { fragment.done(); });
+    releasor_ = [&fragment]() { fragment.done(); };
   }
 
   Slice(Slice&& rhs) noexcept {
@@ -101,6 +101,7 @@ public:
     reservable_ = rhs.reservable_;
     drain_trackers_ = std::move(rhs.drain_trackers_);
     account_ = std::move(rhs.account_);
+    releasor_.swap(rhs.releasor_);
 
     rhs.capacity_ = 0;
     rhs.base_ = nullptr;
@@ -110,6 +111,7 @@ public:
 
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
+      ENVOY_LOG_MISC(debug, "######### Slice& operator=");
       callAndClearDrainTrackersAndCharges();
 
       capacity_ = rhs.capacity_;
@@ -119,6 +121,7 @@ public:
       reservable_ = rhs.reservable_;
       drain_trackers_ = std::move(rhs.drain_trackers_);
       account_ = std::move(rhs.account_);
+      releasor_.swap(rhs.releasor_);
 
       rhs.capacity_ = 0;
       rhs.base_ = nullptr;
@@ -129,7 +132,10 @@ public:
     return *this;
   }
 
-  ~Slice() { callAndClearDrainTrackersAndCharges(); }
+  ~Slice() { callAndClearDrainTrackersAndCharges(); if (releasor_) {
+      ENVOY_LOG_MISC(trace, "############### callAndClearDrainTrackersAndCharges release");
+      releasor_();
+    } }
 
   /**
    * @return true if the data in the slice is mutable
@@ -307,6 +313,7 @@ public:
   void transferDrainTrackersTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
+    destination.releasor_.swap(releasor_);
   }
 
   /**
@@ -321,6 +328,7 @@ public:
    * the drain tracker list.
    */
   void callAndClearDrainTrackersAndCharges() {
+    ENVOY_LOG_MISC(trace, "############### callAndClearDrainTrackersAndCharges");
     for (const auto& drain_tracker : drain_trackers_) {
       drain_tracker();
     }
@@ -397,6 +405,9 @@ protected:
   /** Account associated with this slice. This may be null. When
    * coalescing with another slice, we do not transfer over their account. */
   BufferMemoryAccountSharedPtr account_;
+
+  /** releasor for the BufferFragement */
+  std::function<void()> releasor_;
 };
 
 class OwnedImpl;
@@ -595,6 +606,7 @@ public:
   size_t size() const override { return size_; }
   void done() override {
     if (releasor_) {
+      ENVOY_LOG_MISC(debug, "####### buffer fragemetn done");
       releasor_(data_, size_, this);
     }
   }
