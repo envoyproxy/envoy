@@ -64,6 +64,8 @@ using ::google::protobuf::EnumValueDescriptor;    // NOLINT(misc-unused-using-de
 using ::google::protobuf::FieldDescriptor;        // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldMask;              // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Map;                    // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::MapPair;                // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::OneofDescriptor;        // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Type;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::UInt32Value;            // NOLINT(misc-unused-using-decls)
 #ifdef ENVOY_ENABLE_FULL_PROTOS
