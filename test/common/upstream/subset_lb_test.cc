@@ -1694,7 +1694,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
 
-  auto local_locality = envoy::config::core::v3::Locality();
+  envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}}, local_locality)},
@@ -1824,7 +1824,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 
-  auto local_locality = envoy::config::core::v3::Locality();
+  envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}}, local_locality)},
@@ -1894,6 +1894,77 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+}
+
+TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillRepeatedly(Return(2));
+
+  zoneAwareInit({{
+                     {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:81", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:86", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:87", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:88", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:89", {{"version", "1.1"}}},
+                 }},
+                {{
+                     {"tcp://127.0.0.1:90", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:91", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:92", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:93", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:94", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:95", {{"version", "1.1"}}},
+                 }});
+
+  TestLoadBalancerContext context({{"version", "1.1"}});
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+
+  // Force request out of small zone.
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+
+  envoy::config::core::v3::Locality local_locality;
+  local_locality.set_zone("0");
+
+  modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)},
+              {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
+
+  modifyLocalHosts({local_hosts_->at(1)},
+                   {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, local_locality)}, 0);
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+
+  // Force request out of small zone.
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 }
 
 TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {

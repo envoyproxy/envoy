@@ -1315,6 +1315,49 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
 }
 
+TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+
+  HostVectorSharedPtr hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)}));
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_a)},
+                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_b)},
+                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)}});
+  HostsPerLocalitySharedPtr local_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a)},
+                            {makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_b)}});
+
+  hostSet().healthy_hosts_ = *hosts;
+  hostSet().hosts_ = *hosts;
+  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
+  common_config_.mutable_healthy_panic_threshold()->set_value(100);
+  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
+  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
+  init(true);
+  updateHosts(hosts, local_hosts_per_locality);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 100))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 98))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 7))
+      .WillRepeatedly(Return(7));
+
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
+}
+
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
@@ -1538,16 +1581,20 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   HostVectorSharedPtr upstream_hosts(
       new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
                       makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}));
-  HostVectorSharedPtr local_hosts(new HostVector());
+  HostVectorSharedPtr local_hosts(new HostVector({}, {}));
 
   HostsPerLocalitySharedPtr upstream_hosts_per_locality =
       makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}},
-                           true);
-  HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({}, true);
+                            {makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}});
+  HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{{}}, {{}}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillOnce(Return(50))
       .WillOnce(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillOnce(Return(1));
 
   hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
@@ -1555,9 +1602,10 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
 
-  // Too few local localities, we'll do regular routing.
+  // Local cluster is not OK, we'll do regular routing.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPanic) {
@@ -1566,30 +1614,41 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPani
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
+
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
+
   HostVectorSharedPtr upstream_hosts(
       new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
                       makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}));
-  HostVectorSharedPtr local_hosts(new HostVector());
+  HostVectorSharedPtr local_hosts(new HostVector({}, {}));
+
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
+                            {makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}});
+  HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{{}}, {{}}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillOnce(Return(50))
-      .WillOnce(Return(50))
       .WillOnce(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillOnce(Return(1));
 
-  hostSet().healthy_hosts_ = {};
+  hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
-  hostSet().healthy_hosts_per_locality_ = makeHostsPerLocality({}, true);
+  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
-  updateHosts(local_hosts, makeHostsPerLocality({}, true));
+  updateHosts(local_hosts, local_hosts_per_locality);
 
-  // Too few local localities, we'll do regular routing (and select no host, since we're in global
+  // Local cluster is not OK, we'll do regular routing (and select no host, since we're in global
   // panic).
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
-  EXPECT_EQ(1U, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
 // Validate that if we have healthy host lists >= 2, but there is no local
