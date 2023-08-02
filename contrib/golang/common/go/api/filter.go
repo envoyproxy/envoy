@@ -135,11 +135,11 @@ type FilterCallbacks interface {
 	RecoverPanic()
 	Log(level LogType, msg string)
 	LogLevel() LogType
-	// GetProperty fetch Envoy and return the result as a string.
+	// GetProperty fetch Envoy attribute and return the value as a string.
 	// The list of attributes can be found in https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.
-	// If the fetch failed, an error will be returned.
-	// If there is no value of attribute, an empty string will be returned with error equals to nil.
+	// If the fetch succeeded, a string will be returned.
 	// If the value is a timestamp, it is returned as a timestamp string like "2023-07-31T07:21:40.695646+00:00".
+	// If the fetch failed (including the value is not found), an error will be returned.
 	// Currently, fetching requests/response attributes are mostly unsupported.
 	GetProperty(key string) (string, error)
 	// TODO add more for filter callbacks

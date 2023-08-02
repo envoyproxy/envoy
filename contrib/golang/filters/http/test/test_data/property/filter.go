@@ -54,7 +54,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.assertProperty("request.useragent", "ua")
 	f.assertProperty("request.id", "xri")
 
-	f.assertProperty("request.duration", "") // available only when the request is finished
+	f.assertProperty("request.duration", "value not found") // available only when the request is finished
 
 	f.assertProperty("source.address", f.callbacks.StreamInfo().DownstreamRemoteAddress())
 	f.assertProperty("destination.address", f.callbacks.StreamInfo().DownstreamLocalAddress())
@@ -63,11 +63,29 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.assertProperty("xds.route_name", "test-route-name")
 
 	// non-existed attribute
-	f.assertProperty("request.user_agent", "")
+	f.assertProperty("request.user_agent", "value not found")
 
 	// access response attribute in the decode phase
 	f.assertProperty("response.total_size", "0")
 
+	// bad case
+	// strange input
+	for _, attr := range []string{
+		".",
+		".total_size",
+	} {
+		f.assertProperty(attr, "value not found")
+	}
+	// unsupported value type
+	for _, attr := range []string{
+		// unknown type
+		"",
+		// map type
+		"request",
+		"request.",
+	} {
+		f.assertProperty(attr, "serialization failure")
+	}
 	return api.Continue
 }
 
@@ -78,12 +96,12 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 
 	// response.code is available only after the response has started to send
 	code, _ := f.callbacks.StreamInfo().ResponseCode()
-	exp := ""
+	exp := "value not found"
 	if code != 0 {
 		exp = strconv.Itoa(int(code))
 	}
 	f.assertProperty("response.code", exp)
-	f.assertProperty("response.code", "")
+	f.assertProperty("response.code", "value not found")
 	f.assertProperty("response.code_details", "via_upstream")
 
 	f.assertProperty("request.size", "10") // "helloworld"

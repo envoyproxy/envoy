@@ -83,6 +83,8 @@ func capiStatusToStr(status C.CAPIStatus) string {
 		return errNotInGo
 	case C.CAPIInvalidPhase:
 		return errInvalidPhase
+	case C.CAPIValueNotFound:
+		return errValueNotFound
 	case C.CAPIInternalFailure:
 		return errInternalFailure
 	case C.CAPISerializationFailure:
@@ -352,12 +354,9 @@ func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (str
 		handleCApiStatus(res)
 	}
 
-	switch res {
-	case C.CAPIOK:
+	if res == C.CAPIOK {
 		return strings.Clone(value), nil
-	case C.CAPIValueNotFound:
-		return "", nil
-	default:
-		return "", errors.New(capiStatusToStr(res))
 	}
+
+	return "", errors.New(capiStatusToStr(res))
 }

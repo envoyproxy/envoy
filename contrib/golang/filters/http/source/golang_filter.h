@@ -225,6 +225,8 @@ private:
   void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
                                  GoSlice* buf_slice);
 
+  CAPIStatus getStringPropertyCommon(absl::string_view path, GoString* value_str,
+                                     ProcessorState& state);
   CAPIStatus getStringPropertyInternal(absl::string_view path, std::string* result);
   absl::optional<google::api::expr::runtime::CelValue> findValue(absl::string_view name,
                                                                  Protobuf::Arena* arena);

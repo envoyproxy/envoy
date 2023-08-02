@@ -1232,32 +1232,31 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, GoString* value_str
     activation_response_trailers_ = dynamic_cast<const Http::ResponseTrailerMap*>(trailers_);
   }
 
-  static constexpr auto getStringPropertyInCurrentThread = [this, &state, path, value_str]() {
-    const StreamInfo::StreamInfo& info = state.streamInfo();
-    activation_info_ = &info;
-
-    CAPIStatus status = getStringPropertyInternal(path, &req_->strValue);
-    if (status == CAPIStatus::CAPIOK) {
-      value_str->p = req_->strValue.data();
-      value_str->n = req_->strValue.length();
-    }
-    return status;
-  };
-
   if (state.isThreadSafe()) {
-    return getStringPropertyInCurrentThread();
+    return getStringPropertyCommon(path, value_str, state);
   }
 
   auto weak_ptr = weak_from_this();
   state.getDispatcher().post([this, &state, weak_ptr, path, value_str, rc] {
     if (!weak_ptr.expired() && !hasDestroyed()) {
-      *rc = getStringPropertyInCurrentThread();
+      *rc = getStringPropertyCommon(path, value_str, state);
       dynamic_lib_->envoyGoRequestSemaDec(req_);
     } else {
       ENVOY_LOG(info, "golang filter has gone or destroyed in getStringProperty");
     }
   });
   return CAPIStatus::CAPIYield;
+}
+
+CAPIStatus Filter::getStringPropertyCommon(absl::string_view path, GoString* value_str,
+                                           ProcessorState& state) {
+  activation_info_ = &state.streamInfo();
+  CAPIStatus status = getStringPropertyInternal(path, &req_->strValue);
+  if (status == CAPIStatus::CAPIOK) {
+    value_str->p = req_->strValue.data();
+    value_str->n = req_->strValue.length();
+  }
+  return status;
 }
 
 absl::optional<google::api::expr::runtime::CelValue> Filter::findValue(absl::string_view name,

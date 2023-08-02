@@ -33,6 +33,7 @@ const (
 	errInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
 
 	errInternalFailure      = "internal failure"
+	errValueNotFound        = "value not found"
 	errSerializationFailure = "serialization failure"
 )
 
