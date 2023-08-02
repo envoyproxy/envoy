@@ -424,18 +424,18 @@ HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeader
     // Validate the query component of the URI
     ++iter;
     for (; iter != end; ++iter) {
-      const char ch = *iter;
-      if (ch == '#') {
+      if (*iter == '#') {
         break;
       }
 
-      if (!testCharInTable(allowed_query_fragment_characters, ch)) {
+      if (!testCharInTable(allowed_query_fragment_characters, *iter)) {
         return bad_path_result;
       }
     }
   }
 
-  if (iter != end && *iter == '#') {
+  if (iter != end) {
+    ASSERT(*iter == '#');
     if (!config_.strip_fragment_from_path()) {
       return {HeaderValueValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().FragmentInUrlPath};
@@ -453,6 +453,8 @@ HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeader
 }
 
 void HeaderValidator::encodeAdditionalCharactersInPath(
+    // TODO(#28780): reuse Utility::PercentEncoding class for this code.
+
     ::Envoy::Http::RequestHeaderMap& header_map) {
   // " < > ^ ` { } | TAB space extended-ASCII
   static constexpr std::array<uint32_t, 8> kCharactersToEncode = {

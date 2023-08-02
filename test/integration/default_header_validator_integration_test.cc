@@ -38,7 +38,7 @@ public:
       }
       auto client = makeHttpConnection(lookupPort("http"));
 
-      std::string path = fmt::format(path_format, static_cast<char>(ascii));
+      std::string path = fmt::format(fmt::runtime(path_format), static_cast<char>(ascii));
       Http::HeaderString invalid_value{};
       invalid_value.setCopyUnvalidatedForTestOnly(path);
       Http::TestRequestHeaderMapImpl headers{

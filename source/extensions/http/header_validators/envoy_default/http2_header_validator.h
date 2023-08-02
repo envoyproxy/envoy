@@ -59,7 +59,7 @@ private:
   //
   // " < > [ ] ^ ` { } \ | # SPACE TAB and all extended ASCII
   //
-  // RFC-3986 is ambiguous about " < > [ ] ^ ` { } \ |
+  // NOTE: RFC-3986 is ambiguous about " < > [ ] ^ ` { } \ |
   // # is only allowed as a fragment separator (and not allowed within the fragment)
   // SPACE TAB and all extended ASCII are prohibited
   //
