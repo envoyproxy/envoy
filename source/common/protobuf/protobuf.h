@@ -54,16 +54,16 @@ namespace Protobuf {
 
 using Closure = ::google::protobuf::Closure;
 
-using ::google::protobuf::BytesValue;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::Descriptor;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::DescriptorPool;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::DynamicCastToGenerated;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::BytesValue;             // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Descriptor;             // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DescriptorPool;         // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DynamicCastToGenerated; // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DynamicMessageFactory;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::EnumValueDescriptor;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::FieldDescriptor;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::FieldMask;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::Map;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::UInt32Value;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::EnumValueDescriptor;    // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FieldDescriptor;        // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FieldMask;              // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Map;                    // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::UInt32Value;            // NOLINT(misc-unused-using-decls)
 #ifdef ENVOY_ENABLE_FULL_PROTOS
 using ::google::protobuf::Message;
 using ReflectableMessage = ::google::protobuf::Message*;
@@ -82,42 +82,42 @@ template <typename T> T* DynamicCastToGenerated(Message* from) {
 using ReflectableMessage = std::unique_ptr<::google::protobuf::Message>;
 using uint32 = uint32_t;
 #endif
-using ::google::protobuf::DescriptorPoolDatabase;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::FileDescriptorProto;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::FileDescriptorSet;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::MessageFactory;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::MethodDescriptor;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::Reflection;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::RepeatedFieldBackInserter;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::RepeatedField;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::RepeatedPtrField;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::RepeatedPtrFieldBackInserter;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::TextFormat;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DescriptorPoolDatabase;       // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FileDescriptorProto;          // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FileDescriptorSet;            // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::MessageFactory;               // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::MethodDescriptor;             // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Reflection;                   // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::RepeatedField;                // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::RepeatedFieldBackInserter;    // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::RepeatedPtrField;             // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::RepeatedPtrFieldBackInserter; // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::TextFormat;                   // NOLINT(misc-unused-using-decls)
 
 namespace internal {
-using ::google::protobuf::internal::WireFormatLite;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::internal::WireFormatLite; // NOLINT(misc-unused-using-decls)
 } // namespace internal
 
 namespace io {
-using ::google::protobuf::io::ArrayOutputStream;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::io::CodedInputStream;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::io::CodedOutputStream;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::ArrayOutputStream;   // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::CodedInputStream;    // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::CodedOutputStream;   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::io::StringOutputStream;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::io::ZeroCopyInputStream;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::io::ZeroCopyInputStream; // NOLINT(misc-unused-using-decls)
 } // namespace io
 
 namespace util {
-using ::google::protobuf::util::JsonStringToMessage;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::util::MessageToJsonString;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::util::NewTypeResolverForDescriptorPool;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::JsonStringToMessage;              // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::MessageToJsonString;              // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::NewTypeResolverForDescriptorPool; // NOLINT(misc-unused-using-decls)
 #ifdef ENVOY_ENABLE_FULL_PROTOS
-using ::google::protobuf::util::MessageDifferencer;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::MessageDifferencer; // NOLINT(misc-unused-using-decls)
 #else
 using MessageDifferencer = MessageLiteDifferencer;
 #endif
-using ::google::protobuf::util::JsonParseOptions;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::util::JsonPrintOptions;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::util::TimeUtil;  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::JsonParseOptions; // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::JsonPrintOptions; // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::util::TimeUtil;         // NOLINT(misc-unused-using-decls)
 } // namespace util
 
 using uint32 = uint32_t;
@@ -154,7 +154,6 @@ public:
   static bool Equivalent(const Protobuf::Message& message1, const Protobuf::Message& message2);
 };
 
-using ConstMessagePtrVector = std::vector<std::unique_ptr<const
-        Protobuf::Message>>;
+using ConstMessagePtrVector = std::vector<std::unique_ptr<const Protobuf::Message>>;
 
 } // namespace Envoy
