@@ -6,17 +6,25 @@ FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
 WARNINGS=()
 
+# Sandboxes listed here should be regarded as broken(/untested) until whatever
+# is causing them to flake is resolved!!!
+FLAKY_SANDBOXES=(
+    # https://github.com/envoyproxy/envoy/issues/28542
+    double-proxy
+    # https://github.com/envoyproxy/envoy/issues/28541
+    wasm-cc
+    # https://github.com/envoyproxy/envoy/issues/28546
+    websocket)
+
 
 trap_errors () {
     local frame=0 command line sub file
-    if [[ "$example" == "./double-proxy" ]]; then
-        WARNINGS+=("FAILED (double-proxy)")
-        return
-    fi
-    if [[ "$example" == "./golang-network" ]]; then
-        WARNINGS+=("FAILED (golang-network)")
-        return
-    fi
+    for flake in "${FLAKY_SANDBOXES[@]}"; do
+        if [[ "$example" == "./${flake}" ]]; then
+            WARNINGS+=("FAILED (${flake})")
+            return
+        fi
+    done
     if [[ -n "$example" ]]; then
         command=" (${example})"
     fi

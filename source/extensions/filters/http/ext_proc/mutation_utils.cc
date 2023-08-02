@@ -24,18 +24,41 @@ using Stats::Counter;
 using envoy::service::ext_proc::v3::BodyMutation;
 using envoy::service::ext_proc::v3::HeaderMutation;
 
-bool MutationUtils::headerInAllowList(
+bool MutationUtils::headerInMatcher(
     absl::string_view key, const std::vector<Matchers::StringMatcherPtr>& header_matchers) {
   return std::any_of(header_matchers.begin(), header_matchers.end(),
                      [&key](auto& matcher) { return matcher->match(key); });
 }
 
-void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
-                                   const std::vector<Matchers::StringMatcherPtr>& header_matchers,
-                                   envoy::config::core::v3::HeaderMap& proto_out) {
-  headers_in.iterate([&proto_out,
-                      &header_matchers](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
-    if (header_matchers.empty() || headerInAllowList(e.key().getStringView(), header_matchers)) {
+bool MutationUtils::headerCanBeForwarded(
+    absl::string_view key, const std::vector<Matchers::StringMatcherPtr>& allowed_headers,
+    const std::vector<Matchers::StringMatcherPtr>& disallowed_headers) {
+  // disallow list empty
+  if (disallowed_headers.empty()) {
+    if (allowed_headers.empty() || headerInMatcher(key, allowed_headers)) {
+      return true;
+    }
+    return false;
+  }
+
+  // Now disallow list is set.
+  if (headerInMatcher(key, disallowed_headers)) {
+    return false;
+  }
+  if (allowed_headers.empty() || headerInMatcher(key, allowed_headers)) {
+    return true;
+  }
+  return false;
+}
+
+void MutationUtils::headersToProto(
+    const Http::HeaderMap& headers_in,
+    const std::vector<Matchers::StringMatcherPtr>& allowed_headers,
+    const std::vector<Matchers::StringMatcherPtr>& disallowed_headers,
+    envoy::config::core::v3::HeaderMap& proto_out) {
+  headers_in.iterate([&proto_out, &allowed_headers,
+                      &disallowed_headers](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
+    if (headerCanBeForwarded(e.key().getStringView(), allowed_headers, disallowed_headers)) {
       auto* new_header = proto_out.add_headers();
       new_header->set_key(std::string(e.key().getStringView()));
       // Setting up value or raw_value field based on the runtime flag.

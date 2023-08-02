@@ -46,8 +46,9 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  *
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stats),
+                                           ::Envoy::Http::HeaderValidatorStats& stats,
+                                           const ConfigOverrides& config_overrides)
+    : HeaderValidator(config, protocol, stats, config_overrides),
       request_header_validator_map_{
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
           {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
@@ -428,11 +429,10 @@ ValidationResult Http2HeaderValidator::validateResponseTrailers(
 ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult
 ServerHttp2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
   sanitizeHeadersWithUnderscores(header_map);
-  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
-    auto path_result = path_normalizer_.normalizePathUri(header_map);
-    if (!path_result.ok()) {
-      return path_result;
-    }
+  sanitizePathWithFragment(header_map);
+  auto path_result = transformUrlPath(header_map);
+  if (!path_result.ok()) {
+    return path_result;
   }
 
   // Transform H/2 extended CONNECT to H/1 UPGRADE, so that request processing always observes H/1

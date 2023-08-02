@@ -6,10 +6,9 @@ typedef struct {
 } httpRequest;
 */
 import "C"
-import "unsafe"
-
 import (
 	"sync"
+	"unsafe"
 )
 
 var configCache = &sync.Map{}
@@ -84,10 +83,10 @@ func envoyGoFilterOnDownstreamWrite(wrapper unsafe.Pointer, dataSize uint64, dat
 }
 
 //export envoyGoFilterOnUpstreamConnectionReady
-func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer) {}
+func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer, connID uint64) {}
 
 //export envoyGoFilterOnUpstreamConnectionFailure
-func envoyGoFilterOnUpstreamConnectionFailure(wrapper unsafe.Pointer, reason int) {}
+func envoyGoFilterOnUpstreamConnectionFailure(wrapper unsafe.Pointer, reason int, connID uint64) {}
 
 //export envoyGoFilterOnUpstreamData
 func envoyGoFilterOnUpstreamData(wrapper unsafe.Pointer, dataSize uint64, dataPtr uint64, sliceNum int, endOfStream int) {
@@ -95,6 +94,10 @@ func envoyGoFilterOnUpstreamData(wrapper unsafe.Pointer, dataSize uint64, dataPt
 
 //export envoyGoFilterOnUpstreamEvent
 func envoyGoFilterOnUpstreamEvent(wrapper unsafe.Pointer, event int) {}
+
+//export envoyGoFilterOnSemaDec
+func envoyGoFilterOnSemaDec(wrapper unsafe.Pointer) {
+}
 
 //export envoyGoRequestSemaDec
 func envoyGoRequestSemaDec(r *C.httpRequest) {

@@ -27,8 +27,9 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_, overrides_);
   }
+  ConfigOverrides overrides_;
 };
 
 TEST_F(BaseHeaderValidatorTest, ValidateMethodPermissive) {
@@ -60,17 +61,12 @@ TEST_F(BaseHeaderValidatorTest, ValidateSchemeValid) {
 
   EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_https));
   EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_http));
-}
 
-TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidMixedCase) {
-  HeaderString invalid_https{"HtTps"};
-  HeaderString invalid_http{"hTtp"};
-  auto uhv = createBase(empty_config);
+  HeaderString mixed_https{"HtTps"};
+  HeaderString mixed_http{"hTtp"};
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateSchemeHeader(invalid_https),
-                             UhvResponseCodeDetail::get().InvalidScheme);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateSchemeHeader(invalid_http),
-                             UhvResponseCodeDetail::get().InvalidScheme);
+  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_https));
+  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_http));
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidChar) {
@@ -290,10 +286,18 @@ TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersQuery) {
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersFragment) {
+TEST_F(BaseHeaderValidatorTest, PathWithFragmentRejectedByDefault) {
+  HeaderString invalid{"/root?x=1#fragment"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
+                             UhvResponseCodeDetail::get().FragmentInUrlPath);
+}
+
+TEST_F(BaseHeaderValidatorTest, PathWithFragmentAllowedWhenConfigured) {
   HeaderString valid{"/root?x=1#fragment"};
   HeaderString invalid{"/root#frag|ment"};
-  auto uhv = createBase(empty_config);
+  auto uhv = createBase(fragment_in_path_allowed);
 
   EXPECT_ACCEPT(uhv->validatePathHeaderCharacters(valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),

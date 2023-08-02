@@ -30,7 +30,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, Protocol::Http2, stats_);
+    return std::make_unique<ServerHttp2HeaderValidator>(typed_config, Protocol::Http2, stats_,
+                                                        overrides_);
   }
 
   ::Envoy::Http::ClientHeaderValidatorPtr createH2ClientUhv(absl::string_view config_yaml) {
@@ -38,7 +39,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ClientHttp2HeaderValidator>(typed_config, Protocol::Http2, stats_);
+    return std::make_unique<ClientHttp2HeaderValidator>(typed_config, Protocol::Http2, stats_,
+                                                        overrides_);
   }
 
   std::unique_ptr<Http2HeaderValidator> createH2BaseUhv(absl::string_view config_yaml) {
@@ -46,7 +48,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stats_);
+    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stats_,
+                                                  overrides_);
   }
 
   TestRequestHeaderMapImpl makeGoodRequestHeaders() {
@@ -59,6 +62,7 @@ protected:
   }
 
   TestScopedRuntime scoped_runtime_;
+  ConfigOverrides overrides_;
 };
 
 TEST_F(Http2HeaderValidatorTest, GoodHeadersAccepted) {
@@ -678,34 +682,6 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
   EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers),
                              UhvResponseCodeDetail::get().InvalidUrl);
   ;
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/dir1%2fdir2"},
-                                                  {":authority", "envoy.com"}};
-  auto uhv = createH2ServerUhv(redirect_encoded_slash_config);
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  // Path normalization should result in redirect
-  auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_EQ(
-      result.action(),
-      ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
-  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
-  EXPECT_EQ(headers.path(), "/dir1/dir2");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeadersPathNormalizationDisabled) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/./dir1%2f../dir2"},
-                                                  {":authority", "envoy.com"}};
-  auto uhv = createH2ServerUhv(no_path_normalization);
-
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
-  EXPECT_TRUE(uhv->transformRequestHeaders(headers).ok());
-  EXPECT_EQ(headers.path(), "/./dir1%2f../dir2");
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailerMap) {
