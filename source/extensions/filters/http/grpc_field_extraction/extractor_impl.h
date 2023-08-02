@@ -16,11 +16,11 @@ namespace Envoy {
 
 namespace Protobuf {
 namespace field_extraction {
-using ::google::protobuf::field_extraction::FieldValueExtractorInterface;
 using ::google::protobuf::field_extraction::FieldValueExtractorFactory;
+using ::google::protobuf::field_extraction::FieldValueExtractorInterface;
 using ::google::protobuf::field_extraction::MessageData;
-}  // namespace field_extraction
-}  // namespace Protobuf
+} // namespace field_extraction
+} // namespace Protobuf
 
 namespace Extensions {
 namespace HttpFilters {
