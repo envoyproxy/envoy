@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/ssl/connection.h"
@@ -10,6 +11,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
@@ -24,7 +27,7 @@ namespace NetworkFilters {
 namespace Golang {
 
 /**
- * Configuration for the Golang network filter.
+ * Configuration for the HTTP golang extension filter.
  */
 class FilterConfig {
 public:
