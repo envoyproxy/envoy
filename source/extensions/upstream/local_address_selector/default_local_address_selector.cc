@@ -84,7 +84,6 @@ Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
       std::make_shared<Network::ConnectionSocket::Options>();
 
   if (options) {
-    connection_options = std::make_shared<Network::ConnectionSocket::Options>();
     *connection_options = *options;
     Network::Socket::appendOptions(connection_options, local_address_options);
   } else {
