@@ -81,6 +81,7 @@ envoy_cc_contrib_extension(
     ],
     deps = [
         "//contrib/golang/common/dso:dso_lib",
+        "//contrib/golang/common/log:log_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",

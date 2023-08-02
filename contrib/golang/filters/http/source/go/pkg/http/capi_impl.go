@@ -279,11 +279,11 @@ func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName strin
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
-	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(&message))
 }
 
 func (c *httpCApiImpl) HttpLogLevel() api.LogType {
-	return api.LogType(C.envoyGoFilterHttpLogLevel())
+	return api.LogType(C.envoyGoFilterLogLevel())
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
