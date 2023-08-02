@@ -80,34 +80,6 @@ TEST_P(HttpCommonValidationTest, MalformedUrlEncodingRejectedWithOverride) {
   EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers), "uhv.invalid_url");
 }
 
-TEST_P(HttpCommonValidationTest, DelInPathRejected) {
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":authority", "envoy.com"},
-                                                  {":path", "/path/with/DE\x7FL"},
-                                                  {":method", "GET"}};
-  auto uhv = createUhv(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
-
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
-  uhv = createUhv(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
-}
-
-TEST_P(HttpCommonValidationTest, DelInQueryRejected) {
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":authority", "envoy.com"},
-                                                  {":path", "/query?with=DE\x7FL"},
-                                                  {":method", "GET"}};
-  auto uhv = createUhv(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
-
-  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
-  uhv = createUhv(empty_config);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
-}
-
 TEST_P(HttpCommonValidationTest, BackslashInPathIsTranslatedToSlash) {
   scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},

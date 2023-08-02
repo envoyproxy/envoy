@@ -472,7 +472,7 @@ void HeaderValidator::encodeAdditionalCharactersInPath(
   };
 
   absl::string_view path = header_map.path();
-  // Check if URI the path contains any characters >= 0x80
+  // Check if URL path contains any characters in the kCharactersToEncode set
   auto char_to_encode = path.begin();
   for (; char_to_encode != path.end() && !testCharInTable(kCharactersToEncode, *char_to_encode);
        ++char_to_encode) {
@@ -501,7 +501,7 @@ void HeaderValidator::encodeAdditionalCharactersInPath(
   }
   // Append query and fragment if present
   encoded_path.append(char_to_encode, path.end());
-  // Encoding would change the length of the path
+  // Encoding changes the length of the path
   if (encoded_path.size() > path.size()) {
     header_map.setPath(encoded_path);
   }

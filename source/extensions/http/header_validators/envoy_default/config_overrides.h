@@ -53,8 +53,8 @@ struct ConfigOverrides {
   //
   // In the relaxed mode header validator allows the following additional characters:
   // HTTP/1 protocol: " < > [ ] ^ ` { } \ | #
-  // HTTP/2 and HTTP/3 protocols: all characters allowed for HTTP/1, space, TAB, all extended ASCII
-  // (>= 0x80)
+  // HTTP/2 and HTTP/3 protocols: all characters allowed for HTTP/1, space, TAB
+  // HTTP/2 protocol: also allows all extended ASCII (>= 0x80)
   //
   // NOTE: the " < > [ ] ^ ` { } \ | characters are not explicitly prohibited by the RFC-3986, they
   // are just not part of any defined set. # is only allowed as a fragment separator. Extended

@@ -68,7 +68,7 @@ private:
                                                           const ::Envoy::Http::HeaderString& value);
 
   // This method validates :path header value using character set that includes characters
-  // prohibited by https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC.
+  // that https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC is ambiguous about:
   //
   // " < > [ ] ^ ` { } \ | #
   //
