@@ -117,8 +117,11 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint32_t c
 }
 
 QuicConnectionIdWorkerSelector
-EnvoyDeterministicConnectionIdGeneratorFactory::getCompatibleConnectionIdWorkerSelector() {
-  return bpfEquivalentFunction;
+EnvoyDeterministicConnectionIdGeneratorFactory::getCompatibleConnectionIdWorkerSelector(
+    uint32_t concurrency) {
+  return [concurrency](const Buffer::Instance& packet, uint32_t default_value) {
+    return bpfEquivalentFunction(packet, concurrency, default_value);
+  };
 }
 
 } // namespace Quic

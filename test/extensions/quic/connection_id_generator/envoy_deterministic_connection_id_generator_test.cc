@@ -1,5 +1,7 @@
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator.h"
 
+#include "test/extensions/quic/connection_id_generator/matchers.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_test.h"
@@ -8,6 +10,8 @@
 namespace Envoy {
 namespace Quic {
 
+using Matcher::FactoryFunctions;
+using Matcher::GivenPacket;
 using ::quic::QuicConnectionId;
 using ::quic::test::QuicTest;
 using ::quic::test::TestConnectionId;
@@ -83,42 +87,36 @@ TEST_F(EnvoyDeterministicConnectionIdGeneratorTest, NextConnectionIdPersistsWork
 }
 
 class EnvoyDeterministicConnectionIdGeneratorFactoryTest : public ::testing::Test {
-public:
-  EnvoyDeterministicConnectionIdGeneratorFactoryTest() {
-    EnvoyDeterministicConnectionIdGeneratorFactory factory;
-    worker_selector_ = factory.getCompatibleConnectionIdWorkerSelector();
-  }
-
 protected:
-  QuicConnectionIdWorkerSelector worker_selector_;
+  EnvoyDeterministicConnectionIdGeneratorFactory factory_;
 };
 
 TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
        ConnectionIdWorkerSelectorReturnsCurrentWorkerForShortHeaderPacketsTooShort) {
   Buffer::OwnedImpl buffer("aaaaaa");
-  EXPECT_EQ(12, worker_selector_(buffer, 14, 12));
-  EXPECT_EQ(6, worker_selector_(buffer, 16, 6));
+  EXPECT_THAT(FactoryFunctions(factory_, 256), GivenPacket(buffer).ReturnsDefaultWorkerId());
+  EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsDefaultWorkerId());
 }
 
 TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
        ConnectionIdWorkerSelectorReturnsCurrentWorkerForLongHeaderPacketsTooShort) {
   Buffer::OwnedImpl buffer("\x80xxxxxxxxxxx");
-  EXPECT_EQ(12, worker_selector_(buffer, 14, 12));
-  EXPECT_EQ(6, worker_selector_(buffer, 16, 6));
+  EXPECT_THAT(FactoryFunctions(factory_, 256), GivenPacket(buffer).ReturnsDefaultWorkerId());
+  EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsDefaultWorkerId());
 }
 
 TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
        ConnectionIdWorkerSelectorReturnsBytesOneToFourModConcurrencyForShortPackets) {
   Buffer::OwnedImpl buffer("x\x12\x34\x56\x78xxxxxxxxx");
-  EXPECT_EQ(0x78, worker_selector_(buffer, 256, 12));
-  EXPECT_EQ(0x5678, worker_selector_(buffer, 65536, 6));
+  EXPECT_THAT(FactoryFunctions(factory_, 256), GivenPacket(buffer).ReturnsWorkerId(0x78));
+  EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsWorkerId(0x5678));
 }
 
 TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
        ConnectionIdWorkerSelectorReturnsBytesSixToNineModConcurrencyForLongPackets) {
   Buffer::OwnedImpl buffer("\x80xxxxx\x12\x34\x56\x78xxxxxxxxx");
-  EXPECT_EQ(0x78, worker_selector_(buffer, 256, 12));
-  EXPECT_EQ(0x5678, worker_selector_(buffer, 65536, 6));
+  EXPECT_THAT(FactoryFunctions(factory_, 256), GivenPacket(buffer).ReturnsWorkerId(0x78));
+  EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsWorkerId(0x5678));
 }
 
 } // namespace Quic

@@ -129,7 +129,7 @@ protected:
       uint32_t packets_to_read_to_connection_count_ratio,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-      QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector);
+      QuicConnectionIdGeneratorPtr&& cid_generator);
 
 private:
   friend class ActiveQuicListenerFactoryPeer;
@@ -146,6 +146,7 @@ private:
   QuicStatNames& quic_stat_names_;
   const uint32_t packets_to_read_to_connection_count_ratio_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
+  QuicConnectionIdWorkerSelector worker_selector_;
   bool kernel_worker_routing_{};
   ProcessContextOptRef context_;
 
