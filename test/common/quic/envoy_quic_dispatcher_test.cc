@@ -16,6 +16,7 @@
 
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
@@ -178,14 +179,16 @@ public:
     testing::StrictMock<Stats::MockCounter> write_total;
     testing::StrictMock<Stats::MockGauge> write_current;
 
-    std::vector<Network::FilterFactoryCb> filter_factory(
-        {[&](Network::FilterManager& filter_manager) {
-          filter_manager.addReadFilter(read_filter);
-          read_filter->callbacks_->connection().addConnectionCallbacks(
-              network_connection_callbacks);
-          read_filter->callbacks_->connection().setConnectionStats(
-              {read_total, read_current, write_total, write_current, nullptr, nullptr});
-        }});
+    Filter::NetworkFilterFactoriesList filter_factory;
+    filter_factory.push_back(
+        std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+            [&](Network::FilterManager& filter_manager) {
+              filter_manager.addReadFilter(read_filter);
+              read_filter->callbacks_->connection().addConnectionCallbacks(
+                  network_connection_callbacks);
+              read_filter->callbacks_->connection().setConnectionStats(
+                  {read_total, read_current, write_total, write_current, nullptr, nullptr});
+            }));
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
     EXPECT_CALL(filter_chain_manager, findFilterChain(_, _))
         .WillOnce(
@@ -199,7 +202,7 @@ public:
     EXPECT_CALL(listener_config_, filterChainFactory());
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .WillOnce(Invoke([](Network::Connection& connection,
-                            const std::vector<Network::FilterFactoryCb>& filter_factories) {
+                            const Filter::NetworkFilterFactoriesList& filter_factories) {
           EXPECT_EQ(1u, filter_factories.size());
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           dynamic_cast<EnvoyQuicServerSession&>(connection)
@@ -257,15 +260,18 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
   testing::StrictMock<Stats::MockCounter> write_total;
   testing::StrictMock<Stats::MockGauge> write_current;
 
-  std::vector<Network::FilterFactoryCb> filter_factory(
-      {[&](Network::FilterManager& filter_manager) {
-        filter_manager.addReadFilter(read_filter);
-        read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
-        read_filter->callbacks_->connection().setConnectionStats(
-            {read_total, read_current, write_total, write_current, nullptr, nullptr});
-        // This will not close connection right away, but during processing the first packet.
-        read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-      }});
+  Filter::NetworkFilterFactoriesList filter_factory;
+  filter_factory.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+          [&](Network::FilterManager& filter_manager) {
+            filter_manager.addReadFilter(read_filter);
+            read_filter->callbacks_->connection().addConnectionCallbacks(
+                network_connection_callbacks);
+            read_filter->callbacks_->connection().setConnectionStats(
+                {read_total, read_current, write_total, write_current, nullptr, nullptr});
+            // This will not close connection right away, but during processing the first packet.
+            read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+          }));
 
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   EXPECT_CALL(filter_chain_manager, findFilterChain(_, _))
@@ -275,7 +281,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
   EXPECT_CALL(listener_config_, filterChainFactory());
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
       .WillOnce(Invoke([](Network::Connection& connection,
-                          const std::vector<Network::FilterFactoryCb>& filter_factories) {
+                          const Filter::NetworkFilterFactoriesList& filter_factories) {
         EXPECT_EQ(1u, filter_factories.size());
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
@@ -312,13 +318,17 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
   testing::StrictMock<Stats::MockCounter> write_total;
   testing::StrictMock<Stats::MockGauge> write_current;
 
-  std::vector<Network::FilterFactoryCb> filter_factory(
-      {[&](Network::FilterManager& filter_manager) {
-        filter_manager.addReadFilter(read_filter);
-        read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
-        read_filter->callbacks_->connection().setConnectionStats(
-            {read_total, read_current, write_total, write_current, nullptr, nullptr});
-      }});
+  Filter::NetworkFilterFactoriesList filter_factory;
+  filter_factory.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+          [&](Network::FilterManager& filter_manager) {
+            filter_manager.addReadFilter(read_filter);
+            read_filter->callbacks_->connection().addConnectionCallbacks(
+                network_connection_callbacks);
+            read_filter->callbacks_->connection().setConnectionStats(
+                {read_total, read_current, write_total, write_current, nullptr, nullptr});
+          }));
+
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   EXPECT_CALL(filter_chain_manager, findFilterChain(_, _))
       .WillOnce(Return(&proof_source_->filterChain()));
@@ -327,7 +337,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
   EXPECT_CALL(listener_config_, filterChainFactory());
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
       .WillOnce(Invoke([](Network::Connection& connection,
-                          const std::vector<Network::FilterFactoryCb>& filter_factories) {
+                          const Filter::NetworkFilterFactoriesList& filter_factories) {
         EXPECT_EQ(1u, filter_factories.size());
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;

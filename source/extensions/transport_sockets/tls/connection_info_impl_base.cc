@@ -45,6 +45,20 @@ absl::Span<const std::string> ConnectionInfoImplBase::dnsSansLocalCertificate() 
   return cached_dns_san_local_certificate_;
 }
 
+absl::Span<const std::string> ConnectionInfoImplBase::ipSansLocalCertificate() const {
+  if (!cached_ip_san_local_certificate_.empty()) {
+    return cached_ip_san_local_certificate_;
+  }
+
+  X509* cert = SSL_get_certificate(ssl());
+  if (!cert) {
+    ASSERT(cached_ip_san_local_certificate_.empty());
+    return cached_ip_san_local_certificate_;
+  }
+  cached_ip_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_IPADD);
+  return cached_ip_san_local_certificate_;
+}
+
 const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
   if (!cached_sha_256_peer_certificate_digest_.empty()) {
     return cached_sha_256_peer_certificate_digest_;
@@ -159,6 +173,20 @@ absl::Span<const std::string> ConnectionInfoImplBase::dnsSansPeerCertificate() c
   }
   cached_dns_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_DNS);
   return cached_dns_san_peer_certificate_;
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() const {
+  if (!cached_ip_san_peer_certificate_.empty()) {
+    return cached_ip_san_peer_certificate_;
+  }
+
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  if (!cert) {
+    ASSERT(cached_ip_san_peer_certificate_.empty());
+    return cached_ip_san_peer_certificate_;
+  }
+  cached_ip_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_IPADD);
+  return cached_ip_san_peer_certificate_;
 }
 
 uint16_t ConnectionInfoImplBase::ciphersuiteId() const {

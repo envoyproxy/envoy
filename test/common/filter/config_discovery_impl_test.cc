@@ -72,6 +72,33 @@ public:
   }
 };
 
+class TestNetworkFilterFactory
+    : public TestFilterFactory,
+      public Server::Configuration::NamedNetworkFilterConfigFactory,
+      public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    created_ = true;
+    return [](Network::FilterManager&) -> void {};
+  }
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::CommonFactoryContext&) override {
+    created_ = true;
+    return [](Network::FilterManager&) -> void {};
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return "envoy.test.filter"; }
+  bool isTerminalFilterByProto(const Protobuf::Message&,
+                               Server::Configuration::ServerFactoryContext&) override {
+    return true;
+  }
+};
+
 class TestListenerFilterFactory : public TestFilterFactory,
                                   public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
@@ -136,7 +163,7 @@ public:
   Stats::Scope& scope_{*store_.rootScope()};
 };
 
-// Common base ECDS test class for HTTP filter, and TCP/UDP listener filter.
+// Common base ECDS test class for HTTP filter, Network filter and TCP/UDP listener filter.
 template <class FactoryCb, class FactoryCtx, class CfgProviderMgrImpl, class FilterFactory,
           class FilterCategory, class MockFactoryCtx>
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
@@ -261,6 +288,40 @@ public:
   }
 };
 
+// Network filter test
+class NetworkFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<
+          Network::FilterFactoryCb, Server::Configuration::FactoryContext,
+          NetworkFilterConfigProviderManagerImpl, TestNetworkFilterFactory,
+          Server::Configuration::NamedNetworkFilterConfigFactory,
+          Server::Configuration::MockFactoryContext> {
+public:
+  const std::string getFilterType() const override { return "network"; }
+  const std::string getConfigReloadCounter() const override {
+    return "extension_config_discovery.network_filter.foo.config_reload";
+  }
+  const std::string getConfigFailCounter() const override {
+    return "extension_config_discovery.network_filter.foo.config_fail";
+  }
+};
+
+// Network upstream filter test
+class NetworkUpstreamFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<
+          Network::FilterFactoryCb, Server::Configuration::CommonFactoryContext,
+          UpstreamNetworkFilterConfigProviderManagerImpl, TestNetworkFilterFactory,
+          Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
+          Server::Configuration::MockFactoryContext> {
+public:
+  const std::string getFilterType() const override { return "network"; }
+  const std::string getConfigReloadCounter() const override {
+    return "extension_config_discovery.upstream_network_filter.foo.config_reload";
+  }
+  const std::string getConfigFailCounter() const override {
+    return "extension_config_discovery.upstream_network_filter.foo.config_fail";
+  }
+};
+
 // TCP listener filter test
 class TcpListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
@@ -297,17 +358,17 @@ public:
 
 /***************************************************************************************
  *                  Parameterized test for                                             *
- *     HTTP filter,  TCP listener filter And UDP listener filter                       *
+ *     HTTP filter, Network filter, TCP listener filter And UDP listener filter        *
  *                                                                                     *
  ***************************************************************************************/
 template <typename FilterConfigDiscoveryTestType>
 class FilterConfigDiscoveryImplTestParameter : public testing::Test {};
 
 // The test filter types.
-using FilterConfigDiscoveryTestTypes =
-    ::testing::Types<HttpFilterConfigDiscoveryImplTest, HttpUpstreamFilterConfigDiscoveryImplTest,
-                     TcpListenerFilterConfigDiscoveryImplTest,
-                     UdpListenerFilterConfigDiscoveryImplTest>;
+using FilterConfigDiscoveryTestTypes = ::testing::Types<
+    HttpFilterConfigDiscoveryImplTest, HttpUpstreamFilterConfigDiscoveryImplTest,
+    NetworkFilterConfigDiscoveryImplTest, NetworkUpstreamFilterConfigDiscoveryImplTest,
+    TcpListenerFilterConfigDiscoveryImplTest, UdpListenerFilterConfigDiscoveryImplTest>;
 
 TYPED_TEST_SUITE(FilterConfigDiscoveryImplTestParameter, FilterConfigDiscoveryTestTypes);
 
@@ -524,11 +585,11 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
 }
 
 // Raise exception when filter is not the last filter in filter chain, but the filter is terminal
-// filter. This test is HTTP filter specific.
+// filter. This test does not apply to listener filter.
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
-  if (config_discovery_test.getFilterType() != "http") {
+  if (config_discovery_test.getFilterType() == "listener") {
     return;
   }
 
@@ -551,7 +612,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
                                                        response.version_info()),
       EnvoyException,
       "Error: terminal filter named foo of type envoy.test.filter must be the last filter "
-      "in a http filter chain.");
+      "in a " +
+          config_discovery_test.getFilterType() + " filter chain.");
   EXPECT_EQ(
       0UL,
       config_discovery_test.store_.counter("extension_config_discovery.foo.config_reload").value());

@@ -73,32 +73,6 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
   EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
 }
 
-TEST(UtilityTest, TranslateApiConfigSource) {
-  envoy::config::core::v3::ApiConfigSource api_config_source_rest_legacy;
-  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000, ApiType::get().Rest,
-                                    api_config_source_rest_legacy);
-  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::REST,
-            api_config_source_rest_legacy.api_type());
-  EXPECT_EQ(10000,
-            DurationUtil::durationToMilliseconds(api_config_source_rest_legacy.refresh_delay()));
-  EXPECT_EQ("test_rest_legacy_cluster", api_config_source_rest_legacy.cluster_names(0));
-
-  envoy::config::core::v3::ApiConfigSource api_config_source_rest;
-  Utility::translateApiConfigSource("test_rest_cluster", 20000, ApiType::get().Rest,
-                                    api_config_source_rest);
-  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::REST, api_config_source_rest.api_type());
-  EXPECT_EQ(20000, DurationUtil::durationToMilliseconds(api_config_source_rest.refresh_delay()));
-  EXPECT_EQ("test_rest_cluster", api_config_source_rest.cluster_names(0));
-
-  envoy::config::core::v3::ApiConfigSource api_config_source_grpc;
-  Utility::translateApiConfigSource("test_grpc_cluster", 30000, ApiType::get().Grpc,
-                                    api_config_source_grpc);
-  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::GRPC, api_config_source_grpc.api_type());
-  EXPECT_EQ(30000, DurationUtil::durationToMilliseconds(api_config_source_grpc.refresh_delay()));
-  EXPECT_EQ("test_grpc_cluster",
-            api_config_source_grpc.grpc_services(0).envoy_grpc().cluster_name());
-}
-
 TEST(UtilityTest, createTagProducer) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   auto producer = Utility::createTagProducer(bootstrap, {});

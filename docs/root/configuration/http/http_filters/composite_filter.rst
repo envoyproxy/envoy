@@ -39,7 +39,7 @@ instantiated.
 Statistics
 ----------
 
-The composite filter outputs statistics in the <stat_prefix>.composite.* namespace.
+The composite filter outputs statistics in the ``<stat_prefix>.composite.*`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description

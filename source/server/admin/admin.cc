@@ -252,7 +252,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
-                                         const std::vector<Network::FilterFactoryCb>&) {
+                                         const Filter::NetworkFilterFactoriesList&) {
   // Pass in the null overload manager so that the admin interface is accessible even when Envoy
   // is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(

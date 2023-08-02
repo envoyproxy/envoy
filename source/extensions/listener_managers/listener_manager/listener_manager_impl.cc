@@ -77,15 +77,27 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
 }
 } // namespace
 
-std::vector<Network::FilterFactoryCb>
-ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
+Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
-  std::vector<Network::FilterFactoryCb> ret;
+    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context,
+    Filter::NetworkFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::NetworkFilterFactoriesList ret;
   ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
+    const bool is_terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  filter #{}:", i);
+
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::Filter::ConfigTypeCase::kConfigDiscovery) {
+      ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
+      ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
+          proto_config.config_discovery(), proto_config.name(),
+          filter_chain_factory_context.getServerFactoryContext(), filter_chain_factory_context,
+          is_terminal, "network", nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
@@ -102,10 +114,11 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
         filters[i].name(), factory.name(), "network",
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.getServerFactoryContext()),
-        i == filters.size() - 1);
+        is_terminal);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
-    ret.push_back(std::move(callback));
+    ret.push_back(
+        config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name()));
   }
   return ret;
 }

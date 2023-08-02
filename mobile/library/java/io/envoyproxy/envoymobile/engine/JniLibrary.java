@@ -311,7 +311,7 @@ public class JniLibrary {
       boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
       boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsResourceName,
       long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsJwtToken,
-      long xdsJwtTokenLifetime, String xdsRootCerts, String nodeId, String nodeRegion,
-      String nodeZone, String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds,
-      boolean enableCds);
+      long xdsJwtTokenLifetime, String xdsRootCerts, String xdsJni, String nodeId,
+      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
+      long cdsTimeoutSeconds, boolean enableCds);
 }

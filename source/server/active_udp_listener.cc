@@ -33,19 +33,12 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
   ASSERT(!udp_listener_->dispatcher().isThreadSafe(),
          "Shouldn't be posting if thread safe; use onWorkerData() instead.");
 
-  // It is not possible to capture a unique_ptr because the post() API copies the lambda, so we must
-  // bundle the socket inside a shared_ptr that can be captured.
-  // TODO(mattklein123): It may be possible to change the post() API such that the lambda is only
-  // moved, but this is non-trivial and needs investigation.
-  auto data_to_post = std::make_shared<Network::UdpRecvData>();
-  *data_to_post = std::move(data);
-
   auto address = listen_socket_.connectionInfoProvider().localAddress();
-  udp_listener_->dispatcher().post([data_to_post, tag = config_->listenerTag(), &parent = parent_,
-                                    address]() {
+  udp_listener_->dispatcher().post([data = std::move(data), tag = config_->listenerTag(),
+                                    &parent = parent_, address]() mutable {
     Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag, *address);
     if (listener.has_value()) {
-      listener->get().onDataWorker(std::move(*data_to_post));
+      listener->get().onDataWorker(std::move(data));
     }
   });
 }
