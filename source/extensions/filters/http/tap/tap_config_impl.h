@@ -19,7 +19,8 @@ class HttpTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                           public std::enable_shared_from_this<HttpTapConfigImpl> {
 public:
   HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                    Extensions::Common::Tap::Sink* admin_streamer);
+                    Extensions::Common::Tap::Sink* admin_streamer,
+                    Server::Configuration::FactoryContext& context);
 
   // TapFilter::HttpTapConfig
   HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) override;

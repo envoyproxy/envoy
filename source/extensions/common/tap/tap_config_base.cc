@@ -46,7 +46,8 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                                     Common::Tap::Sink* admin_streamer)
+                                     Common::Tap::Sink* admin_streamer,
+                                     Server::Configuration::CommonFactoryContext& context)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -61,6 +62,17 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   sink_type_ = sinks[0].output_sink_type_case();
 
   switch (sink_type_) {
+  case ProtoOutputSink::OutputSinkTypeCase::kCustomSink: {
+    TapSinkFactory& tap_sink_factory =
+        Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
+    ProtobufTypes::MessagePtr config = Config::Utility::translateAnyToFactoryConfig(
+          sinks[0].custom_sink().typed_config(),
+          context.messageValidationContext().staticValidationVisitor(),
+          tap_sink_factory);
+    sink_ = tap_sink_factory.createSinkPtr(*config, context);
+    sink_to_use_ = sink_.get();
+    break;
+                                                         }
   case ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin:
     ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
     // TODO(mattklein123): Graceful failure, error message, and test if someone specifies an
@@ -86,17 +98,6 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   case ProtoOutputSink::OutputSinkTypeCase::kFilePerTap:
     sink_ = std::make_unique<FilePerTapSink>(sinks[0].file_per_tap());
     sink_to_use_ = sink_.get();
-    break;
-  case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kCustomSink:
-    auto* tap_sink_factory =
-        Envoy::Config::Utility::getFactory<TapSinkFactory>(sinks[0].custom_sink());
-    // TapSinkFactory* const tap_sink_factory =
-    //     Registry::FactoryRegistry<TapSinkFactory>::getFactory(sinks[0].custom_sink().typed_config().type_url());
-    // auto config =
-    // Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(), NULL,
-    // tap_sink_factory);
-    tap_sink_factory.createSinkPtr(sinks[0].custom_sink());
-    PANIC("not implemented");
     break;
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc:
     PANIC("not implemented");

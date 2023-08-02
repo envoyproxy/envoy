@@ -80,15 +80,15 @@ using SinkPtr = std::unique_ptr<Sink>;
 /**
  * Abstract tap sink factory. Produces a factory that can instantiate SinkPtr objects
  */
-class TapSinkFactory {
+class TapSinkFactory : public Config::TypedFactory {
 public:
-  virtual ~TapSinkFactory() = default;
+  ~TapSinkFactory() override = default;
 
   /**
    * @return a new tap SinkPtr
    */
   virtual SinkPtr createSinkPtr(const Protobuf::Message& config,
-                                Server::Configuration::FactoryContext& context) PURE;
+                                Server::Configuration::CommonFactoryContext& context) PURE;
 };
 
 using TapSinkFactoryPtr = std::unique_ptr<TapSinkFactory>;
