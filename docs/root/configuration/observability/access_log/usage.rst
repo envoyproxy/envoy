@@ -459,12 +459,12 @@ The following command operators are supported:
 
 .. csv-table::
   :header: Long name, Short name, Description
-  :widths: 1, 1, 2
+  :widths: 1, 1, 3
 
   **NoHealthyUpstream**, **UH**, No healthy upstream hosts in upstream cluster in addition to 503 response code.
   **UpstreamConnectionFailure**, **UF**, Upstream connection failure in addition to 503 response code.
   **UpstreamOverflow**, **UO**, Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-  **NoRouteFound**, **NR**, No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
+  **NoRouteFound**, **NR**, No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code or no matching filter chain for a downstream connection.
   **UpstreamRetryLimitExceeded**, **URX**, The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
   **NoClusterFound**, **NC**, Upstream cluster not found.
   **DurationTimeout**, **DT**, When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
@@ -473,7 +473,7 @@ The following command operators are supported:
 
 .. csv-table::
   :header: Long name, Short name, Description
-  :widths: 1, 1, 2
+  :widths: 1, 1, 3
 
   **DownstreamConnectionTermination**, **DC**, Downstream connection termination.
   **FailedLocalHealthCheck**, **LH**, Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
