@@ -33,7 +33,7 @@ public:
               (const Http::ResponseHeaderMap& response_headers, const ResponseMetadata& metadata,
                InsertCallback insert_complete, bool end_stream));
   MOCK_METHOD(void, insertBody,
-              (const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk,
+              (const Buffer::Instance& fragment, InsertCallback ready_for_next_fragment,
                bool end_stream));
   MOCK_METHOD(void, insertTrailers,
               (const Http::ResponseTrailerMap& trailers, InsertCallback insert_complete));

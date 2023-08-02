@@ -64,8 +64,8 @@ private:
   // of itself before the end is in sight then it might as well abort since
   // it's not going to get a complete entry.
   bool end_stream_queued_ = false;
-  // If the filter was deleted while !end_in_sight, aborting_ is set to true;
-  // when the next fragment completes (or cancels), the queue is destroyed.
+  // If the filter was deleted while !end_stream_queued_, aborting_ is set to
+  // true; when the next fragment completes (or cancels), the queue is destroyed.
   bool aborting_ = false;
   // When the filter is destroyed, it passes ownership of CacheInsertQueue
   // to itself, because CacheInsertQueue can outlive the filter. The queue
