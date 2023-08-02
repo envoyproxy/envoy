@@ -130,6 +130,7 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
     fragment_in_flight_ = false;
     if (aborting_) {
       // Parent filter was destroyed, so we can quit this operation.
+      fragments_.clear();
       self_ownership_.reset();
       return;
     }
@@ -144,12 +145,18 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
     if (!cache_success) {
       // canceled by cache; unwatermark if necessary, inform the filter if
       // it's still around, and delete the queue.
-      if (watermarked_ && encoder_callbacks_.has_value()) {
-        encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
+      if (watermarked_) {
+        if (encoder_callbacks_.has_value()) {
+          encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
+        }
+        watermarked_ = false;
       }
       fragments_.clear();
+      // Clearing self-ownership might provoke the destructor, so take a copy of the
+      // abort callback to avoid reading from 'this' after it may be deleted.
+      auto abort_callback = abort_callback_;
       self_ownership_.reset();
-      abort_callback_();
+      abort_callback();
       return;
     }
     if (end_stream) {
@@ -175,6 +182,7 @@ void CacheInsertQueue::setSelfOwned(std::unique_ptr<CacheInsertQueue> self) {
   // stream, so we'd better do so.
   if (watermarked_) {
     encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+    watermarked_ = false;
   }
   // Disable all the callbacks, they're going to have nowhere to go.
   abort_callback_ = []() {};
@@ -191,7 +199,11 @@ void CacheInsertQueue::setSelfOwned(std::unique_ptr<CacheInsertQueue> self) {
   self_ownership_ = std::move(self);
 }
 
-CacheInsertQueue::~CacheInsertQueue() { insert_context_->onDestroy(); }
+CacheInsertQueue::~CacheInsertQueue() {
+  ASSERT(!watermarked_, "should not have a watermarked status when the queue is destroyed");
+  ASSERT(fragments_.empty(), "queue should be empty by the time the destructor is run");
+  insert_context_->onDestroy();
+}
 
 } // namespace Cache
 } // namespace HttpFilters
