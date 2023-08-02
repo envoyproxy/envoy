@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
     deps = [
+        ":eds_resources_cache_lib",
         ":grpc_stream_lib",
         ":xds_source_id_lib",
         "//envoy/config:custom_config_validators_interface",
@@ -34,6 +35,7 @@ envoy_cc_library(
         "//source/common/memory:utils_lib",
         "//source/common/protobuf",
         "@com_google_absl//absl/container:btree",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -44,6 +46,7 @@ envoy_cc_library(
     hdrs = ["new_grpc_mux_impl.h"],
     deps = [
         ":delta_subscription_state_lib",
+        ":eds_resources_cache_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
         ":watch_map_lib",
@@ -54,6 +57,7 @@ envoy_cc_library(
         "//source/common/config:xds_context_params_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/memory:utils_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -63,6 +67,7 @@ envoy_cc_library(
     srcs = ["grpc_subscription_impl.cc"],
     hdrs = ["grpc_subscription_impl.h"],
     deps = [
+        ":eds_resources_cache_lib",
         ":grpc_mux_lib",
         ":new_grpc_mux_lib",
         "//envoy/config:subscription_interface",
@@ -210,6 +215,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:decoded_resource_lib",
+        "//source/common/config:resource_name_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/protobuf",

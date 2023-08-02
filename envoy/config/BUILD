@@ -66,6 +66,7 @@ envoy_cc_library(
     name = "grpc_mux_interface",
     hdrs = ["grpc_mux.h"],
     deps = [
+        ":eds_resources_cache_interface",
         ":subscription_interface",
         "//envoy/stats:stats_macros",
         "//source/common/common:cleanup_lib",
