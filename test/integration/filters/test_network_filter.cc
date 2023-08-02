@@ -120,6 +120,26 @@ static Registry::RegisterFactory<TestDrainerNetworkFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     drainer_register_;
 
+class TestDrainerUpstreamNetworkFilter : public Network::WriteFilter {
+public:
+  TestDrainerUpstreamNetworkFilter(
+      const test::integration::filters::TestDrainerUpstreamNetworkFilterConfig& config)
+      : bytes_to_drain_(config.bytes_to_drain()) {}
+
+  Network::FilterStatus onWrite(Buffer::Instance& buffer, bool) override {
+    buffer.drain(bytes_to_drain_);
+    return Network::FilterStatus::Continue;
+  }
+
+  void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) override {
+    write_callbacks_ = &callbacks;
+  }
+
+private:
+  Envoy::Network::WriteFilterCallbacks* write_callbacks_{};
+  int bytes_to_drain_;
+};
+
 class TestDrainerUpstreamNetworkFilterConfigFactory
     : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
@@ -129,15 +149,15 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::CommonFactoryContext& context) override {
     const auto& config = MessageUtil::downcastAndValidate<
-        const test::integration::filters::TestDrainerNetworkFilterConfig&>(
+        const test::integration::filters::TestDrainerUpstreamNetworkFilterConfig&>(
         proto_config, context.messageValidationVisitor());
     return [config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestDrainerNetworkFilter>(config));
+      filter_manager.addWriteFilter(std::make_shared<TestDrainerUpstreamNetworkFilter>(config));
     };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<test::integration::filters::TestDrainerUpstreamNetworkFilterConfig>();
   }
 };
 
