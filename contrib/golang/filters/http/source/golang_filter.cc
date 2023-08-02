@@ -1235,154 +1235,6 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
   return id;
 }
 
-void Filter::defineMetricCommon(uint32_t metric_type, absl::string_view name, uint32_t* metric_id) {
-  auto type = static_cast<MetricType>(metric_type);
-
-  Stats::StatNameManagedStorage storage(name, config_->metricStore().scope_->symbolTable());
-  Stats::StatName stat_name = storage.statName();
-  if (type == MetricType::Counter) {
-    auto id = config_->metricStore().nextCounterMetricId();
-    auto c = &config_->metricStore().scope_->counterFromStatName(stat_name);
-    config_->metricStore().counters_.emplace(id, c);
-    *metric_id = id;
-  } else if (type == MetricType::Gauge) {
-    auto id = config_->metricStore().nextGaugeMetricId();
-    auto g = &config_->metricStore().scope_->gaugeFromStatName(
-        stat_name, Stats::Gauge::ImportMode::Accumulate);
-    config_->metricStore().gauges_.emplace(id, g);
-    *metric_id = id;
-  } else { // (type == MetricType::Histogram) {
-    auto id = config_->metricStore().nextHistogramMetricId();
-    auto h = &config_->metricStore().scope_->histogramFromStatName(
-        stat_name, Stats::Histogram::Unit::Unspecified);
-    config_->metricStore().histograms_.emplace(id, h);
-    *metric_id = id;
-  }
-}
-
-void Filter::incrementMetricCommon(uint32_t metric_id, int64_t offset) {
-  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
-  if (type == MetricType::Counter) {
-    auto it = config_->metricStore().counters_.find(metric_id);
-    if (it != config_->metricStore().counters_.end()) {
-      if (offset > 0) {
-        it->second->add(offset);
-      }
-    }
-  } else if (type == MetricType::Gauge) {
-    auto it = config_->metricStore().gauges_.find(metric_id);
-    if (it != config_->metricStore().gauges_.end()) {
-      if (offset > 0) {
-        it->second->add(offset);
-      } else {
-        it->second->sub(-offset);
-      }
-    }
-  }
-}
-
-void Filter::getMetricCommon(uint32_t metric_id, uint64_t* value) {
-  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
-  if (type == MetricType::Counter) {
-    auto it = config_->metricStore().counters_.find(metric_id);
-    if (it != config_->metricStore().counters_.end()) {
-      *value = it->second->value();
-    }
-  } else if (type == MetricType::Gauge) {
-    auto it = config_->metricStore().gauges_.find(metric_id);
-    if (it != config_->metricStore().gauges_.end()) {
-      *value = it->second->value();
-    }
-  }
-}
-
-CAPIStatus Filter::defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id) {
-  Thread::LockGuard lock(mutex_);
-  if (has_destroyed_) {
-    ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIStatus::CAPIFilterIsDestroy;
-  }
-  auto& state = getProcessorState();
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-  if (metric_type > static_cast<uint32_t>(MetricType::Max)) {
-    return CAPIStatus::CAPIValueNotFound;
-  }
-
-  if (state.isThreadSafe()) {
-    defineMetricCommon(metric_type, name, metric_id);
-  } else {
-    auto name_str = std::string(name);
-    auto weak_ptr = weak_from_this();
-    state.getDispatcher().post([this, metric_type, weak_ptr, name_str, metric_id] {
-      if (!weak_ptr.expired() && !hasDestroyed()) {
-        defineMetricCommon(metric_type, name_str, metric_id);
-        dynamic_lib_->envoyGoRequestSemaDec(req_);
-      } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in defineMetric");
-      }
-    });
-    return CAPIStatus::CAPIYield;
-  }
-  return CAPIStatus::CAPIOK;
-}
-
-CAPIStatus Filter::incrementMetric(uint32_t metric_id, int64_t offset) {
-  Thread::LockGuard lock(mutex_);
-  if (has_destroyed_) {
-    ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIStatus::CAPIFilterIsDestroy;
-  }
-  auto& state = getProcessorState();
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-  if (state.isThreadSafe()) {
-    incrementMetricCommon(metric_id, offset);
-  } else {
-    auto weak_ptr = weak_from_this();
-    state.getDispatcher().post([this, weak_ptr, metric_id, offset] {
-      if (!weak_ptr.expired() && !hasDestroyed()) {
-        incrementMetricCommon(metric_id, offset);
-      } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in incrementMetric");
-      }
-    });
-  }
-  return CAPIStatus::CAPIOK;
-}
-
-CAPIStatus Filter::getMetric(uint32_t metric_id, uint64_t* value) {
-  Thread::LockGuard lock(mutex_);
-  if (has_destroyed_) {
-    ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIStatus::CAPIFilterIsDestroy;
-  }
-  auto& state = getProcessorState();
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-  if (state.isThreadSafe()) {
-    getMetricCommon(metric_id, value);
-  } else {
-    auto weak_ptr = weak_from_this();
-    state.getDispatcher().post([this, weak_ptr, metric_id, value] {
-      if (!weak_ptr.expired() && !hasDestroyed()) {
-        getMetricCommon(metric_id, value);
-        dynamic_lib_->envoyGoRequestSemaDec(req_);
-      } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in getMetric");
-      }
-    });
-    return CAPIStatus::CAPIYield;
-  }
-  return CAPIStatus::CAPIOK;
-}
-
 /*** FilterConfig ***/
 
 FilterConfig::FilterConfig(
@@ -1392,32 +1244,111 @@ FilterConfig::FilterConfig(
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
-      metric_store_(context.threadLocal().allocateSlot()) {
-  ENVOY_LOG(debug, "initializing golang filter config");
+      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))){};
 
+void FilterConfig::newGoPluginConfig() {
+  ENVOY_LOG(debug, "initializing golang filter config");
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
   ASSERT(res, "SerializeToString should always successful");
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
-  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
-                                                          buf.length());
-  if (config_id_ == 0) {
-    throw EnvoyException(fmt::format("golang filter failed to parse plugin config: {} {}",
-                                     proto_config.library_id(), proto_config.library_path()));
-  }
-  ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
 
-  metric_store_->set([&context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    auto metric_store = std::make_shared<MetricStore>(context.scope().createScope(""));
-    return metric_store;
-  });
-};
+  config_ = new httpConfigInternal(weak_from_this());
+  config_->plugin_name_ptr = name_ptr;
+  config_->plugin_name_len = plugin_name_.length();
+  config_->config_ptr = buf_ptr;
+  config_->config_len = buf.length();
+  config_->is_route_config = 0;
+
+  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
+
+  if (config_id_ == 0) {
+    throw EnvoyException(
+        fmt::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
+  }
+
+  ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
+}
 
 FilterConfig::~FilterConfig() {
   if (config_id_ > 0) {
     dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
   }
+}
+
+CAPIStatus FilterConfig::defineMetric(uint32_t metric_type, absl::string_view name,
+                                      uint32_t* metric_id) {
+  Thread::LockGuard lock(mutex_);
+  if (metric_type > static_cast<uint32_t>(MetricType::Max)) {
+    return CAPIStatus::CAPIValueNotFound;
+  }
+
+  auto type = static_cast<MetricType>(metric_type);
+
+  Stats::StatNameManagedStorage storage(name, metric_store_->scope_->symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  if (type == MetricType::Counter) {
+    auto id = metric_store_->nextCounterMetricId();
+    auto c = &metric_store_->scope_->counterFromStatName(stat_name);
+    metric_store_->counters_.emplace(id, c);
+    *metric_id = id;
+  } else if (type == MetricType::Gauge) {
+    auto id = metric_store_->nextGaugeMetricId();
+    auto g =
+        &metric_store_->scope_->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::Accumulate);
+    metric_store_->gauges_.emplace(id, g);
+    *metric_id = id;
+  } else { // (type == MetricType::Histogram)
+    ASSERT(type == MetricType::Histogram);
+    auto id = metric_store_->nextHistogramMetricId();
+    auto h = &metric_store_->scope_->histogramFromStatName(stat_name,
+                                                           Stats::Histogram::Unit::Unspecified);
+    metric_store_->histograms_.emplace(id, h);
+    *metric_id = id;
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus FilterConfig::incrementMetric(uint32_t metric_id, int64_t offset) {
+  Thread::LockGuard lock(mutex_);
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = metric_store_->counters_.find(metric_id);
+    if (it != metric_store_->counters_.end()) {
+      if (offset > 0) {
+        it->second->add(offset);
+      }
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = metric_store_->gauges_.find(metric_id);
+    if (it != metric_store_->gauges_.end()) {
+      if (offset > 0) {
+        it->second->add(offset);
+      } else {
+        it->second->sub(-offset);
+      }
+    }
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus FilterConfig::getMetric(uint32_t metric_id, uint64_t* value) {
+  Thread::LockGuard lock(mutex_);
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = metric_store_->counters_.find(metric_id);
+    if (it != metric_store_->counters_.end()) {
+      *value = it->second->value();
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = metric_store_->gauges_.find(metric_id);
+    if (it != metric_store_->gauges_.end()) {
+      *value = it->second->value();
+    }
+  }
+  return CAPIStatus::CAPIOK;
 }
 
 uint64_t FilterConfig::getConfigId() { return config_id_; }
@@ -1494,8 +1425,14 @@ uint64_t RoutePluginConfig::getConfigId() {
   ASSERT(res, "SerializeToString is always successful");
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
-  return dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
-                                                    buf.length());
+
+  config_ = new httpConfig();
+  config_->plugin_name_ptr = name_ptr;
+  config_->plugin_name_len = plugin_name_.length();
+  config_->config_ptr = buf_ptr;
+  config_->config_len = buf.length();
+  config_->is_route_config = 1;
+  return dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 };
 
 uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {

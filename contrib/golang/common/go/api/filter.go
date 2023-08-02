@@ -83,7 +83,7 @@ func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 }
 
 type StreamFilterConfigParser interface {
-	Parse(any *anypb.Any) (interface{}, error)
+	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
@@ -134,7 +134,6 @@ type FilterCallbacks interface {
 	RecoverPanic()
 	Log(level LogType, msg string)
 	LogLevel() LogType
-	Metric() Metric
 	// TODO add more for filter callbacks
 }
 
@@ -207,8 +206,15 @@ type FilterState interface {
 	GetString(key string) string
 }
 
+type ConfigCallbacks interface {
+	DefineMetric(metricType uint32, name string) Metric
+}
+
+type ConfigCallbackHandler interface {
+	ConfigCallbacks
+}
+
 type Metric interface {
-	DefineMetric(metricType uint32, name string) uint32
-	IncrementMetric(metricId uint32, offset int64)
-	GetMetric(metricId uint32) uint64
+	IncrementMetric(offset int64)
+	GetMetric() uint64
 }

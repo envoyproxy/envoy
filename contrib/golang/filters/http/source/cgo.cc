@@ -74,6 +74,16 @@ CAPIStatus envoyGoFilterHandlerWrapper(void* r,
   return CAPIStatus::CAPIFilterIsGone;
 }
 
+CAPIStatus
+envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<FilterConfig>&)> fc) {
+  auto config = reinterpret_cast<httpConfigInternal*>(c);
+  auto weak_filter_config = config->weakFilterConfig();
+  if (auto filter_config = weak_filter_config.lock()) {
+    return fc(filter_config);
+  }
+  return CAPIStatus::CAPIFilterIsGone;
+}
+
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status) {
   return envoyGoFilterHandlerWrapper(r, [status](std::shared_ptr<Filter>& filter) -> CAPIStatus {
     return filter->continueStatus(static_cast<GolangStatus>(status));
@@ -259,28 +269,29 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value
                                      });
 }
 
-CAPIStatus envoyGoFilterHttpDefineMetric(void* r, uint32_t metric_type, void* name,
+CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name,
                                          void* metric_id) {
-  return envoyGoFilterHandlerWrapper(
-      r, [metric_type, name, metric_id](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+  return envoyGoConfigHandlerWrapper(
+      c,
+      [metric_type, name, metric_id](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
         auto name_str = referGoString(name);
         auto metric_id_int = reinterpret_cast<uint32_t*>(metric_id);
-        return filter->defineMetric(metric_type, name_str, metric_id_int);
+        return filter_config->defineMetric(metric_type, name_str, metric_id_int);
       });
 }
 
-CAPIStatus envoyGoFilterHttpIncrementMetric(void* r, uint32_t metric_id, int64_t offset) {
-  return envoyGoFilterHandlerWrapper(
-      r, [metric_id, offset](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        return filter->incrementMetric(metric_id, offset);
+CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, offset](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        return filter_config->incrementMetric(metric_id, offset);
       });
 }
 
-CAPIStatus envoyGoFilterHttpGetMetric(void* r, uint32_t metric_id, void* value) {
-  return envoyGoFilterHandlerWrapper(
-      r, [metric_id, value](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
         auto value_int = reinterpret_cast<uint64_t*>(value);
-        return filter->getMetric(metric_id, value_int);
+        return filter_config->getMetric(metric_id, value_int);
       });
 }
 

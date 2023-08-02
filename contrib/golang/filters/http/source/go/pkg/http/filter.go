@@ -133,12 +133,6 @@ func (r *httpRequest) Finalize(reason int) {
 	cAPI.HttpFinalize(unsafe.Pointer(r.req), reason)
 }
 
-func (r *httpRequest) Metric() api.Metric {
-	return &metric{
-		request: r,
-	}
-}
-
 type streamInfo struct {
 	request *httpRequest
 }
@@ -243,18 +237,27 @@ func (f *filterState) GetString(key string) string {
 	return cAPI.HttpGetStringFilterState(unsafe.Pointer(f.request), key)
 }
 
+type httpConfig struct {
+	config *C.httpConfig
+}
+
+func (c *httpConfig) DefineMetric(metricType uint32, name string) api.Metric {
+	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), metricType, name)
+	return &metric{
+		config: c,
+		metricId: id,
+	}
+}
+
 type metric struct {
-	request *httpRequest
+	config   *httpConfig
+	metricId uint32
 }
 
-func (m *metric) DefineMetric(metricType uint32, name string) uint32 {
-	return cAPI.HttpDefineMetric(unsafe.Pointer(m.request), metricType, name)
+func (m *metric) IncrementMetric(offset int64) {
+	cAPI.HttpIncrementMetric(unsafe.Pointer(m.config), m.metricId, offset)
 }
 
-func (m *metric) IncrementMetric(metricId uint32, offset int64) {
-	cAPI.HttpIncrementMetric(unsafe.Pointer(m.request), metricId, offset)
-}
-
-func (m *metric) GetMetric(metricId uint32) uint64 {
-	return cAPI.HttpGetMetric(unsafe.Pointer(m.request), metricId)
+func (m *metric) GetMetric() uint64 {
+	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
 }

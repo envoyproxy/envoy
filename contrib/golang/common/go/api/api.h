@@ -19,6 +19,14 @@ typedef struct { // NOLINT(modernize-use-using)
   int phase;
 } httpRequest;
 
+typedef struct { // NOLINT(modernize-use-using)
+  unsigned long long int plugin_name_ptr;
+  unsigned long long int plugin_name_len;
+  unsigned long long int config_ptr;
+  unsigned long long int config_len;
+  int is_route_config;
+} httpConfig;
+
 typedef enum { // NOLINT(modernize-use-using)
   Set,
   Append,
