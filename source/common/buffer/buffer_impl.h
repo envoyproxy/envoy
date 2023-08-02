@@ -111,7 +111,6 @@ public:
 
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
-      ENVOY_LOG_MISC(debug, "######### Slice& operator=");
       callAndClearDrainTrackersAndCharges();
 
       capacity_ = rhs.capacity_;
@@ -132,10 +131,12 @@ public:
     return *this;
   }
 
-  ~Slice() { callAndClearDrainTrackersAndCharges(); if (releasor_) {
-      ENVOY_LOG_MISC(trace, "############### callAndClearDrainTrackersAndCharges release");
+  ~Slice() {
+    callAndClearDrainTrackersAndCharges();
+    if (releasor_) {
       releasor_();
-    } }
+    }
+  }
 
   /**
    * @return true if the data in the slice is mutable
@@ -328,7 +329,6 @@ public:
    * the drain tracker list.
    */
   void callAndClearDrainTrackersAndCharges() {
-    ENVOY_LOG_MISC(trace, "############### callAndClearDrainTrackersAndCharges");
     for (const auto& drain_tracker : drain_trackers_) {
       drain_tracker();
     }
@@ -606,7 +606,6 @@ public:
   size_t size() const override { return size_; }
   void done() override {
     if (releasor_) {
-      ENVOY_LOG_MISC(debug, "####### buffer fragemetn done");
       releasor_(data_, size_, this);
     }
   }

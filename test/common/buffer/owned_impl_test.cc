@@ -65,20 +65,54 @@ TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
       input.c_str(), input.size(),
       [this](const void*, size_t, const BufferFragmentImpl*) { release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
-  ENVOY_LOG_MISC(trace, "########## -1");
   buffer.addBufferFragment(frag);
   EXPECT_EQ(2048, buffer.length());
 
-  ENVOY_LOG_MISC(trace, "########## 0");
   buffer.drain(2000);
   EXPECT_EQ(48, buffer.length());
   EXPECT_FALSE(release_callback_called_);
 
-  ENVOY_LOG_MISC(trace, "########## 1");
   buffer.drain(48);
   EXPECT_EQ(0, buffer.length());
   EXPECT_TRUE(release_callback_called_);
-  ENVOY_LOG_MISC(trace, "########## 2");
+}
+
+TEST_F(OwnedImplTest, MoveBufferFragment) {
+  Buffer::OwnedImpl buffer1;
+  testing::MockFunction<void(const void*, size_t, const BufferFragmentImpl*)>
+      release_callback_tracker;
+  std::string frag_input("a");
+  BufferFragmentImpl frag(frag_input.c_str(), frag_input.size(),
+                          release_callback_tracker.AsStdFunction());
+  buffer1.addBufferFragment(frag);
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.move(buffer1);
+
+  EXPECT_EQ(0, buffer1.length());
+  EXPECT_EQ(1, buffer2.length());
+
+  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
+  buffer2.drain(buffer2.length());
+}
+
+TEST_F(OwnedImplTest, MoveBufferFragmentWithReleaseDrainTracker) {
+  Buffer::OwnedImpl buffer1;
+  testing::MockFunction<void(const void*, size_t, const BufferFragmentImpl*)>
+      release_callback_tracker;
+  std::string frag_input("a");
+  BufferFragmentImpl frag(frag_input.c_str(), frag_input.size(),
+                          release_callback_tracker.AsStdFunction());
+  buffer1.addBufferFragment(frag);
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.move(buffer1, true);
+
+  EXPECT_EQ(0, buffer1.length());
+  EXPECT_EQ(1, buffer2.length());
+
+  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
+  buffer2.drain(buffer2.length());
 }
 
 TEST_F(OwnedImplTest, AddEmptyFragment) {
