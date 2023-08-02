@@ -1,9 +1,11 @@
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
-#include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
+#include "test/extensions/http/header_validators/envoy_default/header_validator_utils.h"
+#include "test/mocks/http/header_validator.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -14,12 +16,13 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 namespace {
 
+using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 // This test suite runs the same tests against both H/1 and H/2 header validators.
-class HttpCommonValidationTest : public HeaderValidatorTest,
+class HttpCommonValidationTest : public HeaderValidatorUtils,
                                  public testing::TestWithParam<Protocol> {
 protected:
   ::Envoy::Http::ServerHeaderValidatorPtr createUhv(absl::string_view config_yaml) {
@@ -36,6 +39,7 @@ protected:
                                                         overrides);
   }
 
+  ::testing::NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
   TestScopedRuntime scoped_runtime_;
 };
 
@@ -74,6 +78,54 @@ TEST_P(HttpCommonValidationTest, MalformedUrlEncodingRejectedWithOverride) {
 
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers), "uhv.invalid_url");
+}
+
+TEST_P(HttpCommonValidationTest, BackslashInPathIsTranslatedToSlash) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":path", "/path\\with/back\\/slash%5C"},
+                                                  {":authority", "envoy.com"},
+                                                  {":method", "GET"}};
+  auto uhv = createUhv(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
+}
+
+TEST_P(HttpCommonValidationTest, BackslashInPathIsRejectedWithOverride) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":path", "/path\\with/back\\/slash%5c"},
+                                                  {":authority", "envoy.com"},
+                                                  {":method", "GET"}};
+  auto uhv = createUhv(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
+}
+
+// With the allow_non_compliant_characters_in_path set to false a request with URL path containing
+// characters not allowed in https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC is
+// rejected.
+TEST_P(HttpCommonValidationTest, PathCharacterSetValidation) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
+  auto uhv = createUhv(fragment_in_path_allowed);
+  // ? and # start query and fragment
+  // validateAllCharacters modifies 12th character in the `path` parameter
+  validateAllCharactersInUrlPath(*uhv, "/path/with/additional/characters", "?#");
+}
+
+TEST_P(HttpCommonValidationTest, QueryCharacterSetValidation) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
+  // # starts fragment
+  auto uhv = createUhv(fragment_in_path_allowed);
+  validateAllCharactersInUrlPath(*uhv, "/query?key=additional/characters", "?#");
+}
+
+TEST_P(HttpCommonValidationTest, FragmentCharacterSetValidation) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
+  auto uhv = createUhv(fragment_in_path_allowed);
+  validateAllCharactersInUrlPath(*uhv, "/q?k=v#fragment/additional/characters", "?");
 }
 
 TEST_P(HttpCommonValidationTest, PathWithFragmentRejectedByDefault) {
