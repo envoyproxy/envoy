@@ -30,7 +30,7 @@ layered_runtime {
       rtds_config {
         ads {
         }
-        resource_api_version: V2
+        resource_api_version: V3
       }
     }
   }
