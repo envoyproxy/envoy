@@ -1125,6 +1125,14 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                         stream_info);
                                   });
                             }}},
+                          {"RESPONSE_FLAGS_LONG",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return StreamInfo::ResponseFlagUtils::toString(stream_info);
+                                  });
+                            }}},
                           {"UPSTREAM_HOST",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {

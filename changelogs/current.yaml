@@ -8,6 +8,10 @@ minor_behavior_changes:
 - area: ext_authz
   change: |
     removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
+- area: quic
+  change: |
+    Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -19,6 +23,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: access_log
+  change: |
+    added %RESPONSE_FLAGS_LONG% substitution string, that will output a pascal case string representing the resonse flags.
+    The output response flags will correspond with %RESPONSE_FLAGS%, only with a long textual string representation.
 - area: extension_discovery_service
   change: |
     added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
