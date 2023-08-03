@@ -63,6 +63,7 @@ using ::google::protobuf::DynamicMessageFactory;  // NOLINT(misc-unused-using-de
 using ::google::protobuf::EnumValueDescriptor;    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldDescriptor;        // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldMask;              // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FileDescriptor;         // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Map;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::MapPair;                // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::OneofDescriptor;        // NOLINT(misc-unused-using-decls)
