@@ -16,8 +16,8 @@ constexpr absl::string_view EcdsClusterName = "ecds_cluster";
 constexpr absl::string_view Ecds2ClusterName = "ecds2_cluster";
 
 class UpstreamNetworkExtensionDiscoveryIntegrationTest
-  : public Grpc::GrpcClientIntegrationParamTest,
-    public BaseIntegrationTest {
+    : public Grpc::GrpcClientIntegrationParamTest,
+      public BaseIntegrationTest {
 public:
   UpstreamNetworkExtensionDiscoveryIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig()) {
@@ -46,7 +46,8 @@ public:
       discovery->add_type_urls(
           "type.googleapis.com/test.integration.filters.TestDrainerUpstreamNetworkFilterConfig");
       if (set_default_config) {
-        auto default_configuration = test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
+        auto default_configuration =
+            test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
         default_configuration.set_bytes_to_drain(default_bytes_to_drain_);
         discovery->mutable_default_config()->PackFrom(default_configuration);
       }
@@ -318,9 +319,8 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addFilterChain();
   addDynamicFilter("bar", 5);
-  std::cerr << "11111111\n\n";
   initialize();
-std::cerr << "222222\n\n";
+
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({port_name_});
