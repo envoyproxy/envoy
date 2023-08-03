@@ -1181,6 +1181,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
                         add_or_update_cluster, load_balancer_factory, map = std::move(host_map),
                         cluster_initialization_object = std::move(cluster_initialization_object)](
                            OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    ASSERT(cluster_manager.has_value(),
+           "Expected the ThreadLocalClusterManager to be set during ClusterManagerImpl creation.");
+
     // Cluster Manager here provided by the particular thread, it will provide
     // this allowing to make the relevant change.
     if (const bool defer_unused_clusters =
@@ -1196,8 +1199,15 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
       // Invoke similar logic of onClusterAddOrUpdate.
       ThreadLocalClusterCommand command = [&cluster_manager,
                                            cluster_name = info->name()]() -> ThreadLocalCluster& {
+        // If we have multiple callbacks only the first one needs to use the
+        // command to initialize the cluster.
+        auto existing_cluster_entry = cluster_manager->thread_local_clusters_.find(cluster_name);
+        if (existing_cluster_entry != cluster_manager->thread_local_clusters_.end()) {
+          return *existing_cluster_entry->second;
+        }
+
         auto* cluster_entry = cluster_manager->initializeClusterInlineIfExists(cluster_name);
-        ASSERT(cluster_entry != nullptr);
+        ASSERT(cluster_entry != nullptr, "Deferred clusters initiailization should not fail.");
         return *cluster_entry;
       };
       for (auto cb_it = cluster_manager->update_callbacks_.begin();
@@ -1262,6 +1272,11 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
   auto entry = cluster_initialization_map_.find(cluster_name);
   // TODO(kbaichoo): if EDS can be configured via cluster_type() then modify the
   // merging logic below.
+  // We should only merge if the cluster type is the same as before and this is
+  // an EDS cluster. This is due to the fact that EDS clusters get
+  // ClusterLoadAssignment from the configuration server but pass per priority
+  // deltas in updates to the ClusterManager. In the future we may decide to
+  // change how the updates propagate among those components.
   const bool should_merge_with_prior_cluster =
       entry != cluster_initialization_map_.end() &&
       entry->second->cluster_info_->type() == cluster_info->type() &&
@@ -1311,6 +1326,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
                             per_priority.overprovisioning_factor_,
                             initialization_object->cross_priority_host_map_);
   }
+
+  // Remove the CIO as we've initialized the cluster.
+  thread_local_deferred_clusters_.erase(entry);
 
   return cluster_entry_ptr;
 }

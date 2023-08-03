@@ -688,6 +688,8 @@ private:
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
+    // Known clusters will exclusively exist in either `thread_local_clusters_`
+    // or `thread_local_deferred_clusters_`.
     absl::flat_hash_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     // Maps from a given cluster name to the CIO for that cluster.
     ClusterInitializationMap thread_local_deferred_clusters_;

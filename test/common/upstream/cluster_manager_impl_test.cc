@@ -2026,7 +2026,7 @@ TEST_P(ClusterManagerLifecycleTest, ClusterAddOrUpdateCallbackRemovalDuringItera
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_, _))
-      .WillOnce(Invoke([&cb](const std::string&, ThreadLocalClusterCommand&) {
+      .WillOnce(Invoke([&cb](absl::string_view, ThreadLocalClusterCommand&) {
         // This call will remove the callback from the list.
         cb.reset();
       }));

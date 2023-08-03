@@ -119,7 +119,7 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
-    const std::string& cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
   if (cluster_name != cluster_name_) {
     return;
   }

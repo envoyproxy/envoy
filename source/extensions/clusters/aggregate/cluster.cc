@@ -114,7 +114,7 @@ void AggregateClusterLoadBalancer::refresh(OptRef<const std::string> excluded_cl
 }
 
 void AggregateClusterLoadBalancer::onClusterAddOrUpdate(
-    const std::string& cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
   if (std::find(clusters_->begin(), clusters_->end(), cluster_name) != clusters_->end()) {
     ENVOY_LOG(debug, "adding or updating cluster '{}' for aggregate cluster '{}'", cluster_name,
               parent_info_->name());

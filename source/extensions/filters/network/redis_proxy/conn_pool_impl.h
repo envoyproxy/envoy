@@ -159,7 +159,7 @@ private:
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::ClientCallbacks& callbacks);
 
-    void onClusterAddOrUpdateNonVirtual(const std::string& cluster_name,
+    void onClusterAddOrUpdateNonVirtual(absl::string_view cluster_name,
                                         Upstream::ThreadLocalClusterCommand& get_cluster);
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
