@@ -366,7 +366,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
     tcp_client->waitForDisconnect();
   }
 
-  // The extension_config_missing stats counter increases by 1.
+  // The network_extension_config_missing stats counter increases by 1.
   test_server_->waitForCounterGe("listener.listener_stat.network_extension_config_missing", 1);
 
   // Reinstate the configuration.
@@ -436,7 +436,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
     tcp_client->waitForDisconnect();
   }
 
-  // The extension_config_missing stats counter increases by 1.
+  // The network_extension_config_missing stats counter increases by 1.
   test_server_->waitForCounterGe("listener.listener_stat.network_extension_config_missing", 1);
 }
 
@@ -607,7 +607,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEnd
     tcp_client->waitForDisconnect();
   }
 
-  // The extension_config_missing stats counter increases by 1.
+  // The network_extension_config_missing stats counter increases by 1.
   test_server_->waitForCounterGe("listener.listener_stat.network_extension_config_missing", 1);
 }
 
