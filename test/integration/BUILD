@@ -1285,6 +1285,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
+    shard_count = 2,
     tags = [
         "cpu:3",
         "nofips",
