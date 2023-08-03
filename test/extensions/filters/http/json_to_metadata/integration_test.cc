@@ -68,11 +68,11 @@ typed_config:
         preserve_existing_metadata_value: true
 )EOF";
 
-  Http::TestRequestHeaderMapImpl incoming_headers_{{":scheme", "http"},
-                                                   {":path", "/ping"},
-                                                   {":method", "GET"},
-                                                   {":authority", "host"},
-                                                   {"Content-Type", "application/json"}};
+  const Http::TestRequestHeaderMapImpl incoming_headers_{{":scheme", "http"},
+                                                         {":path", "/ping"},
+                                                         {":method", "GET"},
+                                                         {":authority", "host"},
+                                                         {"Content-Type", "application/json"}};
 
   std::string request_body_ =
       R"delimiter(
@@ -117,11 +117,11 @@ TEST_P(JsonToMetadataIntegrationTest, BasicOneChunk) {
 TEST_P(JsonToMetadataIntegrationTest, MismatchedContentType) {
   initializeFilter();
 
-  Http::TestRequestHeaderMapImpl incoming_headers{{":scheme", "http"},
-                                                  {":path", "/ping"},
-                                                  {":method", "GET"},
-                                                  {":authority", "host"},
-                                                  {"Content-Type", "application/x-thrift"}};
+  const Http::TestRequestHeaderMapImpl incoming_headers{{":scheme", "http"},
+                                                        {":path", "/ping"},
+                                                        {":method", "GET"},
+                                                        {":authority", "host"},
+                                                        {"Content-Type", "application/x-thrift"}};
 
   runTest(incoming_headers, request_body_);
 

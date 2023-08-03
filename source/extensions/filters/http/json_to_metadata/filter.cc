@@ -233,7 +233,6 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
     return result.status();
   }
 
-  // Exception is handled by caller, which leads on_missing.
   switch (on_present_keyval.type()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::PROTOBUF_VALUE:
