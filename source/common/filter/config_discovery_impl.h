@@ -344,6 +344,7 @@ public:
   FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                            const std::string& filter_config_name,
                            Server::Configuration::ServerFactoryContext& factory_context,
+                           Upstream::ClusterManager& cluster_manager,
                            const std::string& stat_prefix,
                            FilterConfigProviderManagerImplBase& filter_config_provider_manager,
                            const std::string& subscription_id);
@@ -438,9 +439,11 @@ public:
              Server::Configuration::ServerFactoryContext& factory_context) const PURE;
 
 protected:
-  std::shared_ptr<FilterConfigSubscription> getSubscription(
-      const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
-      Server::Configuration::ServerFactoryContext& server_context, const std::string& stat_prefix);
+  std::shared_ptr<FilterConfigSubscription>
+  getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
+                  const std::string& name,
+                  Server::Configuration::ServerFactoryContext& server_context,
+                  Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix);
   void applyLastOrDefaultConfig(std::shared_ptr<FilterConfigSubscription>& subscription,
                                 DynamicFilterConfigProviderImplBase& provider,
                                 const std::string& filter_config_name);
@@ -502,7 +505,8 @@ public:
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name,
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      bool last_filter_in_filter_chain, const std::string& filter_chain_type,
+      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
@@ -511,7 +515,7 @@ public:
     provider_stat_prefix = subscription_stat_prefix;
 
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
-                                        server_context, subscription_stat_prefix);
+                                        server_context, cluster_manager, subscription_stat_prefix);
     // For warming, wait until the subscription receives the first response to indicate readiness.
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.

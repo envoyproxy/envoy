@@ -191,8 +191,9 @@ public:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, server_factory_context_, factory_context_, last_filter_config,
-        getFilterType(), getMatcher());
+        config_source, name, server_factory_context_, factory_context_,
+        server_factory_context_.cluster_manager_, last_filter_config, getFilterType(),
+        getMatcher());
   }
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
@@ -576,8 +577,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
           config_source, "foo", config_discovery_test.server_factory_context_,
-          config_discovery_test.factory_context_, true, config_discovery_test.getFilterType(),
-          config_discovery_test.getMatcher()),
+          config_discovery_test.factory_context_,
+          config_discovery_test.server_factory_context_.cluster_manager_, true,
+          config_discovery_test.getFilterType(), config_discovery_test.getMatcher()),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "
       "configuration with type URL "
