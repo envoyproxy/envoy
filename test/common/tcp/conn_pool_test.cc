@@ -243,9 +243,8 @@ public:
   }
 
   void initialize() {
-    ON_CALL(*cluster_->upstream_local_address_selector_, getUpstreamLocalAddress(_, _))
-        .WillByDefault(
-            Return(Upstream::UpstreamLocalAddress({cluster_->source_address_, options_})));
+    EXPECT_CALL(*cluster_->upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
+        .WillOnce(Return(Upstream::UpstreamLocalAddress({cluster_->source_address_, options_})));
     conn_pool_ = std::make_unique<ConnPoolBase>(dispatcher_, host_, upstream_ready_cb_, options_,
                                                 transport_socket_options_);
   }

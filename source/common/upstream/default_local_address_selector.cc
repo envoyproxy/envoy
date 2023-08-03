@@ -13,23 +13,6 @@ namespace Upstream {
 namespace {
 constexpr absl::string_view kDefaultLocalAddressSelectorName =
     "envoy.upstream.local_address_selector.default_local_address_selector";
-
-Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
-    const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  Network::ConnectionSocket::OptionsSharedPtr connection_options =
-      std::make_shared<Network::ConnectionSocket::Options>();
-
-  if (options) {
-    *connection_options = *options;
-    Network::Socket::appendOptions(connection_options, local_address_options);
-  } else {
-    *connection_options = *local_address_options;
-  }
-
-  return connection_options;
-}
-
 } // namespace
 
 DefaultUpstreamLocalAddressSelector::DefaultUpstreamLocalAddressSelector(
@@ -51,6 +34,18 @@ DefaultUpstreamLocalAddressSelector::DefaultUpstreamLocalAddressSelector(
         "extra_source_addresses/additional_source_addresses field",
         !(cluster_name.has_value()) ? "Bootstrap"
                                     : fmt::format("Cluster {}", cluster_name.value())));
+  }
+  // If we have exactly one upstream address, it needs to have a valid IP
+  // version if non-null
+  if (upstream_local_addresses_.size() == 1) {
+    // First verify that all address have valid IP address information.
+    if (upstream_local_addresses_[0].address_ != nullptr &&
+        upstream_local_addresses_[0].address_->ip() == nullptr) {
+      throw EnvoyException(fmt::format("{}'s upstream binding config has invalid IP addresses.",
+                                       !(cluster_name.has_value())
+                                           ? "Bootstrap"
+                                           : fmt::format("Cluster {}", cluster_name.value())));
+    }
   }
 
   // If we have more than one upstream address, they need to have different IP versions.
@@ -78,25 +73,22 @@ DefaultUpstreamLocalAddressSelector::DefaultUpstreamLocalAddressSelector(
   }
 }
 
-UpstreamLocalAddress DefaultUpstreamLocalAddressSelector::getUpstreamLocalAddress(
-    const Network::Address::InstanceConstSharedPtr& endpoint_address,
-    const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
+UpstreamLocalAddress DefaultUpstreamLocalAddressSelector::getUpstreamLocalAddressImpl(
+    const Network::Address::InstanceConstSharedPtr& endpoint_address) const {
   for (auto& local_address : upstream_local_addresses_) {
     if (local_address.address_ == nullptr) {
       continue;
     }
 
+    // Invalid addresses should have been rejected in constructor
     ASSERT(local_address.address_->ip() != nullptr);
     if (endpoint_address->ip() != nullptr &&
         local_address.address_->ip()->version() == endpoint_address->ip()->version()) {
-      return {local_address.address_,
-              combineConnectionSocketOptions(local_address.socket_options_, socket_options)};
+      return local_address;
     }
   }
 
-  return {
-      upstream_local_addresses_[0].address_,
-      combineConnectionSocketOptions(upstream_local_addresses_[0].socket_options_, socket_options)};
+  return upstream_local_addresses_[0];
 }
 
 std::string DefaultUpstreamLocalAddressSelectorFactory::name() const {

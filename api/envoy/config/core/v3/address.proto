@@ -164,7 +164,7 @@ message BindConfig {
 
   // Custom local address selector to override the default (i.e.
   // :ref:`DefaultLocalAddressSelector
-  // <envoy_v3_api_msg_extensions.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`).
+  // <envoy_v3_api_msg_config.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`).
   // [#extension-category: envoy.upstream.local_address_selector]
   TypedExtensionConfig local_address_selector = 6;
 }

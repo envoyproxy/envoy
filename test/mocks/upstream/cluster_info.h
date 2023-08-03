@@ -76,10 +76,8 @@ class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:
   MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
 
-  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddress,
-              (const Network::Address::InstanceConstSharedPtr& address,
-               const Network::ConnectionSocket::OptionsSharedPtr& connection_socket_options),
-              (const));
+  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddressImpl,
+              (const Network::Address::InstanceConstSharedPtr& address), (const));
 
   Network::Address::InstanceConstSharedPtr& address_;
 };

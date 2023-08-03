@@ -3226,8 +3226,7 @@ public:
       : upstream_local_addresses_{std::move(upstream_local_addresses)} {}
 
   UpstreamLocalAddress
-  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr&,
-                          const Network::ConnectionSocket::OptionsSharedPtr&) const override {
+  getUpstreamLocalAddressImpl(const Network::Address::InstanceConstSharedPtr&) const override {
     current_idx_ = (current_idx_ + 1) % upstream_local_addresses_.size();
     return upstream_local_addresses_[current_idx_];
   }

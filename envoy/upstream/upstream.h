@@ -63,9 +63,28 @@ public:
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
    * options.
    */
-  virtual UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address,
-      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const PURE;
+  UpstreamLocalAddress
+  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr& endpoint_address,
+                          const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
+    UpstreamLocalAddress local_address = getUpstreamLocalAddressImpl(endpoint_address);
+    Network::ConnectionSocket::OptionsSharedPtr connection_options =
+        std::make_shared<Network::ConnectionSocket::Options>(
+            socket_options ? *socket_options
+                           : std::vector<Network::ConnectionSocket::OptionConstSharedPtr>{});
+    return {local_address.address_,
+            local_address.socket_options_ != nullptr
+                ? Network::Socket::appendOptions(connection_options, local_address.socket_options_)
+                : connection_options};
+  }
+
+private:
+  /*
+   * The implementation is responsible for picking the ``UpstreamLocalAddress``
+   * based on the ``endpoint_address``. However adding the connection socket
+   * options is the responsibility of the base class.
+   */
+  virtual UpstreamLocalAddress getUpstreamLocalAddressImpl(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
 };
 
 using UpstreamLocalAddressSelectorConstSharedPtr =

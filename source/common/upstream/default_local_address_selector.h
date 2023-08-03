@@ -26,9 +26,8 @@ public:
       absl::optional<std::string> cluster_name);
 
   // UpstreamLocalAddressSelector
-  UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address,
-      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const override;
+  UpstreamLocalAddress getUpstreamLocalAddressImpl(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address) const override;
 
 private:
   std::vector<UpstreamLocalAddress> upstream_local_addresses_;
