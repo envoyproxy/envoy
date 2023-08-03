@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_authz
+  change: |
+    removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
