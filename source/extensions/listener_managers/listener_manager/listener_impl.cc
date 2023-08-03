@@ -948,7 +948,7 @@ bool ListenerImpl::createNetworkFilterChain(
     Network::Connection& connection, const Filter::NetworkFilterFactoriesList& filter_factories) {
   if (!Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories)) {
     ENVOY_LOG(debug, "New connection accepted while missing configuration. "
-                    "Close socket and stop the iteration onAccept.");
+                     "Close socket and stop the iteration onAccept.");
     missing_listener_config_stats_.network_extension_config_missing_.inc();
     return false;
   }
