@@ -30,24 +30,25 @@ private:
 
 class AddHeaderTempFilterFactory : public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
-    std::string name() const override { return "envoy.test.add_header_upstream"; }
+  std::string name() const override { return "envoy.test.add_header_upstream"; }
 
-    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::make_unique<test::integration::filters::AddHeaderTempFilterConfig>();
-    }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::integration::filters::AddHeaderTempFilterConfig>();
+  }
 
-    Http::FilterFactoryCb
-      createFilterFactoryFromProto(const Protobuf::Message& config, const std::string&,
-                               Server::Configuration::UpstreamHttpFactoryContext& context) override {
+  Http::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message& config, const std::string&,
+      Server::Configuration::UpstreamHttpFactoryContext& context) override {
 
-      const auto& proto_config = MessageUtil::downcastAndValidate<
-          const test::integration::filters::AddHeaderTempFilterConfig&>(
-          config, context.getServerFactoryContext().messageValidationVisitor());
+    const auto& proto_config = MessageUtil::downcastAndValidate<
+      const test::integration::filters::AddHeaderTempFilterConfig&>(
+      config, context.getServerFactoryContext().messageValidationVisitor());
 
-      return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(std::make_shared<AddHeaderTempFilter>(proto_config.header_key(), proto_config.header_val()));
-      };
+    return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<AddHeaderTempFilter>(proto_config.header_key(),
+                                                                      proto_config.header_val()));
     };
+  };
 };
 
 static Registry::RegisterFactory<AddHeaderTempFilterFactory,
