@@ -565,7 +565,7 @@ public:
   const FilterStats& stats() { return stats_; }
 
 protected:
-  void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
+  void setRetryShadowBufferLimit(uint32_t retry_shadow_buffer_limit) {
     ASSERT(retry_shadow_buffer_limit_ > retry_shadow_buffer_limit);
     retry_shadow_buffer_limit_ = retry_shadow_buffer_limit;
   }
