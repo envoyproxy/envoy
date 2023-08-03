@@ -111,7 +111,7 @@ ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
   }
 }
 
-void ProxyFilterConfig::onClusterAddOrUpdate(const std::string& cluster_name,
+void ProxyFilterConfig::onClusterAddOrUpdate(absl::string_view cluster_name,
                                              Upstream::ThreadLocalClusterCommand&) {
   ENVOY_LOG(debug, "thread local cluster {} added or updated", cluster_name);
   ThreadLocalClusterInfo& tls_cluster_info = *tls_slot_;

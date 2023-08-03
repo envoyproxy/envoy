@@ -55,7 +55,7 @@ public:
    * @param get_cluster is a callable that will provide the ThreadLocalCluster that represents the
    * updated cluster. It should be used within the call or discarded.
    */
-  virtual void onClusterAddOrUpdate(const std::string& cluster_name,
+  virtual void onClusterAddOrUpdate(absl::string_view cluster_name,
                                     ThreadLocalClusterCommand& get_cluster) PURE;
   /**
    * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.

@@ -39,7 +39,7 @@ UdpProxyFilter::~UdpProxyFilter() {
   }
 }
 
-void UdpProxyFilter::onClusterAddOrUpdate(const std::string& cluster_name,
+void UdpProxyFilter::onClusterAddOrUpdate(absl::string_view cluster_name,
                                           Upstream::ThreadLocalClusterCommand& get_cluster) {
   ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster_name);
 

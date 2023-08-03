@@ -17,7 +17,7 @@ public:
   ThreadLocalClusterOptRef threadLocalCluster() { return thread_local_cluster_; };
 
   // ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(const std::string& cluster_name,
+  void onClusterAddOrUpdate(absl::string_view cluster_name,
                             ThreadLocalClusterCommand& get_cluster) override;
   void onClusterRemoval(const std::string& cluster) override;
 

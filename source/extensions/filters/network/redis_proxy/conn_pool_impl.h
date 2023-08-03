@@ -166,7 +166,7 @@ private:
     void drainClients();
 
     // Upstream::ClusterUpdateCallbacks
-    void onClusterAddOrUpdate(const std::string& cluster_name,
+    void onClusterAddOrUpdate(absl::string_view cluster_name,
                               Upstream::ThreadLocalClusterCommand& get_cluster) override {
       onClusterAddOrUpdateNonVirtual(cluster_name, get_cluster);
     }

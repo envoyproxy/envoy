@@ -15,7 +15,7 @@ class ClusterCallbacks : public ClusterUpdateCallbacks {
 public:
   ClusterCallbacks(ClusterAddedCb cb) : cb_(std::move(cb)) {}
 
-  void onClusterAddOrUpdate(const std::string& cluster_name, ThreadLocalClusterCommand&) override {
+  void onClusterAddOrUpdate(absl::string_view cluster_name, ThreadLocalClusterCommand&) override {
     cb_(cluster_name);
   };
 

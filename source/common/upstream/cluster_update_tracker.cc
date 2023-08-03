@@ -12,7 +12,7 @@ ClusterUpdateTracker::ClusterUpdateTracker(ClusterManager& cm, const std::string
   }
 }
 
-void ClusterUpdateTracker::onClusterAddOrUpdate(const std::string& cluster_name,
+void ClusterUpdateTracker::onClusterAddOrUpdate(absl::string_view cluster_name,
                                                 ThreadLocalClusterCommand& get_cluster) {
   if (cluster_name != cluster_name_) {
     return;
