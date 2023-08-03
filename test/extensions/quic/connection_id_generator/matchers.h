@@ -63,7 +63,7 @@ MATCHER_P2(FactoryFunctionsReturnWorkerId, packet, expected_id, "") {
   std::string bytes = packet->toString();
   uint32_t bpf_id = bpf_prog_run(arg.bpf_prog_, bytes.c_str());
 #else
-  uint32_t bpf_id = expected_id_;
+  uint32_t bpf_id = expected_id;
   std::cout << "warning: not verifying bpf program due to lacking system support" << std::endl;
 #endif
   if (id != expected_id || bpf_id != expected_id) {
