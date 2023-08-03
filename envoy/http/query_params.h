@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "absl/strings/string_view.h"
-
 #include "header_map.h"
 
 namespace Envoy {
