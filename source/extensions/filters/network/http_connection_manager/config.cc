@@ -133,6 +133,10 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_header_validator")) {
+    // This will cause codecs to use legacy header validation and path normalization
+    return nullptr;
+  }
   ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
   if (!config.has_typed_header_validation_config()) {
     // If header validator is not configured ensure that the defaults match Envoy's original

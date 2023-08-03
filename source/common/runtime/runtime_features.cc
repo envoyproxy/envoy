@@ -116,6 +116,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // TODO(adisuissa): enable by default once this is tested in prod.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
+// TODO(yanavlasov) change to true when UHV is sufficently tested
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_header_validator);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

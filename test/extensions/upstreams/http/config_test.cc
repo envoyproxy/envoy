@@ -10,6 +10,7 @@
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -170,6 +171,9 @@ TEST_F(ConfigTest, HeaderValidatorConfig) {
     typed_config:
       "@type": type.googleapis.com/test.upstreams.http.CustomHeaderValidator
   )EOF";
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+
   TestHeaderValidatorFactoryConfig factory;
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   TestUtility::loadFromYamlAndValidate(yaml_string, options_);
@@ -185,6 +189,8 @@ TEST_F(ConfigTest, HeaderValidatorConfig) {
 }
 
 TEST_F(ConfigTest, DefaultHeaderValidatorConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
@@ -201,12 +207,25 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfig) {
 #endif
 }
 
+TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithoutOverride) {
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      proto_config;
+  DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
+  Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
+  NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
+  ProtocolOptionsConfigImpl config(options_, server_context_);
+  // By default envoy.reloadable_features.enable_header_validator is false preventing UHV use
+  EXPECT_EQ(nullptr, config.header_validator_factory_);
+}
+
 TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig) {
   const std::string yaml_string = R"EOF(
   use_downstream_protocol_config:
     http_protocol_options:
       allow_chunked_length: true
   )EOF";
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
@@ -231,6 +250,8 @@ TEST_F(ConfigTest, TranslateAutoLegacyConfigToDefaultHeaderValidatorConfig) {
     http_protocol_options:
       allow_chunked_length: true
   )EOF";
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
@@ -255,6 +276,8 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
     http_protocol_options:
       allow_chunked_length: true
   )EOF";
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
@@ -279,6 +302,8 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
     http2_protocol_options:
       allow_connect: true
   )EOF";
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
