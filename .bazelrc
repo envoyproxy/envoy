@@ -440,6 +440,12 @@ build:windows --features=fully_static_link
 build:windows --features=static_link_msvcrt
 build:windows --dynamic_mode=off
 
+build:rbe-engflow --remote_cache=grpcs://morganite.cluster.engflow.com
+build:rbe-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
+build:rbe-engflow --bes_backend=grpcs://morganite.cluster.engflow.com/
+build:rbe-engflow --bes_results_url=https://morganite.cluster.engflow.com/invocation/
+build:rbe-engflow --experimental_credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
+
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
 try-import %workspace%/local_tsan.bazelrc
