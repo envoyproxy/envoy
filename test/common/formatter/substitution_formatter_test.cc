@@ -652,6 +652,19 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter response_flags_format("RESPONSE_FLAGS_LONG");
+    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
+        .WillByDefault(Return(true));
+    EXPECT_EQ("LocalReset",
+              response_flags_format.format(request_headers, response_headers, response_trailers,
+                                           stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_THAT(response_flags_format.formatValue(request_headers, response_headers,
+                                                  response_trailers, stream_info, body,
+                                                  AccessLog::AccessLogType::NotSet),
+                ProtoEq(ValueUtil::stringValue("LocalReset")));
+  }
+
+  {
     StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_ADDRESS");
 
     // Validate for IPv4 address

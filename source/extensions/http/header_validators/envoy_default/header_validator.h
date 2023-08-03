@@ -165,6 +165,23 @@ protected:
    */
   void sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& header_map);
 
+  /*
+   * Validate the :path pseudo header using specific allowed character set.
+   */
+  HeaderValueValidationResult
+  validatePathHeaderCharacterSet(const ::Envoy::Http::HeaderString& value,
+                                 const std::array<uint32_t, 8>& allowed_path_chracters,
+                                 const std::array<uint32_t, 8>& allowed_query_fragment_characters);
+
+  // URL-encode additional characters in URL path. This method is called iff
+  // `envoy.uhv.allow_non_compliant_characters_in_path` is true.
+  // Encoded characters:
+  //
+  // " < > ^ ` { } | TAB space extended-ASCII
+  // This method is provided for backward compatibility with Envoy's pre header validator
+  // behavior. See comments in the HeaderValidatorConfigOverrides declaration above for more
+  // information.
+  void encodeAdditionalCharactersInPath(::Envoy::Http::RequestHeaderMap& header_map);
   /**
    * Check if the :path header contains a fragment. If the fragment is found it is stripped from
    * the :path.
