@@ -3,7 +3,7 @@ name: Envoy/prechecks
 permissions:
   contents: read
   # This wont work else something is v broken
-  packages: read
+  # packages: read
 
 on:
   push:
