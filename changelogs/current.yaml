@@ -14,7 +14,7 @@ bug_fixes:
 - area: subset load balancer
   change: |
     Fixed a bug where
-    :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>` and
+    :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
     :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
     values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
 

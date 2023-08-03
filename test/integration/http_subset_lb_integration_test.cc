@@ -190,10 +190,10 @@ public:
     uint32_t weight;
   };
 
-  // Runs a subset lb test to verify traffic correctly spills over across priorities . Two
+  // Runs a subset lb test to verify traffic correctly spills over across priorities. Two
   // priorities are created: the first three hosts are added to p0, and the fourth host is added to
   // p1. The provided endpoint config determines the health and weight of each endpoint. This
-  // config, along with the provide overprovisioning factor and weighted priority health, can be
+  // config, along with the provided overprovisioning factor and weighted priority health, can be
   // used to test various spillover behavior.
   void runSpilloverTest(std::vector<EndpointConfig> endpoint_config,
                         uint32_t overprovisioning_factor, bool weighted_priority_health,
