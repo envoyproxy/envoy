@@ -237,6 +237,7 @@ steps:
 
 - task: PublishTestResults@2
   inputs:
+    publishRunAttachments: false
     testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
     testRunTitle: "${{ parameters.ciTarget }}"
     searchFolder: $(Build.StagingDirectory)/bazel_root
