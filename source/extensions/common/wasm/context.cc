@@ -1125,6 +1125,28 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
   return WasmResult::Ok;
 }
 
+WasmResult Context::setEnvoyFilterState(std::string_view path, std::string_view value) {
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(path);
+  if (!factory) {
+    return WasmResult::NotFound;
+  }
+
+  auto object = factory->createFromBytes(value);
+  if (!object) {
+    return WasmResult::BadArgument;
+  }
+
+  auto* stream_info = getRequestStreamInfo();
+  if (!stream_info) {
+    return WasmResult::NotFound;
+  }
+
+  stream_info->filterState()->setData(path, object, StreamInfo::FilterState::StateType::Mutable,
+                                      prototype.life_span_);
+  return WasmResult::Ok;
+}
+
 WasmResult
 Context::declareProperty(std::string_view path,
                          Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype) {

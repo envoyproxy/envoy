@@ -1,5 +1,6 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
+#include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
 #if defined(WASM_USE_CEL_PARSER)
@@ -59,6 +60,18 @@ RegisterForeignFunction registerUncompressForeignFunction(
         }
         dest_len = dest_len * 2;
       }
+    });
+
+RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
+    "set_envoy_filter_state",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>&) -> WasmResult {
+      envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
+      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+        auto context = static_cast<Context*>(proxy_wasm::current_context_);
+        return context->setEnvoyFilterState(args.path(), args.value());
+      }
+      return WasmResult::BadArgument;
     });
 
 #if defined(WASM_USE_CEL_PARSER)

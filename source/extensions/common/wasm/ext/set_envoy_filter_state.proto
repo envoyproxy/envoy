@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package envoy.source.extensions.common.wasm;
+
+message SetEnvoyFilterStateArguments {
+  string path = 1;
+  string value = 2;
+};

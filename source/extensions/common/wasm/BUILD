@@ -92,6 +92,7 @@ envoy_cc_extension(
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_null_vm_wasm_api",
+        "//source/extensions/common/wasm/ext:set_envoy_filter_state_cc_proto",
         "//source/extensions/filters/common/expr:context_lib",
         "@com_google_cel_cpp//eval/public/containers:field_access",
         "@com_google_cel_cpp//eval/public/containers:field_backed_list_impl",

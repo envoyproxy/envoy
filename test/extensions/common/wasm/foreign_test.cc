@@ -1,5 +1,6 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
 #include "test/mocks/local_info/mocks.h"
@@ -49,6 +50,48 @@ TEST_F(ForeignTest, ForeignFunctionEdgeCaseTest) {
   ASSERT_NE(function, nullptr);
   result = function(wasm, "", [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::BadArgument);
+}
+
+TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info;
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  Wasm wasm(plugin->wasmConfig(), "", scope, *api, cluster_manager, *dispatcher);
+  proxy_wasm::current_context_ = &ctx_;
+
+  auto function = proxy_wasm::getForeignFunction("set_envoy_filter_state");
+  ASSERT_NE(function, nullptr);
+
+  auto result = function(wasm, "bad_arg", [](size_t size) { return malloc(size); });
+  EXPECT_EQ(result, WasmResult::BadArgument);
+
+  envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
+  std::string in;
+
+  args.set_path("invalid.path");
+  args.set_value("unicorns");
+  args.SerializeToString(&in);
+  result = function(wasm, in, [](size_t size) { return malloc(size); });
+  EXPECT_EQ(result, WasmResult::NotFound);
+
+  args.set_path("envoy.tcp_proxy.cluster");
+  args.set_value("unicorns");
+  args.SerializeToString(&in);
+  result = function(wasm, in, [](size_t size) { return malloc(size); });
+  EXPECT_EQ(result, WasmResult::Ok);
+
+  args.set_path("envoy.network.transport_socket.original_dst_address");
+  args.set_value("unicorns");
+  args.SerializeToString(&in);
+  result = function(wasm, in, [](size_t size) { return malloc(size); });
+  EXPECT_EQ(result, WasmResult::Ok);
 }
 
 } // namespace Wasm
