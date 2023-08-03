@@ -517,6 +517,15 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
   config_->stats().oauth_success_.inc();
 }
 
+/*
+  checkCookieSize does only log a warning if cookie size exceeds the limit
+*/
+void checkCookieSize(std::string cookie) {
+  if (cookie.size > 4096) {
+    ENVOY_LOG(warn, "cookie size is greater than 4096: \n{}", cookie);
+  }
+}
+
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
   std::string max_age;
@@ -546,19 +555,19 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
             ? cookie_tail_http_only
             : cookie_tail;
-    headers.addReferenceKey(
-        Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly));
+    string cookie = absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly))
+    checkCookieSize(cookie)
+    headers.addReferenceKey(Http::Headers::get().SetCookie, cookie);
     if (id_token_ != EMPTY_STRING) {
-      headers.addReferenceKey(
-          Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_attribute_httponly));
+      cookie = absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_attribute_httponly)
+      checkCookieSize(cookie)
+      headers.addReferenceKey(Http::Headers::get().SetCookie, cookie);
     }
 
     if (refresh_token_ != EMPTY_STRING) {
-      headers.addReferenceKey(Http::Headers::get().SetCookie,
-                              absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
-                                           cookie_attribute_httponly));
+      cookie = absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_, cookie_attribute_httponly)
+      checkCookieSize(cookie)
+      headers.addReferenceKey(Http::Headers::get().SetCookie, cookie)
     }
   }
 }
