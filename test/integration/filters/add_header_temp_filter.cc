@@ -41,8 +41,8 @@ public:
       Server::Configuration::UpstreamHttpFactoryContext& context) override {
 
     const auto& proto_config = MessageUtil::downcastAndValidate<
-      const test::integration::filters::AddHeaderTempFilterConfig&>(
-      config, context.getServerFactoryContext().messageValidationVisitor());
+        const test::integration::filters::AddHeaderTempFilterConfig&>(
+        config, context.getServerFactoryContext().messageValidationVisitor());
 
     return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<AddHeaderTempFilter>(proto_config.header_key(),
