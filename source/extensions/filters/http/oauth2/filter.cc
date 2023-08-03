@@ -189,10 +189,15 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
   const auto& cookies = Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
-    return key == cookie_names_.oauth_expires_ || key == cookie_names_.bearer_token_ ||
-           key == cookie_names_.oauth_hmac_ || key == cookie_names_.id_token_ ||
-           key == cookie_names_.refresh_token_;
+    return key == cookie_names_.oauth_expires_ || key == cookie_names_.oauth_hmac_ ||
+           absl::StartsWith(key, cookie_names_.bearer_token_) ||
+           absl::StartsWith(key, cookie_names_.id_token_) ||
+           absl::StartsWith(key, cookie_names_.refresh_token_);
   });
+
+  // TODO(kanurag94): remove this comment
+  // Now we have all the cookies required, if they are split cookies
+  // we need to combine them
 
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
   token_ = findValue(cookies, cookie_names_.bearer_token_);
@@ -517,13 +522,33 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
   config_->stats().oauth_success_.inc();
 }
 
-/*
-  checkCookieSize does only log a warning if cookie size exceeds the limit
-*/
-void checkCookieSize(std::string cookie) {
-  if (cookie.size > 4096) {
-    ENVOY_LOG(warn, "cookie size is greater than 4096: \n{}", cookie);
+void setCookie(Http::ResponseHeaderMap& headers, const std::string& key, const std::string& value) {
+  headers.addReferenceKey(Http::Headers::get().SetCookie, absl::StrCat(key, "=", value));
+}
+
+void setSplitCookie(Http::ResponseHeaderMap& headers, const std::string& key,
+                    const std::string& data, size_t maxChunkSize = 4000) {
+  if (data.size() <= maxChunkSize) {
+    // If the data is smaller than the maximum chunk size, no need to split
+    setCookie(headers, key, data);
+    return;
   }
+
+  if (data.size() > maxChunkSize) {
+    ENVOY_LOG(debug, "cookie size is greater than {}: \n{}", maxChunkSize, cookie);
+  }
+
+  std::vector<std::string> chunks;
+  for (size_t i = 0; i < data.size(); i += maxChunkSize) {
+    chunks.push_back(data.substr(i, maxChunkSize));
+  }
+
+  for (size_t i = 0; i < chunks.size(); i++) {
+    setCookie(headers, key + "_" + std::to_string(i), chunks[i]);
+  }
+
+  // Also, set an additional cookie to store the number of chunks
+  setCookie(headers, key + "_count", std::to_string(chunks.size()));
 }
 
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
@@ -555,19 +580,15 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
             ? cookie_tail_http_only
             : cookie_tail;
-    string cookie = absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly))
-    checkCookieSize(cookie)
-    headers.addReferenceKey(Http::Headers::get().SetCookie, cookie);
+    setSplitCookie(cookie_names.bearer_token_,
+                   absl::StrCat(access_token_, cookie_attribute_httponly));
     if (id_token_ != EMPTY_STRING) {
-      cookie = absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_attribute_httponly)
-      checkCookieSize(cookie)
-      headers.addReferenceKey(Http::Headers::get().SetCookie, cookie);
+      setSplitCookie(cookie_names.id_token_, absl::StrCat(id_token_, cookie_attribute_httponly));
     }
 
     if (refresh_token_ != EMPTY_STRING) {
-      cookie = absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_, cookie_attribute_httponly)
-      checkCookieSize(cookie)
-      headers.addReferenceKey(Http::Headers::get().SetCookie, cookie)
+      setSplitCookie(cookie_names.refresh_token_,
+                     absl::StrCat(refresh_token_, cookie_attribute_httponly));
     }
   }
 }
