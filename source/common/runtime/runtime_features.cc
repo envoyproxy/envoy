@@ -80,7 +80,6 @@ RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
-RUNTIME_GUARD(envoy_reloadable_features_uhv_translate_backslash_to_slash);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_allow_connect_with_2xx);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wait_for_response_headers_before_disabling_read);
 RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
@@ -119,6 +118,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
+// TODO(adisuissa) this will be enabled by default once the work on the feature is
+// done in EdsClusterImpl.
+FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

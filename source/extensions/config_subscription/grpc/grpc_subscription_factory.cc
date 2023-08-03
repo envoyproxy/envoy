@@ -33,6 +33,7 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
         Utility::parseRateLimitSettings(api_config_source), data.local_info_,
         api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
         std::move(backoff_strategy), data.xds_config_tracker_, data.xds_resources_delegate_,
+        /*std::move(data.eds_resources_cache_)*/ nullptr, // EDS cache is only used for ADS.
         control_plane_id);
   } else {
     mux = std::make_shared<Config::GrpcMuxImpl>(
@@ -44,6 +45,7 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
         Utility::parseRateLimitSettings(api_config_source),
         api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
         std::move(backoff_strategy), data.xds_config_tracker_, data.xds_resources_delegate_,
+        /*std::move(data.eds_resources_cache_)*/ nullptr, // EDS cache is only used for ADS.
         control_plane_id);
   }
   return std::make_unique<GrpcSubscriptionImpl>(
@@ -73,7 +75,9 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
         data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
         Utility::parseRateLimitSettings(api_config_source), data.local_info_,
         api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-        std::move(backoff_strategy), data.xds_config_tracker_);
+        std::move(backoff_strategy), data.xds_config_tracker_,
+        /*std::move(data.eds_resources_cache_)*/ nullptr // EDS cache is only used for ADS.
+    );
   } else {
     mux = std::make_shared<Config::NewGrpcMuxImpl>(
         Config::Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(),
@@ -81,7 +85,9 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
             ->createUncachedRawAsyncClient(),
         data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
         Utility::parseRateLimitSettings(api_config_source), data.local_info_,
-        std::move(custom_config_validators), std::move(backoff_strategy), data.xds_config_tracker_);
+        std::move(custom_config_validators), std::move(backoff_strategy), data.xds_config_tracker_,
+        /*std::move(data.eds_resources_cache_)*/ nullptr // EDS cache is only used for ADS.
+    );
   }
   return std::make_unique<GrpcSubscriptionImpl>(
       std::move(mux), data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,

@@ -183,7 +183,7 @@ def envoy_jinja_env(
                > $@
         """ % (template_arg, load_args),
         outs = [name_env_py],
-        exec_tools = [name_templates],
+        tools = [name_templates],
     )
 
     py_library(

@@ -113,12 +113,12 @@ genrule(
         -m arm64/envoy-contrib:bin/envoy-contrib-$${VERSION}-linux-aarch_64 \
            --out $@
     """ % VERSION,
-    exec_tools = [
+    tags = ["no-remote"],
+    tools = [
         ":arm64-packages",
-        ":x64-packages",
         ":arm64-release",
+        ":x64-packages",
         ":x64-release",
         "//tools/distribution:sign",
     ],
-    tags = ["no-remote"],
 )

@@ -2,6 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/common/network/filter_state_dst_address.h"
+
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -56,6 +58,11 @@ public:
 
 TEST_F(UpstreamConnTest, ConnectUpstream) {
   initialize();
+
+  const auto* dst_addr =
+      upConn_->requestStreamInfo()->filterState().getDataReadOnly<Network::DestinationAddress>(
+          Network::DestinationAddress::key());
+  EXPECT_EQ(dst_addr->address()->asString(), addr_);
 
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
       .WillOnce(
