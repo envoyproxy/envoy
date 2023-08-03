@@ -7,13 +7,6 @@
 #include "envoy/common/platform.h"
 
 #include "google/protobuf/any.pb.h"
-#include "google/protobuf/io/coded_stream.h"
-#include "google/protobuf/io/zero_copy_stream.h"
-#include "google/protobuf/io/zero_copy_stream_impl.h"
-
-#include "google/protobuf/message.h"
-#include "google/protobuf/repeated_field.h"
-#include "google/protobuf/service.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/descriptor_database.h"
@@ -40,7 +33,7 @@
 
 namespace google::protobuf {
 using ReflectableMessage = ::google::protobuf::Message*;
-} // google::protobuf
+} // namespace google::protobuf
 
 namespace Envoy {
 // All references to google::protobuf in Envoy need to be made via the
@@ -68,32 +61,32 @@ namespace Protobuf {
 
 using Closure = ::google::protobuf::Closure;
 
-using ::google::protobuf::Arena;                  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::BytesValue;             // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::Descriptor;             // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::DescriptorPool;         // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::DynamicCastToGenerated; // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::DynamicMessageFactory;  // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::EnumValueDescriptor;    // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::FieldDescriptor;        // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::FieldMask;              // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::FileDescriptor;         // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::Map;                    // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::MapPair;                // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::OneofDescriptor;        // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::Type;                   // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::UInt32Value;            // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Arena;                        // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::BytesValue;                   // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Descriptor;                   // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DescriptorPool;               // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPoolDatabase;       // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DynamicCastToGenerated;       // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DynamicMessageFactory;        // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::EnumValueDescriptor;          // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FieldDescriptor;              // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FieldMask;                    // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::FileDescriptor;               // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FileDescriptorProto;          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FileDescriptorSet;            // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Map;                          // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::MapPair;                      // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::MessageFactory;               // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::MethodDescriptor;             // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::OneofDescriptor;              // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Reflection;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedField;                // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedFieldBackInserter;    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrField;             // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrFieldBackInserter; // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::TextFormat;                   // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Type;                         // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::UInt32Value;                  // NOLINT(misc-unused-using-decls)
 
 using Message = ::google::protobuf::MessageLite;
 
@@ -147,7 +140,7 @@ public:
 
 using ConstMessagePtrVector = std::vector<std::unique_ptr<const Protobuf::Message>>;
 
-}  // namespace Envoy
+} // namespace Envoy
 
 #endif
 

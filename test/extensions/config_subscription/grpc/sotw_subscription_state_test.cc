@@ -1,9 +1,9 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 
-#include "source/common/protobuf/protobuf.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.h"
 
