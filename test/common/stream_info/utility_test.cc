@@ -22,10 +22,11 @@ namespace {
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  for (const auto& [flag_string, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
+  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
     NiceMock<MockStreamInfo> stream_info;
     ON_CALL(stream_info, hasResponseFlag(flag_enum)).WillByDefault(Return(true));
-    EXPECT_EQ(flag_string, ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ(flag_strings.short_string_, ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ(flag_strings.long_string_, ResponseFlagUtils::toString(stream_info));
   }
 
   // No flag is set.
@@ -33,6 +34,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
     NiceMock<MockStreamInfo> stream_info;
     ON_CALL(stream_info, hasResponseFlag(_)).WillByDefault(Return(false));
     EXPECT_EQ("-", ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ("-", ResponseFlagUtils::toString(stream_info));
   }
 
   // Test combinations.
@@ -44,14 +46,17 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
     ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
     EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ("UpstreamRequestTimeout,DelayInjected,FaultInjected",
+              ResponseFlagUtils::toString(stream_info));
   }
 }
 
 TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 
-  for (const auto& [flag_string, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
-    absl::optional<ResponseFlag> response_flag = ResponseFlagUtils::toResponseFlag(flag_string);
+  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+    absl::optional<ResponseFlag> response_flag =
+        ResponseFlagUtils::toResponseFlag(flag_strings.short_string_);
     EXPECT_TRUE(response_flag.has_value());
     EXPECT_EQ(flag_enum, response_flag.value());
   }

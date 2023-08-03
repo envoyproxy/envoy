@@ -53,12 +53,24 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, 
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
           {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
           {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
-          {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {":path", getPathValidationMethod()},
           {":protocol", absl::bind_front(&Http2HeaderValidator::validateProtocolHeader, this)},
           {"te", absl::bind_front(&Http2HeaderValidator::validateTEHeader, this)},
           {"content-length",
            absl::bind_front(&Http2HeaderValidator::validateContentLengthHeader, this)},
       } {}
+
+HeaderValidator::HeaderValidatorFunction Http2HeaderValidator::getPathValidationMethod() {
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
+    if (protocol_ == ::Envoy::Http::Protocol::Http2) {
+      return absl::bind_front(
+          &Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp2, this);
+    }
+    return absl::bind_front(&Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp3,
+                            this);
+  }
+  return absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this);
+}
 
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -96,6 +108,101 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 
   // Validate the header value
   return validateGenericHeaderValue(value);
+}
+
+HeaderValidator::HeaderValueValidationResult
+Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp2(
+    const HeaderString& path_header_value) {
+  ASSERT(config_overrides_.allow_non_compliant_characters_in_path_);
+  // Same table as the kPathHeaderCharTable but with the following additional character allowed
+  // " < > [ ] ^ ` { } \ | SPACE TAB and all extended ASCII
+  // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
+  // runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b11101111111111111111111111111110,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+  };
+
+  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // allowed " < > [ ] ^ ` { } \ | # SPACE TAB and all extended ASCII This table is used when the
+  // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kQueryAndFragmentCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b11111111111111111111111111111111,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+  };
+  return HeaderValidator::validatePathHeaderCharacterSet(
+      path_header_value, kPathHeaderCharTableWithAdditionalCharacters,
+      kQueryAndFragmentCharTableWithAdditionalCharacters);
+}
+
+HeaderValidator::HeaderValueValidationResult
+Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp3(
+    const HeaderString& path_header_value) {
+  ASSERT(config_overrides_.allow_non_compliant_characters_in_path_);
+  // Same table as the kPathHeaderCharTable but with the following additional character allowed
+  // " < > [ ] ^ ` { } \ | SPACE TAB
+  // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
+  // runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b11101111111111111111111111111110,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+
+  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // allowed " < > [ ] ^ ` { } \ | # SPACE TAB
+  // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
+  // runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kQueryAndFragmentCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b11111111111111111111111111111111,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+  return HeaderValidator::validatePathHeaderCharacterSet(
+      path_header_value, kPathHeaderCharTableWithAdditionalCharacters,
+      kQueryAndFragmentCharTableWithAdditionalCharacters);
 }
 
 ValidationResult
