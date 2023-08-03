@@ -351,9 +351,12 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknownDomainTest(); }
 
+// TODO(yanavlasov) Enable per #26642
+#ifndef ENVOY_ENABLE_UHV
 TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
   requestWithUnknownDomainTest("", "\x00\x00.google.com");
 }
+#endif
 
 // Do a sanity check using the getaddrinfo() resolver.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainGetAddrInfoResolver) {
