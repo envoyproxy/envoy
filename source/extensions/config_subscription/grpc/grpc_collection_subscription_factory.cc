@@ -31,7 +31,9 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
           data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
           Utility::parseRateLimitSettings(api_config_source), data.local_info_,
           std::move(custom_config_validators), std::move(backoff_strategy),
-          data.xds_config_tracker_),
+          data.xds_config_tracker_,
+          // No EDS resources cache needed from collections.
+          /*eds_resources_cache=*/nullptr),
       data.callbacks_, data.resource_decoder_, data.stats_, data.dispatcher_,
       Utility::configSourceInitialFetchTimeout(data.config_), /*is_aggregated=*/false,
       data.options_);
