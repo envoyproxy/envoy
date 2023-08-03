@@ -199,7 +199,7 @@ private:
     std::string typed_config_;
   };
 
-  LogLevel log_level_ = LogLevel::debug;
+  LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
 
   std::string stats_domain_;

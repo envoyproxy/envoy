@@ -187,15 +187,6 @@ envoy_cc_library(
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/type/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/watchdog/v3:pkg_cc_proto_descriptor",
-        #"@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto_descriptor",
-        #"@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto_descriptor",
-        #"@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto_descriptor",
-        #"@envoy_mobile//library/common/extensions/filters/http/platform_bridge:filter_cc_proto_descriptor",
-        #"@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto_descriptor",
-        #"@envoy_mobile//library/common/extensions/key_value/platform:platform_cc_proto_descriptor",
-        #"@envoy_mobile//library/common/extensions/retry/options/network_configuration:predicate_cc_proto_descriptor",
-        #"@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto_descriptor",
-        #"@com_github_cncf_udpa//udpa/xds/type/v3:pkg_cc_proto_descriptor",
     ]),
 )
 
