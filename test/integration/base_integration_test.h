@@ -411,6 +411,10 @@ protected:
 
   bool enableHalfClose() { return upstream_config_.enable_half_close_; }
 
+  void enableRstDetectSend(bool value) { upstream_config_.enable_rst_detect_send_ = value; }
+
+  bool enableRstDetectSend() { return upstream_config_.enable_rst_detect_send_; }
+
   FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
   void setMaxRequestHeadersKb(uint32_t value) { upstream_config_.max_request_headers_kb_ = value; }
   void setMaxRequestHeadersCount(uint32_t value) {

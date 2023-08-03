@@ -54,6 +54,7 @@ void ConnectionImplBase::raiseConnectionEvent(ConnectionEvent event) {
     // events. There was already recursion raising closed events. We still raise closed events
     // to further callbacks because such events are typically used for cleanup.
     if (event != ConnectionEvent::LocalClose && event != ConnectionEvent::RemoteClose &&
+        event != ConnectionEvent::LocalReset && event != ConnectionEvent::RemoteReset &&
         state() != State::Open) {
       return;
     }

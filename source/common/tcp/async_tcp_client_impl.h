@@ -25,7 +25,8 @@ class AsyncTcpClientImpl : public AsyncTcpClient,
 public:
   AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
                      Upstream::ThreadLocalCluster& thread_local_cluster,
-                     Upstream::LoadBalancerContext* context, bool enable_half_close);
+                     Upstream::LoadBalancerContext* context, bool enable_half_close,
+                     bool enable_rst_detect_send);
 
   ~AsyncTcpClientImpl() override;
 
@@ -97,6 +98,7 @@ private:
   AsyncTcpClientCallbacks* callbacks_{};
   bool disconnected_{true};
   bool enable_half_close_{false};
+  bool enable_rst_detect_send_{false};
 };
 
 } // namespace Tcp

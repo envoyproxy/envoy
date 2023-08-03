@@ -91,6 +91,7 @@ public:
   void noDelay(bool enable) override;
   ReadDisableStatus readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override;
+  void enableTcpRstDetectAndSend(bool) override {}
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   void setBufferLimits(uint32_t limit) override;

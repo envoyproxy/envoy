@@ -457,7 +457,9 @@ void MultiConnectionBaseImpl::onEvent(ConnectionEvent event, ConnectionCallbacks
     break;
   }
   case ConnectionEvent::LocalClose:
-  case ConnectionEvent::RemoteClose: {
+  case ConnectionEvent::RemoteClose:
+  case ConnectionEvent::LocalReset:
+  case ConnectionEvent::RemoteReset: {
     ENVOY_CONN_LOG_EVENT(debug, "multi_connection_cx_attempt_failed", "connection={}", *this,
                          connection_provider_->nextConnection());
     // This connection attempt has failed. If possible, start another connection attempt

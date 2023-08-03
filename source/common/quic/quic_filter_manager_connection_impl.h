@@ -72,6 +72,9 @@ public:
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {
     IS_ENVOY_BUG("Unexpected call to detectEarlyCloseWhenReadDisabled");
   }
+  void enableTcpRstDetectAndSend(bool /*value*/) override {
+    IS_ENVOY_BUG("Unexpected call to enableTcpRstDetectAndSend");
+  }
   bool readEnabled() const override { return true; }
   Network::ConnectionInfoSetter& connectionInfoSetter() override {
     ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),

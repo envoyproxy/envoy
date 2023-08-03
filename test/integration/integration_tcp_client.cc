@@ -36,7 +36,7 @@ using ::testing::NiceMock;
 
 IntegrationTcpClient::IntegrationTcpClient(
     Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
-    Network::Address::IpVersion version, bool enable_half_close,
+    Network::Address::IpVersion version, bool enable_half_close, bool enable_rst_detect_send,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::Address::InstanceConstSharedPtr source_address, absl::string_view destination_address)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
@@ -67,12 +67,17 @@ IntegrationTcpClient::IntegrationTcpClient(
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
   connection_->enableHalfClose(enable_half_close);
+  connection_->enableTcpRstDetectAndSend(enable_rst_detect_send);
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
   connection_->connect();
 }
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+
+void IntegrationTcpClient::close(Network::ConnectionCloseType close_type) {
+  connection_->close(close_type);
+}
 
 void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match) {
   auto found = payload_reader_->data().find(data);
@@ -168,7 +173,8 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::RemoteReset) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   }

@@ -17,6 +17,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   bool end_stream = false;
+  absl::optional<Api::IoError::IoErrorCode> err = absl::nullopt;
   do {
     Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, absl::nullopt);
 
@@ -34,21 +35,23 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
       }
     } else {
       // Remote error (might be no data).
-      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(),
-                     result.err_->getErrorDetails());
+      ENVOY_CONN_LOG(trace, "read error: {}, code: {}", callbacks_->connection(),
+                     result.err_->getErrorDetails(), static_cast<int>(result.err_->getErrorCode()));
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
         action = PostIoAction::Close;
+        err = result.err_->getErrorCode();
       }
       break;
     }
   } while (true);
 
-  return {action, bytes_read, end_stream};
+  return {action, bytes_read, end_stream, err};
 }
 
 IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   PostIoAction action;
   uint64_t bytes_written = 0;
+  absl::optional<Api::IoError::IoErrorCode> err = absl::nullopt;
   ASSERT(!shutdown_ || buffer.length() == 0);
   do {
     if (buffer.length() == 0) {
@@ -67,18 +70,19 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.return_value_);
       bytes_written += result.return_value_;
     } else {
-      ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
-                     result.err_->getErrorDetails());
+      ENVOY_CONN_LOG(trace, "write error: {}, code: {}", callbacks_->connection(),
+                     result.err_->getErrorDetails(), static_cast<int>(result.err_->getErrorCode()));
       if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
         action = PostIoAction::KeepOpen;
       } else {
+        err = result.err_->getErrorCode();
         action = PostIoAction::Close;
       }
       break;
     }
   } while (true);
 
-  return {action, bytes_written, false};
+  return {action, bytes_written, false, err};
 }
 
 std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }

@@ -70,6 +70,14 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
     upstream_conn_data_->connection().close(
         Network::ConnectionCloseType::NoFlush,
         StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose);
+  } else if (event == Network::ConnectionEvent::RemoteReset ||
+             event == Network::ConnectionEvent::LocalReset) {
+    // The close call may result in this object being deleted. Latch the
+    // connection locally so it can be returned for potential draining.
+    auto* conn_data = upstream_conn_data_.release();
+    conn_data->connection().close(
+        Network::ConnectionCloseType::AbortReset,
+        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamResetClose);
   }
   return nullptr;
 }
@@ -110,7 +118,9 @@ void HttpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb) {
 Tcp::ConnectionPool::ConnectionData*
 HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteClose) {
+      event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalReset ||
+      event == Network::ConnectionEvent::RemoteReset) {
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
   }
   return nullptr;

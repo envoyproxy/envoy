@@ -1207,7 +1207,8 @@ Tcp::AsyncTcpClientPtr
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpAsyncClient(
     LoadBalancerContext* context, Tcp::AsyncTcpClientOptionsConstSharedPtr options) {
   return std::make_unique<Tcp::AsyncTcpClientImpl>(parent_.thread_local_dispatcher_, *this, context,
-                                                   options->enable_half_close);
+                                                   options->enable_half_close,
+                                                   options->enable_rst_detect_send);
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(

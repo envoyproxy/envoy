@@ -717,8 +717,11 @@ bool Filter::startUpstreamSecureTransport() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteClose) {
+  const bool connection_closed = event == Network::ConnectionEvent::LocalClose ||
+                                 event == Network::ConnectionEvent::RemoteClose ||
+                                 event == Network::ConnectionEvent::LocalReset ||
+                                 event == Network::ConnectionEvent::RemoteReset;
+  if (connection_closed) {
     downstream_closed_ = true;
     // Cancel the potential odcds callback.
     cluster_discovery_handle_ = nullptr;
@@ -735,15 +738,14 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                                   std::move(upstream_callbacks_), std::move(idle_timer_),
                                   read_callbacks_->upstreamHost());
     }
-    if (event == Network::ConnectionEvent::LocalClose ||
-        event == Network::ConnectionEvent::RemoteClose) {
+    if (connection_closed) {
       upstream_.reset();
       disableIdleTimer();
     }
   }
+
   if (generic_conn_pool_) {
-    if (event == Network::ConnectionEvent::LocalClose ||
-        event == Network::ConnectionEvent::RemoteClose) {
+    if (connection_closed) {
       // Cancel the conn pool request and close any excess pending requests.
       generic_conn_pool_.reset();
     }
@@ -770,7 +772,9 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
   connecting_ = false;
 
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+      event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalReset ||
+      event == Network::ConnectionEvent::RemoteReset) {
     upstream_.reset();
     disableIdleTimer();
 
@@ -785,6 +789,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         establishUpstreamConnection();
       }
     } else {
+      // TODO(botengyao): propagate RST back to downstream connection if RST is received.
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       }
@@ -947,7 +952,9 @@ Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedP
 
 void Drainer::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+      event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteReset ||
+      event == Network::ConnectionEvent::LocalReset) {
     if (timer_ != nullptr) {
       timer_->disableTimer();
     }

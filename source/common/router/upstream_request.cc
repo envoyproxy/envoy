@@ -539,6 +539,8 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
       return Http::StreamResetReason::RemoteConnectionFailure;
     case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
       return Http::StreamResetReason::LocalConnectionFailure;
+    case ConnectionPool::PoolFailureReason::CloseResetConnectionFailure:
+      return Http::StreamResetReason::ConnectionTermination;
     case ConnectionPool::PoolFailureReason::Timeout:
       return Http::StreamResetReason::ConnectionTimeout;
     }

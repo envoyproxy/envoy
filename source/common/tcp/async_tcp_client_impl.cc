@@ -18,11 +18,11 @@ namespace Tcp {
 AsyncTcpClientImpl::AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
                                        Upstream::ThreadLocalCluster& thread_local_cluster,
                                        Upstream::LoadBalancerContext* context,
-                                       bool enable_half_close)
+                                       bool enable_half_close, bool enable_rst_detect_send)
     : dispatcher_(dispatcher), thread_local_cluster_(thread_local_cluster),
       cluster_info_(thread_local_cluster_.info()), context_(context),
       connect_timer_(dispatcher.createTimer([this]() { onConnectTimeout(); })),
-      enable_half_close_(enable_half_close) {
+      enable_half_close_(enable_half_close), enable_rst_detect_send_(enable_rst_detect_send) {
   connect_timer_->enableTimer(cluster_info_->connectTimeout());
   cluster_info_->trafficStats()->upstream_cx_active_.inc();
   cluster_info_->trafficStats()->upstream_cx_total_.inc();
@@ -38,6 +38,7 @@ bool AsyncTcpClientImpl::connect() {
     return false;
   }
   connection_->enableHalfClose(enable_half_close_);
+  connection_->enableTcpRstDetectAndSend(enable_rst_detect_send_);
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(std::make_shared<NetworkReadFilter>(*this));
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
@@ -100,7 +101,9 @@ void AsyncTcpClientImpl::reportConnectionDestroy(Network::ConnectionEvent event)
 
 void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+      event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalReset ||
+      event == Network::ConnectionEvent::RemoteReset) {
     if (disconnected_) {
       cluster_info_->trafficStats()->upstream_cx_connect_fail_.inc();
     }

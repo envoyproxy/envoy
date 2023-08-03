@@ -149,5 +149,17 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildUdpGroOptions() {
   return options;
 }
 
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildZeroSoLingerOptions() {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  struct linger linger;
+  linger.l_onoff = 1;
+  linger.l_linger = 0;
+  absl::string_view linger_bstr{reinterpret_cast<const char*>(&linger), sizeof(struct linger)};
+  options->push_back(std::make_shared<SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_LISTENING,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_LINGER), linger_bstr));
+  return options;
+}
+
 } // namespace Network
 } // namespace Envoy

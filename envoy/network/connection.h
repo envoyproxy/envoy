@@ -29,6 +29,8 @@ namespace Network {
 enum class ConnectionEvent {
   RemoteClose,
   LocalClose,
+  RemoteReset,
+  LocalReset,
   Connected,
   ConnectedZeroRtt,
 };
@@ -72,7 +74,9 @@ enum class ConnectionCloseType {
            // raise ConnectionEvent::LocalClose
   FlushWriteAndDelay, // Flush pending write data and delay raising a ConnectionEvent::LocalClose
                       // until the delayed_close_timeout expires
-  Abort // Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
+  Abort, // Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
+  AbortReset // Do not write/flush any pending data and immediately raise
+             // ConnectionEvent::LocalReset Envoy will try close the connection with RST flag.
 };
 
 /**
@@ -204,6 +208,14 @@ public:
    * read disabled
    */
   virtual void detectEarlyCloseWhenReadDisabled(bool should_detect) PURE;
+
+  /**
+   * Set if Envoy should detect TCP Rst
+   *
+   * @param enbale supplies if disconnects should be detected when the connection has been
+   * read disabled
+   */
+  virtual void enableTcpRstDetectAndSend(bool enbale) PURE;
 
   /**
    * @return bool whether reading is enabled on the connection.

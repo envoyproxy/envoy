@@ -28,11 +28,13 @@ class IntegrationTcpClient {
 public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version, bool enable_half_close,
+                       bool enable_rst_detect_send,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        Network::Address::InstanceConstSharedPtr source_address = nullptr,
                        absl::string_view destination_address = "");
 
   void close();
+  void close(Network::ConnectionCloseType close_type);
   void waitForData(const std::string& data, bool exact_match = true);
   // wait for at least `length` bytes to be received
   ABSL_MUST_USE_RESULT AssertionResult

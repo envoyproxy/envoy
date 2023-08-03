@@ -470,7 +470,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
                                          Network::ConnectionEvent event) {
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
-  case Network::ConnectionEvent::LocalClose: {
+  case Network::ConnectionEvent::LocalClose:
+  case Network::ConnectionEvent::RemoteReset:
+  case Network::ConnectionEvent::LocalReset: {
     if (client.connect_timer_) {
       ASSERT(!client.has_handshake_completed_);
       client.connect_timer_->disableTimer();
@@ -503,8 +505,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
         reason = ConnectionPool::PoolFailureReason::Timeout;
       } else if (event == Network::ConnectionEvent::RemoteClose) {
         reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
-      } else {
+      } else if (event == Network::ConnectionEvent::LocalClose) {
         reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
+      } else {
+        reason = ConnectionPool::PoolFailureReason::CloseResetConnectionFailure;
       }
 
       // Raw connect failures should never happen under normal circumstances. If we have an
