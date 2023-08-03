@@ -2,6 +2,8 @@ name: Envoy/prechecks
 
 permissions:
   contents: read
+  # This wont work else something is v broken
+  packages: read
 
 on:
   push:
@@ -46,5 +48,6 @@ jobs:
     with:
       target: ${{ matrix.target }}
       rbe: ${{ matrix.rbe }}
+      bazel_extra: '--config=rbe-engflow'
       managed: ${{ matrix.managed }}
       cache_build_image: ${{ needs.env.outputs.build_image_ubuntu }}
