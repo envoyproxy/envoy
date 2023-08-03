@@ -67,6 +67,21 @@ private:
   HeaderEntryValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                                           const ::Envoy::Http::HeaderString& value);
 
+  // This method validates :path header value using character set that includes characters
+  // that https://datatracker.ietf.org/doc/html/rfc3986#section-3.3 RFC is ambiguous about:
+  //
+  // " < > [ ] ^ ` { } \ | #
+  //
+  // This method is called iff `envoy.uhv.allow_non_compliant_characters_in_path` is
+  // `true`, which is the default value. Note the default will be switched to `false` in the future
+  // for standard compliance.
+  HeaderValidator::HeaderValueValidationResult
+  validatePathHeaderWithAdditionalCharacters(const ::Envoy::Http::HeaderString& path_header_value);
+
+  // Chooses path validation method based on the value of the override flag that affects the
+  // validation algorithm.
+  HeaderValidatorFunction getPathValidationMethod();
+
   const HeaderValidatorMap request_header_validator_map_;
 };
 
