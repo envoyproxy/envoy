@@ -355,8 +355,8 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                      any_message.DebugString()));
 #else
   if (!message.ParseFromString(any_message.value())) {
-    throw EnvoyException(fmt::format("Unable to unpack as {}: {}", message.GetTypeName(),
-                                     any_message.type_url()));
+    throw EnvoyException(
+        fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
 #endif
   }
 }
@@ -370,8 +370,8 @@ absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
                                             any_message.DebugString()));
 #else
   if (!message.ParseFromString(any_message.value())) {
-    return absl::InternalError(absl::StrCat("Unable to unpack as ", message.GetTypeName(), ": ",
-                                            any_message.type_url()));
+    return absl::InternalError(
+        absl::StrCat("Unable to unpack as ", message.GetTypeName(), ": ", any_message.type_url()));
 #endif
   }
   // Ok Status is returned if `UnpackTo` succeeded.
