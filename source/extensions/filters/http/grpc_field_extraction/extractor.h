@@ -15,13 +15,6 @@
 #include "proto_field_extraction/message_data/message_data.h"
 
 namespace Envoy {
-
-namespace Protobuf {
-namespace field_extraction {
-using ::google::protobuf::field_extraction::MessageData;
-} // namespace field_extraction
-} // namespace Protobuf
-
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
