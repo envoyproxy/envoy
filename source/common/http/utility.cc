@@ -503,14 +503,14 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   return parseParameters(url, start, /*decode_params=*/false);
 }
 
-Utility::QueryParamsV2 Utility::QueryParamsV2::parseQueryString(absl::string_view url) {
+Utility::QueryParamsMulti Utility::QueryParamsMulti::parseQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    return Utility::QueryParamsV2();
+    return Utility::QueryParamsMulti();
   }
 
   start++;
-  return Utility::QueryParamsV2::parseParameters(url, start, /*decode_params=*/false);
+  return Utility::QueryParamsMulti::parseParameters(url, start, /*decode_params=*/false);
 }
 
 Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
@@ -524,14 +524,15 @@ Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
   return parseParameters(url, start, /*decode_params=*/true);
 }
 
-Utility::QueryParamsV2 Utility::QueryParamsV2::parseAndDecodeQueryString(absl::string_view url) {
+Utility::QueryParamsMulti
+Utility::QueryParamsMulti::parseAndDecodeQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    return Utility::QueryParamsV2();
+    return Utility::QueryParamsMulti();
   }
 
   start++;
-  return Utility::QueryParamsV2::parseParameters(url, start, /*decode_params=*/true);
+  return Utility::QueryParamsMulti::parseParameters(url, start, /*decode_params=*/true);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
@@ -566,9 +567,10 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
   return params;
 }
 
-Utility::QueryParamsV2 Utility::QueryParamsV2::parseParameters(absl::string_view data, size_t start,
-                                                               bool decode_params) {
-  QueryParamsV2 params;
+Utility::QueryParamsMulti Utility::QueryParamsMulti::parseParameters(absl::string_view data,
+                                                                     size_t start,
+                                                                     bool decode_params) {
+  QueryParamsMulti params;
 
   while (start < data.size()) {
     size_t end = data.find('&', start);
@@ -594,16 +596,16 @@ Utility::QueryParamsV2 Utility::QueryParamsV2::parseParameters(absl::string_view
   return params;
 }
 
-void Utility::QueryParamsV2::remove(std::string key) { this->data.erase(key); }
+void Utility::QueryParamsMulti::remove(std::string key) { this->data.erase(key); }
 
-void Utility::QueryParamsV2::add(std::string key, std::string value) {
+void Utility::QueryParamsMulti::add(std::string key, std::string value) {
   auto result = this->data.emplace(key, std::vector<std::string>{value});
   if (!result.second) {
     result.first->second.push_back(value);
   }
 }
 
-void Utility::QueryParamsV2::overwrite(std::string key, std::string value) {
+void Utility::QueryParamsMulti::overwrite(std::string key, std::string value) {
   this->data[key] = std::vector<std::string>{value};
 }
 
@@ -636,7 +638,7 @@ std::string Utility::replaceQueryString(const HeaderString& path,
   return new_path;
 }
 
-std::string Utility::QueryParamsV2::replaceQueryString(const HeaderString& path) {
+std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) {
   std::string new_path{Http::Utility::stripQueryString(path)};
 
   if (!this->data.empty()) {
@@ -1092,7 +1094,7 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
   return out;
 }
 
-std::string Utility::QueryParamsV2::toString() {
+std::string Utility::QueryParamsMulti::toString() {
   std::string out;
   std::string delim = "?";
   for (const auto& p : this->data) {

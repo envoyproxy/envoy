@@ -18,7 +18,7 @@ namespace Utility {
 using QueryParams = std::map<std::string, std::string>;
 using QueryParamsVector = std::vector<std::pair<std::string, std::string>>;
 
-class QueryParamsV2 {
+class QueryParamsMulti {
 private:
   std::map<std::string, std::vector<std::string>> data;
 
@@ -29,9 +29,9 @@ public:
   std::string toString();
   std::string replaceQueryString(const HeaderString& path);
 
-  static QueryParamsV2 parseParameters(absl::string_view data, size_t start, bool decode_params);
-  static QueryParamsV2 parseQueryString(absl::string_view url);
-  static QueryParamsV2 parseAndDecodeQueryString(absl::string_view url);
+  static QueryParamsMulti parseParameters(absl::string_view data, size_t start, bool decode_params);
+  static QueryParamsMulti parseQueryString(absl::string_view url);
+  static QueryParamsMulti parseAndDecodeQueryString(absl::string_view url);
 };
 
 } // namespace Utility

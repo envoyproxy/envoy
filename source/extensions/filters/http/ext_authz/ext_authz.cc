@@ -318,9 +318,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       response_headers_to_set_ = std::move(response->response_headers_to_set);
     }
 
-    absl::optional<Http::Utility::QueryParamsV2> modified_query_parameters;
+    absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
     if (!response->query_parameters_to_set.empty()) {
-      modified_query_parameters = Http::Utility::QueryParamsV2::parseQueryString(
+      modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
           request_headers_->Path()->value().getStringView());
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
@@ -332,7 +332,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     if (!response->query_parameters_to_remove.empty()) {
       if (!modified_query_parameters) {
-        modified_query_parameters = Http::Utility::QueryParamsV2::parseQueryString(
+        modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
             request_headers_->Path()->value().getStringView());
       }
       ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
