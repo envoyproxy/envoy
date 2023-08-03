@@ -417,10 +417,10 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
   // This transcoder is used by createDynamicMessage() to convert an instance of a MessageLite
   // subclass into an instance of Message. This Message instance has reflection capabilities
   // but does not have the per-field accessors that the generated C++ subclasses have.
-  // As such it is only useful for relfection uses.
+  // As such it is only useful for reflection uses.
   static std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> transcoder =
       createTranscoder();
-  return createDynamicMessage(*createTranscoder, message);
+  return createDynamicMessage(*transcoder, message);
 }
 } // namespace Envoy
 #endif
