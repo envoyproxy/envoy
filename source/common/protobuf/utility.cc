@@ -348,12 +348,14 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-  // if (!message.ParseFromCord(any_message.value())) {
-  if (!message.ParseFromString(any_message.value())) {
-    throw EnvoyException(fmt::format("Unable to unpack as {}: {}", message.GetTypeName(),
 #ifdef ENVOY_ENABLE_FULL_PROTOS
+  if (!any_message.UnpackTo(&message)) {
+    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
+                                     message.GetDescriptor()->full_name(),
                                      any_message.DebugString()));
 #else
+  if (!message.ParseFromString(any_message.value())) {
+    throw EnvoyException(fmt::format("Unable to unpack as {}: {}", message.GetTypeName(),
                                      any_message.type_url()));
 #endif
   }
@@ -361,12 +363,14 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
 
 absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
                                           Protobuf::Message& message) {
-  // if (!message.ParseFromCord(any_message.value())) {
-  if (!message.ParseFromString(any_message.value())) {
-    return absl::InternalError(absl::StrCat("Unable to unpack as ", message.GetTypeName(), ": ",
 #ifdef ENVOY_ENABLE_FULL_PROTOS
+  if (!any_message.UnpackTo(&message)) {
+    return absl::InternalError(absl::StrCat("Unable to unpack as ",
+                                            message.GetDescriptor()->full_name(), ": ",
                                             any_message.DebugString()));
 #else
+  if (!message.ParseFromString(any_message.value())) {
+    return absl::InternalError(absl::StrCat("Unable to unpack as ", message.GetTypeName(), ": ",
                                             any_message.type_url()));
 #endif
   }
