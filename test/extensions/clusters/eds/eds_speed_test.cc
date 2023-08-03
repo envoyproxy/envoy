@@ -58,7 +58,8 @@ public:
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
           scope_, {}, local_info_, true, std::move(config_validators_), std::move(backoff_strategy),
-          /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef()));
+          /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef(),
+          /*xds_resources_delegate=*/{}, /*eds_resources_cache=*/nullptr));
     } else {
       grpc_mux_.reset(new Config::GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
@@ -68,6 +69,7 @@ public:
           scope_, {}, true, std::move(config_validators_), std::move(backoff_strategy),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/Config::XdsResourcesDelegateOptRef(),
+          /*eds_resources_cache=*/nullptr,
           /*target_xds_authority=*/""));
     }
     resetCluster(R"EOF(

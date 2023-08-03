@@ -45,7 +45,7 @@ will not enforce any policies.
 Statistics
 ----------
 
-The CORS filter outputs statistics in the <stat_prefix>.cors.* namespace.
+The CORS filter outputs statistics in the ``<stat_prefix>.cors.*`` namespace.
 
 .. note::
   Requests that do not have an Origin header will be omitted from statistics.

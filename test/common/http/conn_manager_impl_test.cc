@@ -525,12 +525,6 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
 
 // Invalid paths are rejected with 400.
 TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#26642): Enable this test after UHV rejects requests with the %00 sequence in the URL path
-  // in compatibility mode
-  delete codec_;
-  return;
-#endif
   setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;
@@ -565,8 +559,9 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
-        EXPECT_EQ("path_normalization_failed",
-                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
+        // Error details are different in UHV and legacy modes
+        EXPECT_THAT(filter->decoder_callbacks_->streamInfo().responseCodeDetails().value(),
+                    HasSubstr("path"));
       }));
   EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());

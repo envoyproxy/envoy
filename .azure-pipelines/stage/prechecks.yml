@@ -25,11 +25,18 @@ parameters:
   type: string
   default: ""
 
+# Timeout/s
+- name: timeoutPrechecks
+  type: number
+  # Building the rst from protos can take a while even with RBE if there is
+  # a lot of change - eg protobuf changed, or a primitve proto changed.
+  default: 40
+
 
 jobs:
 - job: prechecks
   displayName: Precheck
-  timeoutInMinutes: 30
+  timeoutInMinutes: ${{ parameters.timeoutPrechecks }}
   pool:
     vmImage: $(agentUbuntu)
   variables:

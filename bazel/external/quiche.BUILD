@@ -5150,6 +5150,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 

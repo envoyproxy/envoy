@@ -99,7 +99,8 @@ jobs:
   condition: |
     and(not(canceled()),
         eq(${{ parameters.runChecks }}, 'true'))
-  timeoutInMinutes: 300
+  # TODO(phlax): Make this configurable and ratchet down!
+  timeoutInMinutes: 240
   pool: "envoy-x64-large"
   strategy:
     maxParallel: 2
