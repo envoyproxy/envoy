@@ -510,6 +510,25 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "add_header_temp_filter_lib",
+    srcs = [
+        "add_header_temp_filter.cc",
+    ],
+    deps = [
+        ":add_header_temp_filter_config_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "add_header_temp_filter_config_proto",
+    srcs = [":add_header_temp_filter_config.proto"],
+)
+
+envoy_cc_test_library(
     name = "server_factory_context_filter_lib",
     srcs = [
         "server_factory_context_filter.cc",

@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+message AddHeaderTempFilterConfig {
+  string header_key = 1;
+  string header_val = 2;
+}
