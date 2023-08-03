@@ -6,9 +6,10 @@ typedef struct {
 } httpRequest;
 */
 import "C"
+import "unsafe"
+
 import (
 	"sync"
-	"unsafe"
 )
 
 var configCache = &sync.Map{}
