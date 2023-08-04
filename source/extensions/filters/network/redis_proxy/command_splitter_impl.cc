@@ -627,18 +627,18 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     // Respond to TIME locally.
     Common::Redis::RespValuePtr time_resp(new Common::Redis::RespValue());
     time_resp->type(Common::Redis::RespType::Array);
-    std::vector<Common::Redis::RespValue> resp_array(2);
+    std::vector<Common::Redis::RespValue> resp_array;
 
     auto now = dispatcher.timeSource().systemTime().time_since_epoch();
 
     Common::Redis::RespValue time_in_secs;
-    time_in_secs.type(Common::Redis::RespType::SimpleString);
+    time_in_secs.type(Common::Redis::RespType::BulkString);
     time_in_secs.asString() =
         std::to_string(std::chrono::duration_cast<std::chrono::seconds>(now).count());
     resp_array.push_back(time_in_secs);
 
     Common::Redis::RespValue time_in_micro_secs;
-    time_in_micro_secs.type(Common::Redis::RespType::SimpleString);
+    time_in_micro_secs.type(Common::Redis::RespType::BulkString);
     time_in_micro_secs.asString() =
         std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
     resp_array.push_back(time_in_micro_secs);
