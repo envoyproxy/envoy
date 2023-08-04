@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/container/btree_map.h"
 #include "absl/strings/string_view.h"
 #include "header_map.h"
 
@@ -20,7 +21,7 @@ using QueryParamsVector = std::vector<std::pair<std::string, std::string>>;
 
 class QueryParamsMulti {
 private:
-  std::map<std::string, std::vector<std::string>> data;
+  absl::btree_map<std::string, std::vector<std::string>> data;
 
 public:
   void remove(std::string key);
