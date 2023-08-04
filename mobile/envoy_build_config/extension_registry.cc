@@ -13,7 +13,7 @@
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
-#include "source/common/upstream/upstream_impl.h"
+#include "source/common/upstream/default_local_address_selector_factory.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
