@@ -55,7 +55,7 @@ IoUringSocketEntry& IoUringWorkerImpl::addSocket(IoUringSocketEntryPtr&& socket)
 }
 
 IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
-  // Remove all the injectioned completion for this socket.
+  // Remove all the injection completion for this socket.
   io_uring_->removeInjectedCompletion(socket.fd());
   return socket.removeFromList(sockets_);
 }
