@@ -32,7 +32,7 @@ const static bool should_log = false;
 const static bool should_log = true;
 #endif
 
-// TODO: find out a way for extensions to register new logger IDs
+// TODO: find a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
   FUNCTION(alternate_protocols_cache)                                                              \
@@ -661,8 +661,16 @@ public:
   } while (0)
 
 #define ENVOY_CONN_LOG_EVENT(LEVEL, EVENT_NAME, FORMAT, CONNECTION, ...)                           \
-  ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, "[C{}] " FORMAT, (CONNECTION).id(), \
-                            ##__VA_ARGS__);
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+      std::map<std::string, std::string> log_tags;                                                 \
+      log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
+      const auto combined_format = ::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT;  \
+      ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, fmt::runtime(combined_format), ##__VA_ARGS__);    \
+      ::Envoy::Logger::Registry::getSink()->logWithStableName(                                     \
+          EVENT_NAME, #LEVEL, (ENVOY_LOGGER()).name(), combined_format, ##__VA_ARGS__);            \
+    }                                                                                              \
+  } while (0)
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \

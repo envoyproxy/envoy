@@ -66,6 +66,7 @@ public:
               CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
               XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+              EdsResourcesCachePtr eds_resources_cache = nullptr,
               const std::string& target_xds_authority = "");
 
   ~GrpcMuxImpl() override;
@@ -106,6 +107,10 @@ public:
   void onDiscoveryResponse(std::unique_ptr<RS>&& message,
                            ControlPlaneStats& control_plane_stats) override {
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
+  }
+
+  EdsResourcesCacheOptRef edsResourcesCache() override {
+    return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
   GrpcStream<RQ, RS>& grpcStreamForTest() { return grpc_stream_; }
@@ -209,6 +214,7 @@ private:
   CustomConfigValidatorsPtr config_validators_;
   XdsConfigTrackerOptRef xds_config_tracker_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
+  EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
@@ -224,7 +230,8 @@ public:
                const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
                const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
                bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-               BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker);
+               BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
+               EdsResourcesCachePtr eds_resources_cache);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -241,6 +248,7 @@ public:
               bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
               BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+              EdsResourcesCachePtr eds_resources_cache = nullptr,
               const std::string& target_xds_authority = "");
 
   // GrpcStreamCallbacks
@@ -267,6 +275,8 @@ public:
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
+
+  EdsResourcesCacheOptRef edsResourcesCache() override { return {}; }
 };
 
 } // namespace XdsMux

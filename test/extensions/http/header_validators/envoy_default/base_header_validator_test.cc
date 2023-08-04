@@ -1,10 +1,10 @@
-#include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
-
 #include "envoy/http/header_validator_errors.h"
 
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/header_validator.h"
 
+#include "test/extensions/http/header_validators/envoy_default/header_validator_utils.h"
+#include "test/mocks/http/header_validator.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -18,17 +18,17 @@ using ::Envoy::Http::Protocol;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-using ServerHeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
-
-class BaseHeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
+class BaseHeaderValidatorTest : public HeaderValidatorUtils, public testing::Test {
 protected:
-  ServerHeaderValidatorPtr createBase(absl::string_view config_yaml) {
+  std::unique_ptr<HeaderValidator> createBase(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    return std::make_unique<HeaderValidator>(typed_config, Protocol::Http11, stats_, overrides_);
   }
+  ConfigOverrides overrides_;
+  ::testing::NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
 };
 
 TEST_F(BaseHeaderValidatorTest, ValidateMethodPermissive) {

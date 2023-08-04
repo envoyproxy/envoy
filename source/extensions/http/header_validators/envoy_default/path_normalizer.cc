@@ -24,7 +24,9 @@ using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config) : config_(config) {}
+PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config,
+                               const ConfigOverrides& config_overrides)
+    : config_(config), config_overrides_(config_overrides) {}
 
 PathNormalizer::DecodedOctet
 PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
@@ -55,8 +57,7 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     return {PercentDecodeResult::Invalid};
   }
 
-  const bool preserve_case =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_preserve_url_encoded_case");
+  const bool preserve_case = config_overrides_.preserve_url_encoded_case_;
 
   char ch = '\0';
   // Normalize and decode the octet
@@ -237,8 +238,9 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     redirect |= result.action() == PathNormalizationResult::Action::Redirect;
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.uhv_translate_backslash_to_slash")) {
+  // The `envoy.uhv.allow_non_compliant_characters_in_path` flag allows the \ (back slash)
+  // character, which legacy path normalization was changing to / (forward slash).
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
     translateBackToForwardSlashes(path);
   }
 

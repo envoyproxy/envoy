@@ -5,13 +5,36 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: quic
+  change: |
+    Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: connection limit
+  change: |
+    fixed a use-after-free bug in the connection limit filter.
+- area: subset load balancer
+  change: |
+    Fixed a bug where
+    :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
+    :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
+    values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: access_log
+  change: |
+    added %RESPONSE_FLAGS_LONG% substitution string, that will output a pascal case string representing the resonse flags.
+    The output response flags will correspond with %RESPONSE_FLAGS%, only with a long textual string representation.
+- area: extension_discovery_service
+  change: |
+    added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
+- area: extension_discovery_service
+  change: |
+    added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
 
 deprecated:

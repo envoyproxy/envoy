@@ -275,9 +275,6 @@ public:
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
-  void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
-                        bool end_stream);
-
   void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                      ProcessorState::CallbackState new_state, bool end_stream);
 
