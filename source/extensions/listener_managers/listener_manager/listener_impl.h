@@ -34,7 +34,9 @@ constexpr absl::string_view ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG{
 /**
  * All missing listener config stats. @see stats_macros.h
  */
-#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER)                                                 \
+  COUNTER(extension_config_missing)                                                                \
+  COUNTER(network_extension_config_missing)
 
 /**
  * Struct definition for all missing listener config stats. @see stats_macros.h
