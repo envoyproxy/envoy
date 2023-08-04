@@ -60,7 +60,6 @@ public:
   FilterConfig(
       const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
       Stats::Scope& scope);
-  ~FilterConfig() = default;
 
   JsonToMetadataStats& stats() { return stats_; }
   // True if we have rules for requests
@@ -90,7 +89,6 @@ const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(std::shared_ptr<FilterConfig> config) : config_(config){};
-  ~Filter() override;
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

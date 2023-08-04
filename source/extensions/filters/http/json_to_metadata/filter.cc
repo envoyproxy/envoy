@@ -90,8 +90,6 @@ FilterConfig::FilterConfig(
       request_allow_content_types_(generateRequestAllowContentTypes(proto_config)),
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()) {}
 
-Filter::~Filter() = default;
-
 Rules FilterConfig::generateRequestRules(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
     const {
