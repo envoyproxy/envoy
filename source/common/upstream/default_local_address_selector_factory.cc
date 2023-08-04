@@ -30,30 +30,17 @@ void DefaultUpstreamLocalAddressSelectorFactory::validate(
                                     : fmt::format("Cluster {}", cluster_name.value())));
   }
   // If we have exactly one upstream address, it needs to have a valid IP
-  // version if non-null
-  if (upstream_local_addresses.size() == 1) {
-    // First verify that all address have valid IP address information.
-    if (upstream_local_addresses[0].address_ != nullptr &&
-        upstream_local_addresses[0].address_->ip() == nullptr) {
-      throw EnvoyException(fmt::format("{}'s upstream binding config has invalid IP addresses.",
-                                       !(cluster_name.has_value())
-                                           ? "Bootstrap"
-                                           : fmt::format("Cluster {}", cluster_name.value())));
-    }
-  }
+  // version if non-null. This is enforced by the fact that BindConfig only
+  // allows socket address.
+  ASSERT(upstream_local_addresses.size() != 1 || upstream_local_addresses[0].address_ != nullptr ||
+         upstream_local_addresses[0].address_->ip() != nullptr);
 
   // If we have more than one upstream address, they need to have different IP versions.
   if (upstream_local_addresses.size() == 2) {
-    // First verify that all address have valid IP address information.
-    if (upstream_local_addresses[0].address_ == nullptr ||
-        upstream_local_addresses[1].address_ == nullptr ||
-        upstream_local_addresses[0].address_->ip() == nullptr ||
-        upstream_local_addresses[1].address_->ip() == nullptr) {
-      throw EnvoyException(fmt::format("{}'s upstream binding config has invalid IP addresses.",
-                                       !(cluster_name.has_value())
-                                           ? "Bootstrap"
-                                           : fmt::format("Cluster {}", cluster_name.value())));
-    }
+    ASSERT(upstream_local_addresses[0].address_ != nullptr &&
+           upstream_local_addresses[1].address_ != nullptr &&
+           upstream_local_addresses[0].address_->ip() != nullptr &&
+           upstream_local_addresses[1].address_->ip() != nullptr);
 
     if (upstream_local_addresses[0].address_->ip()->version() ==
         upstream_local_addresses[1].address_->ip()->version()) {

@@ -218,6 +218,7 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
 
 std::vector<::Envoy::Upstream::UpstreamLocalAddress>
 parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
+                const std::optional<std::string>& cluster_name,
                 Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
                 Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options) {
 
@@ -281,6 +282,18 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
     upstream_local_addresses.push_back(local_address);
   }
 
+  // Verify that we have valid addresses if size is greater than 1.
+  if (upstream_local_addresses.size() > 1) {
+    for (auto const& upstream_local_address : upstream_local_addresses) {
+      if (upstream_local_address.address_ == nullptr) {
+        throw EnvoyException(fmt::format("{}'s upstream binding config has invalid IP addresses.",
+                                         !(cluster_name.has_value())
+                                             ? "Bootstrap"
+                                             : fmt::format("Cluster {}", cluster_name.value())));
+      }
+    }
+  }
+
   return upstream_local_addresses;
 }
 
@@ -341,7 +354,7 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
   }
   return local_address_selector_factory->createLocalAddressSelector(
       parseBindConfig(
-          bind_config,
+          bind_config, cluster_name,
           buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                      envoy::config::core::v3::BindConfig{})),
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
