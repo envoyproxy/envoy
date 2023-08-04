@@ -302,6 +302,7 @@ public:
     const std::string ResourceExhausted{"resource-exhausted"};
     const std::string Unavailable{"unavailable"};
     const std::string Internal{"internal"};
+    const std::string Unknown{"unknown"};
   } EnvoyRetryOnGrpcValues;
 
   struct {

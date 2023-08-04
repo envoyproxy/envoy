@@ -1518,6 +1518,11 @@ TEST_F(RouterRetryStateImplTest, ParseRetryGrpcOn) {
   EXPECT_EQ(result.first, 224);
   EXPECT_TRUE(result.second);
 
+  config = "cancelled,deadline-exceeded,resource-exhausted,unknown";
+  result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 32992);
+  EXPECT_TRUE(result.second);
+
   config = "cancelled,deadline-exceeded,resource-exhaust";
   result = RetryStateImpl::parseRetryGrpcOn(config);
   EXPECT_EQ(result.first, 96);

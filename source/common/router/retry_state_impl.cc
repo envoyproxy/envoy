@@ -234,6 +234,8 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view ret
       ret |= RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Internal) {
       ret |= RetryPolicy::RETRY_ON_GRPC_INTERNAL;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Unknown) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_UNKNOWN;
     } else {
       all_fields_valid = false;
     }
