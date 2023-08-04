@@ -36,7 +36,7 @@ public:
   // Remove a socket from this worker.
   IoUringSocketEntryPtr removeSocket(IoUringSocketEntry& socket);
 
-  // Inject a request completion into the io_uring instance for a specific socket.
+  // Inject a request completion into the iouring instance for a specific socket.
   void injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result);
 
   // Return the number of sockets in this worker.
@@ -48,11 +48,11 @@ protected:
   void onFileEvent();
   void submit();
 
-  // The io_uring instance.
+  // The iouring instance.
   IoUringPtr io_uring_;
   // The dispatcher of this worker is running on.
   Event::Dispatcher& dispatcher_;
-  // The file event of io_uring's eventfd.
+  // The file event of iouring's eventfd.
   Event::FileEventPtr file_event_{nullptr};
   // All the sockets in this worker.
   std::list<IoUringSocketEntryPtr> sockets_;
