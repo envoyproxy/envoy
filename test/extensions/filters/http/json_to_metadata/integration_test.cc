@@ -80,7 +80,7 @@ typed_config:
   const Http::TestRequestTrailerMapImpl incoming_trailers_{{"request1", "trailer1"},
                                                            {"request2", "trailer2"}};
 
-  std::string request_body_ =
+  const std::string request_body_ =
       R"delimiter(
         {"version":"1.0.0",
         "messages":[
