@@ -76,6 +76,11 @@ struct SupportedCommands {
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
 
   /**
+   * @return time command
+   */
+  static const std::string& time() { CONSTRUCT_ON_FIRST_USE(std::string, "time"); }
+
+  /**
    * @return quit command
    */
   static const std::string& quit() { CONSTRUCT_ON_FIRST_USE(std::string, "quit"); }
