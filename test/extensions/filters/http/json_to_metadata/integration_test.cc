@@ -12,7 +12,7 @@ public:
   }
 
   void runTest(const Http::RequestHeaderMap& request_headers, const std::string& request_body,
-               const size_t chunk_size = 5) {
+               const size_t chunk_size = 5, bool has_trailer = false) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     IntegrationStreamDecoderPtr response;
     if (request_body.empty()) {
@@ -29,7 +29,11 @@ public:
       // Send the last chunk flagged as end_stream.
       Buffer::OwnedImpl buffer(
           request_body.substr(i * chunk_size, request_body.length() % chunk_size));
-      codec_client_->sendData(*request_encoder_, buffer, true);
+      codec_client_->sendData(*request_encoder_, buffer, !has_trailer);
+
+      if (has_trailer) {
+        codec_client_->sendTrailers(*request_encoder_, incoming_trailers_);
+      }
     }
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -73,6 +77,8 @@ typed_config:
                                                          {":method", "GET"},
                                                          {":authority", "host"},
                                                          {"Content-Type", "application/json"}};
+  const Http::TestRequestTrailerMapImpl incoming_trailers_{{"request1", "trailer1"},
+                                                           {"request2", "trailer2"}};
 
   std::string request_body_ =
       R"delimiter(
@@ -107,6 +113,17 @@ TEST_P(JsonToMetadataIntegrationTest, BasicOneChunk) {
   initializeFilter();
 
   runTest(incoming_headers_, request_body_, 1);
+
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq_success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_no_body")->value());
+  EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_invalid_json_body")->value());
+}
+
+TEST_P(JsonToMetadataIntegrationTest, Trailer) {
+  initializeFilter();
+
+  runTest(incoming_headers_, request_body_, 5, true);
 
   EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq_success")->value());
   EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq_mismatched_content_type")->value());
