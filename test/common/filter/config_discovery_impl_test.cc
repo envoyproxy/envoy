@@ -313,7 +313,7 @@ class NetworkUpstreamFilterConfigDiscoveryImplTest
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
           Server::Configuration::MockFactoryContext> {
 public:
-  const std::string getFilterType() const override { return "network"; }
+  const std::string getFilterType() const override { return "upstream_network"; }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.upstream_network_filter.foo.config_reload";
   }
@@ -584,14 +584,12 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
       "type.googleapis.com/test.integration.filters.Bogus.");
 }
 
-// Raise exception when filter is not the last filter in filter chain, but the filter is terminal
-// filter. This test does not apply to listener filter.
+// For filters which are not listener and upstream network, raise exception when filter is not the
+// last filter in filter chain, but the filter is terminal. For listener and upstream network filter
+// check that there is no exception raised.
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
-  if (config_discovery_test.getFilterType() == "listener") {
-    return;
-  }
 
   config_discovery_test.setup(true, false, false);
   const std::string response_yaml = R"EOF(
@@ -607,6 +605,14 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
+
+  if (config_discovery_test.getFilterType() == "listener" ||
+      config_discovery_test.getFilterType() == "upstream_network") {
+    EXPECT_NO_THROW(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                                     response.version_info()));
+    return;
+  }
+
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
                                                        response.version_info()),
