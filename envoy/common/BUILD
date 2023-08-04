@@ -43,6 +43,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resource_interface",
     hdrs = ["resource.h"],
+    deps = [":base_includes"],
 )
 
 envoy_cc_library(
