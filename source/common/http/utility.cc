@@ -596,16 +596,16 @@ Utility::QueryParamsMulti Utility::QueryParamsMulti::parseParameters(absl::strin
   return params;
 }
 
-void Utility::QueryParamsMulti::remove(std::string key) { this->data.erase(key); }
+void Utility::QueryParamsMulti::remove(absl::string_view key) { this->data.erase(key); }
 
-void Utility::QueryParamsMulti::add(std::string key, std::string value) {
+void Utility::QueryParamsMulti::add(absl::string_view key, std::string value) {
   auto result = this->data.emplace(key, std::vector<std::string>{value});
   if (!result.second) {
     result.first->second.push_back(value);
   }
 }
 
-void Utility::QueryParamsMulti::overwrite(std::string key, std::string value) {
+void Utility::QueryParamsMulti::overwrite(absl::string_view key, std::string value) {
   this->data[key] = std::vector<std::string>{value};
 }
 

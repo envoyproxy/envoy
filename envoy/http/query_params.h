@@ -24,9 +24,9 @@ private:
   absl::btree_map<std::string, std::vector<std::string>> data;
 
 public:
-  void remove(std::string key);
-  void add(std::string key, std::string value);
-  void overwrite(std::string key, std::string value);
+  void remove(absl::string_view key);
+  void add(absl::string_view key, std::string value);
+  void overwrite(absl::string_view key, std::string value);
   std::string toString();
   std::string replaceQueryString(const HeaderString& path);
 
