@@ -33,5 +33,8 @@ new_features:
 - area: extension_discovery_service
   change: |
     added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
+- area: router
+  change: |
+    Add support to retry on grpc status UNKNOWN.
 
 deprecated:
