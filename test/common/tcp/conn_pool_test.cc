@@ -147,7 +147,7 @@ public:
       EXPECT_CALL(*dispatcher, createTimer_(_)).Times(0);
     }
 
-    EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, options_))
+    EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_conn.connection_));
     EXPECT_CALL(*test_conn.connection_, addReadFilter(_))
         .WillOnce(Invoke(

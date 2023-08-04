@@ -393,7 +393,7 @@ envoy_cc_library(
     srcs = ["upstream_impl.cc"],
     deps = [
         ":cluster_factory_lib",
-        ":default_local_address_selector",
+        ":default_local_address_selector_factory",
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":upstream_includes",
@@ -579,14 +579,26 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_optional"],
     deps = [
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "default_local_address_selector_factory",
+    srcs = [
+        "default_local_address_selector_factory.cc",
+    ],
+    hdrs = [
+        "default_local_address_selector_factory.h",
+    ],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":default_local_address_selector",
         "//envoy/network:address_interface",
         "//envoy/network:socket_interface",
         "//envoy/registry",
         "//envoy/upstream:upstream_interface",
         "//source/common/network:resolver_lib",
-        "//source/common/network:socket_option_factory_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
 )

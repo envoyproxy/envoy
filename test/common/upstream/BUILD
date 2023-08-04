@@ -772,7 +772,7 @@ envoy_cc_test(
         "//envoy/upstream:upstream_interface",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:default_local_address_selector",
+        "//source/common/upstream:default_local_address_selector_factory",
         "//test/test_common:utility_lib",
     ],
 )

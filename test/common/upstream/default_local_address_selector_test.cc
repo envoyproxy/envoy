@@ -4,7 +4,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/upstream/default_local_address_selector.h"
+#include "source/common/upstream/default_local_address_selector_factory.h"
 
 #include "test/test_common/utility.h"
 
