@@ -1,6 +1,7 @@
 #include "source/common/io/io_uring_impl.h"
 #include "source/common/network/address_impl.h"
 
+#include "test/mocks/io/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -13,10 +14,15 @@ namespace {
 
 class TestRequest : public Request {
 public:
-  TestRequest(int& data) : data_(data) {}
+  TestRequest(int& data)
+      : data_(data), mock_io_uring_socket_(std::make_unique<MockIoUringSocket>()) {}
   ~TestRequest() { data_ = -1; }
 
+  uint32_t type() const override { return RequestType::Read; }
+  IoUringSocket& socket() const override { return *mock_io_uring_socket_; }
+
   int& data_;
+  std::unique_ptr<MockIoUringSocket> mock_io_uring_socket_;
 };
 
 class IoUringImplTest : public ::testing::Test {

@@ -31,5 +31,19 @@ public:
   MOCK_METHOD(void, removeInjectedCompletion, (os_fd_t fd));
 };
 
+class MockIoUringSocket : public IoUringSocket {
+public:
+  MOCK_METHOD(IoUringWorker&, getIoUringWorker, (), (const));
+  MOCK_METHOD(os_fd_t, fd, (), (const));
+  MOCK_METHOD(void, onAccept, (Request * req, int32_t result, bool injected));
+  MOCK_METHOD(void, onConnect, (Request * req, int32_t result, bool injected));
+  MOCK_METHOD(void, onRead, (Request * req, int32_t result, bool injected));
+  MOCK_METHOD(void, onWrite, (Request * req, int32_t result, bool injected));
+  MOCK_METHOD(void, onClose, (Request * req, int32_t result, bool injected));
+  MOCK_METHOD(void, onCancel, (Request * req, int32_t result, bool injected));
+  MOCK_METHOD(void, onShutdown, (Request * req, int32_t result, bool injected));
+  MOCK_METHOD(void, injectCompletion, (uint32_t type));
+};
+
 } // namespace Io
 } // namespace Envoy
