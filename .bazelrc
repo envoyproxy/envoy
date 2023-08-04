@@ -309,7 +309,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33@sha256:50337314a150ed12447c87c1622eac6f611a069888722fb9a426e21ed161cc26
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
