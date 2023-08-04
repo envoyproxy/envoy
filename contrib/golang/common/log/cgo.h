@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Common {
 namespace Golang {
 
-class FilterLogger : Logger::Loggable<Logger::Id::http> {
+class FilterLogger : Logger::Loggable<Logger::Id::golang> {
 public:
   FilterLogger() = default;
 
