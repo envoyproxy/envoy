@@ -25,8 +25,8 @@ private:
 
 public:
   void remove(absl::string_view key);
-  void add(absl::string_view key, std::string value);
-  void overwrite(absl::string_view key, std::string value);
+  void add(absl::string_view key, const std::string& value);
+  void overwrite(absl::string_view key, const std::string& value);
   std::string toString();
   std::string replaceQueryString(const HeaderString& path);
 
