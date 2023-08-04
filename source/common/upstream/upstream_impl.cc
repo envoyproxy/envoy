@@ -1231,7 +1231,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       filter_factories_.push_back(
           network_config_provider_manager_.createDynamicFilterConfigProvider(
               proto_config.config_discovery(), proto_config.name(), server_context, server_context,
-              is_terminal, "network", nullptr));
+              factory_context.clusterManager(), is_terminal, "network", nullptr));
       continue;
     }
 

@@ -196,12 +196,10 @@ public:
     // Response with initial LDS.
     sendLdsResponse("initial");
 
-    if (expect_ecds_) {
-      waitForEcdsStream(getEcdsFakeUpstream(), ecds_connection_, ecds_stream_);
-      if (two_connections_) {
-        // Wait for 2nd ECDS stream.
-        waitForEcdsStream(getEcds2FakeUpstream(), ecds2_connection_, ecds2_stream_);
-      }
+    waitForEcdsStream(getEcdsFakeUpstream(), ecds_connection_, ecds_stream_);
+    if (two_connections_) {
+      // Wait for 2nd ECDS stream.
+      waitForEcdsStream(getEcds2FakeUpstream(), ecds2_connection_, ecds2_stream_);
     }
   }
 
@@ -222,7 +220,6 @@ public:
     typed_config.set_name(name);
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
-
     auto configuration = test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
     configuration.set_bytes_to_drain(bytes_to_drain);
     typed_config.mutable_typed_config()->PackFrom(configuration);
@@ -292,7 +289,6 @@ public:
   const std::string data_ = "HelloWorld";
   const std::string port_name_ = "tcp";
   bool two_connections_{false};
-  bool expect_ecds_{true};
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
   FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[2]; }
@@ -315,10 +311,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, UpstreamNetworkExtensionDiscovery
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccess) {
-  expect_ecds_ = false;
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addFilterChain();
-  addDynamicFilter("bar", 5);
+  addDynamicFilter(filter_name_, false);
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
