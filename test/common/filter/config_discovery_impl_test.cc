@@ -313,7 +313,7 @@ class NetworkUpstreamFilterConfigDiscoveryImplTest
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
           Server::Configuration::MockFactoryContext> {
 public:
-  const std::string getFilterType() const override { return "network"; }
+  const std::string getFilterType() const override { return "upstream_network"; }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.upstream_network_filter.foo.config_reload";
   }
@@ -585,11 +585,12 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
 }
 
 // Raise exception when filter is not the last filter in filter chain, but the filter is terminal
-// filter. This test does not apply to listener filter.
+// filter. This test does not apply to listener filter and upstream network filter.
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
-  if (config_discovery_test.getFilterType() == "listener") {
+  if (config_discovery_test.getFilterType() == "listener" ||
+      config_discovery_test.getFilterType() == "upstream_network") {
     return;
   }
 

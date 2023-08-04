@@ -224,10 +224,10 @@ private:
 };
 
 template <class FactoryCtx, class NeutralNetworkFilterConfigFactory>
-class NetworkDynamicFilterConfigProviderImpl
+class NetworkDynamicFilterConfigProviderImplBase
     : public DynamicFilterConfigProviderImpl<Network::FilterFactoryCb> {
 public:
-  NetworkDynamicFilterConfigProviderImpl(
+  NetworkDynamicFilterConfigProviderImplBase(
       FilterConfigSubscriptionSharedPtr& subscription,
       const absl::flat_hash_set<std::string>& require_type_urls,
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
@@ -239,14 +239,6 @@ public:
                                         last_filter_in_filter_chain, filter_chain_type, stat_prefix,
                                         listener_filter_matcher),
         server_context_(server_context), factory_context_(factory_context) {}
-  void validateMessage(const std::string& config_name, const Protobuf::Message& message,
-                       const std::string& factory_name) const override {
-    auto* factory =
-        Registry::FactoryRegistry<NeutralNetworkFilterConfigFactory>::getFactory(factory_name);
-    const bool is_terminal_filter = factory->isTerminalFilterByProto(message, server_context_);
-    Config::Utility::validateTerminalFilters(config_name, factory_name, filter_chain_type_,
-                                             is_terminal_filter, last_filter_in_filter_chain_);
-  }
 
 private:
   Network::FilterFactoryCb
@@ -256,8 +248,43 @@ private:
     return factory->createFilterFactoryFromProto(message, factory_context_);
   }
 
+protected:
   Server::Configuration::ServerFactoryContext& server_context_;
   FactoryCtx& factory_context_;
+};
+
+template <class FactoryCtx, class NeutralNetworkFilterConfigFactory>
+class DownstreamNetworkDynamicFilterConfigProviderImpl
+    : public NetworkDynamicFilterConfigProviderImplBase<FactoryCtx,
+                                                        NeutralNetworkFilterConfigFactory> {
+public:
+  using NetworkDynamicFilterConfigProviderImplBase<
+      FactoryCtx, NeutralNetworkFilterConfigFactory>::NetworkDynamicFilterConfigProviderImplBase;
+
+  void validateMessage(const std::string& config_name, const Protobuf::Message& message,
+                       const std::string& factory_name) const override {
+    auto* factory =
+        Registry::FactoryRegistry<NeutralNetworkFilterConfigFactory>::getFactory(factory_name);
+    const bool is_terminal_filter =
+        factory->isTerminalFilterByProto(message, this->server_context_);
+    Config::Utility::validateTerminalFilters(config_name, factory_name, this->filter_chain_type_,
+                                             is_terminal_filter,
+                                             this->last_filter_in_filter_chain_);
+  }
+};
+
+template <class FactoryCtx, class NeutralNetworkFilterConfigFactory>
+class UpstreamNetworkDynamicFilterConfigProviderImpl
+    : public NetworkDynamicFilterConfigProviderImplBase<FactoryCtx,
+                                                        NeutralNetworkFilterConfigFactory> {
+public:
+  using NetworkDynamicFilterConfigProviderImplBase<
+      FactoryCtx, NeutralNetworkFilterConfigFactory>::NetworkDynamicFilterConfigProviderImplBase;
+
+  void validateMessage(const std::string&, const Protobuf::Message&,
+                       const std::string&) const override {
+    // Upstream network filters don't use the concept of terminal filters.
+  }
 };
 
 // Implementation of a listener dynamic filter config provider.
@@ -648,7 +675,7 @@ class NetworkFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedNetworkFilterConfigFactory, Network::FilterFactoryCb,
           Server::Configuration::FactoryContext,
-          NetworkDynamicFilterConfigProviderImpl<
+          DownstreamNetworkDynamicFilterConfigProviderImpl<
               Server::Configuration::FactoryContext,
               Server::Configuration::NamedNetworkFilterConfigFactory>> {
 public:
@@ -675,7 +702,7 @@ class UpstreamNetworkFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory, Network::FilterFactoryCb,
           Server::Configuration::CommonFactoryContext,
-          NetworkDynamicFilterConfigProviderImpl<
+          UpstreamNetworkDynamicFilterConfigProviderImpl<
               Server::Configuration::CommonFactoryContext,
               Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>> {
 public:
@@ -688,11 +715,9 @@ protected:
                    Server::Configuration::ServerFactoryContext& factory_context) const override {
     return default_factory->isTerminalFilterByProto(message, factory_context);
   }
-  void validateFilters(const std::string& filter_config_name, const std::string& filter_type,
-                       const std::string& filter_chain_type, bool is_terminal_filter,
-                       bool last_filter_in_filter_chain) const override {
-    Config::Utility::validateTerminalFilters(filter_config_name, filter_type, filter_chain_type,
-                                             is_terminal_filter, last_filter_in_filter_chain);
+  void validateFilters(const std::string&, const std::string&, const std::string&, bool,
+                       bool) const override {
+    // Upstream network filters don't use the concept of terminal filters.
   }
   const std::string getConfigDumpType() const override { return "ecds_filter_upstream_network"; }
 };
