@@ -623,6 +623,31 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  if (command_name == Common::Redis::SupportedCommands::time()) {
+    // Respond to TIME locally.
+    Common::Redis::RespValuePtr time_resp(new Common::Redis::RespValue());
+    time_resp->type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> resp_array;
+
+    auto now = dispatcher.timeSource().systemTime().time_since_epoch();
+
+    Common::Redis::RespValue time_in_secs;
+    time_in_secs.type(Common::Redis::RespType::BulkString);
+    time_in_secs.asString() =
+        std::to_string(std::chrono::duration_cast<std::chrono::seconds>(now).count());
+    resp_array.push_back(time_in_secs);
+
+    Common::Redis::RespValue time_in_micro_secs;
+    time_in_micro_secs.type(Common::Redis::RespType::BulkString);
+    time_in_micro_secs.asString() =
+        std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
+    resp_array.push_back(time_in_micro_secs);
+
+    time_resp->asArray().swap(resp_array);
+    callbacks.onResponse(std::move(time_resp));
+    return nullptr;
+  }
+
   if (command_name == Common::Redis::SupportedCommands::quit()) {
     callbacks.onQuit();
     return nullptr;
@@ -630,7 +655,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
   if (request->asArray().size() < 2 &&
       Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0) {
-    // Commands other than PING and transaction commands all have at least two arguments.
+    // Commands other than PING, TIME and transaction commands all have at least two arguments.
     onInvalidRequest(callbacks);
     return nullptr;
   }
