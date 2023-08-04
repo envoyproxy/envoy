@@ -72,13 +72,13 @@ typed_config:
         preserve_existing_metadata_value: true
 )EOF";
 
-  const Http::TestRequestHeaderMapImpl incoming_headers_{{":scheme", "http"},
-                                                         {":path", "/ping"},
-                                                         {":method", "GET"},
-                                                         {":authority", "host"},
-                                                         {"Content-Type", "application/json"}};
-  const Http::TestRequestTrailerMapImpl incoming_trailers_{{"request1", "trailer1"},
-                                                           {"request2", "trailer2"}};
+  Http::TestRequestHeaderMapImpl incoming_headers_{{":scheme", "http"},
+                                                   {":path", "/ping"},
+                                                   {":method", "GET"},
+                                                   {":authority", "host"},
+                                                   {"Content-Type", "application/json"}};
+  Http::TestRequestTrailerMapImpl incoming_trailers_{{"request1", "trailer1"},
+                                                     {"request2", "trailer2"}};
 
   const std::string request_body_ =
       R"delimiter(

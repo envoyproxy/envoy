@@ -111,7 +111,7 @@ request_rules:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
   Buffer::OwnedImpl buffer_;
-  const Http::TestRequestHeaderMapImpl incoming_headers_{
+  Http::TestRequestHeaderMapImpl incoming_headers_{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/json"}};
 };
 
