@@ -584,8 +584,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
       "type.googleapis.com/test.integration.filters.Bogus.");
 }
 
-// Raise exception when filter is not the last filter in filter chain, but the filter is terminal
-// filter. This test does not apply to listener filter and upstream network filter.
+// For filters which are not listener and upstream network, raise exception when filter is not the
+// last filter in filter chain, but the filter is terminal. For listener and upstream network filter
+// check that there is no exception raised.
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
