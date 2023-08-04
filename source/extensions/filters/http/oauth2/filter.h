@@ -210,6 +210,8 @@ public:
   const std::string& token() const override { return token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
+  void combineSplitCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
+                           const std::string& keyPrefix) const;
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
   bool isValid() const override;
   bool hmacIsValid() const;
@@ -283,6 +285,10 @@ private:
 
   std::string getEncodedToken() const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
+  void setCookie(Http::ResponseHeaderMap& headers, const std::string& key,
+                 const std::string& value) const;
+  void setSplitCookie(Http::ResponseHeaderMap& headers, const std::string& key,
+                      const std::string& data, size_t maxChunkSize) const;
   const std::string& bearerPrefix() const;
 };
 

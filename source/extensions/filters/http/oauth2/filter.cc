@@ -186,6 +186,44 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
   return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
+void OAuth2CookieValidator::combineSplitCookies(
+    const absl::flat_hash_map<std::string, std::string>& cookies,
+    const std::string& keyPrefix) const {
+  // Find the _count cookie
+  auto countIt = cookies.find(keyPrefix + "_count");
+  if (countIt != cookies.end()) {
+    const std::string& countValue = countIt->second;
+    int count = std::stoi(countValue);
+
+    // Combine the split cookie parts
+    std::string combinedValue;
+
+    for (int i = 0; i < count; ++i) {
+      auto it = cookies.find(keyPrefix + "_" + std::to_string(i));
+      if (it != cookies.end()) {
+        combinedValue += it->second;
+      } else {
+        ENVOY_LOG(warn, "missing cookie sequence {}: \n{}", i, keyPrefix);
+        combinedValue.clear();
+        break;
+      }
+    }
+
+    // Add the combined cookie to the map, overwriting the split cookies
+    if (!combinedValue.empty()) {
+      cookies[keyPrefix] = combinedValue;
+    }
+
+    // Remove the split cookie parts from the map
+    for (int i = 0; i < count; ++i) {
+      cookies.erase(keyPrefix + "_" + std::to_string(i));
+    }
+
+    // Remove the _count cookie
+    cookies.erase(countIt);
+  }
+}
+
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
   const auto& cookies = Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
@@ -195,9 +233,10 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
            absl::StartsWith(key, cookie_names_.refresh_token_);
   });
 
-  // TODO(kanurag94): remove this comment
-  // Now we have all the cookies required, if they are split cookies
-  // we need to combine them
+  // Combine split cookies if needed
+  combineSplitCookies(cookies, cookie_names_.bearer_token_);
+  combineSplitCookies(cookies, cookie_names_.id_token_);
+  combineSplitCookies(cookies, cookie_names_.refresh_token_);
 
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
   token_ = findValue(cookies, cookie_names_.bearer_token_);
@@ -522,12 +561,13 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
   config_->stats().oauth_success_.inc();
 }
 
-void setCookie(Http::ResponseHeaderMap& headers, const std::string& key, const std::string& value) {
+void OAuth2Filter::setCookie(Http::ResponseHeaderMap& headers, const std::string& key,
+                             const std::string& value) const {
   headers.addReferenceKey(Http::Headers::get().SetCookie, absl::StrCat(key, "=", value));
 }
 
-void setSplitCookie(Http::ResponseHeaderMap& headers, const std::string& key,
-                    const std::string& data, size_t maxChunkSize = 4000) {
+void OAuth2Filter::setSplitCookie(Http::ResponseHeaderMap& headers, const std::string& key,
+                                  const std::string& data, size_t maxChunkSize = 4000) const {
   if (data.size() <= maxChunkSize) {
     // If the data is smaller than the maximum chunk size, no need to split
     setCookie(headers, key, data);
@@ -535,7 +575,7 @@ void setSplitCookie(Http::ResponseHeaderMap& headers, const std::string& key,
   }
 
   if (data.size() > maxChunkSize) {
-    ENVOY_LOG(debug, "cookie size is greater than {}: \n{}", maxChunkSize, cookie);
+    ENVOY_LOG(debug, "cookie size is greater than {}: \n{}", maxChunkSize, key);
   }
 
   std::vector<std::string> chunks;
@@ -580,14 +620,15 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
             ? cookie_tail_http_only
             : cookie_tail;
-    setSplitCookie(cookie_names.bearer_token_,
+    setSplitCookie(headers, cookie_names.bearer_token_,
                    absl::StrCat(access_token_, cookie_attribute_httponly));
     if (id_token_ != EMPTY_STRING) {
-      setSplitCookie(cookie_names.id_token_, absl::StrCat(id_token_, cookie_attribute_httponly));
+      setSplitCookie(headers, cookie_names.id_token_,
+                     absl::StrCat(id_token_, cookie_attribute_httponly));
     }
 
     if (refresh_token_ != EMPTY_STRING) {
-      setSplitCookie(cookie_names.refresh_token_,
+      setSplitCookie(headers, cookie_names.refresh_token_,
                      absl::StrCat(refresh_token_, cookie_attribute_httponly));
     }
   }
