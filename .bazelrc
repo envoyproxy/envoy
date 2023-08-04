@@ -445,7 +445,7 @@ build:rbe-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
 build:rbe-engflow --bes_backend=grpcs://morganite.cluster.engflow.com/
 build:rbe-engflow --bes_results_url=https://morganite.cluster.engflow.com/invocation/
 build:rbe-engflow --experimental_credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:rbe-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu
+build:rbe-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
 
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
