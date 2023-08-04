@@ -2,8 +2,6 @@ name: Envoy/prechecks
 
 permissions:
   contents: read
-  # This wont work else something is v broken
-  packages: read
 
 on:
   push:
@@ -45,6 +43,9 @@ jobs:
           managed: true
     uses: ./.github/workflows/_ci.yml
     name: CI ${{ matrix.target }}
+    permissions:
+      contents: read
+      packages: read
     with:
       target: ${{ matrix.target }}
       rbe: ${{ matrix.rbe }}
