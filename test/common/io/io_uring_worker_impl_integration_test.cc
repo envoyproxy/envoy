@@ -214,6 +214,7 @@ TEST_F(IoUringWorkerIntegrationTest, Injection) {
   socket.injectCompletion(RequestType::Connect);
   socket.injectCompletion(RequestType::Read);
   socket.injectCompletion(RequestType::Write);
+  socket.injectCompletion(RequestType::Shutdown);
 
   // Wait for server socket receive injected completion.
   while (socket.accept_result_ == -1 || socket.cancel_result_ == -1 || socket.close_result_ == -1 ||
@@ -227,12 +228,14 @@ TEST_F(IoUringWorkerIntegrationTest, Injection) {
   EXPECT_TRUE(socket.is_connect_injected_completion_);
   EXPECT_TRUE(socket.is_read_injected_completion_);
   EXPECT_TRUE(socket.is_write_injected_completion_);
+  EXPECT_TRUE(socket.is_shutdown_injected_completion_);
   EXPECT_EQ(socket.accept_result_, -EAGAIN);
   EXPECT_EQ(socket.cancel_result_, -EAGAIN);
   EXPECT_EQ(socket.close_result_, -EAGAIN);
   EXPECT_EQ(socket.connect_result_, -EAGAIN);
   EXPECT_EQ(socket.read_result_, -EAGAIN);
   EXPECT_EQ(socket.write_result_, -EAGAIN);
+  EXPECT_EQ(socket.shutdown_result_, -EAGAIN);
 
   socket.cleanupForTest();
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
