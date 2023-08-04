@@ -210,8 +210,8 @@ public:
   const std::string& token() const override { return token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
-  void combineSplitCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
-                           const std::string& keyPrefix) const;
+  std::string combineSplitCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
+                                  const std::string& keyPrefix) const;
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
   bool isValid() const override;
   bool hmacIsValid() const;

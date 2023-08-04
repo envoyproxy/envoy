@@ -186,7 +186,7 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
   return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
-void OAuth2CookieValidator::combineSplitCookies(
+std::string OAuth2CookieValidator::combineSplitCookies(
     const absl::flat_hash_map<std::string, std::string>& cookies,
     const std::string& keyPrefix) const {
   // Find the _count cookie
@@ -203,25 +203,12 @@ void OAuth2CookieValidator::combineSplitCookies(
       if (it != cookies.end()) {
         combinedValue += it->second;
       } else {
-        ENVOY_LOG(warn, "missing cookie sequence {}: \n{}", i, keyPrefix);
-        combinedValue.clear();
-        break;
+        // TODO(kanurag94): log warning here
+        return EMPTY_STRING;
       }
     }
-
-    // Add the combined cookie to the map, overwriting the split cookies
-    if (!combinedValue.empty()) {
-      cookies[keyPrefix] = combinedValue;
-    }
-
-    // Remove the split cookie parts from the map
-    for (int i = 0; i < count; ++i) {
-      cookies.erase(keyPrefix + "_" + std::to_string(i));
-    }
-
-    // Remove the _count cookie
-    cookies.erase(countIt);
   }
+  return findValue(cookies, keyPrefix);
 }
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
@@ -233,15 +220,10 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
            absl::StartsWith(key, cookie_names_.refresh_token_);
   });
 
-  // Combine split cookies if needed
-  combineSplitCookies(cookies, cookie_names_.bearer_token_);
-  combineSplitCookies(cookies, cookie_names_.id_token_);
-  combineSplitCookies(cookies, cookie_names_.refresh_token_);
-
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
-  token_ = findValue(cookies, cookie_names_.bearer_token_);
-  id_token_ = findValue(cookies, cookie_names_.id_token_);
-  refresh_token_ = findValue(cookies, cookie_names_.refresh_token_);
+  token_ = combineSplitCookies(cookies, cookie_names_.bearer_token_);
+  id_token_ = combineSplitCookies(cookies, cookie_names_.id_token_);
+  refresh_token_ = combineSplitCookies(cookies, cookie_names_.refresh_token_);
   hmac_ = findValue(cookies, cookie_names_.oauth_hmac_);
   host_ = headers.Host()->value().getStringView();
 
