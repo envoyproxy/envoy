@@ -413,15 +413,27 @@ TEST_P(HttpCacheImplementationTest, StreamingPut) {
   InsertContextPtr inserter = cache()->makeInsertContext(lookup(request_path), encoder_callbacks_);
   absl::Cleanup destroy_inserter{[&inserter] { inserter->onDestroy(); }};
   ResponseMetadata metadata{time_system_.systemTime()};
-  auto insert_promise = std::make_shared<std::promise<bool>>();
+  std::promise<bool> insert_headers_promise;
+  std::promise<bool> insert_body1_promise;
+  std::promise<bool> insert_body2_promise;
   inserter->insertHeaders(
-      response_headers, metadata, [](bool ready) { EXPECT_TRUE(ready); }, false);
+      response_headers, metadata,
+      [&insert_headers_promise](bool ready) { insert_headers_promise.set_value(ready); }, false);
+  auto insert_future = insert_headers_promise.get_future();
+  ASSERT_EQ(std::future_status::ready, insert_future.wait_for(std::chrono::seconds(5)))
+      << "timed out waiting for inserts to complete";
+  ASSERT_TRUE(insert_future.get());
   inserter->insertBody(
-      Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
+      Buffer::OwnedImpl("Hello, "),
+      [&insert_body1_promise](bool ready) { insert_body1_promise.set_value(ready); }, false);
+  insert_future = insert_body1_promise.get_future();
+  ASSERT_EQ(std::future_status::ready, insert_future.wait_for(std::chrono::seconds(5)))
+      << "timed out waiting for inserts to complete";
+  ASSERT_TRUE(insert_future.get());
   inserter->insertBody(
       Buffer::OwnedImpl("World!"),
-      [insert_promise](bool ready) { insert_promise->set_value(ready); }, true);
-  auto insert_future = insert_promise->get_future();
+      [&insert_body2_promise](bool ready) { insert_body2_promise.set_value(ready); }, true);
+  insert_future = insert_body2_promise.get_future();
   ASSERT_EQ(std::future_status::ready, insert_future.wait_for(std::chrono::seconds(5)))
       << "timed out waiting for inserts to complete";
   ASSERT_TRUE(insert_future.get());
