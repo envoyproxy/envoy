@@ -43,3 +43,30 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "stream_info_formatter_lib",
+    srcs = ["stream_info_formatter.cc"],
+    hdrs = ["stream_info_formatter.h"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/config:datasource_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stream_info:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "http_specific_formatter_lib",
+    srcs = ["http_specific_formatter.cc"],
+    hdrs = ["http_specific_formatter.h"],
+    deps = [
+        ":stream_info_formatter_lib",
+    ],
+)
