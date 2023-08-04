@@ -218,7 +218,7 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
 
 std::vector<::Envoy::Upstream::UpstreamLocalAddress>
 parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
-                const std::optional<std::string>& cluster_name,
+                const absl::optional<std::string>& cluster_name,
                 Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
                 Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options) {
 
