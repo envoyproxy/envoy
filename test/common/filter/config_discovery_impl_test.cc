@@ -589,10 +589,6 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
-  if (config_discovery_test.getFilterType() == "listener" ||
-      config_discovery_test.getFilterType() == "upstream_network") {
-    return;
-  }
 
   config_discovery_test.setup(true, false, false);
   const std::string response_yaml = R"EOF(
@@ -608,6 +604,14 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
+
+  if (config_discovery_test.getFilterType() == "listener" ||
+      config_discovery_test.getFilterType() == "upstream_network") {
+    EXPECT_NO_THROW(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                                     response.version_info()));
+    return;
+  }
+
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
                                                        response.version_info()),
