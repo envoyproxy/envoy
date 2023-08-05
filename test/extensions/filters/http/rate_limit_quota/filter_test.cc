@@ -255,30 +255,6 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   EXPECT_EQ(ret.status().message(), "Failed to generate the id from custom value config.");
 }
 
-// TEST_F(FilterTest, DecodeHeaderWithValidConfig) {
-//   addMatcherConfig(MatcherConfigType::Valid);
-//   createFilter();
-
-//   // Define the key value pairs that is used to build the bucket_id dynamically via
-//   `custom_value`
-//   // in the config.
-//   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
-//                                                                       {"group", "envoy"}};
-
-//   buildCustomHeader(custom_value_pairs);
-
-//   RateLimitTestClient test_client(context_, *config_.mutable_rlqs_server());
-//   EXPECT_OK(test_client.client_->startStream(decoder_callbacks_.stream_info_));
-//   // Send quota usage report and ensure that we get it.
-//   EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, false));
-//   EXPECT_CALL(test_client.stream_, closeStream());
-//   EXPECT_CALL(test_client.stream_, resetStream());
-//   test_client.client_->closeStream();
-
-//   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
-//   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-// }
-
 TEST_F(FilterTest, DecodeHeaderWithInValidConfig) {
   addMatcherConfig(MatcherConfigType::Invalid);
   createFilter();
@@ -291,23 +267,6 @@ TEST_F(FilterTest, DecodeHeaderWithInValidConfig) {
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
-
-// TEST_F(FilterTest, DecodeHeaderWithOnNoMatchConfigured) {
-//   addMatcherConfig(MatcherConfigType::ValidOnNoMatchConfig);
-//   createFilter();
-
-//   RateLimitTestClient test_client(context_, *config_.mutable_rlqs_server());
-//   // TODO(tyxia) Invest, two in parallel??
-//   EXPECT_OK(test_client.client_->startStream(decoder_callbacks_.stream_info_));
-//   // Send quota usage report and ensure that we get it.
-//   EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, false));
-//   EXPECT_CALL(test_client.stream_, closeStream());
-//   EXPECT_CALL(test_client.stream_, resetStream());
-//   test_client.client_->closeStream();
-
-//   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
-//   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-// }
 
 TEST_F(FilterTest, DecodeHeaderWithEmptyConfig) {
   addMatcherConfig(MatcherConfigType::Empty);

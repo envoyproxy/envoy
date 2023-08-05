@@ -44,6 +44,7 @@ public:
     if (reset_callbacks_started_) {
       return;
     }
+
     reset_callbacks_started_ = true;
     for (StreamCallbacks* callbacks : callbacks_) {
       if (callbacks) {
