@@ -1222,7 +1222,19 @@ ClusterInfoImpl::ClusterInfoImpl(
   filter_factories_.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
+    const bool is_terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  upstream filter #{}:", i);
+
+    if (proto_config.config_type_case() ==
+        envoy::config::cluster::v3::Filter::ConfigTypeCase::kConfigDiscovery) {
+      ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
+      filter_factories_.push_back(
+          network_config_provider_manager_.createDynamicFilterConfigProvider(
+              proto_config.config_discovery(), proto_config.name(), server_context, server_context,
+              factory_context.clusterManager(), is_terminal, "network", nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
