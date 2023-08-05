@@ -108,18 +108,6 @@ public:
   configSourceInitialFetchTimeout(const envoy::config::core::v3::ConfigSource& config_source);
 
   /**
-   * Populate an envoy::config::core::v3::ApiConfigSource.
-   * @param cluster supplies the cluster name for the ApiConfigSource.
-   * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
-   * @param api_type supplies the type of subscription to use for the ApiConfigSource.
-   * @param api_config_source a reference to the envoy::config::core::v3::ApiConfigSource object to
-   * populate.
-   */
-  static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                                       const std::string& api_type,
-                                       envoy::config::core::v3::ApiConfigSource& api_config_source);
-
-  /**
    * Check cluster info for API config sanity. Throws on error.
    * @param error_prefix supplies the prefix to use in error messages.
    * @param cluster_name supplies the cluster name to check.
@@ -159,15 +147,6 @@ public:
    * @param api reference to the Api object
    */
   static void checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api);
-
-  /**
-   * Check the grpc_services and cluster_names for API config sanity. Throws on error.
-   * @param api_config_source the config source to validate.
-   * @throws EnvoyException when an API config has the wrong number of gRPC
-   * services or cluster names, depending on expectations set by its API type.
-   */
-  static void
-  checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.

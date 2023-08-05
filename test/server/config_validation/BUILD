@@ -87,6 +87,7 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "config_fuzz_test",
+    size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
     deps = [

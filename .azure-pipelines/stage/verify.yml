@@ -13,7 +13,7 @@ jobs:
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
   timeoutInMinutes: 120
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -28,6 +28,7 @@ jobs:
       AZP_BRANCH: $(Build.SourceBranch)
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_DOCKER_IN_DOCKER: 1
+      ENVOY_RBE: 1
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
@@ -52,6 +53,7 @@ jobs:
       AZP_BRANCH: $(Build.SourceBranch)
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_DOCKER_IN_DOCKER: 1
+      ENVOY_RBE: 1
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
@@ -60,8 +62,7 @@ jobs:
 - job: verified
   displayName: Verification complete
   dependsOn: ["packages_x64", "packages_arm64"]
-  pool:
-    vmImage: "ubuntu-20.04"
+  pool: x64-nano
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:

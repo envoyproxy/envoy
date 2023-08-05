@@ -2,6 +2,7 @@ services:
 
   tls-inspector:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service-https-http2:
@@ -16,6 +17,7 @@ services:
 
   service-https-http2:
     build:
+      context: .
       dockerfile: ../shared/echo2/Dockerfile
     hostname: service-https-http2
     environment:
@@ -23,6 +25,7 @@ services:
 
   service-https-http1.1:
     build:
+      context: .
       dockerfile: ../shared/echo2/Dockerfile
     hostname: service-https-http1.1
     environment:
@@ -30,6 +33,7 @@ services:
 
   service-http:
     build:
+      context: .
       dockerfile: ../shared/echo2/Dockerfile
     hostname: service-http
     environment:

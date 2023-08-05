@@ -418,11 +418,9 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
           local_info, std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), {});
+          makeOptRefFromPtr(xds_config_tracker_.get()), {}, false);
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      const std::string target_xds_authority =
-          Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or("");
       auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
       std::string name;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
@@ -441,7 +439,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
           local_info, std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref);
+          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, false);
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -1126,7 +1124,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
                            OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
     if (add_or_update_cluster) {
-      if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
+      if (cluster_manager->thread_local_clusters_.contains(info->name())) {
         ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
       } else {
         ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
@@ -1225,7 +1223,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
                             hosts_added, hosts_removed, weighted_priority_health,
                             overprovisioning_factor, std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
-  if (lb_factory_ != nullptr) {
+  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
     lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }

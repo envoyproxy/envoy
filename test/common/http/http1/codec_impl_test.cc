@@ -231,7 +231,8 @@ public:
             headers_with_underscores_action_));
     header_validator_ = std::make_unique<
         Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
-        header_validator_config_, Protocol::Http11, http1CodecStats());
+        header_validator_config_, Protocol::Http11, http1CodecStats(),
+        header_validator_config_overrides_);
   }
 
 protected:
@@ -242,6 +243,8 @@ protected:
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
   ServerHeaderValidatorPtr header_validator_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
@@ -770,12 +773,11 @@ TEST_P(Http1ServerConnectionImplTest, InvalidChunkHeader) {
 
 TEST_P(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO(#27377): http-parser will not be used together with UHV and triggers an internal
-  // transfer-encoding check preventing UHV to be called.
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
-    return;
-  }
+  const bool strict = false;
+#else
+  const bool strict = true;
 #endif
+
   initialize();
 
   InSequence sequence;
@@ -786,16 +788,27 @@ TEST_P(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
                            "identity,chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
 
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+  if (strict) {
     EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, _, _, _,
                                         "http1.invalid_transfer_encoding"));
   } else {
-    // TODO(#27375): Balsa codec produces invalid response in non UHV mode
-    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, _, _, _, "http1.codec_error"));
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      EXPECT_CALL(decoder, decodeHeaders_(_, true));
+    } else {
+      EXPECT_CALL(decoder, decodeHeaders_(_, false));
+      EXPECT_CALL(decoder, decodeData(BufferStringEqual("Hello World"), false));
+      EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+    }
   }
+
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_THAT(status.message(), StartsWith("http/1.1 protocol error"));
+
+  if (strict) {
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_THAT(status.message(), StartsWith("http/1.1 protocol error"));
+  } else {
+    EXPECT_TRUE(status.ok());
+  }
 }
 
 TEST_P(Http1ServerConnectionImplTest, HostWithLWS) {
@@ -1966,6 +1979,40 @@ TEST_P(Http1ServerConnectionImplTest, ChunkedResponse) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
             "World\r\n0\r\n\r\n",
             output);
+}
+
+TEST_P(Http1ServerConnectionImplTest, VerifyRequestHeaderTrailerMapMaxLimits) {
+  initialize();
+  InSequence sequence;
+
+  codec_settings_.allow_absolute_url_ = true;
+  codec_settings_.enable_trailers_ = true;
+  codec_ = std::make_unique<Http1::ServerConnectionImpl>(
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+      overload_manager_);
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  TestRequestHeaderMapImpl expected_headers{
+      {{":path", "/"}, {":method", "POST"}, {"transfer-encoding", "chunked"}},
+      max_request_headers_kb_,
+      max_request_headers_count_};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_headers), false));
+  Buffer::OwnedImpl expected_data("Hello World");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+
+  TestRequestTrailerMapImpl expected_trailers{{{"hello", "world"}, {"second", "header"}},
+                                              max_request_headers_kb_,
+                                              max_request_headers_count_};
+  EXPECT_CALL(decoder, decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_trailers)));
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\nhello: world\r\nsecond: header\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_P(Http1ServerConnectionImplTest, ChunkedResponseWithTrailers) {
@@ -3776,6 +3823,38 @@ TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength100) {
   testClientAllowChunkedContentLength(100, true);
 }
 
+TEST_P(Http1ClientConnectionImplTest, VerifyResponseHeaderTrailerMapMaxLimits) {
+  codec_settings_.allow_chunked_length_ = true;
+  codec_settings_.enable_trailers_ = true;
+  codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  TestResponseHeaderMapImpl expected_headers{{{":status", "200"}, {"transfer-encoding", "chunked"}},
+                                             Http1::MAX_RESPONSE_HEADERS_KB,
+                                             max_response_headers_count_};
+  Buffer::OwnedImpl expected_data("Hello World");
+
+  EXPECT_CALL(response_decoder,
+              decodeHeaders_(HeaderMapEqualWithMaxSize(&expected_headers), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
+  TestResponseTrailerMapImpl expected_trailers{{{"hello", "world"}, {"second", "header"}},
+                                               Http1::MAX_RESPONSE_HEADERS_KB,
+                                               max_response_headers_count_};
+  EXPECT_CALL(response_decoder, decodeTrailers_(HeaderMapEqualWithMaxSize(&expected_trailers)));
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\nhello: world\r\nsecond: header\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
 TEST_P(Http1ClientConnectionImplTest,
        ShouldDumpParsedAndPartialHeadersWithoutAllocatingMemoryIfProcessingHeaders) {
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
@@ -4362,8 +4441,8 @@ TEST_P(Http1ClientConnectionImplTest, EOFDuringContentLengthBody) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_EOF_STATE");
 }
 
-// A request method requiring a body but without a Content-Length (or Transfer-Encoding: chunked)
-// header is an error.
+// Do not signal an error upon receiving a request with a method requiring a
+// body but without a Content-Length (or Transfer-Encoding: chunked) header.
 TEST_P(Http1ServerConnectionImplTest, NoContentLengthRequest) {
   initialize();
   InSequence s;
@@ -4376,27 +4455,15 @@ TEST_P(Http1ServerConnectionImplTest, NoContentLengthRequest) {
         return decoder;
       }));
 
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder,
-                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-  } else {
-    EXPECT_CALL(decoder, decodeHeaders_(_, true));
-  }
+  EXPECT_CALL(decoder, decodeHeaders_(_, true));
   constexpr absl::string_view kFirstLine = "POST / HTTP/1.1\r\n\r\n";
   constexpr absl::string_view kBody = "foo";
+
   Buffer::OwnedImpl buffer(absl::StrCat(kFirstLine, kBody));
   auto status = codec_->dispatch(buffer);
-
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_EQ(status.message(), "http/1.1 protocol error: REQUIRED_BODY_BUT_NO_CONTENT_LENGTH");
-    EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
-    EXPECT_EQ(kFirstLine.length() + kBody.length(), buffer.length());
-  } else {
-    // http-parser actually does not signal an error, but ignores the fraction of the body received.
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(kBody.length(), buffer.length());
-  }
+  EXPECT_TRUE(status.ok());
+  // The received body is ignored.
+  EXPECT_EQ(kBody.length(), buffer.length());
 }
 
 // Regression test for #24557: A read of zero bytes can signal the end of response body if there is
@@ -4721,6 +4788,38 @@ TEST_P(Http1ServerConnectionImplTest, ExtendedAsciiInHeaderName) {
   auto status = codec_->dispatch(buffer);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+}
+
+TEST_P(Http1ClientConnectionImplTest, Char22InHeaderValue) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "foo: \022\r\n"
+                             "\r\n");
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+}
+
+TEST_P(Http1ServerConnectionImplTest, Char22InHeaderValue) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _,
+                                      "http1.invalid_characters"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           "foo: \022\r\n"
+                           "\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
 }
 
 } // namespace Http

@@ -135,6 +135,8 @@ struct ResponseCodeDetailValues {
   const std::string InvalidEnvoyRequestHeaders = "request_headers_failed_strict_check";
   // The request was rejected due to a missing Path or :path header field.
   const std::string MissingPath = "missing_path_rejected";
+  // The request was rejected due to an invalid Path or :path header field.
+  const std::string InvalidPath = "invalid_path";
   // The request was rejected due to using an absolute path on a route not supporting them.
   const std::string AbsolutePath = "absolute_path_rejected";
   // The request was rejected because path normalization was configured on and failed, probably due

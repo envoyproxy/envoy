@@ -12,6 +12,7 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -38,6 +39,23 @@ using HostMultiMap = absl::flat_hash_map<std::string, HostsForAddressSharedPtr>;
 using HostMultiMapSharedPtr = std::shared_ptr<HostMultiMap>;
 using HostMultiMapConstSharedPtr = std::shared_ptr<const HostMultiMap>;
 
+class OriginalDstCluster;
+
+// Handle object whose sole purpose is to ensure that the destructor of the inner OriginalDstCluster
+// is called on the main thread.
+class OriginalDstClusterHandle {
+public:
+  OriginalDstClusterHandle(std::shared_ptr<OriginalDstCluster> cluster)
+      : cluster_(std::move(cluster)) {}
+  ~OriginalDstClusterHandle();
+
+private:
+  std::shared_ptr<OriginalDstCluster> cluster_;
+  friend class OriginalDstCluster;
+};
+
+using OriginalDstClusterHandleSharedPtr = std::shared_ptr<OriginalDstClusterHandle>;
+
 /**
  * The OriginalDstCluster is a dynamic cluster that automatically adds hosts as needed based on the
  * original destination address of the downstream connection. These hosts are also automatically
@@ -48,6 +66,11 @@ class OriginalDstCluster : public ClusterImplBase {
 public:
   OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
                      ClusterFactoryContext& context);
+
+  ~OriginalDstCluster() override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    cleanup_timer_->disableTimer();
+  }
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -65,9 +88,11 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent)
-        : parent_(parent), http_header_name_(parent->httpHeaderName()),
-          port_override_(parent->portOverride()), host_map_(parent->getCurrentHostMap()) {}
+    LoadBalancer(const OriginalDstClusterHandleSharedPtr& parent)
+        : parent_(parent), http_header_name_(parent->cluster_->httpHeaderName()),
+          metadata_key_(parent->cluster_->metadataKey()),
+          port_override_(parent->cluster_->portOverride()),
+          host_map_(parent->cluster_->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -87,33 +112,35 @@ public:
 
     Network::Address::InstanceConstSharedPtr filterStateOverrideHost(LoadBalancerContext* context);
     Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
+    Network::Address::InstanceConstSharedPtr metadataOverrideHost(LoadBalancerContext* context);
 
   private:
-    const std::shared_ptr<OriginalDstCluster> parent_;
+    const OriginalDstClusterHandleSharedPtr parent_;
     // The optional original host provider that extracts the address from HTTP header map.
     const absl::optional<Http::LowerCaseString>& http_header_name_;
+    const absl::optional<Config::MetadataKey>& metadata_key_;
     const absl::optional<uint32_t> port_override_;
     HostMultiMapConstSharedPtr host_map_;
   };
 
   const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
+  const absl::optional<Config::MetadataKey>& metadataKey() { return metadata_key_; }
   const absl::optional<uint32_t> portOverride() { return port_override_; }
 
 private:
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
-    LoadBalancerFactory(const std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
+    LoadBalancerFactory(const OriginalDstClusterHandleSharedPtr& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
       return std::make_unique<LoadBalancer>(cluster_);
     }
 
-    const std::shared_ptr<OriginalDstCluster> cluster_;
+    const OriginalDstClusterHandleSharedPtr cluster_;
   };
 
   struct ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
-    ThreadAwareLoadBalancer(const std::shared_ptr<OriginalDstCluster>& cluster)
-        : cluster_(cluster) {}
+    ThreadAwareLoadBalancer(const OriginalDstClusterHandleSharedPtr& cluster) : cluster_(cluster) {}
 
     // Upstream::ThreadAwareLoadBalancer
     Upstream::LoadBalancerFactorySharedPtr factory() override {
@@ -121,7 +148,7 @@ private:
     }
     void initialize() override {}
 
-    const std::shared_ptr<OriginalDstCluster> cluster_;
+    const OriginalDstClusterHandleSharedPtr cluster_;
   };
 
   HostMultiMapConstSharedPtr getCurrentHostMap() {
@@ -147,11 +174,11 @@ private:
   absl::Mutex host_map_lock_;
   HostMultiMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
   absl::optional<Http::LowerCaseString> http_header_name_;
+  absl::optional<Config::MetadataKey> metadata_key_;
   absl::optional<uint32_t> port_override_;
   friend class OriginalDstClusterFactory;
+  friend class OriginalDstClusterHandle;
 };
-
-using OriginalDstClusterSharedPtr = std::shared_ptr<OriginalDstCluster>;
 
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:

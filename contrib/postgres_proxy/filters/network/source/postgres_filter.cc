@@ -243,7 +243,8 @@ void PostgresFilter::sendUpstream(Buffer::Instance& data) {
   read_callbacks_->injectReadDataToFilterChain(data, false);
 }
 
-void PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& data) {
+bool PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& data) {
+  bool encrypted = false;
   RELEASE_ASSERT(
       config_->upstream_ssl_ !=
           envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE,
@@ -261,6 +262,7 @@ void PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& dat
     if (read_callbacks_->startUpstreamSecureTransport()) {
       config_->stats_.sessions_upstream_ssl_success_.inc();
       read_callbacks_->injectReadDataToFilterChain(data, false);
+      encrypted = true;
       ENVOY_CONN_LOG(trace, "postgres_proxy: upstream SSL enabled.", read_callbacks_->connection());
     } else {
       ENVOY_CONN_LOG(info,
@@ -271,6 +273,8 @@ void PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& dat
       config_->stats_.sessions_upstream_ssl_failed_.inc();
     }
   }
+
+  return encrypted;
 }
 
 Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {

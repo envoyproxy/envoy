@@ -16,9 +16,9 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: Golang]
+// [#protodoc-title: Golang HTTP filter]
 //
-// For an overview of the Golang filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
+// For an overview of the Golang HTTP filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
 // [#extension: envoy.filters.http.golang]
 
 // [#next-free-field: 6]
@@ -40,7 +40,7 @@ message Config {
   string library_id = 1 [(validate.rules).string = {min_len: 1}];
 
   // Path to a dynamic library implementing the
-  // :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`
+  // :repo:`StreamFilter API <contrib/golang/common/go/api.StreamFilter>`
   // interface.
   // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
   string library_path = 2 [(validate.rules).string = {min_len: 1}];
@@ -59,7 +59,7 @@ message Config {
   //     This configuration is only parsed in the go plugin, and is therefore not validated
   //     by Envoy.
   //
-  //     See the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
+  //     See the :repo:`StreamFilter API <contrib/golang/common/go/api/filter.go>`
   //     for more information about how the plugin's configuration data can be accessed.
   //
   google.protobuf.Any plugin_config = 4;

@@ -238,7 +238,9 @@ private:
  * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
  * beyond that is broken into component classes.
  */
-class OAuth2Filter : public Http::PassThroughFilter, public FilterCallbacks {
+class OAuth2Filter : public Http::PassThroughFilter,
+                     FilterCallbacks,
+                     Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
                TimeSource& time_source);
@@ -282,7 +284,7 @@ private:
   absl::string_view host_;
   std::string state_;
   Http::RequestHeaderMap* request_headers_{nullptr};
-  bool wasRefreshTokenFlow_;
+  bool was_refresh_token_flow_;
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;

@@ -994,9 +994,18 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   case EnvoyValue::DownstreamRemoteAddress:
     req_->strValue = state.streamInfo().downstreamAddressProvider().remoteAddress()->asString();
     break;
-  case EnvoyValue::UpstreamHostAddress:
-    if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
-      req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->address()->asString();
+  case EnvoyValue::UpstreamLocalAddress:
+    if (state.streamInfo().upstreamInfo() &&
+        state.streamInfo().upstreamInfo()->upstreamLocalAddress()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamLocalAddress()->asString();
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    break;
+  case EnvoyValue::UpstreamRemoteAddress:
+    if (state.streamInfo().upstreamInfo() &&
+        state.streamInfo().upstreamInfo()->upstreamRemoteAddress()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamRemoteAddress()->asString();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
@@ -1009,6 +1018,12 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
       return CAPIStatus::CAPIValueNotFound;
     }
     break;
+  case EnvoyValue::VirtualClusterName:
+    if (!state.streamInfo().virtualClusterName().has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = state.streamInfo().virtualClusterName().value();
+    break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }
@@ -1016,6 +1031,52 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   value_str->p = req_->strValue.data();
   value_str->n = req_->strValue.length();
   return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* buf_slice) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (!state.isThreadSafe()) {
+    auto weak_ptr = weak_from_this();
+    ENVOY_LOG(debug, "golang filter getDynamicMetadata posting request to dispatcher");
+    state.getDispatcher().post([this, &state, weak_ptr, filter_name, buf_slice] {
+      ENVOY_LOG(debug, "golang filter getDynamicMetadata request in worker thread");
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        populateSliceWithMetadata(state, filter_name, buf_slice);
+        dynamic_lib_->envoyGoRequestSemaDec(req_);
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in getDynamicMetadata");
+      }
+    });
+    return CAPIStatus::CAPIYield;
+  } else {
+    ENVOY_LOG(debug, "golang filter getDynamicMetadata replying directly");
+    populateSliceWithMetadata(state, filter_name, buf_slice);
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
+void Filter::populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
+                                       GoSlice* buf_slice) {
+  const auto& metadata = state.streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = metadata.find(filter_name);
+  if (filter_it != metadata.end()) {
+    filter_it->second.SerializeToString(&req_->strValue);
+    buf_slice->data = req_->strValue.data();
+    buf_slice->len = req_->strValue.length();
+    buf_slice->cap = req_->strValue.length();
+  }
 }
 
 CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
@@ -1142,7 +1203,7 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
         }
         dynamic_lib_->envoyGoRequestSemaDec(req_);
       } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+        ENVOY_LOG(info, "golang filter has gone or destroyed in getStringFilterState");
       }
     });
     return CAPIStatus::CAPIYield;
