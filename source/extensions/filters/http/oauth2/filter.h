@@ -210,8 +210,8 @@ public:
   const std::string& token() const override { return token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
-  std::string combineSplitCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
-                                  const std::string& keyPrefix) const;
+  std::string combineChunkedCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
+                                    const std::string& keyPrefix) const;
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
   bool isValid() const override;
   bool hmacIsValid() const;
@@ -284,11 +284,13 @@ private:
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   std::string getEncodedToken() const;
-  void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   void setCookie(Http::ResponseHeaderMap& headers, const std::string& key,
                  const std::string& value) const;
-  void setSplitCookie(Http::ResponseHeaderMap& headers, const std::string& key,
-                      const std::string& data, size_t maxChunkSize) const;
+  size_t setChunkedCookies(Http::ResponseHeaderMap& headers, const std::string& key,
+                           const std::string& data, size_t maxChunkSize) const;
+  void setCookieOrChunkedCookies(Http::ResponseHeaderMap& headers, const std::string& key,
+                                 const std::string& data, size_t maxChunkSize = 4000) const;
+  void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };
 
