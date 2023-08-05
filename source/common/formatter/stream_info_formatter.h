@@ -244,6 +244,9 @@ public:
   StreamInfoFormatter(const std::string&, const std::string& = "",
                       absl::optional<size_t> = absl::nullopt);
 
+  StreamInfoFormatter(StreamInfoFormatterProviderPtr formatter)
+      : formatter_(std::move(formatter)) {}
+
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                      const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
@@ -251,10 +254,6 @@ public:
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view, AccessLog::AccessLogType) const override;
-
-  StreamInfoFormatter(StreamInfoFormatterProviderPtr formatter) {
-    formatter_ = std::move(formatter);
-  }
 
 private:
   StreamInfoFormatterProviderPtr formatter_;
