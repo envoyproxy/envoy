@@ -56,7 +56,8 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
   auto upstream_meter = stream->grpc_stream_->streamInfo().getUpstreamBytesMeter();
   uint64_t total_bytes_sent = upstream_meter->wireBytesSent();
   uint64_t header_bytes_sent = upstream_meter->headerBytesSent();
-  EXPECT_EQ(total_bytes_sent - header_bytes_sent, send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+  EXPECT_EQ(total_bytes_sent - header_bytes_sent,
+            send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
 
   stream->sendReply(/*check_response_size=*/true);
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
@@ -128,13 +129,14 @@ TEST_P(GrpcClientIntegrationTest, MultiStreamWithBytesMeter) {
   auto upstream_meter_0 = stream_0->grpc_stream_->streamInfo().getUpstreamBytesMeter();
   uint64_t total_bytes_sent = upstream_meter_0->wireBytesSent();
   uint64_t header_bytes_sent = upstream_meter_0->headerBytesSent();
-  EXPECT_EQ(total_bytes_sent - header_bytes_sent, send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+  EXPECT_EQ(total_bytes_sent - header_bytes_sent,
+            send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
 
   auto upstream_meter_1 = stream_1->grpc_stream_->streamInfo().getUpstreamBytesMeter();
   uint64_t total_bytes_sent_1 = upstream_meter_1->wireBytesSent();
-  uint64_t header_bytes_sent_1= upstream_meter_1->headerBytesSent();
-  EXPECT_EQ(total_bytes_sent_1 - header_bytes_sent_1, send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
-
+  uint64_t header_bytes_sent_1 = upstream_meter_1->headerBytesSent();
+  EXPECT_EQ(total_bytes_sent_1 - header_bytes_sent_1,
+            send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
 
   stream_0->sendServerInitialMetadata(empty_metadata_);
   stream_0->sendReply(true);

@@ -183,9 +183,8 @@ public:
             auto upstream_meter = this->grpc_stream_->streamInfo().getUpstreamBytesMeter();
             uint64_t total_bytes_rev = upstream_meter->wireBytesReceived();
             uint64_t header_bytes_rev = upstream_meter->headerBytesReceived();
-            EXPECT_EQ(total_bytes_rev - header_bytes_rev, recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
-
-            // EXPECT_EQ(this->grpc_stream_->streamInfo().bytesReceived(), recv_buf->length());
+            EXPECT_EQ(total_bytes_rev - header_bytes_rev,
+                      recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
           }
           dispatcher_helper_.exitDispatcherIfNeeded();
         }));
