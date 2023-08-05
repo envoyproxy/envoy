@@ -65,10 +65,9 @@ def swift_repos():
 def kotlin_repos():
     http_archive(
         name = "rules_java",
-        sha256 = "19462d64b1586c0d4ea0e87f9325be2514f0eb84e56dbf3245450451b3701581",
-        strip_prefix = "rules_java-43243982abc76390ef64be62379a1353f9011771",
-        # TODO(jpsim): Switch back to bazelbuild repo when https://github.com/bazelbuild/rules_java/issues/64 is fixed
-        url = "https://github.com/jpsim/rules_java/archive/43243982abc76390ef64be62379a1353f9011771.tar.gz",
+        sha256 = "241822bf5fad614e3e1c42431002abd9af757136fa590a6a7870c6e0640a82e3",
+        strip_prefix = "rules_java-6.4.0",
+        url = "https://github.com/bazelbuild/rules_java/archive/6.4.0.tar.gz",
     )
 
     http_archive(
