@@ -1887,9 +1887,9 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
        "OauthHMAC="
        "N2Q1ZWI2M2EwMmUyYTQyODUzNDEwMGI3NTA1ODAzYTdlOTc5YjAyODkyNmY3Y2VkZWU3MGE4MjYyNTYyYmQ2Yw==;"
        "version=1;path=/;Max-Age=;secure;HttpOnly"},
-       {Http::Headers::get().SetCookie.get(),
+      {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-       {Http::Headers::get().SetCookie.get(),
+      {Http::Headers::get().SetCookie.get(),
        "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
   };
 
