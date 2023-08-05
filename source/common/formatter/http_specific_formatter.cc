@@ -14,8 +14,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
-#include "stream_info_formatter.h"
-
 namespace Envoy {
 namespace Formatter {
 
@@ -76,18 +74,18 @@ absl::optional<std::string> HeaderFormatter::format(const Http::HeaderMap& heade
   }
 
   std::string val = std::string(header->value().getStringView());
-  CommonFormatterUtil::truncate(val, max_length_);
+  SubstitutionFormatUtils::truncate(val, max_length_);
   return val;
 }
 
 ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
-    return CommonFormatterUtil::unspecifiedProtobufValue();
+    return SubstitutionFormatUtils::unspecifiedValue();
   }
 
   std::string val = std::string(header->value().getStringView());
-  CommonFormatterUtil::truncate(val, max_length_);
+  SubstitutionFormatUtils::truncate(val, max_length_);
   return ValueUtil::stringValue(val);
 }
 
@@ -251,13 +249,13 @@ ProtobufWkt::Value GrpcStatusFormatter::formatValue(
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
     if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
-      return CommonFormatterUtil::unspecifiedProtobufValue();
+      return SubstitutionFormatUtils::unspecifiedValue();
     }
   }
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
-    return CommonFormatterUtil::unspecifiedProtobufValue();
+    return SubstitutionFormatUtils::unspecifiedValue();
   }
 
   switch (format_) {
@@ -309,7 +307,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           CommonFormatterUtil::parseSubcommandHeaders(format, main_header, alternative_header);
+           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
+                                                            alternative_header);
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);
@@ -319,7 +318,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           CommonFormatterUtil::parseSubcommandHeaders(format, main_header, alternative_header);
+           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
+                                                            alternative_header);
 
            return std::make_unique<ResponseHeaderFormatter>(main_header, alternative_header,
                                                             max_length);
@@ -329,7 +329,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           CommonFormatterUtil::parseSubcommandHeaders(format, main_header, alternative_header);
+           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
+                                                            alternative_header);
 
            return std::make_unique<ResponseTrailerFormatter>(main_header, alternative_header,
                                                              max_length);
@@ -378,7 +379,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
-           CommonFormatterUtil::parseSubcommandHeaders(format, main_header, alternative_header);
+           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
+                                                            alternative_header);
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);

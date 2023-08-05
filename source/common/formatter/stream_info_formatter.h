@@ -11,6 +11,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -18,116 +19,183 @@
 namespace Envoy {
 namespace Formatter {
 
-class CommandSyntaxChecker {
+class StreamInfoFormatterProvider {
 public:
-  using CommandSyntaxFlags = std::bitset<4>;
-  static constexpr CommandSyntaxFlags COMMAND_ONLY = 0;
-  static constexpr CommandSyntaxFlags PARAMS_REQUIRED = 1 << 0;
-  static constexpr CommandSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
-  static constexpr CommandSyntaxFlags LENGTH_ALLOWED = 1 << 2;
+  virtual ~StreamInfoFormatterProvider() = default;
 
-  static void verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
-                           const std::string& command, const std::string& subcommand,
-                           absl::optional<size_t> length);
+  virtual absl::optional<std::string> format(const StreamInfo::StreamInfo&) const PURE;
+  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const PURE;
 };
 
-/**
- * Util class for access log format.
- */
-class CommonFormatterUtil {
-public:
-  // Optional references are not supported, but this method has large performance
-  // impact, so using reference_wrapper.
-  static const absl::optional<std::reference_wrapper<const std::string>>
-  protocolToString(const absl::optional<Http::Protocol>& protocol);
-
-  static const std::string&
-  protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol);
-
-  static const absl::optional<std::string> getHostname();
-
-  static const std::string getHostnameOrDefault();
-
-  static absl::string_view defaultUnspecifiedValueString();
-
-  static const ProtobufWkt::Value& unspecifiedProtobufValue();
-
-  static void truncate(std::string& str, absl::optional<uint32_t> max_length);
-
-  /**
-   * Parse a header subcommand of the form: X?Y .
-   * Will populate a main_header and an optional alternative header if specified.
-   * See doc:
-   * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
-   */
-  static void parseSubcommandHeaders(const std::string& subcommand, std::string& main_header,
-                                     std::string& alternative_header);
-
-  /* Variadic function template to parse the
-     subcommand and assign found tokens to sequence of params.
-     subcommand must be a sequence
-     of tokens separated by the same separator, like: header1:header2 or header1?header2?header3.
-     params must be a sequence of std::string& with optional container storing std::string. Here are
-     examples of params:
-     - std::string& token1
-     - std::string& token1, std::string& token2
-     - std::string& token1, std::string& token2, std::vector<std::string>& remaining
-
-     If command contains more tokens than number of passed params, unassigned tokens will be
-     ignored. If command contains less tokens than number of passed params, some params will be left
-     untouched.
-  */
-  template <typename... Tokens>
-  static void parseSubcommand(const std::string& subcommand, const char separator,
-                              Tokens&&... params) {
-    std::vector<absl::string_view> tokens;
-    tokens = absl::StrSplit(subcommand, separator);
-    std::vector<absl::string_view>::iterator it = tokens.begin();
-    (
-        [&](auto& param) {
-          if (it != tokens.end()) {
-            if constexpr (std::is_same_v<typename std::remove_reference<decltype(param)>::type,
-                                         std::string>) {
-              // Compile time handler for std::string.
-              param = std::string(*it);
-              it++;
-            } else {
-              // Compile time handler for container type. It will catch all remaining tokens and
-              // move iterator to the end.
-              do {
-                param.push_back(std::string(*it));
-                it++;
-              } while (it != tokens.end());
-            }
-          }
-        }(params),
-        ...);
-  }
-};
-
-namespace StreamInfoOnly {
-
-class FieldExtractor {
-public:
-  virtual ~FieldExtractor() = default;
-
-  virtual absl::optional<std::string> extract(const StreamInfo::StreamInfo&) const PURE;
-  virtual ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const PURE;
-};
-
-using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
-using FieldExtractorCreateFunc =
-    std::function<FieldExtractorPtr(const std::string&, absl::optional<size_t>)>;
+using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
+using StreamInfoFormatterProviderCreateFunc =
+    std::function<StreamInfoFormatterProviderPtr(const std::string&, absl::optional<size_t>)>;
 
 enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
 
-using FieldExtractorLookupTbl =
+/**
+ * Base formatter for formatting Metadata objects
+ */
+class MetadataFormatter : public StreamInfoFormatterProvider {
+public:
+  using GetMetadataFunction =
+      std::function<const envoy::config::core::v3::Metadata*(const StreamInfo::StreamInfo&)>;
+  MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
+                    absl::optional<size_t> max_length, GetMetadataFunction get);
+
+  // StreamInfoFormatterProvider
+  absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
+
+protected:
+  absl::optional<std::string>
+  formatMetadata(const envoy::config::core::v3::Metadata& metadata) const;
+  ProtobufWkt::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
+
+private:
+  std::string filter_namespace_;
+  std::vector<std::string> path_;
+  absl::optional<size_t> max_length_;
+  GetMetadataFunction get_func_;
+};
+
+/**
+ * FormatterProvider for DynamicMetadata from StreamInfo.
+ */
+class DynamicMetadataFormatter : public MetadataFormatter {
+public:
+  DynamicMetadataFormatter(const std::string& filter_namespace,
+                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+};
+
+/**
+ * FormatterProvider for ClusterMetadata from StreamInfo.
+ */
+class ClusterMetadataFormatter : public MetadataFormatter {
+public:
+  ClusterMetadataFormatter(const std::string& filter_namespace,
+                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+};
+
+/**
+ * FormatterProvider for UpstreamHostMetadata from StreamInfo.
+ */
+class UpstreamHostMetadataFormatter : public MetadataFormatter {
+public:
+  UpstreamHostMetadataFormatter(const std::string& filter_namespace,
+                                const std::vector<std::string>& path,
+                                absl::optional<size_t> max_length);
+};
+
+/**
+ * StreamInfoFormatterProvider for FilterState from StreamInfo.
+ */
+class FilterStateFormatter : public StreamInfoFormatterProvider {
+public:
+  static std::unique_ptr<FilterStateFormatter>
+  create(const std::string& format, const absl::optional<size_t>& max_length, bool is_upstream);
+
+  FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
+                       bool serialize_as_string, bool is_upstream = false);
+
+  // StreamInfoFormatterProvider
+  absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+
+private:
+  const Envoy::StreamInfo::FilterState::Object*
+  filterState(const StreamInfo::StreamInfo& stream_info) const;
+
+  std::string key_;
+  absl::optional<size_t> max_length_;
+
+  bool serialize_as_string_;
+  const bool is_upstream_;
+};
+
+/**
+ * Base StreamInfoFormatterProvider for system times from StreamInfo.
+ */
+class SystemTimeFormatter : public StreamInfoFormatterProvider {
+public:
+  using TimeFieldExtractor =
+      std::function<absl::optional<SystemTime>(const StreamInfo::StreamInfo& stream_info)>;
+  using TimeFieldExtractorPtr = std::unique_ptr<TimeFieldExtractor>;
+
+  SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f);
+
+  // StreamInfoFormatterProvider
+  absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+
+private:
+  const Envoy::DateFormatter date_formatter_;
+  const TimeFieldExtractorPtr time_field_extractor_;
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for request start time from StreamInfo.
+ */
+class StartTimeFormatter : public SystemTimeFormatter {
+public:
+  StartTimeFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for downstream cert start time from the StreamInfo's
+ * ConnectionInfo.
+ */
+class DownstreamPeerCertVStartFormatter : public SystemTimeFormatter {
+public:
+  DownstreamPeerCertVStartFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for downstream cert end time from the StreamInfo's
+ * ConnectionInfo.
+ */
+class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
+public:
+  DownstreamPeerCertVEndFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for upstream cert start time from the StreamInfo's
+ * upstreamInfo.
+ */
+class UpstreamPeerCertVStartFormatter : public SystemTimeFormatter {
+public:
+  UpstreamPeerCertVStartFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for upstream cert end time from the StreamInfo's
+ * upstreamInfo.
+ */
+class UpstreamPeerCertVEndFormatter : public SystemTimeFormatter {
+public:
+  UpstreamPeerCertVEndFormatter(const std::string& format);
+};
+
+/**
+ * FormatterProvider for environment. If no valid environment value then
+ */
+class EnvironmentFormatter : public StreamInfoFormatterProvider {
+public:
+  EnvironmentFormatter(const std::string& key, absl::optional<size_t> max_length);
+
+  // StreamInfoFormatterProvider
+  absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+
+private:
+  ProtobufWkt::Value str_;
+};
+
+using StreamInfoFormatterProviderLookupTable =
     absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
-                                                     FieldExtractorCreateFunc>>;
-
-const FieldExtractorLookupTbl& getKnownFieldExtractors();
-
-} // namespace StreamInfoOnly
+                                                     StreamInfoFormatterProviderCreateFunc>>;
+const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders();
 
 /**
  * FormatterProvider for string literals. It ignores headers and stream info and returns string by
@@ -184,12 +252,12 @@ public:
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view, AccessLog::AccessLogType) const override;
 
-  StreamInfoFormatter(StreamInfoOnly::FieldExtractorPtr field_extractor) {
-    field_extractor_ = std::move(field_extractor);
+  StreamInfoFormatter(StreamInfoFormatterProviderPtr formatter) {
+    formatter_ = std::move(formatter);
   }
 
 private:
-  StreamInfoOnly::FieldExtractorPtr field_extractor_;
+  StreamInfoFormatterProviderPtr formatter_;
 };
 
 } // namespace Formatter
