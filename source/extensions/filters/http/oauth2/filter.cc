@@ -341,6 +341,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     }
 
     ENVOY_LOG(debug, "path {} does not match with redirect matcher. redirecting to OAuth server.",
+              path_str);
     redirectToOAuthServer(headers);
     return Http::FilterHeadersStatus::StopIteration;
   }
