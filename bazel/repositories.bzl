@@ -13,7 +13,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
-    "envoy.tracers.opencensus",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -285,7 +284,6 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
@@ -900,47 +898,6 @@ def _com_google_protobuf():
     native.bind(
         name = "python_headers",
         actual = "//bazel:python_headers",
-    )
-
-def _io_opencensus_cpp():
-    external_http_archive(
-        name = "io_opencensus_cpp",
-    )
-    native.bind(
-        name = "opencensus_trace",
-        actual = "@io_opencensus_cpp//opencensus/trace",
-    )
-    native.bind(
-        name = "opencensus_trace_b3",
-        actual = "@io_opencensus_cpp//opencensus/trace:b3",
-    )
-    native.bind(
-        name = "opencensus_trace_cloud_trace_context",
-        actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
-    )
-    native.bind(
-        name = "opencensus_trace_grpc_trace_bin",
-        actual = "@io_opencensus_cpp//opencensus/trace:grpc_trace_bin",
-    )
-    native.bind(
-        name = "opencensus_trace_trace_context",
-        actual = "@io_opencensus_cpp//opencensus/trace:trace_context",
-    )
-    native.bind(
-        name = "opencensus_exporter_ocagent",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/ocagent:ocagent_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_stdout",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stdout:stdout_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_stackdriver",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stackdriver:stackdriver_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_zipkin",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/zipkin:zipkin_exporter",
     )
 
 def _com_github_curl():

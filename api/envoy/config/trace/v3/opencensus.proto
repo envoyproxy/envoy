@@ -21,6 +21,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: OpenCensus tracer]
 
+// [#not-implemented-hide:]
+//
 // Configuration for the OpenCensus tracer.
 // [#next-free-field: 15]
 // [#extension: envoy.tracers.opencensus]

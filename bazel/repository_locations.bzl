@@ -759,7 +759,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Tencent/rapidjson/archive/{version}.tar.gz"],
         use_category = ["observability_ext"],
         # Rapidjson is used in the external dependency of zipkin tracer.
-        extensions = ["envoy.tracers.zipkin", "envoy.tracers.opencensus"],
+        extensions = ["envoy.tracers.zipkin"],
         release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
         license = "RapidJSON",
@@ -1045,21 +1045,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/WebAssembly/wasm-c-api/blob/{version}/LICENSE",
     ),
-    io_opencensus_cpp = dict(
-        project_name = "OpenCensus C++",
-        project_desc = "OpenCensus tracing library",
-        project_url = "https://github.com/census-instrumentation/opencensus-cpp",
-        version = "f68a2d0ea43eb61a4b7889f09987294c4f94d436",
-        sha256 = "b5fd69da558d08480e254c7e2a91e23a88ec8b72d9aec1a6c2329d7560a61744",
-        strip_prefix = "opencensus-cpp-{version}",
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/{version}.tar.gz"],
-        use_category = ["observability_ext"],
-        extensions = ["envoy.tracers.opencensus"],
-        release_date = "2022-09-20",
-        cpe = "N/A",
-        license = "Apache-2.0",
-        license_url = "https://github.com/census-instrumentation/opencensus-cpp/blob/{version}/LICENSE",
-    ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/11816.
     com_github_curl = dict(
         project_name = "curl",
@@ -1074,7 +1059,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.http.aws_lambda",
             "envoy.filters.http.aws_request_signing",
             "envoy.grpc_credentials.aws_iam",
-            "envoy.tracers.opencensus",
         ],
         release_date = "2023-07-26",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
