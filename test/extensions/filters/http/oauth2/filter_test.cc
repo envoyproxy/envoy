@@ -1296,7 +1296,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC="
-       "M2M4Y2I1OGM4ODYzNGIwMWU1NmQ2MWU0ODA5Y2UyNWZhODk4MWI3YTJlMjAyOGJiM2YxNzdlNTdmYThmMzZmMA==;"
+       "Mzk4OWNlMGNmYjEyMTlhNmM0YTU5ZDhiMDIyM2YxY2EzMDA1ODBkZmZiZmY5NWUwZGI4MWJiOGQ0YTE0NmYyMg==;"
        "version=1;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=10;version=1;path=/;Max-Age=10;secure;HttpOnly"},
@@ -1644,7 +1644,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC="
-       "NWUzNzE5MWQwYTg0ZjA2NjIyMjVjMzk3MzY3MzMyZmE0NjZmMWI2MjI1NWFhNDhkYjQ4NDFlZmRiMTVmMTk0MQ==;"
+       "N2Q1ZWI2M2EwMmUyYTQyODUzNDEwMGI3NTA1ODAzYTdlOTc5YjAyODkyNmY3Y2VkZWU3MGE4MjYyNTYyYmQ2Yw==;"
        "version=1;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
@@ -1835,7 +1835,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
   Http::TestResponseHeaderMapImpl expected_response_headers{
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC="
-       "NWUzNzE5MWQwYTg0ZjA2NjIyMjVjMzk3MzY3MzMyZmE0NjZmMWI2MjI1NWFhNDhkYjQ4NDFlZmRiMTVmMTk0MQ==;"
+       "N2Q1ZWI2M2EwMmUyYTQyODUzNDEwMGI3NTA1ODAzYTdlOTc5YjAyODkyNmY3Y2VkZWU3MGE4MjYyNTYyYmQ2Yw==;"
        "version=1;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
@@ -1843,7 +1843,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
        "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
   };
 
-  EXPECT_EQ(response_headers, expected_response_headers);
+  EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
@@ -1885,15 +1885,15 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   Http::TestResponseHeaderMapImpl expected_response_headers{
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC="
-       "NWUzNzE5MWQwYTg0ZjA2NjIyMjVjMzk3MzY3MzMyZmE0NjZmMWI2MjI1NWFhNDhkYjQ4NDFlZmRiMTVmMTk0MQ==;"
+       "N2Q1ZWI2M2EwMmUyYTQyODUzNDEwMGI3NTA1ODAzYTdlOTc5YjAyODkyNmY3Y2VkZWU3MGE4MjYyNTYyYmQ2Yw==;"
        "version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
+       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
+       {Http::Headers::get().SetCookie.get(),
        "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
   };
 
-  EXPECT_EQ(response_headers, expected_response_headers);
+  EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));
 }
 
 } // namespace Oauth2
