@@ -180,7 +180,12 @@ public:
             Common::prependGrpcFrameHeader(*recv_buf);
             // Verify that the number of received byte that is tracked in the stream info equals to
             // the length of reply response buffer.
-            EXPECT_EQ(this->grpc_stream_->streamInfo().bytesReceived(), recv_buf->length());
+            auto upstream_meter = this->grpc_stream_->streamInfo().getUpstreamBytesMeter();
+            uint64_t total_bytes_rev = upstream_meter->wireBytesReceived();
+            uint64_t header_bytes_rev = upstream_meter->headerBytesReceived();
+            EXPECT_EQ(total_bytes_rev - header_bytes_rev, recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+
+            // EXPECT_EQ(this->grpc_stream_->streamInfo().bytesReceived(), recv_buf->length());
           }
           dispatcher_helper_.exitDispatcherIfNeeded();
         }));
@@ -274,9 +279,11 @@ public:
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
-      FakeUpstreamConfig config(test_time_.timeSystem());
-      config.upstream_protocol_ = Http::CodecType::HTTP2;
-      fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
+      // FakeUpstreamConfig config(test_time_.timeSystem());
+      // config.upstream_protocol_ = Http::CodecType::HTTP2;
+      // fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
+      fake_upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
+      fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), fake_upstream_config_);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -472,6 +479,7 @@ public:
   }
 
   DangerousDeprecatedTestTime test_time_;
+  FakeUpstreamConfig fake_upstream_config_{test_time_.timeSystem()};
   std::unique_ptr<FakeUpstream> fake_upstream_;
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
