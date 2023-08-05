@@ -412,13 +412,12 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
 
   // Note: the content of opaque types may contain illegal content that mismatches the type_url
   // which may cause unpacking to fail. We catch the exception here to avoid crashing Envoy.
-  try {
-    unpack(typed_message.get(), reflection, value_field_descriptor);
-  } catch (const EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { unpack(typed_message.get(), reflection, value_field_descriptor); }
+  END_TRY CATCH(const EnvoyException& e, {
     ENVOY_LOG_MISC(warn, "Could not unpack {} with type URL {}: {}", opaque_type_name, type_url,
                    e.what());
     return false;
-  }
+  });
   redact(typed_message.get(), ancestor_is_sensitive);
   repack(typed_message.get(), reflection, value_field_descriptor);
   return true;
