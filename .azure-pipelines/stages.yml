@@ -14,12 +14,6 @@ parameters:
   default:
   - env
   - prechecks
-- name: windowsBuildStageDeps
-  displayName: "Windows stage dependencies"
-  type: object
-  default:
-  - env
-  - prechecks
 - name: checkStageDeps
   displayName: "Check stage dependencies"
   type: object
@@ -167,17 +161,6 @@ stages:
     RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
   jobs:
   - template: stage/macos.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)
-      runBuild: variables['RUN_BUILD']
-
-- stage: windows
-  displayName: Windows
-  dependsOn: ${{ parameters.windowsBuildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-  jobs:
-  - template: stage/windows.yml
     parameters:
       authGCP: $(GcpServiceAccountKey)
       runBuild: variables['RUN_BUILD']

@@ -80,8 +80,6 @@ stages:
       concurrencyChecks: 10
       macBuildStageDeps:
       - env
-      windowsBuildStageDeps:
-      - env
 
 # Postsubmit main/release branches
 - ${{ if eq(variables.pipelinePostsubmit, true) }}:
@@ -96,6 +94,4 @@ stages:
       - env
       concurrencyChecks: 10
       macBuildStageDeps:
-      - env
-      windowsBuildStageDeps:
       - env
