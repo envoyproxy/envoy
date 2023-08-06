@@ -1303,7 +1303,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC="
-       "ZTEzMmIyYzRmNTdmMTdiY2IyYmViZDE3ODA5ZDliOTE2MTRlNzNjYjc4MjBlMTVlOWY1OTM2ZjViZjM4MzAwNA==;"
+       "fc371d9edcff7773ccb94e04438a9d9b11516b74920ddb35388a0b3784df9e83;"
        "version=1;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
@@ -1384,7 +1384,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_http
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC="
-       "ZTEzMmIyYzRmNTdmMTdiY2IyYmViZDE3ODA5ZDliOTE2MTRlNzNjYjc4MjBlMTVlOWY1OTM2ZjViZjM4MzAwNA==;"
+       "fc371d9edcff7773ccb94e04438a9d9b11516b74920ddb35388a0b3784df9e83;"
        "version=1;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
