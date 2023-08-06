@@ -68,6 +68,9 @@ protected:
   }
 
   void initializeConfig() {
+
+    // Add the encode-complete-filter to read
+    // config_helper_.addFilter("name: encode-complete-filter");
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_value_in_bytes", filter_mutation_rule_}});
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
