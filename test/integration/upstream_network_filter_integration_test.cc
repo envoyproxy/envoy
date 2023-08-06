@@ -630,7 +630,8 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterCon
 }
 
 // ECDS config dump test with two filters.
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterTypeWithConfigDump) {
+TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
+       TwoSubscriptionsSameFilterTypeWithConfigDump) {
   DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
@@ -680,7 +681,8 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFil
 }
 
 // ECDS config dump test with specified resource and regex name search.
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithResourceAndRegex) {
+TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
+       TwoSubscriptionsConfigDumpWithResourceAndRegex) {
   DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
@@ -716,7 +718,8 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigD
   EXPECT_EQ(4, network_filter_config.bytes_to_drain());
 }
 
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyToExistingConnection) {
+TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
+       ConfigUpdateDoesNotApplyToExistingConnection) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addFilterChain();
   addDynamicFilter(filter_name_, false);
