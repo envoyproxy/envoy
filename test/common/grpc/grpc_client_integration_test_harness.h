@@ -278,9 +278,6 @@ public:
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
-      // FakeUpstreamConfig config(test_time_.timeSystem());
-      // config.upstream_protocol_ = Http::CodecType::HTTP2;
-      // fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
       fake_upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
       fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), fake_upstream_config_);
     }

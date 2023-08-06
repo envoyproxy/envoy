@@ -34,7 +34,9 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
   // Currently, bytes metering is only implemented in Envoy gRPC. Therefore, skip this test for
   // google gRPC.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
-  //
+  // The check of bytes in this test is based on HTTP2 codec logic (i.e., including
+  // H2_FRAME_HEADER_SIZE). HTTP2 is the protocol type used in GrpcClientIntegrationTest but skip
+  // the test in case if protocol changed in the future.
   if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2)
     return;
   initialize();
@@ -103,6 +105,9 @@ TEST_P(GrpcClientIntegrationTest, MultiStream) {
 // Validate that multiple streams work with bytes metering.
 TEST_P(GrpcClientIntegrationTest, MultiStreamWithBytesMeter) {
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  // The check of bytes in this test is based on HTTP2 codec logic (i.e., including
+  // H2_FRAME_HEADER_SIZE). HTTP2 is the protocol type used in GrpcClientIntegrationTest but skip
+  // the test in case if protocol changed in the future.
   if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2)
     return;
   initialize();

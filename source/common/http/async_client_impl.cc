@@ -122,6 +122,7 @@ void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_str
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
             *headers);
   ASSERT(!remote_closed_);
+  streamInfo().addBytesReceived(headers->byteSize());
   encoded_response_headers_ = true;
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
@@ -159,6 +160,7 @@ void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
+  streamInfo().addBytesSent(headers.byteSize());
   if (Http::Headers::get().MethodValues.Head == headers.getMethodValue()) {
     is_head_request_ = true;
   }
