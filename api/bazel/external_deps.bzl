@@ -135,6 +135,15 @@ def load_repository_locations(repository_locations_spec):
             if category not in USE_CATEGORIES:
                 fail("Unknown use_category value '" + category + "' for dependecy " + key)
 
+        mirror_url = None
+        for url in locations[key]["urls"]:
+            if url.startswith("https://github.com/"):
+                mirror_url = "https://mirror.bazel.build/%s" % url[8:]
+                break
+
+        if mirror_url and not mirror_url in locations[key]["urls"]:
+            locations[key]["urls"].append(mirror_url)
+
         # Remove any extra annotations that we add, so that we don't confuse http_archive etc.
         for annotation in DEPENDENCY_ANNOTATIONS:
             if annotation in mutable_location:
