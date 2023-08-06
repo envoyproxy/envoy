@@ -718,7 +718,6 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   EXPECT_EQ(4, network_filter_config.bytes_to_drain());
 }
 
-
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
        ConfigUpdateDoesNotApplyToExistingConnection) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
