@@ -5,6 +5,7 @@ package envoy.service.rate_limit_quota.v3;
 import "envoy/type/v3/ratelimit_strategy.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -57,10 +58,6 @@ service RateLimitQuotaService {
 
 message RateLimitQuotaUsageReports {
   // The usage report for a bucket.
-  //
-  // .. note::
-  //   Note that the first report sent for a ``BucketId`` indicates to the RLQS server that
-  //   the RLQS client is subscribing for the future assignments for this ``BucketId``.
   message BucketQuotaUsage {
     // ``BucketId`` for which request quota usage is reported.
     BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
@@ -76,20 +73,29 @@ message RateLimitQuotaUsageReports {
 
     // Requests throttled.
     uint64 num_requests_denied = 4;
+
+    // The timestamp for the last report.
+    google.protobuf.Timestamp last_report = 5;
   }
 
   // All quota requests must specify the domain. This enables sharing the quota
   // server between different applications without fear of overlap.
   // E.g., "envoy".
   //
-  // Should only be provided in the first report, all subsequent messages on the same
-  // stream are considered to be in the same domain. In case the domain needs to be
-  // changes, close the stream, and reopen a new one with the different domain.
-  string domain = 1 [(validate.rules).string = {min_len: 1}];
+  // Should only be provided in the first report, all subsequent messages on the
+  // same stream are considered to be in the same domain. In case the domain
+  // needs to be changes, close the stream, and reopen a new one with the
+  // different domain.
+  string domain = 1 [(validate.rules).string = { min_len: 1 }];
 
-  // A list of quota usage reports. The list is processed by the RLQS server in the same order
-  // it's provided by the client.
-  repeated BucketQuotaUsage bucket_quota_usages = 2 [(validate.rules).repeated = {min_items: 1}];
+  // The map of quota usage reports: The key as id of the bucket and
+  // the value as the quota usage for that specific bucket.
+  //
+  // .. note::
+  //   Note that the first report sent for a ``BucketId`` indicates to the RLQS
+  //   server that the RLQS client is subscribing for the future assignments for
+  //   this ``BucketId``.
+  map<uint64, BucketQuotaUsage> bucket_quota_usages = 2;
 }
 
 message RateLimitQuotaResponse {

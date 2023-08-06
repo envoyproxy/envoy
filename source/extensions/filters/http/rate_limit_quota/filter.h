@@ -77,7 +77,7 @@ public:
     // Notify the client that has been destroyed and its callback which is pointer to this pointer
     // can not be used anymore.
     if (client_.rate_limit_client != nullptr) {
-      client_.rate_limit_client->notifyFilterDestroy();
+      client_.rate_limit_client->resetCallback();
     }
   }
 

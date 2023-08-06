@@ -12,6 +12,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+class RateLimitQuotaCallbacks;
+
 class MockRateLimitQuotaCallbacks : public RateLimitQuotaCallbacks {
 public:
   MockRateLimitQuotaCallbacks() = default;
@@ -31,7 +33,8 @@ public:
   MOCK_METHOD(void, sendUsageReport,
               (absl::string_view, absl::optional<envoy::service::rate_limit_quota::v3::BucketId>));
 
-  MOCK_METHOD(void, notifyFilterDestroy, ());
+  MOCK_METHOD(void, setCallback, (RateLimitQuotaCallbacks*));
+  MOCK_METHOD(void, resetCallback, ());
 };
 
 } // namespace RateLimitQuota

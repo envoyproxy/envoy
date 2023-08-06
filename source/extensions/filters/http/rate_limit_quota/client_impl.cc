@@ -7,53 +7,57 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+BucketQuotaUsage RateLimitClientImpl::addNewBucketUsage(const BucketId& bucket_id) {
+  // Add the usage report.
+  BucketQuotaUsage usage;
+  *usage.mutable_bucket_id() = bucket_id;
+  // Keep track of the time
+  usage.mutable_time_elapsed()->set_seconds(0);
+  // TimestampUtil::systemClockToTimestamp(time_source_.systemTime(),
+  // *usage.mutable_last_report());
+
+  usage.mutable_last_report()->MergeFrom(Protobuf::util::TimeUtil::MillisecondsToTimestamp(
+      time_source_.monotonicTime().time_since_epoch().count()));
+  // TODO(tyxia) 2) Set the value of requests allowed and denied.
+  // This is requests allowed and denied for this bucket which contains many requests.
+  // It seems that the lock is needed for this?? Because here is read from the map
+  // update is write to map.
+  usage.set_num_requests_allowed(1);
+  usage.set_num_requests_denied(0);
+  return usage;
+}
+
 RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_view domain,
                                                                  const BucketId& bucket_id) {
-  // ASSERT(quota_usage_reports_ != nullptr);
+  const uint64_t id = MessageUtil::hash(bucket_id);
   // TODO(tyxia) Domain is provided by filter configuration whose lifetime is tied with HCM. This
   // means that domain name has same lifetime as TLS because TLS is created by factory context. In
   // other words, there is only one domain name throughout the whole lifetime of
   // `quota_usage_reports_`. (i.e., no need for container/map).
+
+  // First report.
   if (quota_usage_reports_.domain().empty()) {
     // Set the domain name in the first report.
     quota_usage_reports_.set_domain(std::string(domain));
     // Add the usage report.
-    auto* usage = quota_usage_reports_.add_bucket_quota_usages();
-    *usage->mutable_bucket_id() = bucket_id;
-    // TODO(tyxia) 1) Keep track of the time
-    // It is better to be last report time and current time.
-    usage->mutable_time_elapsed()->set_seconds(0);
-    // TODO(tyxia) 2) Set the value of requests allowed and denied.
-    // This is requests allowed and denied for this bucket which contains many requests.
-    // It seems that the lock is needed for this?? Because here is read from the map
-    // update is write to map.
-    usage->set_num_requests_allowed(1);
-    usage->set_num_requests_denied(0);
-  }
-  // If the cached report exists.
-  else {
-    RateLimitQuotaUsageReports& cached_report = quota_usage_reports_;
-    bool updated = false;
-    // TODO(tyxia) That will be better if it can be a map
-    for (int idx = 0; idx < cached_report.bucket_quota_usages_size(); ++idx) {
-      auto* usage = cached_report.mutable_bucket_quota_usages(idx);
-      // Only update the quota usage for that specific bucket id.
-      if (Protobuf::util::MessageDifferencer::Equals(usage->bucket_id(), bucket_id)) {
-        usage->set_num_requests_allowed(usage->num_requests_allowed() + 1);
-        // TODO(tyxia) Update the logic of setting the second logic.
-        usage->mutable_time_elapsed()->set_seconds(1000);
-        updated = true;
-        // Break the loop here since it should only one unique usage report for
-        // particular bucket in the report.
-        break;
-      }
-    }
-    // New bucket in this report(i.e., No updates has been performed.)
-    if (updated == false) {
-      auto* usage = quota_usage_reports_.add_bucket_quota_usages();
-      *usage->mutable_bucket_id() = bucket_id;
-      usage->mutable_time_elapsed()->set_seconds(0);
-      usage->set_num_requests_allowed(1);
+    (*quota_usage_reports_.mutable_bucket_quota_usages())[id] = addNewBucketUsage(bucket_id);
+  } else {
+    auto quota_usage = quota_usage_reports_.bucket_quota_usages();
+    if (quota_usage.find(id) != quota_usage.end()) {
+      auto mutable_quota_usage = quota_usage_reports_.mutable_bucket_quota_usages();
+      (*mutable_quota_usage)[id].set_num_requests_allowed(quota_usage[id].num_requests_allowed() +
+                                                          1);
+      // TODO(tyxia) Closer look
+      auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                     time_source_.monotonicTime().time_since_epoch())
+                     .count();
+      auto time_elapsed =
+          now - Protobuf::util::TimeUtil::TimestampToNanoseconds(quota_usage[id].last_report());
+      *(*mutable_quota_usage)[id].mutable_time_elapsed() =
+          Protobuf::util::TimeUtil::NanosecondsToDuration(time_elapsed);
+    } else {
+      // New bucket in this report(i.e., No updates has been performed.)
+      (*quota_usage_reports_.mutable_bucket_quota_usages())[id] = addNewBucketUsage(bucket_id);
     }
   }
   return quota_usage_reports_;
@@ -99,8 +103,8 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
   }
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.
   // This doesn't work for periodical response as filter has been destroyed.
-  if (rlqs_callbacks_ != nullptr) {
-    rlqs_callbacks_->onQuotaResponse(*response);
+  if (rlqs_callback_ != nullptr) {
+    rlqs_callback_->onQuotaResponse(*response);
   }
 }
 void RateLimitClientImpl::closeStream() {

@@ -38,8 +38,9 @@ public:
                       RateLimitQuotaUsageReports& usage_reports)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)),
-        rlqs_callbacks_(callbacks), quota_buckets_(quota_buckets),
-        quota_usage_reports_(usage_reports) {}
+        rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
+        quota_usage_reports_(usage_reports),
+        time_source_(context.mainThreadDispatcher().timeSource()) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
   // Build the usage report (i.e., the request sent to RLQS server).
@@ -56,11 +57,13 @@ public:
   void closeStream() override;
   // Send the usage report to RLQS server
   void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id) override;
+  void setCallback(RateLimitQuotaCallbacks* callbacks) override { rlqs_callback_ = callbacks; }
   // Notify the rate limit client that the filter itself has been destroyed. i.e., the filter
   // callback can not be used anymore.
-  void notifyFilterDestroy() override { rlqs_callbacks_ = nullptr; }
+  void resetCallback() override { rlqs_callback_ = nullptr; }
 
 private:
+  BucketQuotaUsage addNewBucketUsage(const BucketId& bucket_id);
   // Store the client as the bare object since there is no ownership transfer involved.
   GrpcAsyncClient aync_client_;
   Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
@@ -73,10 +76,11 @@ private:
   // The TLS should be same but filter is different now how about storage it in the TLS then??? How
   // about the client and filter class have the pointer points to the same TLS object Then we don't
   // even need the callback to update it then!!!
-  RateLimitQuotaCallbacks* rlqs_callbacks_ = nullptr;
+  RateLimitQuotaCallbacks* rlqs_callback_ = nullptr;
   // Reference to objects that are stored in TLS cache. They outlive the filter.
   BucketsContainer& quota_buckets_;
   RateLimitQuotaUsageReports& quota_usage_reports_;
+  TimeSource& time_source_;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;

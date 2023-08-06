@@ -83,10 +83,11 @@ TEST_F(RateLimitClientTest, BuildUsageReport) {
 
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
   RateLimitQuotaUsageReports report = test_client.client_->buildUsageReport(domain, bucket_id);
+  const uint64_t bucket_identifier = MessageUtil::hash(bucket_id);
   EXPECT_EQ(report.domain(), domain);
   EXPECT_EQ(report.bucket_quota_usages().size(), 1);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 1);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_identifier).num_requests_allowed(), 1);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_identifier).num_requests_denied(), 0);
 }
 
 TEST_F(RateLimitClientTest, BuildMultipleReports) {
@@ -100,46 +101,31 @@ TEST_F(RateLimitClientTest, BuildMultipleReports) {
   for (int i = 0; i < 2; ++i) {
     report = test_client.client_->buildUsageReport(domain, bucket_id);
   }
-
+  const uint64_t bucket_id_0 = MessageUtil::hash(bucket_id);
+  std::cout << "test:" << bucket_id_0 << "\n";
   EXPECT_EQ(report.domain(), domain);
   EXPECT_EQ(report.bucket_quota_usages().size(), 1);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 2);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_allowed(), 2);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_denied(), 0);
 
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id2;
   TestUtility::loadFromYaml(MultipleBukcetId, bucket_id2);
   // Build the usage report with the entry with different bucket id which will create a new entry in
   // report.
+  const uint64_t bucket_id_1 = MessageUtil::hash(bucket_id2);
+  std::cout << "test:" << bucket_id_1 << "\n";
   report = test_client.client_->buildUsageReport(domain, bucket_id2);
   EXPECT_EQ(report.bucket_quota_usages().size(), 2);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 2);
-  EXPECT_EQ(report.bucket_quota_usages(1).num_requests_allowed(), 1);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_allowed(), 2);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_1).num_requests_allowed(), 1);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_denied(), 0);
 
   // Update the usage report with old bucket id.
   report = test_client.client_->buildUsageReport(domain, bucket_id);
   EXPECT_EQ(report.bucket_quota_usages().size(), 2);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 3);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_allowed(), 3);
+  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_denied(), 0);
 }
-
-// class FailedClientTest {
-// public:
-//   void initialize() {
-//     client_ = std::make_unique<MockRateLimitClient>();
-//     EXPECT_CALL(*client_, startStream(_)).WillOnce(Invoke(this,
-//     &FailedClientTest::doStartStream));
-//   }
-
-//   absl::Status doStartStream(const StreamInfo::StreamInfo&) {
-//     return absl::InternalError("Failed to start the stream");
-//   }
-//   std::unique_ptr<MockRateLimitClient> client_;
-// };
-
-// TEST_F(FailedClientTest, StartStreamFailure) {
-//   initialize();
-// }
 
 } // namespace
 } // namespace RateLimitQuota

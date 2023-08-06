@@ -249,7 +249,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResposneMatched) {
   EXPECT_EQ(response_->headers().getStatusValue(), "200");
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiRequest) {
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiSameRequest) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
@@ -259,7 +259,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiRequest) {
     sendClientRequest(&custom_headers);
 
     // Second downstream client request will not trigger the reports to RLQS
-    // server as it will find the entry in the cache.
+    // server since it is the same as first request that it will find the entry in the cache.
     if (i == 0) {
       // Start the gRPC stream to RLQS server.
       ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
@@ -300,6 +300,64 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiRequest) {
     // For loop need this cleanUp, otherwise it fail as
     // http://sponge2/693f7fa1-7cab-412e-b3e3-4591efe6231d
     cleanUp();
+  }
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+
+  absl::flat_hash_map<std::string, std::string> custom_headers_2 = {{"environment", "staging"},
+                                                                    {"group", "envoy_test"}};
+  for (int i = 0; i < 2; ++i) {
+    // Send downstream client request to upstream.
+    if (i == 0) {
+      sendClientRequest(&custom_headers);
+      // Start the gRPC stream to RLQS server.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+    } else {
+      sendClientRequest(&custom_headers_2);
+
+      // No need to start gRPC stream since it is kept open.
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+    }
+
+    // Build the response.
+    envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+    absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
+    custom_headers_cpy.insert({"name", "prod"});
+    auto* bucket_action = rlqs_response.add_bucket_action();
+    // (*bucket_action->mutable_bucket_id()->mutable_bucket()) =
+    // GenerateBucketId(custom_headers);
+    for (const auto& [key, value] : custom_headers_cpy) {
+      (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+    }
+
+    // Send the response from RLQS server.
+    rlqs_stream_->sendGrpcMessage(rlqs_response);
+
+    // Handle the request received by upstream.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
+    // open.
+    cleanupUpstreamAndDownstream();
   }
 }
 

@@ -36,6 +36,10 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
   if (client_.rate_limit_client == nullptr) {
     client_.rate_limit_client = createRateLimitClient(factory_context_, config_->rlqs_server(),
                                                       this, quota_buckets_, quota_usage_reports_);
+  } else {
+    // Callback has been reset to nullptr when filter was destroyed last time.
+    // Reset it here when new filter has been created.
+    client_.rate_limit_client->setCallback(this);
   }
 
   // It can not be nullptr based on current implementation.
