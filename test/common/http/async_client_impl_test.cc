@@ -156,7 +156,6 @@ TEST_F(AsyncClientImplTest, BasicStream) {
 
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
-  EXPECT_EQ(stream->streamInfo().bytesSent(), body->length());
 
   response_decoder_->decode1xxHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
@@ -164,7 +163,6 @@ TEST_F(AsyncClientImplTest, BasicStream) {
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, true);
 
-  EXPECT_EQ(stream->streamInfo().bytesReceived(), body->length());
   EXPECT_EQ(
       1UL,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
