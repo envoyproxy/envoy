@@ -21,12 +21,11 @@ constexpr absl::string_view expected_types[] = {
     "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
     "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
-class UpstreamNetworkExtensionDiscoveryIntegrationTest
-    : public Grpc::GrpcClientIntegrationParamTest,
-      public BaseIntegrationTest {
+class UpstreamNetworkFiltersIntegrationTestBase : public BaseIntegrationTest {
 public:
-  UpstreamNetworkExtensionDiscoveryIntegrationTest()
-      : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig()) {
+  UpstreamNetworkFiltersIntegrationTestBase(Network::Address::IpVersion ip_version,
+                                            std::string base_config)
+      : BaseIntegrationTest(ip_version, base_config) {
     skip_tag_extraction_rule_check_ = true;
   }
 
@@ -36,6 +35,97 @@ public:
       listener->set_stat_prefix("listener_stat");
       listener->add_filter_chains();
     });
+  }
+
+  void addStaticFilter(const std::string& name, uint32_t bytes_to_drain) {
+    config_helper_.addConfigModifier(
+        [name, bytes_to_drain](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+          auto* filter = cluster->add_filters();
+          filter->set_name(name);
+          auto configuration = test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
+          configuration.set_bytes_to_drain(bytes_to_drain);
+          filter->mutable_typed_config()->PackFrom(configuration);
+        });
+  }
+
+  void sendDataVerifyResults(uint32_t bytes_drained) {
+    test_server_->waitUntilListenersReady();
+    test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+    EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
+    ASSERT_TRUE(tcp_client->write(data_));
+    FakeRawConnectionPtr fake_upstream_connection;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+    std::string received_data;
+    ASSERT_TRUE(
+        fake_upstream_connection->waitForData(data_.size() - bytes_drained, &received_data));
+    const std::string expected_data = data_.substr(bytes_drained);
+    EXPECT_EQ(expected_data, received_data);
+    tcp_client->close();
+  }
+
+  const uint32_t default_bytes_to_drain_{2};
+  const std::string filter_name_ = "foo";
+  const std::string data_ = "HelloWorld";
+  const std::string port_name_ = "tcp";
+};
+
+class StaticUpstreamNetworkFilterIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public UpstreamNetworkFiltersIntegrationTestBase {
+public:
+  StaticUpstreamNetworkFilterIntegrationTest()
+      : UpstreamNetworkFiltersIntegrationTestBase(GetParam(), ConfigHelper::baseConfig()) {}
+
+  void initialize() override {
+    setUpstreamCount(1);
+
+    // Add a tcp_proxy network filter.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      auto* filter_chain = listener->mutable_filter_chains(0);
+      auto* filter = filter_chain->add_filters();
+      filter->set_name("envoy.filters.network.tcp_proxy");
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+      config.set_stat_prefix("tcp_stats");
+      config.set_cluster("cluster_0");
+      filter->mutable_typed_config()->PackFrom(config);
+    });
+
+    BaseIntegrationTest::initialize();
+    registerTestServerPorts({port_name_});
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, StaticUpstreamNetworkFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(StaticUpstreamNetworkFilterIntegrationTest, BasicSuccess) {
+  addFilterChain();
+  addStaticFilter(filter_name_, 5);
+  initialize();
+
+  sendDataVerifyResults(5);
+}
+
+TEST_P(StaticUpstreamNetworkFilterIntegrationTest, TwoStaticFilters) {
+  addFilterChain();
+  addStaticFilter(filter_name_, 5);
+  addStaticFilter(filter_name_, 3);
+  initialize();
+
+  sendDataVerifyResults(8);
+}
+
+class UpstreamNetworkExtensionDiscoveryIntegrationTest
+    : public Grpc::GrpcClientIntegrationParamTest,
+      public UpstreamNetworkFiltersIntegrationTestBase {
+public:
+  UpstreamNetworkExtensionDiscoveryIntegrationTest()
+      : UpstreamNetworkFiltersIntegrationTestBase(ipVersion(), ConfigHelper::baseConfig()) {
+    skip_tag_extraction_rule_check_ = true;
   }
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
@@ -76,18 +166,6 @@ public:
                        getEcds2FakeUpstream().localAddress());
       }
     });
-  }
-
-  void addStaticFilter(const std::string& name, uint32_t bytes_to_drain) {
-    config_helper_.addConfigModifier(
-        [name, bytes_to_drain](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          auto* filter = cluster->add_filters();
-          filter->set_name(name);
-          auto configuration = test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
-          configuration.set_bytes_to_drain(bytes_to_drain);
-          filter->mutable_typed_config()->PackFrom(configuration);
-        });
   }
 
   void addEcdsCluster(const std::string& cluster_name) {
@@ -241,22 +319,6 @@ public:
     }
   }
 
-  void sendDataVerifyResults(uint32_t bytes_drained) {
-    test_server_->waitUntilListenersReady();
-    test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
-    EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
-    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
-    ASSERT_TRUE(tcp_client->write(data_));
-    FakeRawConnectionPtr fake_upstream_connection;
-    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-    std::string received_data;
-    ASSERT_TRUE(
-        fake_upstream_connection->waitForData(data_.size() - bytes_drained, &received_data));
-    const std::string expected_data = data_.substr(bytes_drained);
-    EXPECT_EQ(expected_data, received_data);
-    tcp_client->close();
-  }
-
   // Verify ECDS config dump data.
   bool verifyConfigDumpData(
       envoy::config::core::v3::TypedExtensionConfig filter_config,
@@ -290,10 +352,6 @@ public:
     return entry->value().getStringView();
   }
 
-  const uint32_t default_bytes_to_drain_{2};
-  const std::string filter_name_ = "foo";
-  const std::string data_ = "HelloWorld";
-  const std::string port_name_ = "tcp";
   bool two_connections_{false};
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
