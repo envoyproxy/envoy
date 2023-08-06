@@ -58,6 +58,7 @@ service RateLimitQuotaService {
 
 message RateLimitQuotaUsageReports {
   // The usage report for a bucket.
+  // [#next-free-field: 6]
   message BucketQuotaUsage {
     // ``BucketId`` for which request quota usage is reported.
     BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
@@ -86,7 +87,7 @@ message RateLimitQuotaUsageReports {
   // same stream are considered to be in the same domain. In case the domain
   // needs to be changes, close the stream, and reopen a new one with the
   // different domain.
-  string domain = 1 [(validate.rules).string = { min_len: 1 }];
+  string domain = 1 [(validate.rules).string = {min_len: 1 }];
 
   // The map of quota usage reports: The key as id of the bucket and
   // the value as the quota usage for that specific bucket.
