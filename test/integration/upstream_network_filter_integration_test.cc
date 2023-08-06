@@ -405,6 +405,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   // Send 1st config update with TTL 1s, and have network filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5, true);
@@ -434,6 +435,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWith
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   // Send 1st config update with TTL 1s, and have network filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5, true);
@@ -456,6 +458,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   // Send config update with invalid config (bytes_to_drain needs to be >=2).
   sendXdsResponse(filter_name_, "1", 1);
@@ -473,6 +476,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   // Send config update with invalid config (drain_bytes has to >=2).
   sendXdsResponse(filter_name_, "1", 1);
@@ -491,6 +495,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  registerTestServerPorts({port_name_});
 
   // Send data without send config update, the default config will be applied.
   sendDataVerifyResults(default_bytes_to_drain_);
@@ -509,6 +514,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicWithoutWarmingConf
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  registerTestServerPorts({port_name_});
 
   // Send data without send config update, the default config will be applied.
   sendDataVerifyResults(default_bytes_to_drain_);
@@ -529,6 +535,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameNam
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   sendXdsResponse(filter_name_, "1", 3);
   test_server_->waitForCounterGe(
@@ -548,6 +555,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsDiffere
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   // Send 1st config update.
   sendXdsResponse("foo", "1", 3);
@@ -582,6 +590,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilt
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   sendXdsResponse(filter_name_, "1", 3);
   test_server_->waitForCounterGe(
@@ -601,6 +610,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixe
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   sendXdsResponse(filter_name_, "1", 2);
   test_server_->waitForCounterGe(
@@ -619,6 +629,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigD
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   // Send 1st config update to have network filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
@@ -663,6 +674,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterCon
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   // Send config update with TTL 1s.
   sendXdsResponse(filter_name_, "1", 5, true);
@@ -700,6 +712,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
@@ -751,6 +764,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
@@ -785,6 +799,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({port_name_});
 
   // Send config update to have filter drain 5 bytes of data.
   uint32_t bytes_to_drain = 5;
