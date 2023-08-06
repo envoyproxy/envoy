@@ -151,9 +151,9 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWTEndedWithSpaceAndMore
   std::string concatenated = std::string(GoodToken) + " ." + chars_after_space;
   const char* valid_token_with_space_and_chars = concatenated.c_str();
 
-  autoheaders = TestRequestHeaderMapImpl{
+  auto headers = TestRequestHeaderMapImpl{
       {absl::StrCat("Authorization"), absl::StrCat("Bearer ", valid_token_with_space_and_chars)}};
-  autotokens = extractor_->extract(headers);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   // Only the issue1 is using default header location.
