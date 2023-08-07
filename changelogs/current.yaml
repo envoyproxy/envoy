@@ -39,5 +39,11 @@ new_features:
 - area: router
   change: |
     Add support to retry on grpc status UNKNOWN.
+- area: redis
+  change: |
+    added support for time command (returns a local response).
+- area: redis
+  change: |
+    added support for lmove command.
 
 deprecated:

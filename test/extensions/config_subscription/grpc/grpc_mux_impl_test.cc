@@ -1165,6 +1165,90 @@ TEST_F(GrpcMuxImplTest, AddRemoveSubscriptions) {
   }
 }
 
+// Validate that a cached resource is removed only after the last subscription
+// (watch) that needs it is removed.
+TEST_F(GrpcMuxImplTest, RemoveCachedResourceOnLastSubscription) {
+  // Create the cache that will also be passed to the GrpcMux object via setup().
+  eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
+  setup();
+
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  InSequence s;
+
+  NiceMock<MockSubscriptionCallbacks> eds_sub1_callbacks;
+  auto eds_sub1 = grpc_mux_->addWatch(type_url, {"x"}, eds_sub1_callbacks, resource_decoder, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {"x"}, "", true);
+  grpc_mux_->start();
+
+  // Reply with the resource, it will be added to the cache.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    response->add_resources()->PackFrom(load_assignment);
+
+    EXPECT_CALL(eds_sub1_callbacks, onConfigUpdate(_, "1"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+          EXPECT_EQ(1, resources.size());
+        }));
+    EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
+    expectSendMessage(type_url, {"x"}, "1"); // Ack.
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+  }
+
+  // Add another subscription to the same resource. The non-unified SotW
+  // implementation will send another request for that resource.
+  expectSendMessage(type_url, {"x"}, "1");
+  NiceMock<MockSubscriptionCallbacks> eds_sub2_callbacks;
+  auto eds_sub2 = grpc_mux_->addWatch(type_url, {"x"}, eds_sub2_callbacks, resource_decoder, {});
+
+  // The reply with the resource will update the cached resource.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("2");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    response->add_resources()->PackFrom(load_assignment);
+
+    // Both subscriptions should receive the update for the resource, and each
+    // will store the resource in the cache.
+    EXPECT_CALL(eds_sub2_callbacks, onConfigUpdate(_, "2"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+          EXPECT_EQ(1, resources.size());
+        }));
+    EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
+    EXPECT_CALL(eds_sub1_callbacks, onConfigUpdate(_, "2"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+          EXPECT_EQ(1, resources.size());
+        }));
+    EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
+    expectSendMessage(type_url, {"x"}, "2"); // Ack.
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+  }
+
+  // Removing the first subscription will still keep the resource in the cache.
+  {
+    // The non-unified SotW implementation will send another request with the
+    // same resource.
+    expectSendMessage(type_url, {"x"}, "2");
+    EXPECT_CALL(*eds_resources_cache_, removeResource("x")).Times(0);
+    eds_sub1.reset();
+  }
+
+  // Watcher (eds_sub2) going out of scope, the resource should be removed, as well as
+  // the interest in the resource.
+  expectSendMessage(type_url, {}, "2");
+  EXPECT_CALL(*eds_resources_cache_, removeResource("x"));
+}
+
 /**
  * Tests the NullGrpcMuxImpl object to increase code-coverage.
  */
