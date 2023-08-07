@@ -320,31 +320,31 @@ TEST(TestConfig, XdsConfig) {
   xds_builder.setSni(/*sni=*/"fake-td.googleapis.com");
   engine_builder.setXds(std::move(xds_builder));
   bootstrap = engine_builder.generateBootstrap();
-  auto& ads_config_with_tokens = bootstrap->dynamic_resources().ads_config();
-  EXPECT_EQ(ads_config_with_tokens.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).google_grpc().target_uri(),
+  auto& ads_config_with_jwt_tokens = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config_with_jwt_tokens.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config_with_jwt_tokens.grpc_services(0).google_grpc().target_uri(),
             "fake-td.googleapis.com:12345");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0).google_grpc().stat_prefix(), "ads");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+  EXPECT_EQ(ads_config_with_jwt_tokens.grpc_services(0).google_grpc().stat_prefix(), "ads");
+  EXPECT_EQ(ads_config_with_jwt_tokens.grpc_services(0)
                 .google_grpc()
                 .channel_credentials()
                 .ssl_credentials()
                 .root_certs()
                 .inline_string(),
             "my_root_cert");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+  EXPECT_EQ(ads_config_with_jwt_tokens.grpc_services(0)
                 .google_grpc()
                 .call_credentials(0)
                 .service_account_jwt_access()
                 .json_key(),
             "my_jwt_token");
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+  EXPECT_EQ(ads_config_with_jwt_tokens.grpc_services(0)
                 .google_grpc()
                 .call_credentials(0)
                 .service_account_jwt_access()
                 .token_lifetime_seconds(),
             500);
-  EXPECT_EQ(ads_config_with_tokens.grpc_services(0)
+  EXPECT_EQ(ads_config_with_jwt_tokens.grpc_services(0)
                 .google_grpc()
                 .channel_args()
                 .args()
