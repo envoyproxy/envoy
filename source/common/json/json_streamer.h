@@ -45,12 +45,16 @@ public:
 
   struct Array : public Level {
     Array(Streamer& streamer) : Level(streamer, "[", "]") {}
-    void newEntries(const absl::Span<const absl::string_view>& entries);
+    using Strings = absl::Span<const absl::string_view>;
+    void newEntries(const Strings& entries);
   };
 
   Map& newMap();
-  void mapEntries(const Map::Entries& entries);
   Array& newArray();
+
+  void mapEntries(const Map::Entries& entries);
+  void arrayEntries(const Array::Strings& strings);
+
   void pop(Level& level);
   void clear();
 
@@ -59,7 +63,7 @@ public:
   void addDouble(double number);
   static std::string quote(absl::string_view str);
   void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
-  void addFragments(absl::Span<const absl::string_view> src);
+  void addFragments(const Array::Strings& src);
   void flush();
 
   static std::string number(double d);

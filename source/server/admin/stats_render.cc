@@ -157,10 +157,11 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
   json_histogram_array_->newEntry();
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::NoBuckets: {
-    json_streamer_.addFragments(
-        {"{\"name\":\"", Json::sanitize(name_buffer_, name), "\",\"values\":"});
+    Json::Streamer::Map& map = json_streamer_.newMap();
+    map.newEntries({{"name", Json::Streamer::quote(Json::sanitize(name_buffer_, name))}});
+    map.newKey("values");
     populatePercentiles(histogram);
-    json_streamer_.addNoCopy("}");
+    json_streamer_.pop(map);
     break;
   }
   case Utility::HistogramBucketsMode::Cumulative: {
@@ -188,11 +189,15 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 }
 
 void StatsJsonRender::populateSupportedPercentiles() {
-  auto x100 = [](double fraction) -> double { return fraction * 100; };
+  auto x100 = [](double fraction) -> std::string { return Json::Streamer::number(fraction * 100); };
+  auto view = [](const std::string& str) -> absl::string_view { return str; };
   Stats::HistogramStatisticsImpl empty_statistics;
   std::vector<double> supported = empty_statistics.supportedQuantiles();
-  std::transform(supported.begin(), supported.end(), supported.begin(), x100);
-  json_streamer_.addFragments({"[", absl::StrJoin(supported, ","), "]"});
+  std::vector<std::string> supported_strings;
+  std::vector<absl::string_view> views;
+  std::transform(supported.begin(), supported.end(), supported_strings.begin(), x100);
+  std::transform(supported_strings.begin(), supported_strings.end(), views.begin(), view);
+  json_streamer_.arrayEntries(views);
 }
 
 void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogram) {

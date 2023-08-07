@@ -28,6 +28,13 @@ void Streamer::mapEntries(const Map::Entries& entries) {
   std::make_unique<Map>(*this)->newEntries(entries);
 }
 
+void Streamer::arrayEntries(const Array::Strings& strings) {
+  if (!levels_.empty()) {
+    levels_.top()->newEntry();
+  }
+  std::make_unique<Array>(*this)->newEntries(strings);
+}
+
 Streamer::Array& Streamer::newArray() {
   auto array = std::make_unique<Array>(*this);
   Array& ret = *array;
@@ -67,7 +74,7 @@ void Streamer::Map::newEntries(const Entries& entries) {
   }
 }
 
-void Streamer::Array::newEntries(const absl::Span<const absl::string_view>& entries) {
+void Streamer::Array::newEntries(const Strings& entries) {
   for (absl::string_view str : entries) {
     newEntry();
     streamer_.addCopy(str);
@@ -104,7 +111,7 @@ void Streamer::flush() {
   fragments_.clear();
 }
 
-void Streamer::addFragments(absl::Span<const absl::string_view> src) {
+void Streamer::addFragments(const Array::Strings& src) {
   if (fragments_.empty()) {
     response_.addFragments(src);
   } else {
