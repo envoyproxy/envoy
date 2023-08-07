@@ -46,6 +46,21 @@ let statusDiv = null;
  */
 const paramIdPrefix = 'param-1-stats-';
 
+let postRenderTestHook = null;
+
+/**
+ * To make testing easier, provide a hook for tests to set, to enable tests
+ * to block on rendering.
+ *
+ * @param {!function()} hook
+ */
+function setRenderTestHook(hook) { // eslint-disable-line no-unused-vars
+  if (postRenderTestHook != null) {
+    throw new Exception('setRenderTestHook called with hook already pending');
+  }
+  postRenderTestHook = hook;
+}
+
 /**
  * Hook that's run on DOMContentLoaded to create the HTML elements (just one
  * PRE right now) and kick off the periodic JSON updates.

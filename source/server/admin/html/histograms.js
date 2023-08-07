@@ -56,8 +56,6 @@ const globalState = {
   highlightedBucket: null,
 };
 
-let postRenderTestHook = null;
-
 
 /**
  * Formula to compute bucket width based on number of buckets. This formula
@@ -631,18 +629,4 @@ function renderHistogram(histogramDiv, supportedPercentiles, histogram, changeCo
     }
     painter.drawBucket(bucket);
   }
-}
-
-
-/**
- * To make testing easier, provide a hook for tests to set, to enable tests
- * to block on rendering.
- *
- * @param {!function()} hook
- */
-function setRenderTestHook(hook) { // eslint-disable-line no-unused-vars
-  if (postRenderTestHook != null) {
-    throw new Exception('setRenderTestHook called with hook already pending');
-  }
-  postRenderTestHook = hook;
 }
