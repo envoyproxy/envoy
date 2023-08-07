@@ -1275,6 +1275,9 @@ FilterConfig::~FilterConfig() {
   if (config_id_ > 0) {
     dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
   }
+  if (config_ != nullptr) {
+    delete config_;
+  }
 }
 
 CAPIStatus FilterConfig::defineMetric(uint32_t metric_type, absl::string_view name,
