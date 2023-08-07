@@ -944,7 +944,8 @@ private extension EngineBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
                                                     Int32(xdsBuilder.xdsServerPort))
       if let xdsAuthHeader = xdsBuilder.authHeader {
-        cxxXdsBuilder.setAuthenticationToken(xdsAuthHeader.toCXX(), xdsBuilder.authToken?.toCXX() ?? "".toCXX())
+        cxxXdsBuilder.setAuthenticationToken(xdsAuthHeader.toCXX(),
+                                             xdsBuilder.authToken?.toCXX() ?? "".toCXX())
       }
       if let xdsJwtToken = xdsBuilder.jwtToken {
         cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(),
