@@ -136,8 +136,6 @@ void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_str
 }
 
 void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
-  streamInfo().addBytesReceived(data.length());
-
   ENVOY_LOG(trace, "async http request response data (length={} end_stream={})", data.length(),
             end_stream);
   ASSERT(!remote_closed_);
@@ -174,8 +172,6 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
-  streamInfo().addBytesSent(data.length());
-
   ASSERT(dispatcher().isThreadSafe());
   // Map send calls after local closure to no-ops. The send call could have been queued prior to
   // remote reset or closure, and/or closure could have occurred synchronously in response to a

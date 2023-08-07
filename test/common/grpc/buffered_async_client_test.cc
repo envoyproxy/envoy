@@ -33,8 +33,7 @@ class BufferedAsyncClientTest : public testing::Test {
 public:
   BufferedAsyncClientTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
-        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        stream_info_(dispatcher_->timeSource(), nullptr) {
+        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     config_.mutable_envoy_grpc()->set_cluster_name("test_cluster");
 
     cm_.initializeThreadLocalClusters({"test_cluster"});
@@ -92,7 +91,6 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockAsyncClient> http_client_;
   Http::MockAsyncClientStream http_stream_;
-  StreamInfo::StreamInfoImpl stream_info_;
   std::shared_ptr<AsyncClientImpl> raw_client_;
   std::unique_ptr<AsyncClient<helloworld::HelloRequest, helloworld::HelloReply>> client_;
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> callback_;
@@ -101,7 +99,6 @@ public:
 };
 
 TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
-  EXPECT_CALL(http_stream_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(http_stream_, sendData(_, _));
   EXPECT_CALL(http_stream_, isAboveWriteBufferHighWatermark()).WillRepeatedly(Return(false));
 
