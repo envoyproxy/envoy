@@ -148,12 +148,10 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view hos
   // return Hex::encode(crypto_util.getSha256Hmac(secret, hmac_payload));
   // Calculate the HMAC value
   std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
-  
   // Log the HMAC value to the console
   std::cout << "Calculated HMAC value: " << Hex::encode(hmac_result) << std::endl;
-
   // Return the encoded HMAC value
-  return Hex::encode(hmac_result);  
+  return Hex::encode(hmac_result);
 }
 
 } // namespace
