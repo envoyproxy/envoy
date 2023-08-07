@@ -200,6 +200,13 @@ private:
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
+      // The sendLocalReply() method of Http::RequestDecoder may be called before the route is set.
+      // Try to refresh the route if it is not set to avoid the refreshing route in the response
+      // filter chain.
+      if (!cached_route_.has_value()) {
+        refreshCachedRoute();
+      }
+
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
@@ -310,12 +317,13 @@ private:
     void blockRouteCache();
     // Return true if the cached route is blocked.
     bool routeCacheBlocked() const {
-      ENVOY_BUG(!route_cache_blocked_,
-                "Should never try to refresh or clear the route cache when "
-                "it is blocked! To temporarily ignore this new constraint, "
-                "set runtime flag "
+      ENVOY_LOG(warn,
+                "Route cache will be blocked after response headers are sent and should never "
+                "try to refresh or clear the route cache when it is blocked! To temporarily ignore "
+                "this new constraint, set runtime flag "
                 "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` "
                 "to `false`");
+
       return route_cache_blocked_;
     }
 
