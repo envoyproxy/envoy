@@ -32,7 +32,7 @@ void DefaultUpstreamLocalAddressSelectorFactory::validate(
   // If we have exactly one upstream address, it needs to have a valid IP
   // version if non-null. This is enforced by the fact that BindConfig only
   // allows socket address.
-  ASSERT(upstream_local_addresses.size() != 1 || upstream_local_addresses[0].address_ != nullptr ||
+  ASSERT(upstream_local_addresses.size() != 1 || upstream_local_addresses[0].address_ == nullptr ||
          upstream_local_addresses[0].address_->ip() != nullptr);
 
   // If we have more than one upstream address, they need to have different IP versions.
