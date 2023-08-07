@@ -42,5 +42,9 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: upstream
+  change: |
+    added :ref:`allow_redundant_keys <envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.allow_redundant_keys>`
+    to suppport redundant keys in request metadata for subset load balancing.
 
 deprecated:
