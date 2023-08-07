@@ -143,6 +143,7 @@ build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 # https://github.com/abseil/abseil-cpp/issues/760
 # https://github.com/google/sanitizers/issues/953
 build:clang-tsan --test_env="TSAN_OPTIONS=report_atomic_races=0"
+build:clang-tsan --test_timeout=120,600,1500,4800
 
 # Clang MSAN - this is the base config for remote-msan and docker-msan. To run this config without
 # our build image, follow https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo
@@ -168,6 +169,10 @@ build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
+
+build:libc++20 --config=libc++
+# gRPC has a lot of deprecated-enum-enum-conversion warning. Remove once it is addressed
+build:libc++20 --cxxopt=-std=c++20 --copt=-Wno-error=deprecated-enum-enum-conversion
 
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os

@@ -1360,6 +1360,9 @@ TYPED_TEST(OwnedImplTypedTest, ReserveZeroCommit) {
   const ssize_t rc = os_sys_calls.write(fds[1], data.data(), max_length).return_value_;
   ASSERT_GT(rc, 0);
   const uint32_t previous_length = buf.length();
+  // The remainder of this test flakes under Windows.
+  // See https://github.com/envoyproxy/envoy/issues/28177.
+  DISABLE_UNDER_WINDOWS;
   Api::IoCallUint64Result result = io_handle.read(buf, max_length);
   ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
   ASSERT_EQ(os_sys_calls.close(fds[1]).return_value_, 0);

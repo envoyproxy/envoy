@@ -1528,25 +1528,66 @@ TEST_F(HostImplTest, HealthFlags) {
 TEST_F(HostImplTest, HealthStatus) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1, 0,
-                                    Host::HealthStatus::DRAINING);
+                                    Host::HealthStatus::DEGRADED);
 
-  // To begin with, no flags are set so EDS status is used.
+  // To begin with, no active flags are set so EDS status is used.
+  EXPECT_EQ(Host::HealthStatus::DEGRADED, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::DEGRADED, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Degraded, host->coarseHealth());
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::DEGRADED_EDS_HEALTH));
+
+  // Update EDS status to healthy, host should be healthy.
+  host->setEdsHealthStatus(Host::HealthStatus::HEALTHY);
+  EXPECT_EQ(Host::HealthStatus::HEALTHY, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::HEALTHY, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Healthy, host->coarseHealth());
+  // Old EDS flags should be cleared.
+  EXPECT_FALSE(host->healthFlagGet(Host::HealthFlag::DEGRADED_EDS_HEALTH));
+
+  // Update EDS status to draining.
+  host->setEdsHealthStatus(Host::HealthStatus::DRAINING);
   EXPECT_EQ(Host::HealthStatus::DRAINING, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
+  // Old EDS flags should be cleared and new flag will be set.
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH));
 
   // Setting an active unhealthy flag make the host unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
   host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  // Setting another active unhealthy flag make the host unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
 
-  // Setting a degraded flag on an unhealthy host has no effect.
+  // Setting a active degraded flag on an unhealthy host has no effect.
   host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
 
-  // If the degraded flag is the only thing set, host is degraded.
+  // If the active degraded flag is the only thing set, the unhealthy EDS status is used.
   host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
+
+  // If the unhealthy EDS is removed, the active degraded flag is used.
+  host->setEdsHealthStatus(Host::HealthStatus::HEALTHY);
   EXPECT_EQ(Host::HealthStatus::DEGRADED, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::HEALTHY, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Degraded, host->coarseHealth());
+
+  // Remove the active degraded flag, host should be healthy.
+  host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  EXPECT_EQ(Host::HealthStatus::HEALTHY, host->healthStatus());
+  EXPECT_EQ(Host::HealthStatus::HEALTHY, host->edsHealthStatus());
+  EXPECT_EQ(Host::Health::Healthy, host->coarseHealth());
 }
 
 TEST_F(HostImplTest, SkipActiveHealthCheckFlag) {

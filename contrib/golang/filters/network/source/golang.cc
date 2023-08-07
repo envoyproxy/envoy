@@ -115,6 +115,85 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& data, bool end_stream) {
   return Network::FilterStatus(ret);
 }
 
+CAPIStatus Filter::setFilterState(absl::string_view key, absl::string_view value, int state_type,
+                                  int life_span, int stream_sharing) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (closed_) {
+    ENVOY_CONN_LOG(warn, "connection has closed, addr: {}", read_callbacks_->connection(), addr_);
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  if (dispatcher_->isThreadSafe()) {
+    read_callbacks_->connection().streamInfo().filterState()->setData(
+        key, std::make_shared<GoStringFilterState>(value),
+        static_cast<StreamInfo::FilterState::StateType>(state_type),
+        static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+        static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+  } else {
+    auto key_str = std::string(key);
+    auto filter_state = std::make_shared<GoStringFilterState>(value);
+    auto weak_ptr = weak_from_this();
+    dispatcher_->post(
+        [this, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
+          if (!weak_ptr.expired() && !closed_) {
+            Thread::LockGuard lock(mutex_);
+            read_callbacks_->connection().streamInfo().filterState()->setData(
+                key_str, filter_state, static_cast<StreamInfo::FilterState::StateType>(state_type),
+                static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+                static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+          } else {
+            ENVOY_CONN_LOG(info, "golang filter has gone or destroyed in setStringFilterState",
+                           read_callbacks_->connection());
+          }
+        });
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus Filter::getFilterState(absl::string_view key, GoString* value_str) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (closed_) {
+    ENVOY_CONN_LOG(warn, "connection has closed, addr: {}", read_callbacks_->connection(), addr_);
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  if (dispatcher_->isThreadSafe()) {
+    auto go_filter_state = read_callbacks_->connection()
+                               .streamInfo()
+                               .filterState()
+                               ->getDataReadOnly<GoStringFilterState>(key);
+    if (go_filter_state) {
+      wrapper_->str_value_ = go_filter_state->value();
+      value_str->p = wrapper_->str_value_.data();
+      value_str->n = wrapper_->str_value_.length();
+    }
+  } else {
+    auto key_str = std::string(key);
+    auto weak_ptr = weak_from_this();
+    dispatcher_->post([this, weak_ptr, key_str, value_str] {
+      if (!weak_ptr.expired() && !closed_) {
+        auto go_filter_state = read_callbacks_->connection()
+                                   .streamInfo()
+                                   .filterState()
+                                   ->getDataReadOnly<GoStringFilterState>(key_str);
+        if (go_filter_state) {
+          wrapper_->str_value_ = go_filter_state->value();
+          value_str->p = wrapper_->str_value_.data();
+          value_str->n = wrapper_->str_value_.length();
+        }
+        dynamic_lib_->envoyGoFilterOnSemaDec(wrapper_);
+      } else {
+        ENVOY_CONN_LOG(info, "golang filter has gone or destroyed in setStringFilterState",
+                       read_callbacks_->connection());
+      }
+    });
+    return CAPIStatus::CAPIYield;
+  }
+  return CAPIStatus::CAPIOK;
+}
+
 } // namespace Golang
 } // namespace NetworkFilters
 } // namespace Extensions

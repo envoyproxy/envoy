@@ -58,12 +58,16 @@ jobs:
       msan:
         CI_TARGET: "bazel.msan"
         ENVOY_FILTER_EXAMPLE: true
-      clang_tidy:
-        CI_TARGET: "bazel.clang_tidy"
-        REPO_FETCH_DEPTH: 0
-        REPO_FETCH_TAGS: true
-        PUBLISH_TEST_RESULTS: false
-        PUBLISH_ENVOY: false
+      #
+      # Temporarily disabled to facilitate release CI, should be resolved
+      #    as part of https://github.com/envoyproxy/envoy/issues/28566
+      #
+      # clang_tidy:
+      #   CI_TARGET: "bazel.clang_tidy"
+      #   REPO_FETCH_DEPTH: 0
+      #   REPO_FETCH_TAGS: true
+      #   PUBLISH_TEST_RESULTS: false
+      #   PUBLISH_ENVOY: false
       api:
         CI_TARGET: "bazel.api"
   timeoutInMinutes: 180
@@ -95,6 +99,7 @@ jobs:
   condition: |
     and(not(canceled()),
         eq(${{ parameters.runChecks }}, 'true'))
+  # TODO(phlax): Make this configurable and ratchet down!
   timeoutInMinutes: 240
   pool: "envoy-x64-large"
   strategy:

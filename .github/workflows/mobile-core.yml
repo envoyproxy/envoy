@@ -13,7 +13,7 @@ concurrency:
 jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/env.yml
+    uses: ./.github/workflows/_env.yml
     secrets: inherit
 
   unittests:
