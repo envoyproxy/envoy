@@ -180,6 +180,8 @@ open class EngineBuilder(
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
+  private var http3ConnectionOptions = ""
+  private var http3ClientConnectionOptions = ""
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -707,6 +709,8 @@ open class EngineBuilder(
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      http3ConnectionOptions,
+      http3ClientConnectionOptions,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,

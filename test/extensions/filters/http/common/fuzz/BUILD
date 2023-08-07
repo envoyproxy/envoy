@@ -74,7 +74,7 @@ envoy_cc_fuzz_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//test/config:utility_lib",
-        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ] + envoy_all_http_filters(),
 )

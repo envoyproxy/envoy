@@ -3552,15 +3552,15 @@ envoy_cc_library(
     srcs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
-            "quiche/quic/core/io/event_loop_socket_factory.cc",
             "quiche/quic/core/io/event_loop_connecting_client_socket.cc",
+            "quiche/quic/core/io/event_loop_socket_factory.cc",
         ],
     }),
     hdrs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
-            "quiche/quic/core/io/event_loop_socket_factory.h",
             "quiche/quic/core/io/event_loop_connecting_client_socket.h",
+            "quiche/quic/core/io/event_loop_socket_factory.h",
         ],
     }),
     copts = quiche_copts,

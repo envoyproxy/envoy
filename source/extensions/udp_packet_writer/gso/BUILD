@@ -23,8 +23,8 @@ envoy_cc_extension(
     tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
-        "//envoy/registry",
         "//envoy/network:udp_packet_writer_handler_interface",
+        "//envoy/registry",
         "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic:udp_gso_batch_writer_lib",

@@ -506,8 +506,8 @@ envoy_cc_library(
         "//bazel:boringssl_fips": [],
         "//bazel:boringssl_disabled": [],
         "//conditions:default": [
-            ":server_codec_lib",
             ":quic_transport_socket_factory_lib",
+            ":server_codec_lib",
             "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
             "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",
         ],

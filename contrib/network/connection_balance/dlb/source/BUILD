@@ -37,8 +37,8 @@ envoy_cc_contrib_extension(
         ],
     }),
     deps = [
-        "//envoy/registry",
         "//envoy/api:api_interface",
+        "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
