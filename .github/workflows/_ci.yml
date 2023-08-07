@@ -115,20 +115,7 @@ jobs:
       run: git config --global --add safe.directory /__w/envoy/envoy
 
     - if: ${{ inputs.diskspace_hack }}
-      name: Cruft removal
-      run: |
-        echo "Disk space before cruft removal"
-        df -h
-
-        TO_REMOVE=(
-            /opt/hostedtoolcache
-            /usr/local/lib/android
-            /usr/local/.ghcup)
-
-        for removal in "${TO_REMOVE[@]}"; do
-            echo "Removing: ${removal} ..."
-            sudo rm -rf "$removal"
-        done
+      uses: ./.github/actions/diskspace
     - run: |
         echo "disk space at beginning of build:"
         df -h
