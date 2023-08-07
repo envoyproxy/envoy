@@ -145,7 +145,15 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view hos
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hmac_payload =
       absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
-  return Hex::encode(crypto_util.getSha256Hmac(secret, hmac_payload));
+  // return Hex::encode(crypto_util.getSha256Hmac(secret, hmac_payload));
+  // Calculate the HMAC value
+  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
+  
+  // Log the HMAC value to the console
+  std::cout << "Calculated HMAC value: " << Hex::encode(hmac_result) << std::endl;
+
+  // Return the encoded HMAC value
+  return Hex::encode(hmac_result);  
 }
 
 } // namespace
