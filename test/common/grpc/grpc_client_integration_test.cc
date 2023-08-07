@@ -29,14 +29,13 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that a simple request-reply stream works with bytes metering.
+// Validate that a simple request-reply stream works with bytes metering in Envoy gRPC.
 TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
-  // Currently, bytes metering is only implemented in Envoy gRPC. Therefore, skip this test for
-  // google gRPC.
+  // Currently, only Envoy gRPC's bytes metering is based on the bytes meter in Envoy.
+  // Therefore, skip the test for google gRPC.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
-  // The check of bytes in this test is based on HTTP2 codec logic (i.e., including
-  // H2_FRAME_HEADER_SIZE). HTTP2 is the protocol type used in GrpcClientIntegrationTest but skip
-  // the test in case if protocol changed in the future.
+  // The check in this test is based on HTTP2 codec logic (i.e., including H2_FRAME_HEADER_SIZE).
+  // Skip this test if default protocol of this integration test is no longer HTTP2.
   if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2)
     return;
   initialize();
@@ -53,11 +52,14 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
 
   auto send_buf = Common::serializeMessage(request_msg);
   Common::prependGrpcFrameHeader(*send_buf);
-  // Verify that the number of sent bytes that is tracked in stream info equals to the length of
-  // request buffer.
+
   auto upstream_meter = stream->grpc_stream_->streamInfo().getUpstreamBytesMeter();
   uint64_t total_bytes_sent = upstream_meter->wireBytesSent();
   uint64_t header_bytes_sent = upstream_meter->headerBytesSent();
+  // Verify the number of sent bytes that is tracked in stream info equals to the length of
+  // request buffer.
+  // Note, in HTTP2 codec, H2_FRAME_HEADER_SIZE is always included in bytes meter so we need to
+  // account for it in the check here as well.
   EXPECT_EQ(total_bytes_sent - header_bytes_sent,
             send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
 
@@ -102,12 +104,11 @@ TEST_P(GrpcClientIntegrationTest, MultiStream) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that multiple streams work with bytes metering.
+// Validate that multiple streams work with bytes metering in Envoy gRPC.
 TEST_P(GrpcClientIntegrationTest, MultiStreamWithBytesMeter) {
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
-  // The check of bytes in this test is based on HTTP2 codec logic (i.e., including
-  // H2_FRAME_HEADER_SIZE). HTTP2 is the protocol type used in GrpcClientIntegrationTest but skip
-  // the test in case if protocol changed in the future.
+  // The check in this test is based on HTTP2 codec logic (i.e., including H2_FRAME_HEADER_SIZE).
+  // Skip this test if default protocol of this integration test is no longer HTTP2.
   if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2)
     return;
   initialize();

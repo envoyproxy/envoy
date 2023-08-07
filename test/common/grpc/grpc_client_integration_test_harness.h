@@ -183,6 +183,8 @@ public:
             auto upstream_meter = this->grpc_stream_->streamInfo().getUpstreamBytesMeter();
             uint64_t total_bytes_rev = upstream_meter->wireBytesReceived();
             uint64_t header_bytes_rev = upstream_meter->headerBytesReceived();
+            // In HTTP2 codec, H2_FRAME_HEADER_SIZE is always included in bytes meter so we need to
+            // account for it in the check here as well.
             EXPECT_EQ(total_bytes_rev - header_bytes_rev,
                       recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
           }
