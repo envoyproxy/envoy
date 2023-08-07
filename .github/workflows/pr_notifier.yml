@@ -14,7 +14,7 @@ jobs:
       pull-requests: read  # for pr_notifier.py
     name: PR Notifier
     runs-on: ubuntu-22.04
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.schedule

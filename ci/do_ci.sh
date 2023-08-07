@@ -293,25 +293,7 @@ case $CI_TARGET in
         ;;
 
     compile_time_options)
-        # Right now, none of the available compile-time options conflict with each other. If this
-        # changes, this build type may need to be broken up.
-        COMPILE_TIME_OPTIONS=(
-            "--define" "admin_html=disabled"
-            "--define" "signal_trace=disabled"
-            "--define" "hot_restart=disabled"
-            "--define" "google_grpc=disabled"
-            "--define" "boringssl=fips"
-            "--define" "log_debug_assert_in_release=enabled"
-            "--define" "path_normalization_by_default=true"
-            "--define" "deprecated_features=disabled"
-            "--define" "tcmalloc=gperftools"
-            "--define" "zlib=ng"
-            "--define" "uhv=enabled"
-            "--@envoy//bazel:http3=False"
-            "--@envoy//source/extensions/filters/http/kill_request:enabled"
-            "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true"
-            "--remote_download_minimal")
-        ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
+        # See `compile-time-options` in `.bazelrc`
         setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
@@ -321,8 +303,8 @@ case $CI_TARGET in
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wamr \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
@@ -330,10 +312,9 @@ case $CI_TARGET in
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wasmtime \
-            --define admin_html=disabled \
             --define admin_functionality=disabled \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
@@ -341,8 +322,8 @@ case $CI_TARGET in
         echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wavm \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
@@ -351,28 +332,28 @@ case $CI_TARGET in
         # these tests under "-c opt" to save time in CI.
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wavm \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c opt \
             @envoy//test/common/common:assert_test \
             @envoy//test/server:server_test
         # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wavm \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
             --define log_debug_assert_in_release=disabled
         echo "Building binary with wasm=wavm... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-              --define wasm=wavm \
-              --define enable_logging=disabled \
-              "${COMPILE_TIME_OPTIONS[@]}" \
-              -c fastbuild \
-              @envoy//source/exe:envoy-static \
-              --build_tag_filters=-nofips
+            --config=compile-time-options \
+            --define wasm=wavm \
+            --define enable_logging=disabled \
+            -c fastbuild \
+            @envoy//source/exe:envoy-static \
+            --build_tag_filters=-nofips
         collect_build_profile build
         ;;
 
@@ -527,6 +508,7 @@ case $CI_TARGET in
     dockerhub-readme)
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              --remote_download_toplevel \
               //distribution/dockerhub:readme
         cat bazel-bin/distribution/dockerhub/readme.md
         ;;
@@ -629,7 +611,9 @@ case $CI_TARGET in
             "${BAZEL_RELEASE_OPTIONS[@]}" \
             "${TEST_TARGETS[@]}"
         # Build release binaries
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_outputs=toplevel \
               //distribution/binary:release
         # Copy release binaries to binary export directory
         cp -a \
