@@ -52,6 +52,7 @@ public:
   MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
   MOCK_METHOD(bool, panicModeAny, (), (const));
   MOCK_METHOD(bool, listAsAny, (), (const));
+  MOCK_METHOD(bool, allowRedundantKeys, (), (const));
 
   std::vector<SubsetSelectorPtr> subset_selectors_;
 };

@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Optionally divide the endpoints in this cluster into subsets defined by
 // endpoint metadata and selected by route and weighted cluster metadata.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Subset {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.v3.LbSubsetConfig";
@@ -216,4 +216,35 @@ message Subset {
   // The child LB policy to create for endpoint-picking within the chosen subset.
   config.cluster.v3.LoadBalancingPolicy subset_lb_policy = 9
       [(validate.rules).message = {required: true}];
+
+    // If true, redundant key/value pairs are allowed in the request (route, weighted cluster or dynamic)
+    // metadata. By default, only when the request metadata has **same** keys with one of the subset
+    // selectors and the values of related keys are matched, we will get valid subset. For example:
+    //
+    // .. code-block:: json
+    //
+    //   { "subset_selectors": [
+    //       { "keys": [ "version" ] },
+    //       { "keys": [ "stage", "version" ] }
+    //   ]}
+    //
+    // A request with metadata ``{"redundant-key": "any", "stage": "prod", "version": "v1"}`` or
+    // ``{"redundant-key": "any", "version": "v1"}`` can never get valid subset even if the values of
+    // ``stage`` and ``version`` are matched because of the redundant key/value pair in the request
+    // metadata.
+    //
+    // By set this to true, only the necessary key/value pairs will be evaluated and redundant key/value
+    // pairs will be ignored. Take the above example, if the request metadata is ``{"redundant-key": "any",
+    // "stage": "prod", "version": "v1"}``, the subset lb will keep the ``{"stage": "prod", "version": "v1"}``
+    // as the request metadata for the evaluation. If the request metadata is ``{"redundant-key": "any",
+    // "version": "v1"}``, the subset lb will keep the ``{"version": "v1"}`` as the request metadata for
+    // the evaluation.
+    //
+    // .. note::
+    //   To avoid the performance impact and potential complexity, subset lb will keep at much as possible
+    //   key/value pairs in the request metadata. Take the above example, if the request metadata is
+    //   ``{"redundant-key": "any", "stage": "prod", "version": "v1"}``, the subset lb will keep the
+    //   ``{"stage": "prod", "version": "v1"}`` as the request metadata for the evaluation and will not
+    //   try the ``{"version": "v1"}`` as the request metadata.
+    bool allow_redundant_keys = 10;
 }

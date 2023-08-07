@@ -2267,6 +2267,51 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackMatchesTopLevelOne) {
   EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
 }
 
+TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+  ON_CALL(subset_info_, allowRedundantKeys()).WillByDefault(Return(true));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      makeSelector(
+          {"version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK),
+      makeSelector(
+          {"app"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK),
+      makeSelector(
+          {"foo", "version"},
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NO_FALLBACK)};
+
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"bar", "default"}});
+  EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
+
+  // Add hosts initial hosts.
+  init({{"tcp://127.0.0.1:81", {{"version", "0.0"}}},
+        {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+        {"tcp://127.0.0.1:83", {{"app", "envoy"}}},
+        {"tcp://127.0.0.1:84", {{"foo", "abc"}, {"bar", "default"}}},
+        {"tcp://127.0.0.1:85", {{"foo", "abc"}, {"version", "2.0"}}}});
+
+  TestLoadBalancerContext context_ver_10(
+      {{"version", "1.0"}, {"redundant_key", "redundant_value"}});
+  TestLoadBalancerContext context_ver_nx({{"version", "x"}});
+  TestLoadBalancerContext context_app({{"app", "envoy"}, {"redundant_key", "redundant_value"}});
+  TestLoadBalancerContext context_app_nx({{"app", "ngnix"}, {"redundant_key", "redundant_value"}});
+  TestLoadBalancerContext context_foo({{"foo", "abc"}});
+  TestLoadBalancerContext context_foo_ver(
+      {{"foo", "abc"}, {"version", "2.0"}, {"redundant_key", "redundant_value"}});
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_ver_10));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_ver_nx));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_app));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_app_nx));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_foo));
+  EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context_foo_ver));
+}
+
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAnyFallbackPerSelector) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));

@@ -815,6 +815,7 @@ public:
   bool scaleLocalityWeight() const override { return scale_locality_weight_; }
   bool panicModeAny() const override { return panic_mode_any_; }
   bool listAsAny() const override { return list_as_any_; }
+  bool allowRedundantKeys() const override { return false; }
 
 private:
   const ProtobufWkt::Struct default_subset_;
