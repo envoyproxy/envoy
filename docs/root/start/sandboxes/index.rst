@@ -55,7 +55,8 @@ The following sandboxes are available:
     ext_authz
     fault_injection
     front_proxy
-    golang
+    golang-http
+    golang-network
     grpc_bridge
     gzip
     jaeger_native_tracing

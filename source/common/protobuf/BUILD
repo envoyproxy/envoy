@@ -83,6 +83,7 @@ envoy_cc_library(
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "@utf8_range//:utf8_validity",
     ],
 )
 

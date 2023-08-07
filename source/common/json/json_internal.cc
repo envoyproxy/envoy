@@ -68,6 +68,8 @@ public:
   int64_t getInteger(const std::string& name) const override;
   int64_t getInteger(const std::string& name, int64_t default_value) const override;
   ObjectSharedPtr getObject(const std::string& name, bool allow_empty) const override;
+  absl::StatusOr<ObjectSharedPtr> getObjectNoThrow(const std::string& name,
+                                                   bool allow_empty) const override;
   std::vector<ObjectSharedPtr> getObjectArray(const std::string& name,
                                               bool allow_empty) const override;
   std::string getString(const std::string& name) const override;
@@ -463,21 +465,31 @@ int64_t Field::getInteger(const std::string& name, int64_t default_value) const 
 }
 
 ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) const {
+  auto result = getObjectNoThrow(name, allow_empty);
+  if (!result.ok()) {
+    throw Exception(std::string(result.status().message()));
+  }
+
+  return result.value();
+}
+
+absl::StatusOr<ObjectSharedPtr> Field::getObjectNoThrow(const std::string& name,
+                                                        bool allow_empty) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end()) {
     if (allow_empty) {
       return createObject();
     } else {
-      throw Exception(fmt::format("key '{}' missing from lines {}-{}", name, line_number_start_,
-                                  line_number_end_));
+      return absl::NotFoundError(fmt::format("key '{}' missing from lines {}-{}", name,
+                                             line_number_start_, line_number_end_));
     }
   } else if (!value_itr->second->isType(Type::Object)) {
-    throw Exception(fmt::format("key '{}' not an object from line {}", name,
-                                value_itr->second->line_number_start_));
-  } else {
-    return value_itr->second;
+    return absl::InternalError(fmt::format("key '{}' not an object from line {}", name,
+                                           value_itr->second->line_number_start_));
   }
+
+  return value_itr->second;
 }
 
 std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name,
@@ -695,17 +707,26 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 
 } // namespace
 
-ObjectSharedPtr Factory::loadFromString(const std::string& json) {
+absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string& json) {
   ObjectHandler handler;
   auto json_container = JsonContainer(json.c_str(), &handler);
 
   nlohmann::json::sax_parse(json_container, &handler);
 
   if (handler.hasParseError()) {
-    throw Exception(fmt::format("JSON supplied is not valid. Error({}): {}\n",
-                                handler.getErrorPosition(), handler.getParseError()));
+    return absl::InternalError(fmt::format("JSON supplied is not valid. Error({}): {}\n",
+                                           handler.getErrorPosition(), handler.getParseError()));
   }
   return handler.getRoot();
+}
+
+ObjectSharedPtr Factory::loadFromString(const std::string& json) {
+  auto result = loadFromStringNoThrow(json);
+  if (!result.ok()) {
+    throw Exception(std::string(result.status().message()));
+  }
+
+  return result.value();
 }
 
 std::string Factory::serialize(absl::string_view str) {

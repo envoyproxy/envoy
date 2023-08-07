@@ -994,9 +994,18 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   case EnvoyValue::DownstreamRemoteAddress:
     req_->strValue = state.streamInfo().downstreamAddressProvider().remoteAddress()->asString();
     break;
-  case EnvoyValue::UpstreamHostAddress:
-    if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
-      req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->address()->asString();
+  case EnvoyValue::UpstreamLocalAddress:
+    if (state.streamInfo().upstreamInfo() &&
+        state.streamInfo().upstreamInfo()->upstreamLocalAddress()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamLocalAddress()->asString();
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    break;
+  case EnvoyValue::UpstreamRemoteAddress:
+    if (state.streamInfo().upstreamInfo() &&
+        state.streamInfo().upstreamInfo()->upstreamRemoteAddress()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamRemoteAddress()->asString();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
@@ -1008,6 +1017,12 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
+    break;
+  case EnvoyValue::VirtualClusterName:
+    if (!state.streamInfo().virtualClusterName().has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = state.streamInfo().virtualClusterName().value();
     break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
@@ -1188,7 +1203,7 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
         }
         dynamic_lib_->envoyGoRequestSemaDec(req_);
       } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+        ENVOY_LOG(info, "golang filter has gone or destroyed in getStringFilterState");
       }
     });
     return CAPIStatus::CAPIYield;

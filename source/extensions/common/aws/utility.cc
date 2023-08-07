@@ -20,8 +20,8 @@ constexpr absl::string_view QUERY_SEPERATOR = "&";
 constexpr absl::string_view QUERY_SPLITTER = "?";
 constexpr absl::string_view RESERVED_CHARS = "-._~";
 constexpr absl::string_view S3_SERVICE_NAME = "s3";
-const std::string URI_ENCODE = "%{:02X}";
-const std::string URI_DOUBLE_ENCODE = "%25{:02X}";
+constexpr absl::string_view URI_ENCODE = "%{:02X}";
+constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
 
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,

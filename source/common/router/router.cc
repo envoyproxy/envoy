@@ -51,7 +51,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   OptRef<const Network::Connection> connection) {
-  if (downstream_headers.getSchemeValue() == Http::Headers::get().SchemeValues.Http) {
+  if (Http::Utility::schemeIsHttp(downstream_headers.getSchemeValue())) {
     return true;
   }
   if (connection.has_value() && !connection->ssl()) {
@@ -78,14 +78,14 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
 }
 
 void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure) {
-  if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+  if (Http::Utility::schemeIsValid(headers.getSchemeValue())) {
     return;
   }
   // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
   // this path should only occur if a buggy filter has removed the :scheme
   // header. In that case best-effort set from X-Forwarded-Proto.
   absl::string_view xfp = headers.getForwardedProtoValue();
-  if (Http::HeaderUtility::schemeIsValid(xfp)) {
+  if (Http::Utility::schemeIsValid(xfp)) {
     headers.setScheme(xfp);
     return;
   }
@@ -1739,7 +1739,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   const auto& policy = route_entry_->internalRedirectPolicy();
   // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(downstream_headers, callbacks_->connection());
-  const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
+  const bool target_is_http = Http::Utility::schemeIsHttp(absolute_url.scheme());
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: incorrect scheme for {}", *callbacks_,
                      redirect_url);
@@ -1940,7 +1940,7 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& 
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
     // buffer safe requests with body which is not common.
-    setRetryShadownBufferLimit(0);
+    setRetryShadowBufferLimit(0);
   }
   return retry_state;
 }

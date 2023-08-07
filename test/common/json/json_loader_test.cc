@@ -20,17 +20,43 @@ protected:
   JsonLoaderTest() : api_(Api::createApiForTest()) {}
 
   ValueType getValidValue(const Json::Object& json, const std::string& key) {
-    auto result = json.getValue(key);
-    EXPECT_TRUE(result.ok());
-    return result.value();
+    return getValid(json.getValue(key));
   }
 
   void expectErrorValue(const Json::Object& json, const std::string& key,
                         absl::StatusCode status_code, const std::string& message) {
-    auto result = json.getValue(key);
-    EXPECT_FALSE(result.ok());
-    EXPECT_THAT(result, StatusIs(status_code));
-    EXPECT_EQ(result.status().message(), message);
+    expectError(json.getValue(key), status_code, message);
+  }
+
+  ObjectSharedPtr getValidObject(const Json::Object& json, const std::string& key) {
+    return getValid(json.getObjectNoThrow(key));
+  }
+
+  void expectErrorObject(const Json::Object& json, const std::string& key,
+                         absl::StatusCode status_code, const std::string& message) {
+    expectError(json.getObjectNoThrow(key), status_code, message);
+  }
+
+  ObjectSharedPtr loadValidJson(const std::string& json) {
+    return getValid(Factory::loadFromStringNoThrow(json));
+  }
+
+  void loadInvalidJson(const std::string& json, absl::StatusCode status_code,
+                       const std::string& message) {
+    expectError(Factory::loadFromStringNoThrow(json), status_code, message);
+  }
+
+  template <typename Type> Type getValid(const absl::StatusOr<Type>& status_or) {
+    EXPECT_TRUE(status_or.ok());
+    return status_or.value();
+  }
+
+  template <typename StatusOrType>
+  void expectError(const StatusOrType& status_or, absl::StatusCode status_code,
+                   const std::string& message) {
+    EXPECT_FALSE(status_or.ok());
+    EXPECT_THAT(status_or, StatusIs(status_code));
+    EXPECT_EQ(status_or.status().message(), message);
   }
   Api::ApiPtr api_;
 };
@@ -44,7 +70,11 @@ TEST_F(JsonLoaderTest, Basic) {
     EXPECT_FALSE(json->hasObject("world"));
     EXPECT_FALSE(json->empty());
     EXPECT_THROW(json->getObject("world"), Exception);
+    expectErrorObject(*json, "world", absl::StatusCode::kNotFound,
+                      "key 'world' missing from lines 1-1");
     EXPECT_THROW(json->getObject("hello"), Exception);
+    expectErrorObject(*json, "hello", absl::StatusCode::kInternal,
+                      "key 'hello' not an object from line 1");
     EXPECT_THROW(json->getBoolean("hello"), Exception);
     EXPECT_THROW(json->getObjectArray("hello"), Exception);
     EXPECT_THROW(json->getString("hello"), Exception);
@@ -97,6 +127,13 @@ TEST_F(JsonLoaderTest, Basic) {
                               "JSON supplied is not valid. Error(line 3, column 8, token "
                               "\"world\"): syntax error while "
                               "parsing object - unexpected end of input; expected '}'\n");
+  }
+
+  {
+    loadInvalidJson("{\"hello\": \n\n\"world\"", absl::StatusCode::kInternal,
+                    "JSON supplied is not valid. Error(line 3, column 8, token "
+                    "\"world\"): syntax error while "
+                    "parsing object - unexpected end of input; expected '}'\n");
   }
 
   {
@@ -257,6 +294,11 @@ TEST_F(JsonLoaderTest, Basic) {
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": {}}");
     EXPECT_EQ(json->getObject("hello")->asJsonString(), "null");
+  }
+
+  {
+    ObjectSharedPtr json = loadValidJson("{\"hello\": {}}");
+    EXPECT_EQ(getValidObject(*json, "hello")->asJsonString(), "null");
   }
 
   {
