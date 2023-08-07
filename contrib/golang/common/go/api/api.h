@@ -65,8 +65,8 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name, void* hand);
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf);
 
-void envoyGoFilterHttpLog(uint32_t level, void* message);
-uint32_t envoyGoFilterHttpLogLevel();
+void envoyGoFilterLog(uint32_t level, void* message);
+uint32_t envoyGoFilterLogLevel();
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
 
