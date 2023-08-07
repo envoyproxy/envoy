@@ -49,6 +49,7 @@ type HttpCAPI interface {
 	HttpLogLevel() LogType
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+	HttpConfigFinalize(c unsafe.Pointer, reason int)
 
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	HttpGetStringFilterState(r unsafe.Pointer, key string) string

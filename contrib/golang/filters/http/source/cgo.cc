@@ -240,6 +240,14 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   delete req;
 }
 
+void envoyGoConfigHttpFinalize(void* c, int reason) {
+  UNREFERENCED_PARAMETER(reason);
+  // config is used by go, so need to use raw memory and then it is safe to release at the gc
+  // finalize phase of the go object.
+  auto config = reinterpret_cast<httpConfigInternal*>(c);
+  delete config;
+}
+
 CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
   return envoyGoFilterHandlerWrapper(r, [details](std::shared_ptr<Filter>& filter) -> CAPIStatus {
     // Since this is only used for logs we don't need to deep copy.

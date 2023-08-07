@@ -32,7 +32,9 @@ package http
 import "C"
 
 import (
+	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -48,12 +50,70 @@ var (
 	configCache        = &sync.Map{} // uint64 -> *anypb.Any
 )
 
+var ErrDupConfigKey = errors.New("dup config key")
+
+var Configs = &configMap{}
+
+type configMap struct {
+	m sync.Map // *C.httpConfig -> *httpConfig
+}
+
+func (f *configMap) StoreConfig(key *C.httpConfig, req *httpConfig) error {
+	if _, loaded := f.m.LoadOrStore(key, req); loaded {
+		return ErrDupConfigKey
+	}
+	return nil
+}
+
+func (f *configMap) GetConfig(key *C.httpConfig) *httpConfig {
+	if v, ok := f.m.Load(key); ok {
+		return v.(*httpConfig)
+	}
+	return nil
+}
+
+func (f *configMap) DeleteConfig(key *C.httpConfig) {
+	f.m.Delete(key)
+}
+
+func (f *configMap) Clear() {
+	f.m.Range(func(key, _ interface{}) bool {
+		f.m.Delete(key)
+		return true
+	})
+}
+
+func configFinalize(c *httpConfig) {
+	c.Finalize(api.NormalFinalize)
+}
+
+func createConfig(c *C.httpConfig) *httpConfig {
+	config := &httpConfig{
+		config: c,
+	}
+	// NP: make sure filter will be deleted.
+	runtime.SetFinalizer(config, configFinalize)
+
+	err := Configs.StoreConfig(c, config)
+	if err != nil {
+		panic(fmt.Sprintf("createConfig failed, err: %s", err.Error()))
+	}
+
+	return config
+}
+
+func getConfig(c *C.httpConfig) *httpConfig {
+	return Configs.GetConfig(c)
+}
+
 //export envoyGoFilterNewHttpPluginConfig
 func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 	if !api.CgoCheckDisabled() {
 		cAPI.HttpLog(api.Error, "The Envoy Golang filter requires the `GODEBUG=cgocheck=0` environment variable set.")
 		return 0
 	}
+
+	http_config := createConfig(c)
 
 	buf := utils.BytesToSlice(uint64(c.config_ptr), uint64(c.config_len))
 	var any anypb.Any
@@ -69,9 +129,6 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 		if c.is_route_config == 1 {
 			parsedConfig, err = configParser.Parse(&any, nil)
 		} else {
-			http_config := &httpConfig{
-				config: c,
-			}
 			parsedConfig, err = configParser.Parse(&any, http_config)
 		}
 		if err != nil {
@@ -87,8 +144,9 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 }
 
 //export envoyGoFilterDestroyHttpPluginConfig
-func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
+func envoyGoFilterDestroyHttpPluginConfig(c *C.httpConfig, id uint64) {
 	configCache.Delete(id)
+	Configs.DeleteConfig(c)
 }
 
 //export envoyGoFilterMergeHttpPluginConfig

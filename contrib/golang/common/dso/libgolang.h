@@ -100,7 +100,7 @@ envoyGoFilterNewHttpPluginConfig(httpConfig* p0); // NOLINT(readability-identifi
 
 // go:linkname envoyGoFilterDestroyHttpPluginConfig
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterDestroyHttpPluginConfig
-extern void envoyGoFilterDestroyHttpPluginConfig(GoUint64 id);
+extern void envoyGoFilterDestroyHttpPluginConfig(httpConfig* c, GoUint64 id);
 
 // go:linkname envoyGoFilterMergeHttpPluginConfig
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterMergeHttpPluginConfig

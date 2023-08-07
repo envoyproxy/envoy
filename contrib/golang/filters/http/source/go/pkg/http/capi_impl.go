@@ -290,6 +290,10 @@ func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
+func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer, reason int) {
+	C.envoyGoConfigHttpFinalize(cfg, C.int(reason))
+}
+
 var cAPI api.HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI

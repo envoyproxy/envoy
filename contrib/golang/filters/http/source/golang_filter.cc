@@ -1,5 +1,6 @@
 #include "contrib/golang/filters/http/source/golang_filter.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -1272,11 +1273,8 @@ void FilterConfig::newGoPluginConfig() {
 }
 
 FilterConfig::~FilterConfig() {
-  if (config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
-  }
   if (config_ != nullptr) {
-    delete config_;
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_, config_id_);
   }
 }
 
@@ -1409,11 +1407,11 @@ RoutePluginConfig::RoutePluginConfig(
 
 RoutePluginConfig::~RoutePluginConfig() {
   absl::WriterMutexLock lock(&mutex_);
-  if (config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
+  if (config_ != nullptr) {
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_, config_id_);
   }
   if (merged_config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(nullptr, merged_config_id_);
   }
 }
 
@@ -1452,7 +1450,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
       return merged_config_id_;
     }
     // upper level config changed, merged_config_id_ is outdated.
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(nullptr, merged_config_id_);
   }
 
   if (config_id_ == 0) {
