@@ -65,7 +65,7 @@ public class EnvoyConfiguration {
   public final String xdsAddress;
   public final Integer xdsPort;
   public final String xdsAuthHeader;
-  public final String xdsAuthenticationValue;
+  public final String xdsAuthToken;
   public final String xdsJwtToken;
   public final Integer xdsJwtTokenLifetime;
   public final String xdsRootCerts;
@@ -136,9 +136,9 @@ public class EnvoyConfiguration {
    * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
    * @param xdsAddress                                    the address for the xDS management server.
    * @param xdsPort                                       the port for the xDS server.
-   * @param xdsAuthHeader                       the HTTP header to use for sending the
+   * @param xdsAuthHeader                                 the HTTP header to use for sending the
    *                                                      authentication token to the xDS server.
-   * @param xdsAuthToken                        the token to send as the authentication
+   * @param xdsAuthToken                                  the token to send as the authentication
    *                                                      header value to authenticate with the
    *                                                      xDS server.
    * @param xdsJwtToken                                   the JWT token to use for authenticating
