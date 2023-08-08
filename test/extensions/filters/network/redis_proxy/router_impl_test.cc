@@ -200,7 +200,7 @@ TEST(PrefixRoutesTest, TestFormatterWhenConnectionClosed) {
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
   router.initializeReadFilterCallbacks(&filter_callbacks);
   std::string key("abc:bar");
-  // Clear the connectoin and validate that formatter still works.
+  // Clear the connection and validate that formatter still works.
   connection_ptr = nullptr;
   ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnPointee(connection_ptr));
   EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
