@@ -20,6 +20,7 @@ envoy_cc_library(
     deps = [
         "//envoy/grpc:status",
         "//source/common/common:enum_to_int",
+        "//source/common/common:fmt_lib",
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3:pkg_cc_proto",
     ],
 )

@@ -463,7 +463,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
-  if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
+  if (!body_delivered && state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) {
     // If no gRPC stream yet, opens it before sending data.
     switch (openStream()) {
     case StreamOpenState::Error:
@@ -477,7 +477,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
-    sendBufferedData(state, ProcessorState::CallbackState::BufferedBodyCallback, true);
+    sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback,
+                  false);
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
@@ -544,7 +545,7 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                            ProcessorState::CallbackState new_state, bool end_stream) {
-  ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
+  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
   ProcessingRequest req;
@@ -553,17 +554,6 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
   body_req->set_body(data.toString());
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
-}
-
-void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
-                              bool end_stream) {
-  if (state.hasBufferedData()) {
-    sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
-  } else {
-    // If there is no buffered data, sends an empty body.
-    Buffer::OwnedImpl data("");
-    sendBodyChunk(state, data, new_state, end_stream);
-  }
 }
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {

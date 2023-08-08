@@ -8,11 +8,13 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
+#include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
 #include "source/common/tracing/tracer_impl.h"
@@ -27,7 +29,9 @@
 #include "contrib/generic_proxy/filters/network/source/rds.h"
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
+#include "contrib/generic_proxy/filters/network/source/stats.h"
 #include "contrib/generic_proxy/filters/network/source/upstream.h"
+#include "stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,10 +57,12 @@ public:
                    std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
                    Tracing::ConnectionManagerTracingConfigPtr tracing_config,
                    Envoy::Server::Configuration::FactoryContext& context)
-      : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
-        route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
-        drain_decision_(context.drainDecision()), tracer_(std::move(tracer)),
-        tracing_config_(std::move(tracing_config)) {}
+      : stat_prefix_(stat_prefix),
+        stats_(GenericFilterStats::generateStats(stat_prefix_, context.scope())),
+        codec_factory_(std::move(codec)), route_config_provider_(std::move(route_config_provider)),
+        factories_(std::move(factories)), drain_decision_(context.drainDecision()),
+        tracer_(std::move(tracer)), tracing_config_(std::move(tracing_config)),
+        time_source_(context.timeSource()) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
@@ -72,6 +78,8 @@ public:
     return makeOptRefFromPtr<const Tracing::ConnectionManagerTracingConfig>(tracing_config_.get());
   }
 
+  GenericFilterStats& stats() override { return stats_; }
+
   // FilterChainFactory
   void createFilterChain(FilterChainManager& manager) override {
     for (auto& factory : factories_) {
@@ -84,6 +92,7 @@ private:
   friend class Filter;
 
   const std::string stat_prefix_;
+  GenericFilterStats stats_;
 
   CodecFactoryPtr codec_factory_;
 
@@ -95,6 +104,8 @@ private:
 
   Tracing::TracerSharedPtr tracer_;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
+
+  TimeSource& time_source_;
 };
 
 class ActiveStream : public FilterChainManager,
@@ -287,6 +298,8 @@ private:
 
   StreamInfo::StreamInfoImpl stream_info_;
 
+  Stats::TimespanPtr request_timer_;
+
   OptRef<const Tracing::ConnectionManagerTracingConfig> connection_manager_tracing_config_;
   Tracing::SpanPtr active_span_;
 };
@@ -327,8 +340,8 @@ class Filter : public Envoy::Network::ReadFilter,
                public RequestDecoderCallback {
 public:
   Filter(FilterConfigSharedPtr config, TimeSource& time_source, Runtime::Loader& runtime)
-      : config_(std::move(config)), drain_decision_(config_->drainDecision()),
-        time_source_(time_source), runtime_(runtime) {
+      : config_(std::move(config)), stats_(config_->stats()),
+        drain_decision_(config_->drainDecision()), time_source_(time_source), runtime_(runtime) {
     request_decoder_ = config_->codecFactory().requestDecoder();
     request_decoder_->setDecoderCallback(*this);
     response_encoder_ = config_->codecFactory().responseEncoder();
@@ -426,6 +439,7 @@ private:
   bool downstream_connection_closed_{};
 
   FilterConfigSharedPtr config_{};
+  GenericFilterStats& stats_;
   const Network::DrainDecision& drain_decision_;
   bool stream_drain_decision_{};
   TimeSource& time_source_;

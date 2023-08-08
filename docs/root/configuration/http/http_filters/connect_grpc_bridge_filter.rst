@@ -8,7 +8,7 @@ Connect-gRPC Bridge
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.connect_grpc_bridge.v3.FilterConfig>`
 
 This filter enables a Buf Connect client to connect to a compliant gRPC server.
-More information on the Buf Connect protocol can be found here https://connect.build/docs/protocol.
+More information on the Buf Connect protocol can be found `here <https://connect.build/docs/protocol>`_.
 
 HTTP GET support
 ----------------
