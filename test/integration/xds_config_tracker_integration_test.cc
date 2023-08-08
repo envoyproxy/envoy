@@ -54,10 +54,8 @@ public:
     stats_.on_config_accepted_.inc();
     for (const auto& resource : decoded_resources) {
       if (resource->metadata().has_value()) {
-        const auto& config_typed_metadata =
-            resource->metadata()->typed_filter_metadata();
-        if (const auto& metadata_it =
-          config_typed_metadata.find(kTestKey);
+        const auto& config_typed_metadata = resource->metadata()->typed_filter_metadata();
+        if (const auto& metadata_it = config_typed_metadata.find(kTestKey);
             metadata_it != config_typed_metadata.end()) {
           stats_.on_config_metadata_readed_.inc();
         }
@@ -65,16 +63,15 @@ public:
     }
   }
 
-  void onConfigAccepted(const absl::string_view,
-                        const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
-                        const Protobuf::RepeatedPtrField<std::string>&) override {
+  void onConfigAccepted(
+      const absl::string_view,
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
+      const Protobuf::RepeatedPtrField<std::string>&) override {
     stats_.on_config_accepted_.inc();
     for (const auto& resource : resources) {
       if (resource.has_metadata()) {
-        const auto& config_typed_metadata =
-            resource.metadata().typed_filter_metadata();
-        if (const auto& metadata_it =
-          config_typed_metadata.find(kTestKey);
+        const auto& config_typed_metadata = resource.metadata().typed_filter_metadata();
+        if (const auto& metadata_it = config_typed_metadata.find(kTestKey);
             metadata_it != config_typed_metadata.end()) {
           stats_.on_config_metadata_readed_.inc();
         }
@@ -214,8 +211,8 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
 
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_},
-      {}, "1", true, kTestKey, ProtobufWkt::Any());
+      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1", true,
+      kTestKey, ProtobufWkt::Any());
 
   // 3 because the statically specified CDS server itself counts as a cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
