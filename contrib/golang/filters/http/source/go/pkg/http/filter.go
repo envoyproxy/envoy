@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -183,6 +183,10 @@ func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
 	}
 }
 
+func (d *dynamicMetadata) Get(filterName string) map[string]interface{} {
+	return cAPI.HttpGetDynamicMetadata(unsafe.Pointer(d.request), filterName)
+}
+
 func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
 	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
 }
@@ -197,12 +201,22 @@ func (s *streamInfo) DownstreamRemoteAddress() string {
 	return address
 }
 
-func (s *streamInfo) UpstreamHostAddress() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamHostAddress)
+// UpstreamLocalAddress return the upstream local address.
+func (s *streamInfo) UpstreamLocalAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamLocalAddress)
+}
+
+// UpstreamRemoteAddress return the upstream remote address.
+func (s *streamInfo) UpstreamRemoteAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamRemoteAddress)
 }
 
 func (s *streamInfo) UpstreamClusterName() (string, bool) {
 	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamClusterName)
+}
+
+func (s *streamInfo) VirtualClusterName() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueVirtualClusterName)
 }
 
 type filterState struct {

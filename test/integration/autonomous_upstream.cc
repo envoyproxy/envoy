@@ -120,7 +120,7 @@ AutonomousUpstream::~AutonomousUpstream() {
 }
 
 bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connection,
-                                                  const std::vector<Network::FilterFactoryCb>&) {
+                                                  const Filter::NetworkFilterFactoriesList&) {
   shared_connections_.emplace_back(new SharedConnectionWrapper(connection));
   AutonomousHttpConnectionPtr http_connection(
       new AutonomousHttpConnection(*this, *shared_connections_.back(), http_type_, *this));

@@ -21,9 +21,6 @@ parameters:
 - name: authGCP
   type: string
   default: ""
-- name: authGithub
-  type: string
-  default: ""
 - name: authGithubWorkflow
   type: string
   default: ""
@@ -90,11 +87,6 @@ parameters:
   displayName: "Publish Github release"
   type: string
   default: false
-- name: publishGithubReleaseDryRun
-  displayName: "Publish Github release (dry run)"
-  type: string
-  default: false
-
 
 jobs:
 - job: docker
@@ -159,38 +151,9 @@ jobs:
           DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
           DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
       stepsPost:
-      - task: DownloadSecureFile@1
-        name: WorkflowTriggerKey
-        displayName: 'Download workflow trigger key'
-        inputs:
-          secureFile: '${{ parameters.authGithubWorkflow }}'
-      - bash: |
-          set -e
-          KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
-          echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
-        name: key
-      - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify.trigger' || echo "trigger not ready yet ..."
-        # Please see `ci/do_ci.sh` for notes on required vars.
-        env:
-          ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-            ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
-            ENVOY_COMMIT: "$(System.PullRequest.SourceCommitId)"
-            ENVOY_HEAD_REF: "$(Build.SourceBranch)"
-          ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-            ENVOY_BRANCH: "$(Build.SourceBranch)"
-          # github auth
-          GITHUB_TOKEN: "$(key.value)"
-          GITHUB_APP_ID: ${{ parameters.authGithubWorkflowAppId }}
-          GITHUB_INSTALL_ID: ${{ parameters.authGithubWorkflowInstallId }}
-          # rbe env
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-      - script: sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
+      - script: |
+          sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
+          sudo rm -rf /var/lib/docker
         displayName: "Cache/save (publish_docker)"
 
 - job: package_x64
@@ -289,9 +252,7 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
           DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
@@ -307,9 +268,7 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-publish-latest'
@@ -365,6 +324,8 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: release.signed
+      env:
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       stepsPre:
       - template: ../gpg.yml
         parameters:
@@ -401,17 +362,45 @@ jobs:
   pool:
     vmImage: $(agentUbuntu)
   steps:
-  - task: DownloadBuildArtifacts@0
-    inputs:
-      buildType: current
-      artifactName: "release.signed"
-      itemPattern: "release.signed/release.signed.tar.zst"
-      targetPath: $(Build.StagingDirectory)
   - template: ../bazel.yml
     parameters:
-      ciTarget: publish
+      ciTarget: verify.trigger
+      authGithub: "$(key.value)"
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
       publishTestResults: false
       env:
-        ENVOY_PUBLISH_DRY_RUN: ${{ parameters.publishGithubReleaseDryRun }}
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          ENVOY_HEAD_REF: "$(Build.SourceBranch)"
+          ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
+          ENVOY_COMMIT: "$(System.PullRequest.SourceCommitId)"
+        ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+          ENVOY_HEAD_REF: "$(Build.SourceBranchName)"
+          ENVOY_BRANCH: "$(Build.SourceBranch)"
+        # github auth
+        GITHUB_APP_ID: ${{ parameters.authGithubWorkflowAppId }}
+        GITHUB_INSTALL_ID: ${{ parameters.authGithubWorkflowInstallId }}
+        # rbe env
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      stepsPre:
+      - bash: |
+          set -e
+          if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+              DOWNLOAD_PATH="$(git rev-parse HEAD | head -c7)"
+          else
+              DOWNLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+          fi
+          curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/release/release.signed.tar.zst"
+          mkdir -p $(Build.StagingDirectory)/release.signed
+          mv release.signed.tar.zst $(Build.StagingDirectory)/release.signed
+        displayName: Fetch signed release
+      - task: DownloadSecureFile@1
+        name: WorkflowTriggerKey
+        displayName: 'Download workflow trigger key'
+        inputs:
+          secureFile: '${{ parameters.authGithubWorkflow }}'
+      - bash: |
+          set -e
+          KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
+          echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
+        name: key

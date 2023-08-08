@@ -18,6 +18,8 @@
 namespace Envoy {
 namespace Http {
 
+bool HeaderStringValidator::disable_validation_for_tests_ = false;
+
 namespace {
 
 constexpr absl::string_view DelimiterForInlineHeaders{","};

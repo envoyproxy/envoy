@@ -198,6 +198,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/types:variant",
     ],
 )
 
@@ -5150,6 +5151,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -5326,13 +5328,13 @@ envoy_cc_library(
         ":quiche_common_platform_default_quiche_platform_impl_flag_utils_impl_lib",
         ":quiche_common_platform_default_quiche_platform_impl_reference_counted_impl_lib",
         ":quiche_common_platform_default_quiche_platform_impl_testvalue_impl_lib",
-        ":quiche_common_platform_default_quiche_platform_impl_time_utils_impl_lib",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
         "@envoy//source/common/quic/platform:quic_base_impl_lib",
         "@envoy//source/common/quic/platform:quiche_flags_impl_lib",
         "@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_time_utils_impl_lib",
     ],
 )
 
@@ -5372,19 +5374,6 @@ envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_testvalue_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_testvalue_impl.h",
-    ],
-    deps = [
-        ":quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_default_quiche_platform_impl_time_utils_impl_lib",
-    srcs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.cc",
-    ],
-    hdrs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.h",
     ],
     deps = [
         ":quiche_common_platform_export",
@@ -5485,7 +5474,10 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = [":quiche_common_platform_export"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@com_google_absl//absl/hash",
+    ],
 )
 
 envoy_cc_library(

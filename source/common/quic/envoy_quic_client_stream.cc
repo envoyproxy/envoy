@@ -222,6 +222,10 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
+  if (read_side_closed()) {
+    return;
+  }
+
   if (!headers_decompressed() || header_list.empty()) {
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
                   quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -234,10 +238,11 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
+  auto client_session = static_cast<EnvoyQuicClientSession*>(session());
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_,
-          transform_rst);
+          header_list, *this, client_session->max_inbound_header_list_size(),
+          filterManagerConnection()->maxIncomingHeadersCount(), details_, transform_rst);
   if (headers == nullptr) {
     onStreamError(close_connection_upon_invalid_header_, transform_rst);
     return;
@@ -383,9 +388,10 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
+    auto client_session = static_cast<EnvoyQuicClientSession*>(session());
     auto trailers = http2HeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
-        transform_rst);
+        received_trailers(), client_session->max_inbound_header_list_size(),
+        filterManagerConnection()->maxIncomingHeadersCount(), *this, details_, transform_rst);
     if (trailers == nullptr) {
       onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;
@@ -491,6 +497,10 @@ void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_->setStreamDecoder(response_decoder_);
 }
 #endif
+
+void EnvoyQuicClientStream::OnInvalidHeaders() {
+  onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+}
 
 } // namespace Quic
 } // namespace Envoy

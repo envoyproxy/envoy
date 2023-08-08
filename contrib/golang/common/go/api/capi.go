@@ -42,7 +42,7 @@ type HttpCAPI interface {
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
 
-	// TODO: HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
+	HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
 
 	HttpLog(level LogType, message string)
@@ -63,9 +63,13 @@ type NetworkCAPI interface {
 	DownstreamFinalize(f unsafe.Pointer, reason int)
 	// DownstreamInfo gets the downstream connection info of infoType
 	DownstreamInfo(f unsafe.Pointer, infoType int) string
+	// GetFilterState gets the filter state of key
+	GetFilterState(f unsafe.Pointer, key string) string
+	// SetFilterState sets the filter state of key to value
+	SetFilterState(f unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 
 	// UpstreamConnect creates an envoy upstream connection to address
-	UpstreamConnect(libraryID string, addr string) unsafe.Pointer
+	UpstreamConnect(libraryID string, addr string, connID uint64) unsafe.Pointer
 	// UpstreamWrite writes buffer data into upstream connection.
 	UpstreamWrite(f unsafe.Pointer, bufferPtr unsafe.Pointer, bufferLen int, endStream int)
 	// UpstreamClose closes the upstream connection

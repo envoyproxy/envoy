@@ -127,7 +127,7 @@ protected:
       void hashKey(std::vector<uint8_t>&) const override {}
       std::string nextProtocol() const override { return EMPTY_STRING; }
       void noDelay(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
-      void readDisable(bool) override {}
+      ReadDisableStatus readDisable(bool) override { return ReadDisableStatus::NoTransition; }
       void detectEarlyCloseWhenReadDisabled(bool) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
@@ -209,8 +209,8 @@ public:
           http_connection_manager_(parent.http_connection_manager_factory_(read_callbacks_)) {}
     ~ApiListenerWrapper() override;
 
-    Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
-                                    bool is_internally_created = false) override;
+    Http::RequestDecoderHandlePtr newStreamHandle(Http::ResponseEncoder& response_encoder,
+                                                  bool is_internally_created = false) override;
 
     SyntheticReadCallbacks& readCallbacks() { return read_callbacks_; }
 

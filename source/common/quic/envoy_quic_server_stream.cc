@@ -222,6 +222,10 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
+  if (read_side_closed()) {
+    return;
+  }
+
   if (!headers_decompressed() || header_list.empty()) {
     onStreamError(absl::nullopt);
     return;
@@ -233,9 +237,11 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
+  auto server_session = static_cast<EnvoyQuicServerSession*>(session());
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_, rst);
+          header_list, *this, server_session->max_inbound_header_list_size(),
+          filterManagerConnection()->maxIncomingHeadersCount(), details_, rst);
   if (headers == nullptr) {
     onStreamError(close_connection_upon_invalid_header_, rst);
     return;
@@ -366,9 +372,10 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
+    auto server_session = static_cast<EnvoyQuicServerSession*>(session());
     auto trailers = http2HeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
-        rst);
+        received_trailers(), server_session->max_inbound_header_list_size(),
+        filterManagerConnection()->maxIncomingHeadersCount(), *this, details_, rst);
     if (trailers == nullptr) {
       onStreamError(close_connection_upon_invalid_header_, rst);
       return;
@@ -565,6 +572,8 @@ void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_->setStreamDecoder(request_decoder_);
 }
 #endif
+
+void EnvoyQuicServerStream::OnInvalidHeaders() { onStreamError(absl::nullopt); }
 
 } // namespace Quic
 } // namespace Envoy

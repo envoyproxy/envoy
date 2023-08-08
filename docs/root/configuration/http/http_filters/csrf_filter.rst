@@ -20,7 +20,8 @@ There are many ways to mitigate CSRF, some of which have been outlined in the
 This filter employs a stateless mitigation pattern known as origin verification.
 
 This pattern relies on two pieces of information used in determining if
-a request originated from the same host.
+a request originated from the same host:
+
 * The origin that caused the user agent to issue the request (source origin).
 * The origin that the request is going to (target origin).
 
@@ -39,7 +40,7 @@ requests, the filter only acts on HTTP requests that have a state-changing metho
 
 For more information on CSRF please refer to the pages below.
 
-* https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29
+* https://owasp.org/www-community/attacks/csrf
 * https://seclab.stanford.edu/websec/csrf/csrf.pdf
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.csrf.v3.CsrfPolicy>`
@@ -52,7 +53,7 @@ Configuration
 The CSRF filter supports the ability to extend the source origins it will consider
 valid. The reason it is able to do this while still mitigating cross-site request
 forgery attempts is because the target origin has already been reached by the time
-front-envoy is applying the filter. This means that while endpoints may support
+front Envoy is applying the filter. This means that while endpoints may support
 cross-origin requests they are still protected from malicious third-parties who
 have not been allowlisted.
 
@@ -92,7 +93,7 @@ to determine if it's valid but will not enforce any policies.
 Statistics
 ----------
 
-The CSRF filter outputs statistics in the <stat_prefix>.csrf.* namespace.
+The CSRF filter outputs statistics in the ``<stat_prefix>.csrf.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
