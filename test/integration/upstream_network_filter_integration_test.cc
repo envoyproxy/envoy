@@ -368,22 +368,23 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, UpstreamNetworkExtensionDiscoveryIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
+TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addFilterChain();
-  addDynamicFilter(filter_name_, true);
+  addDynamicFilter(filter_name_, false);
   initialize();
-
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({port_name_});
-
-  // Send data without send config update, the default config will be applied.
-  sendDataVerifyResults(default_bytes_to_drain_);
-
-  // Send update should cause a different response.
-  sendXdsResponse(filter_name_, "1", 3);
+  // Send 1st config update to have filter drain 5 bytes of data.
+  sendXdsResponse(filter_name_, "1", 5);
   test_server_->waitForCounterGe(
       "extension_config_discovery.upstream_network_filter." + filter_name_ + ".config_reload", 1);
+  sendDataVerifyResults(5);
+  // Send 2nd config update to have filter drain 3 bytes of data.
+  sendXdsResponse(filter_name_, "2", 3);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_network_filter." + filter_name_ + ".config_reload", 2);
   sendDataVerifyResults(3);
 }
 
