@@ -67,7 +67,11 @@ public:
    */
   virtual RouteSharedPtr upstreamPool(std::string& key) PURE;
 
-  virtual void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) PURE;
+  /**
+   * Initializes read filter callbacks.
+   * @param callbacks supplies the read filter callbacks.
+   */
+  virtual void initializeReadFilterCallbacks(Network::ReadFilterCallbacks* callbacks) PURE;
 };
 
 using RouterPtr = std::unique_ptr<Router>;

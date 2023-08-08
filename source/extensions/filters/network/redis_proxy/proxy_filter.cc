@@ -88,7 +88,7 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
                                                config_->stats_.downstream_cx_tx_bytes_total_,
                                                config_->stats_.downstream_cx_tx_bytes_buffered_,
                                                nullptr, nullptr});
-  splitter_.setReadFilterCallback(callbacks_);
+  splitter_.initializeReadFilterCallbacks(&callbacks);
 }
 
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
@@ -104,8 +104,12 @@ void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
 }
 
 void ProxyFilter::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
+    ENVOY_LOG(trace, "new connection to redis proxy filter");
+  }
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    ENVOY_LOG(trace, "connection to redis proxy filter closed");
     while (!pending_requests_.empty()) {
       if (pending_requests_.front().request_handle_ != nullptr) {
         pending_requests_.front().request_handle_->cancel();

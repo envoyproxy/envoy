@@ -13,6 +13,8 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/http/header_map_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
@@ -64,7 +66,7 @@ private:
 
 using PrefixSharedPtr = std::shared_ptr<Prefix>;
 
-class PrefixRoutes : public Router {
+class PrefixRoutes : public Router, public Logger::Loggable<Logger::Id::redis> {
 public:
   PrefixRoutes(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes&
                    prefix_routes,
@@ -72,8 +74,13 @@ public:
 
   RouteSharedPtr upstreamPool(std::string& key) override;
 
-  void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) override {
-    callbacks_ = callbacks;
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks* callbacks) override {
+    // Capture the stream info so that we can use it for formatting. This is needed to
+    // to avoid lifetime issues if the stream is destroyed before formatting is done.
+    stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
+        callbacks->connection().dispatcher().timeSource(),
+        callbacks->connection().connectionInfoProviderSharedPtr());
+    stream_info_->setFrom(callbacks->connection().streamInfo(), nullptr);
   }
 
   /**
@@ -88,7 +95,7 @@ private:
   const bool case_insensitive_;
   Upstreams upstreams_;
   PrefixSharedPtr catch_all_route_;
-  Network::ReadFilterCallbacks* callbacks_{};
+  std::unique_ptr<StreamInfo::StreamInfoImpl> stream_info_;
   const std::string redis_key_formatter_command_ = "%KEY%";
 };
 

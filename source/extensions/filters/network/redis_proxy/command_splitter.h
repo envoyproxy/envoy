@@ -94,7 +94,11 @@ public:
                                       SplitCallbacks& callbacks,
                                       Event::Dispatcher& dispatcher) PURE;
 
-  virtual void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) PURE;
+  /**
+   * Initializes read filter callbacks.
+   * @param callbacks supplies the read filter callbacks.
+   */
+  virtual void initializeReadFilterCallbacks(Network::ReadFilterCallbacks* callbacks) PURE;
 };
 
 } // namespace CommandSplitter
