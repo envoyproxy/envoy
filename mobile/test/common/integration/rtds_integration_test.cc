@@ -73,6 +73,22 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
 
   // Verify that the Runtime config values are from the RTDS response.
   EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  // Send another RTDS request and get back the RTDS response.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_resource"},
+                                    {"some_rtds_resource"}, {}, true));
+  some_rtds_resource = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_rtds_resource
+    layer:
+      envoy.reloadable_features.test_feature_false: False
+  )EOF");
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+      Config::TypeUrl::get().Runtime, {some_rtds_resource}, {some_rtds_resource}, {}, "1", true);
+  // Wait until the RTDS updates from the DiscoveryResponse have been applied.
+  ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
+
+  // Verify that the Runtime config values are from the RTDS response.
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 }
 
 } // namespace
