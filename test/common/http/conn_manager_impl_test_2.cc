@@ -1107,7 +1107,12 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
-  EXPECT_ENVOY_BUG(
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "Route cache will be blocked after response headers are sent and should never try to refresh "
+      "or clear the route cache when it is blocked! To temporarily ignore "
+      "this new constraint, set runtime flag "
+      "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` to `false`",
       {
         // The cached route will not be cleared after response headers are sent.
         filter->callbacks_->downstreamCallbacks()->clearRouteCache();
@@ -1116,12 +1121,7 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
         // We cannot set route after response headers are sent.
         filter->callbacks_->downstreamCallbacks()->setRoute(nullptr);
         EXPECT_EQ(filter->callbacks_->route().get(), mock_route_2.get());
-      },
-      "Should never try to refresh or clear the route cache when it is blocked! "
-      "To temporarily ignore this new constraint, "
-      "set runtime flag "
-      "`envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent` "
-      "to `false`");
+      });
 
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
