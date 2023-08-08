@@ -113,10 +113,12 @@ void AggregateClusterLoadBalancer::refresh(OptRef<const std::string> excluded_cl
   priority_context_ = std::move(priority_context);
 }
 
-void AggregateClusterLoadBalancer::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  if (std::find(clusters_->begin(), clusters_->end(), cluster.info()->name()) != clusters_->end()) {
-    ENVOY_LOG(debug, "adding or updating cluster '{}' for aggregate cluster '{}'",
-              cluster.info()->name(), parent_info_->name());
+void AggregateClusterLoadBalancer::onClusterAddOrUpdate(
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+  if (std::find(clusters_->begin(), clusters_->end(), cluster_name) != clusters_->end()) {
+    ENVOY_LOG(debug, "adding or updating cluster '{}' for aggregate cluster '{}'", cluster_name,
+              parent_info_->name());
+    auto& cluster = get_cluster();
     refresh();
     addMemberUpdateCallbackForCluster(cluster);
   }

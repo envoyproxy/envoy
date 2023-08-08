@@ -63,26 +63,26 @@ public:
   void setup() {
     auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
-
+    GrpcMuxContext grpc_mux_context{
+        /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*dispatcher_=*/dispatcher_,
+        /*service_method_=*/
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+        /*local_info_=*/local_info_,
+        /*rate_limit_settings_=*/rate_limit_settings_,
+        /*scope_=*/*stats_.rootScope(),
+        /*config_validators_=*/std::move(config_validators_),
+        /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+        /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+        /*backoff_strategy_=*/std::move(backoff_strategy),
+        /*target_xds_authority_=*/"",
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
     if (isUnifiedMuxTest()) {
-      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(
-          std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          *stats_.rootScope(), rate_limit_settings_, local_info_, false,
-          std::move(config_validators_), std::move(backoff_strategy),
-          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
-          std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_));
+      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
       return;
     }
-    grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(
-        std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        *stats_.rootScope(), rate_limit_settings_, local_info_, std::move(config_validators_),
-        std::move(backoff_strategy),
-        /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
-        std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_));
+    grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);
   }
 
   void expectSendMessage(const std::string& type_url,
