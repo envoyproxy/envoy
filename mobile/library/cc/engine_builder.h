@@ -49,11 +49,27 @@ public:
   //                    requests.
   XdsBuilder(std::string xds_server_address, const int xds_server_port);
 
+  // Sets the authentication token in the gRPC headers used to authenticate to the xDS management
+  // server.
+  //
+  // For example, if using API keys to authenticate to Traffic Director on GCP (see
+  // https://cloud.google.com/docs/authentication/api-keys for details), invoke:
+  //   builder.setAuthenticationToken("x-goog-api-key", api_key_token)
+  //
+  // If this method is called, then don't call setJwtAuthenticationToken.
+  //
+  // `token_header`: the header name for which the the `token` will be set as a value.
+  // `token`: the authentication token.
+  XdsBuilder& setAuthenticationToken(std::string token_header, std::string token);
+
   // Sets JWT as the authentication method to the xDS management server, using the given token.
+  //
+  // If setAuthenticationToken is called, then invocations of this method will be ignored.
   //
   // `token`: the JWT token used to authenticate the client to the xDS management server.
   // `token_lifetime_in_seconds`: <optional> the lifetime of the JWT token, in seconds. If none
   //                              (or 0) is specified, then DefaultJwtTokenLifetimeSeconds is used.
+  // TODO(abeyad): Deprecate and remove this.
   XdsBuilder&
   setJwtAuthenticationToken(std::string token,
                             int token_lifetime_in_seconds = DefaultJwtTokenLifetimeSeconds);
@@ -107,6 +123,8 @@ private:
 
   std::string xds_server_address_;
   int xds_server_port_;
+  std::string authentication_token_header_;
+  std::string authentication_token_;
   std::string jwt_token_;
   int jwt_token_lifetime_in_seconds_ = DefaultJwtTokenLifetimeSeconds;
   std::string ssl_root_certs_;
