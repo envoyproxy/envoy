@@ -200,13 +200,6 @@ private:
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
-      // The sendLocalReply() method of Http::RequestDecoder may be called before the route is set.
-      // Try to refresh the route if it is not set to avoid the refreshing route in the response
-      // filter chain.
-      if (!cached_route_.has_value()) {
-        refreshCachedRoute();
-      }
-
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
