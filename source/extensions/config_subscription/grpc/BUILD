@@ -10,11 +10,25 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "grpc_mux_context_lib",
+    hdrs = ["grpc_mux_context.h"],
+    deps = [
+        "//envoy/config:custom_config_validators_interface",
+        "//envoy/config:eds_resources_cache_interface",
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_resources_delegate_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_mux_lib",
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
     deps = [
         ":eds_resources_cache_lib",
+        ":grpc_mux_context_lib",
         ":grpc_stream_lib",
         ":xds_source_id_lib",
         "//envoy/config:custom_config_validators_interface",
@@ -47,6 +61,7 @@ envoy_cc_library(
     deps = [
         ":delta_subscription_state_lib",
         ":eds_resources_cache_lib",
+        ":grpc_mux_context_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
         ":watch_map_lib",
