@@ -59,6 +59,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "deferred_cluster_initialization_test",
+    srcs = ["deferred_cluster_initialization_test.cc"],
+    external_deps = [
+        "abseil_base",
+    ],
+    deps = [
+        ":test_cluster_manager",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "cluster_manager_impl_test",
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
@@ -189,11 +211,11 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
@@ -554,7 +576,6 @@ envoy_cc_test(
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/mocks/upstream:typed_load_balancer_factory_mocks",
         "//test/test_common:registry_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",

@@ -93,10 +93,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       }
     }
 
-    if (common_response.clear_route_cache()) {
-      clearRouteCache(common_response);
-    }
-
+    clearRouteCache(common_response);
     onFinishProcessorCall(Grpc::Status::Ok);
 
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
@@ -129,13 +126,18 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       } else if (complete_body_available_ && body_mode_ != ProcessingMode::NONE) {
         // If we get here, then all the body data came in before the header message
         // was complete, and the server wants the body. It doesn't matter whether the
-        // processing mode is buffered, streamed, or partially streamed -- if we get
-        // here then the whole body is in the buffer and we can proceed as if the
-        // "buffered" processing mode was set.
-        ENVOY_LOG(debug, "Sending buffered request body message");
-        filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback, true);
-        clearWatermark();
-        return absl::OkStatus();
+        // processing mode is buffered, streamed, or partially buffered.
+        if (bufferedData()) {
+          // Get here, no_body_ = false, and complete_body_available_ = true, the end_stream
+          // flag of decodeData() can be determined by whether the trailers are received.
+          // Also, bufferedData() is not nullptr means decodeData() is called, even though
+          // the data can be an empty chunk.
+          filter_.sendBodyChunk(*this, *bufferedData(),
+                                ProcessorState::CallbackState::BufferedBodyCallback,
+                                !trailers_available_);
+          clearWatermark();
+          return absl::OkStatus();
+        }
       } else if (body_mode_ == ProcessingMode::BUFFERED) {
         // Here, we're not ready to continue processing because then
         // we won't be able to modify the headers any more, so do nothing and
@@ -324,10 +326,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::FailedPrecondition);
     }
 
-    if (common_response.clear_route_cache()) {
-      clearRouteCache(common_response);
-    }
-
+    clearRouteCache(common_response);
     headers_ = nullptr;
 
     if (send_trailers_ && trailers_available_) {
@@ -363,20 +362,6 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
     return absl::OkStatus();
   }
   return absl::FailedPreconditionError("spurious message");
-}
-
-void ProcessorState::clearRouteCache(const CommonResponse& common_response) {
-  // Only clear the route cache if there is a mutation to the header and clearing is allowed.
-  if (filter_.config().disableClearRouteCache()) {
-    filter_.stats().clear_route_cache_disabled_.inc();
-    ENVOY_LOG(debug, "NOT clearing route cache, it is disabled in the config");
-  } else if (common_response.has_header_mutation()) {
-    ENVOY_LOG(debug, "clearing route cache");
-    filter_callbacks_->downstreamCallbacks()->clearRouteCache();
-  } else {
-    filter_.stats().clear_route_cache_ignored_.inc();
-    ENVOY_LOG(debug, "NOT clearing route cache, no header mutations detected");
-  }
 }
 
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream,
@@ -438,6 +423,25 @@ void DecodingProcessorState::clearWatermark() {
     watermark_requested_ = false;
     decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   }
+}
+
+void DecodingProcessorState::clearRouteCache(const CommonResponse& common_response) {
+  if (!common_response.clear_route_cache()) {
+    return;
+  }
+  // Only clear the route cache if there is a mutation to the header and clearing is allowed.
+  if (filter_.config().disableClearRouteCache()) {
+    filter_.stats().clear_route_cache_disabled_.inc();
+    ENVOY_LOG(debug, "NOT clearing route cache, it is disabled in the config");
+    return;
+  }
+  if (common_response.has_header_mutation()) {
+    ENVOY_LOG(debug, "clearing route cache");
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+    return;
+  }
+  filter_.stats().clear_route_cache_ignored_.inc();
+  ENVOY_LOG(debug, "NOT clearing route cache, no header mutations detected");
 }
 
 void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {

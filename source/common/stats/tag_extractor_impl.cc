@@ -21,9 +21,8 @@ namespace {
 std::regex parseStdRegex(const std::string& regex) {
   TRY_ASSERT_MAIN_THREAD { return std::regex(regex, std::regex::optimize); }
   END_TRY
-  catch (const std::regex_error& e) {
-    throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
-  }
+  CATCH(const std::regex_error& e,
+        { throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what())); });
 }
 } // namespace
 
@@ -161,11 +160,10 @@ bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<
   }
 
   // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
-  re2::StringPiece remove_subexpr, value_subexpr;
+  absl::string_view remove_subexpr, value_subexpr;
 
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (re2::RE2::PartialMatch(re2::StringPiece(stat_name.data(), stat_name.size()), regex_,
-                             &remove_subexpr, &value_subexpr) &&
+  if (re2::RE2::PartialMatch(stat_name, regex_, &remove_subexpr, &value_subexpr) &&
       !remove_subexpr.empty()) {
 
     // value_subexpr is the optional second submatch. It is usually inside the first submatch

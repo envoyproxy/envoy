@@ -349,6 +349,7 @@ public:
   }
 
   void onReject(RejectCause) override { PANIC("not implemented"); }
+  void recordConnectionsAcceptedOnSocketEvent(uint32_t) override {}
 
   void addHosts(const std::string& hostname, const IpList& ip, const RecordType& type) {
     if (type == RecordType::A) {
@@ -721,7 +722,8 @@ public:
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
-    listener_ = dispatcher_->createListener(socket_, *server_, runtime_, true, false);
+    NiceMock<Network::MockListenerConfig> listener_config;
+    listener_ = dispatcher_->createListener(socket_, *server_, runtime_, listener_config);
     updateDnsResolverOptions();
 
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
@@ -1121,6 +1123,9 @@ TEST_P(DnsImplTest, DestroyChannelOnResetNetworking) {
 // Validate that the c-ares channel is destroyed and re-initialized when c-ares returns
 // ARES_ECONNREFUSED as its callback status.
 TEST_P(DnsImplTest, DestroyChannelOnRefused) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   ASSERT_FALSE(peer_->isChannelDirty());
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   server_->setRefused(true);

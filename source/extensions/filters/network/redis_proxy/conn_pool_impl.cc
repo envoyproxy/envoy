@@ -98,7 +98,10 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
-    onClusterAddOrUpdateNonVirtual(*cluster);
+    Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+      return *cluster;
+    };
+    onClusterAddOrUpdateNonVirtual(cluster->info()->name(), command);
   }
 }
 
@@ -115,8 +118,8 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
-    Upstream::ThreadLocalCluster& cluster) {
-  if (cluster.info()->name() != cluster_name_) {
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+  if (cluster_name != cluster_name_) {
     return;
   }
   // Ensure the filter is not deleted in the main thread during this method.
@@ -131,6 +134,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   }
 
   ASSERT(cluster_ == nullptr);
+  auto& cluster = get_cluster();
   cluster_ = &cluster;
   // Update username and password when cluster updates.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
@@ -282,15 +286,15 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
+  uint32_t client_idx = transaction.current_client_idx_;
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
-    transaction.client_ =
+    transaction.clients_[client_idx] =
         client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
                                auth_username_, auth_password_, true);
     if (transaction.connection_cb_) {
-      transaction.client_->addConnectionCallbacks(*transaction.connection_cb_);
+      transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }
-    transaction.connection_established_ = true;
   }
 
   pending_requests_.emplace_back(*this, std::move(request), callbacks, host);
@@ -308,7 +312,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     pending_request.request_handler_ = client->redis_client_->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
   } else {
-    pending_request.request_handler_ = transaction.client_->makeRequest(
+    pending_request.request_handler_ = transaction.clients_[client_idx]->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
   }
 
@@ -347,11 +351,10 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
       return nullptr;
     }
-    try {
+    TRY_NEEDS_AUDIT {
       address_ptr = std::make_shared<Network::Address::Ipv6Instance>(ip_address, ip_port_number);
-    } catch (const EnvoyException&) {
-      return nullptr;
     }
+    END_TRY catch (const EnvoyException&) { return nullptr; }
     host_address_map_key = address_ptr->asString();
   }
 
@@ -370,11 +373,10 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
       if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
         return nullptr;
       }
-      try {
+      TRY_NEEDS_AUDIT {
         address_ptr = std::make_shared<Network::Address::Ipv4Instance>(ip_address, ip_port_number);
-      } catch (const EnvoyException&) {
-        return nullptr;
       }
+      END_TRY catch (const EnvoyException&) { return nullptr; }
     }
     Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
         cluster_->info(), "", address_ptr, nullptr, 1, envoy::config::core::v3::Locality(),

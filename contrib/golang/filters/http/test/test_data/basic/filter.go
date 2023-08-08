@@ -7,10 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 type filter struct {
+	api.PassThroughStreamFilter
+
 	callbacks       api.FilterCallbackHandler
 	req_body_length uint64
 	query_params    url.Values
@@ -80,14 +82,17 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 
 func (f *filter) fail(msg string, a ...any) api.StatusType {
 	body := fmt.Sprintf(msg, a...)
-	f.callbacks.SendLocalReply(500, body, nil, -1, "")
+	f.callbacks.SendLocalReply(500, body, nil, 0, "")
 	return api.LocalReply
 }
 
 func (f *filter) sendLocalReply(phase string) api.StatusType {
-	headers := make(map[string]string)
+	headers := map[string]string{
+		"Content-type": "text/html",
+		"test-phase":   phase,
+	}
 	body := fmt.Sprintf("forbidden from go in %s\r\n", phase)
-	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
+	f.callbacks.SendLocalReply(403, body, headers, 0, "")
 	return api.LocalReply
 }
 
@@ -100,6 +105,12 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.callbacks.Log(api.Warn, "log test")
 	f.callbacks.Log(api.Error, "log test")
 	f.callbacks.Log(api.Critical, "log test")
+	api.LogTrace("log test")
+	api.LogDebug("log test")
+	api.LogInfo("log test")
+	api.LogWarn("log test")
+	api.LogError("log test")
+	api.LogCritical("log test")
 
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
@@ -108,11 +119,31 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	_, found := header.Get("x-set-metadata")
 	if found {
 		md := f.callbacks.StreamInfo().DynamicMetadata()
+		empty_metadata := md.Get("filter.go")
+		if len(empty_metadata) != 0 {
+			return f.fail("Metadata should be empty")
+		}
 		md.Set("filter.go", "foo", "bar")
+		metadata := md.Get("filter.go")
+		if len(metadata) == 0 {
+			return f.fail("Metadata should not be empty")
+		}
+
+		k, ok := metadata["foo"]
+		if !ok {
+			return f.fail("Metadata foo should be found")
+		}
+
+		if fmt.Sprint(k) != "bar" {
+			return f.fail("Metadata foo has unexpected value %v", k)
+		}
 	}
 
 	fs := f.callbacks.StreamInfo().FilterState()
 	fs.SetString("go_state_test_key", "go_state_test_value", api.StateTypeReadOnly, api.LifeSpanRequest, api.SharedWithUpstreamConnection)
+
+	val := fs.GetString("go_state_test_key")
+	header.Add("go-state-test-header-key", val)
 
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
@@ -121,6 +152,14 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	header.Range(func(key, value string) bool {
 		if key == ":path" && value != f.path {
 			f.fail("path not match in Range")
+			return false
+		}
+		return true
+	})
+
+	header.RangeWithCopy(func(key, value string) bool {
+		if key == ":path" && value != f.path {
+			f.fail("path not match in RangeWithCopy")
 			return false
 		}
 		return true
@@ -223,7 +262,7 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	if details, ok := f.callbacks.StreamInfo().ResponseCodeDetails(); ok {
 		header.Set("rsp-response-code-details", details)
 	}
-	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamHostAddress(); ok {
+	if upstream_host_address, ok := f.callbacks.StreamInfo().UpstreamRemoteAddress(); ok {
 		header.Set("rsp-upstream-host", upstream_host_address)
 	}
 	if upstream_cluster_name, ok := f.callbacks.StreamInfo().UpstreamClusterName(); ok {
@@ -260,6 +299,11 @@ func (f *filter) encodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 	header.Set("rsp-route-name", f.callbacks.StreamInfo().GetRouteName())
 	header.Set("rsp-filter-chain-name", f.callbacks.StreamInfo().FilterChainName())
 	header.Set("rsp-attempt-count", strconv.Itoa(int(f.callbacks.StreamInfo().AttemptCount())))
+	if name, ok := f.callbacks.StreamInfo().VirtualClusterName(); ok {
+		header.Set("rsp-virtual-cluster-name", name)
+	} else {
+		header.Set("rsp-virtual-cluster-name", "not found")
+	}
 
 	if f.panic == "encode-header" {
 		badcode()

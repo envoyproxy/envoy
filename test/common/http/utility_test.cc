@@ -912,23 +912,44 @@ TEST(HttpUtility, TestParseSetCookieWithQuotes) {
 }
 
 TEST(HttpUtility, TestMakeSetCookieValue) {
+  CookieAttributeRefVector ref_attributes;
   EXPECT_EQ("name=\"value\"; Max-Age=10",
-            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"",
-            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), false));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), false,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Max-Age=10; HttpOnly",
-            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), true));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), true,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; HttpOnly",
-            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), true));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), true,
+                                        ref_attributes));
 
   EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/",
-            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), false));
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), false,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Path=/",
-            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), false));
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), false,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/; HttpOnly",
-            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), true));
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), true,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Path=/; HttpOnly",
-            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true));
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true,
+                                        ref_attributes));
+
+  std::vector<CookieAttribute> attributes;
+  attributes.push_back({"SameSite", "None"});
+  attributes.push_back({"Secure", ""});
+  attributes.push_back({"Partitioned", ""});
+  for (const auto& attribute : attributes) {
+    ref_attributes.push_back(attribute);
+  }
+
+  EXPECT_EQ("name=\"value\"; Path=/; SameSite=None; Secure; Partitioned; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true,
+                                        ref_attributes));
 }
 
 TEST(HttpUtility, SendLocalReply) {
@@ -1216,6 +1237,32 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   // make sure that the callback was called (which means that the dynamic_cast worked.)
   ASSERT_TRUE(merged_cfg.has_value());
   EXPECT_EQ(2, merged_cfg.value().state_);
+}
+
+class BadConfig {
+public:
+  int state_;
+  void merge(const BadConfig& other) { state_ += other.state_; }
+};
+
+// Verify that merging result is empty as expected when the bad config is provided.
+TEST(HttpUtility, GetMergedPerFilterBadConfig) {
+  TestConfig testConfig;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(_, _))
+      .WillOnce(Invoke([&](const std::string&,
+                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+        cb(testConfig);
+      }));
+
+  EXPECT_LOG_CONTAINS(
+      "debug", "Failed to retrieve the correct type of route specific filter config",
+      auto merged_cfg = Utility::getMergedPerFilterConfig<BadConfig>(
+          &filter_callbacks,
+          [&](BadConfig& base_cfg, const BadConfig& route_cfg) { base_cfg.merge(route_cfg); });
+      // Dynamic_cast failed, so merged_cfg is not set.
+      ASSERT_FALSE(merged_cfg.has_value()););
 }
 
 TEST(HttpUtility, CheckIsIpAddress) {
@@ -1890,6 +1937,52 @@ TEST(Utility, isValidRefererValue) {
       Utility::isValidRefererValue(absl::string_view("http://www.example.com/?foo=bar#fragment")));
   EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("foo=bar#fragment")));
 };
+TEST(HeaderIsValidTest, SchemeIsValid) {
+  EXPECT_TRUE(Utility::schemeIsValid("http"));
+  EXPECT_TRUE(Utility::schemeIsValid("https"));
+  EXPECT_TRUE(Utility::schemeIsValid("HtTP"));
+  EXPECT_TRUE(Utility::schemeIsValid("HtTPs"));
+
+  EXPECT_FALSE(Utility::schemeIsValid("htt"));
+  EXPECT_FALSE(Utility::schemeIsValid("httpss"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsHttp) {
+  EXPECT_TRUE(Utility::schemeIsHttp("http"));
+  EXPECT_TRUE(Utility::schemeIsHttp("htTp"));
+  EXPECT_FALSE(Utility::schemeIsHttp("https"));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+  EXPECT_TRUE(Utility::schemeIsHttp("http"));
+  EXPECT_FALSE(Utility::schemeIsHttp("htTp"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsHttps) {
+  EXPECT_TRUE(Utility::schemeIsHttps("https"));
+  EXPECT_TRUE(Utility::schemeIsHttps("htTps"));
+  EXPECT_FALSE(Utility::schemeIsHttps("http"));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+  EXPECT_TRUE(Utility::schemeIsHttps("https"));
+  EXPECT_FALSE(Utility::schemeIsHttps("htTps"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsValidLegacy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+
+  EXPECT_TRUE(Utility::schemeIsValid("http"));
+  EXPECT_TRUE(Utility::schemeIsValid("https"));
+
+  // These were not considered valid previously
+  EXPECT_FALSE(Utility::schemeIsValid("HtTP"));
+  EXPECT_FALSE(Utility::schemeIsValid("HtTPs"));
+
+  EXPECT_FALSE(Utility::schemeIsValid("htt"));
+  EXPECT_FALSE(Utility::schemeIsValid("httpss"));
+}
 
 } // namespace Http
 } // namespace Envoy

@@ -41,7 +41,6 @@ public:
   static const std::chrono::milliseconds& slowStartWindow(EdfLoadBalancerBase& edf_lb) {
     return edf_lb.slow_start_window_;
   }
-  static double aggression(EdfLoadBalancerBase& edf_lb) { return edf_lb.aggression_; }
   static const std::chrono::milliseconds latestHostAddedTime(EdfLoadBalancerBase& edf_lb) {
     return std::chrono::time_point_cast<std::chrono::milliseconds>(edf_lb.latest_host_added_time_)
         .time_since_epoch();
@@ -317,6 +316,70 @@ TEST_P(LoadBalancerBaseTest, OverProvisioningFactor) {
   failover_host_set_.setOverprovisioningFactor(100);
   updateHostSet(failover_host_set_, 4, 2);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
+}
+
+TEST_P(LoadBalancerBaseTest, WeightedPriorityHealth) {
+  host_set_.weighted_priority_health_ = true;
+  failover_host_set_.weighted_priority_health_ = true;
+
+  // Makes math easier to read.
+  host_set_.setOverprovisioningFactor(100);
+  failover_host_set_.setOverprovisioningFactor(100);
+
+  // Basic healthy/unhealthy test.
+  updateHostSet(host_set_, 4, 2, 0, 0);
+  updateHostSet(failover_host_set_, 1, 1);
+
+  // Total weight is 10, healthy weight is 6.
+  host_set_.hosts_[0]->weight(3); // Healthy
+  host_set_.hosts_[1]->weight(3); // Healthy
+  host_set_.hosts_[2]->weight(2); // Unhealthy
+  host_set_.hosts_[3]->weight(2); // Unhealthy
+  host_set_.runCallbacks({}, {});
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(60, 40));
+}
+
+TEST_P(LoadBalancerBaseTest, WeightedPriorityHealthExcluded) {
+  host_set_.weighted_priority_health_ = true;
+  failover_host_set_.weighted_priority_health_ = true;
+
+  // Makes math easier to read.
+  host_set_.setOverprovisioningFactor(100);
+  failover_host_set_.setOverprovisioningFactor(100);
+
+  updateHostSet(failover_host_set_, 1, 1);
+  updateHostSet(host_set_, 3, 1, 0, 1);
+  host_set_.hosts_[0]->weight(4);  // Healthy
+  host_set_.hosts_[1]->weight(10); // Excluded
+  host_set_.hosts_[2]->weight(6);  // Unhealthy
+  host_set_.runCallbacks({}, {});
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(40, 60));
+}
+
+TEST_P(LoadBalancerBaseTest, WeightedPriorityHealthDegraded) {
+  host_set_.weighted_priority_health_ = true;
+  failover_host_set_.weighted_priority_health_ = true;
+
+  // Makes math easier to read.
+  host_set_.setOverprovisioningFactor(100);
+  failover_host_set_.setOverprovisioningFactor(100);
+
+  updateHostSet(host_set_, 4, 1, 1, 0);
+  host_set_.hosts_[0]->weight(4); // Healthy
+  host_set_.hosts_[1]->weight(3); // Degraded
+  host_set_.hosts_[2]->weight(2); // Unhealthy
+  host_set_.hosts_[3]->weight(1); // Unhealthy
+  host_set_.runCallbacks({}, {});
+
+  updateHostSet(failover_host_set_, 2, 1, 1); // 1 healthy host, 1 degraded.
+  failover_host_set_.hosts_[0]->weight(1);    // Healthy
+  failover_host_set_.hosts_[1]->weight(9);    // Degraded
+  failover_host_set_.runCallbacks({}, {});
+
+  // 40% for healthy priority 0, 10% for healthy priority 1, 30% for degraded priority zero, and the
+  // remaining 20% to degraded priority 1.
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(40, 10));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(30, 20));
 }
 
 TEST_P(LoadBalancerBaseTest, GentleFailover) {
@@ -1553,9 +1616,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
-  const auto aggression =
-      EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(1.0, aggression);
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
@@ -1570,9 +1630,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
-  const auto aggression =
-      EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(1.0, aggression);
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
@@ -2228,9 +2285,6 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
-  const auto aggression =
-      EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(lb_2));
-  EXPECT_EQ(1.0, aggression);
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);

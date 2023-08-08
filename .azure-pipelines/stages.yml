@@ -60,20 +60,16 @@ stages:
 - stage: prechecks
   displayName: Prechecks
   dependsOn: ["env"]
-  variables:
-    CHECK_DEPS: $[stageDependencies.env.repo.outputs['changed.requirements']]
   jobs:
   - template: stage/prechecks.yml
     parameters:
       concurrencyPrechecks: ${{ parameters.concurrencyPrechecks }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
-      authGithub: $(GitHubPublicRepoOnlyAccessToken)
       authGCP: $(GcpServiceAccountKey)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
-      checkDeps: variables['CHECK_DEPS']
 
 - stage: linux_x64
   displayName: Linux x64
@@ -110,6 +106,7 @@ stages:
   jobs:
   - template: stage/checks.yml
     parameters:
+      cacheTestResults: ${{ parameters.cacheTestResults }}
       concurrencyChecks: ${{ parameters.concurrencyChecks }}
       authGCP: $(GcpServiceAccountKey)
       bucketGCP: $(GcsArtifactBucket)
@@ -132,7 +129,6 @@ stages:
       authDockerUser: $(DockerUsername)
       authDockerPassword: $(DockerPassword)
       authGCP: $(GcpServiceAccountKey)
-      authGithub: $(GitHubPublicRepoOnlyAccessToken)
       authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
       authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
       authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)

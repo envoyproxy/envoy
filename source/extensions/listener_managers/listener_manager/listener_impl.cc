@@ -320,6 +320,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       added_via_api_(added_via_api), workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      max_connections_to_accept_per_socket_event_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
+                                          Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -446,6 +449,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      max_connections_to_accept_per_socket_event_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
+                                          Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -939,9 +945,15 @@ bool PerListenerFactoryContextImpl::isQuicListener() const {
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
 bool ListenerImpl::createNetworkFilterChain(
-    Network::Connection& connection,
-    const std::vector<Network::FilterFactoryCb>& filter_factories) {
-  return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+    Network::Connection& connection, const Filter::NetworkFilterFactoriesList& filter_factories) {
+  if (!Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories)) {
+    ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                     "Close socket and stop the iteration onAccept.");
+    missing_listener_config_stats_.network_extension_config_missing_.inc();
+    return false;
+  }
+
+  return true;
 }
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {

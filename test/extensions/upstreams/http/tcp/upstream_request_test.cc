@@ -41,8 +41,7 @@ public:
     cm.initializeThreadLocalClusters({"fake_cluster"});
     EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, true, route_entry,
-                                               Envoy::Http::Protocol::Http11, nullptr);
+    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, route_entry, nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;
@@ -94,9 +93,10 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
-    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _))
-        .WillByDefault(Invoke(
-            [&](Envoy::Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
+    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _, _))
+        .WillByDefault(
+            Invoke([&](Envoy::Http::FilterChainManager& manager, bool only_create_if_configured,
+                       const Envoy::Http::FilterChainOptions&) -> bool {
               if (only_create_if_configured) {
                 return false;
               }

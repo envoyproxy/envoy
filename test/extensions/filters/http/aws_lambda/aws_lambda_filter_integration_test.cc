@@ -29,7 +29,7 @@ public:
   void TearDown() override { fake_upstream_connection_.reset(); }
 
   void setupLambdaFilter(bool passthrough) {
-    const std::string filter =
+    constexpr absl::string_view filter =
         R"EOF(
             name: envoy.filters.http.aws_lambda
             typed_config:

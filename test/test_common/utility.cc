@@ -285,6 +285,21 @@ uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,
   return sample_count;
 }
 
+double TestUtility::readSampleSum(Event::Dispatcher& main_dispatcher,
+                                  const Stats::ParentHistogram& histogram) {
+  // Note: we need to read the sample count from the main thread, to avoid data races.
+  double sample_sum = 0;
+  absl::Notification notification;
+
+  main_dispatcher.post([&] {
+    sample_sum = histogram.cumulativeStatistics().sampleSum();
+    notification.Notify();
+  });
+  notification.WaitForNotification();
+
+  return sample_sum;
+}
+
 std::list<Network::DnsResponse>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
   std::list<Network::DnsResponse> ret;

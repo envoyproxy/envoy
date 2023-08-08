@@ -61,7 +61,7 @@ For Envoy acting as a forward proxy, the preferred configuration is the
 :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
 By default it will use TCP and ALPN to select the best available protocol of HTTP/2 and HTTP/1.1.
 
-.. _arch_overview_http3_upstream:
+.. _arch_overview_http3_pooling_upstream:
 
 For auto-http with HTTP/3, an alternate protocol cache must be configured via
 :ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`.  HTTP/3 connections will only be attempted to servers which
@@ -86,13 +86,20 @@ production burn time, but is considered ready for use.
 Happy Eyeballs Support
 ----------------------
 
-Envoy supports Happy Eyeballs, `RFC6555 <https://tools.ietf.org/html/rfc6555>`_,
-for upstream TCP connections.  For clusters which use
+Envoy supports Happy Eyeballs, `RFC8305 <https://tools.ietf.org/html/rfc8305>`_,
+for upstream TCP connections. For clusters which use
 :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
 this behavior is configured by setting the DNS IP address resolution policy in
 :ref:`config.cluster.v3.Cluster.DnsLookupFamily <envoy_v3_api_enum_config.cluster.v3.Cluster.DnsLookupFamily>`
 to the :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` option to return
-both IPv4 and IPv6 addresses. The returned addresses will be sorted according the the Happy Eyeballs
+both IPv4 and IPv6 addresses. For clusters which use
+:ref:`EDS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.EDS>`, this behavior is configured
+by specifying additional IP addresses for a host using the
+:ref:`additional_addresses <envoy_v3_api_field_config.endpoint.v3.Endpoint.additional_addresses>` field.
+The addresses specified in this field will be appended in a list to the one specified in
+:ref:`address <envoy_v3_api_field_config.endpoint.v3.Endpoint.address>`
+
+The list of all addresses will be sorted according the the Happy Eyeballs
 specification and a connection will be attempted to the first in the list. If this connection succeeds,
 it will be used. If it fails, an attempt will be made to the next on the list. If after 300ms the connection
 is still connecting, then a backup connection attempt will be made to the next address on the list.

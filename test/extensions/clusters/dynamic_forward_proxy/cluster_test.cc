@@ -18,6 +18,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 
@@ -108,7 +109,7 @@ public:
     host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
   }
 
-  void refreshLb() { lb_ = lb_factory_->create(); }
+  void refreshLb() { lb_ = lb_factory_->create(lb_params_); }
 
   Upstream::MockLoadBalancerContext* setHostAndReturnContext(const std::string& host) {
     downstream_headers_.remove(":authority");
@@ -169,6 +170,10 @@ public:
   Envoy::Common::CallbackHandlePtr member_update_cb_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Network::MockConnection> connection_;
+
+  // Just use this as parameters of create() method but thread aware load balancer will not use it.
+  NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
 
   const std::string sub_cluster_yaml_config_ = R"EOF(
 name: name

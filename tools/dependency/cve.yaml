@@ -49,3 +49,6 @@ ignored_cves:
 - CVE-2021-22939
 - CVE-2021-22940
 - CVE-2021-43803
+# This CVE assumes an untrusted client that can affect a shared connection between an intervening proxy and
+# gRPC server, and does not affect Envoy directly
+- CVE-2023-32732

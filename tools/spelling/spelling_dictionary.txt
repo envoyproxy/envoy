@@ -30,6 +30,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+CIO
 DFP
 DOM
 GiB
@@ -248,6 +249,7 @@ hls
 iframe
 ingressed
 integrations
+iouring
 jkl
 lang
 libsxg
@@ -632,6 +634,7 @@ cryptographic
 cryptographically
 cstate
 cstring
+ctad
 ctor
 ctrl
 customizations
@@ -815,6 +818,7 @@ idx
 ifdef
 iff
 ified
+ifndef
 impl
 implementors
 impls
@@ -924,6 +928,7 @@ metatable
 microbenchmarks
 midp
 milli
+mimics
 misconfiguration
 misconfigured
 mixin
@@ -1160,6 +1165,7 @@ responder
 restarter
 resync
 ret
+retransmissions
 retransmitted
 retransmitting
 retriable
@@ -1205,6 +1211,7 @@ serv
 servercert
 setenv
 setsockopt
+sfixed
 sig
 sigaction
 sigactions
@@ -1214,6 +1221,7 @@ signalstack
 siloed
 sim
 sinked
+sint
 sizeof
 smatch
 snapshotted
@@ -1391,6 +1399,7 @@ versa
 versioned
 vhost
 viewable
+viewport
 vip
 virtualhost
 virtualize

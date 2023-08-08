@@ -10,5 +10,9 @@ ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   return Nlohmann::Factory::loadFromString(json);
 }
 
+absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string& json) {
+  return Nlohmann::Factory::loadFromStringNoThrow(json);
+}
+
 } // namespace Json
 } // namespace Envoy

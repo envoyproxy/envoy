@@ -118,8 +118,6 @@ public:
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
-    quic_stream_->useCapsuleProtocol();
-
     // Decodes a CONNECT-UDP request.
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _))
         .WillOnce(Invoke([](const Http::RequestHeaderMapSharedPtr& headers, bool) {
@@ -266,6 +264,7 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";
   spdy_headers[":path"] = "/";
+  spdy_headers[":scheme"] = "https";
   spdy_headers.AppendValueOrAddHeader("cookie", "a=b");
   spdy_headers.AppendValueOrAddHeader("cookie", "c=d");
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_headers);

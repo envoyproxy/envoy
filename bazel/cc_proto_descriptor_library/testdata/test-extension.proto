@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package testdata.dynamic_descriptors;
+
+import "bazel/cc_proto_descriptor_library/testdata/test.proto";
+
+extend Foo {
+  optional int64 number = 11;
+}
