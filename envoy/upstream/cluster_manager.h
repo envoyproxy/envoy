@@ -43,6 +43,7 @@ namespace Upstream {
  * ClusterUpdateCallbacks provide a way to expose Cluster lifecycle events in the
  * ClusterManager.
  */
+using ThreadLocalClusterCommand = std::function<ThreadLocalCluster&()>;
 class ClusterUpdateCallbacks {
 public:
   virtual ~ClusterUpdateCallbacks() = default;
@@ -50,11 +51,12 @@ public:
   /**
    * onClusterAddOrUpdate is called when a new cluster is added or an existing cluster
    * is updated in the ClusterManager.
-   * @param cluster is the ThreadLocalCluster that represents the updated
-   * cluster.
+   * @param cluster_name the name of the changed cluster.
+   * @param get_cluster is a callable that will provide the ThreadLocalCluster that represents the
+   * updated cluster. It should be used within the call or discarded.
    */
-  virtual void onClusterAddOrUpdate(ThreadLocalCluster& cluster) PURE;
-
+  virtual void onClusterAddOrUpdate(absl::string_view cluster_name,
+                                    ThreadLocalClusterCommand& get_cluster) PURE;
   /**
    * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
    * @param cluster_name is the name of the removed cluster.
