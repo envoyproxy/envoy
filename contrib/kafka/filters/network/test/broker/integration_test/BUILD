@@ -17,8 +17,8 @@ envoy_py_test(
         "@kafka_python_client//:all",
     ],
     data = [
-        "//bazel:remote_jdk11",
         "//contrib/exe:envoy-static",
+        "//bazel:remote_jdk11",
         "@kafka_server_binary//:all",
     ] + glob(["*.j2"]),
     flaky = True,

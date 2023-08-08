@@ -1200,7 +1200,7 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jlong connect_time
                       jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
                       jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
-                      jstring http3_connection_options, jstring, http3_client_connection_options,
+                      jstring http3_connection_options, jstring http3_client_connection_options,
                       jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
                       jboolean enable_socket_tagging, jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,

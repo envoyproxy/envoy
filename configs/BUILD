@@ -43,8 +43,8 @@ filegroup(
         "//bazel:disable_admin_functionality": [],
         "//conditions:default": [
             "envoy-demo.yaml",
-            "envoy-tap-config.yaml",
             "freebind/freebind.yaml",
+            "envoy-tap-config.yaml",
         ],
     }),
 )
