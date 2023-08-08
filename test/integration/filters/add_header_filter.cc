@@ -72,9 +72,9 @@ public:
       const Protobuf::Message& config, const std::string&,
       Server::Configuration::UpstreamHttpFactoryContext& context) override {
 
-    const auto& proto_config = MessageUtil::downcastAndValidate<
-        const test::integration::filters::AddHeaderFilterConfig&>(
-        config, context.getServerFactoryContext().messageValidationVisitor());
+    const auto& proto_config =
+        MessageUtil::downcastAndValidate<const test::integration::filters::AddHeaderFilterConfig&>(
+            config, context.getServerFactoryContext().messageValidationVisitor());
 
     return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<AddConfigurableHeaderFilter>(

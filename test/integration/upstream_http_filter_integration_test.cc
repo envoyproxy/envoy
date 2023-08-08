@@ -72,8 +72,7 @@ class StaticUpstreamHttpFilterIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public UpstreamHttpFilterIntegrationTestBase {
 public:
-  StaticUpstreamHttpFilterIntegrationTest()
-      : UpstreamHttpFilterIntegrationTestBase(GetParam()) {}
+  StaticUpstreamHttpFilterIntegrationTest() : UpstreamHttpFilterIntegrationTestBase(GetParam()) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, StaticUpstreamHttpFilterIntegrationTest,
@@ -144,9 +143,8 @@ TEST_P(StaticUpstreamHttpFilterIntegrationTest, RouterAndClusterFilters) {
   EXPECT_FALSE(upstream_headers->get(Http::LowerCaseString("x-header-to-add")).empty());
 }
 
-class UpstreamHttpExtensionDiscoveryIntegrationTest
-    : public Grpc::GrpcClientIntegrationParamTest,
-      public UpstreamHttpFilterIntegrationTestBase {
+class UpstreamHttpExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                                      public UpstreamHttpFilterIntegrationTestBase {
 public:
   UpstreamHttpExtensionDiscoveryIntegrationTest()
       : UpstreamHttpFilterIntegrationTestBase(ipVersion()) {}
