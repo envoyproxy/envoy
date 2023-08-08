@@ -280,8 +280,6 @@ public:
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
-      ProtobufWkt::Any temp_any;
-      temp_any.PackFrom(message);
       resource.mutable_resource()->PackFrom(message);
       resource.set_name(intResourceName(message));
       resource.set_version(version);

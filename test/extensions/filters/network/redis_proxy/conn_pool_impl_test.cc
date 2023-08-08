@@ -591,7 +591,12 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
   EXPECT_EQ(nullptr, request);
 
   // Now add the cluster. Request to the cluster should succeed.
-  update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return cm_.thread_local_cluster_;
+    };
+    update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_.info()->name(), command);
+  }
   // MurmurHash of "foo" is 9631199822919835226U
   makeSimpleRequest(true, "foo", 9631199822919835226U);
 
@@ -604,10 +609,20 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
   // Add a cluster we don't care about.
   NiceMock<Upstream::MockThreadLocalCluster> cluster2;
   cluster2.cluster_.info_->name_ = "cluster2";
-  update_callbacks_->onClusterAddOrUpdate(cluster2);
+  {
+    Upstream::ThreadLocalClusterCommand command = [&cluster2]() -> Upstream::ThreadLocalCluster& {
+      return cluster2;
+    };
+    update_callbacks_->onClusterAddOrUpdate(cluster2.cluster_.info()->name(), command);
+  }
 
   // Add the cluster back. Request to the cluster should succeed.
-  update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return cm_.thread_local_cluster_;
+    };
+    update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_.info()->name(), command);
+  }
   // MurmurHash of "foo" is 9631199822919835226U
   makeSimpleRequest(true, "foo", 9631199822919835226U);
 
@@ -619,7 +634,12 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
   // Update the cluster. This should count as a remove followed by an add. Request to the cluster
   // should succeed.
   EXPECT_CALL(*client_, close());
-  update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return cm_.thread_local_cluster_;
+    };
+    update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_.info()->name(), command);
+  }
   // MurmurHash of "foo" is 9631199822919835226U
   makeSimpleRequest(true, "foo", 9631199822919835226U);
 
@@ -654,7 +674,12 @@ TEST_F(RedisConnPoolImplTest, AuthInfoUpdate) {
   auth_password_ = "";
 
   // Now add the cluster. Request to the cluster should succeed.
-  update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return cm_.thread_local_cluster_;
+    };
+    update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_.info()->name(), command);
+  }
   // MurmurHash of "foo" is 9631199822919835226U
   makeSimpleRequest(true, "foo", 9631199822919835226U);
 
@@ -800,7 +825,12 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToHost) {
     // There is no cluster yet, so makeRequestToHost() should fail.
     EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
     // Add the cluster now.
-    update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+    {
+      Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+        return cm_.thread_local_cluster_;
+      };
+      update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_.info()->name(), command);
+    }
 
     EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
     EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
