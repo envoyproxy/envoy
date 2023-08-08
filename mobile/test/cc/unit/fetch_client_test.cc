@@ -13,7 +13,7 @@ namespace {
 // to do so.
 TEST(FetchClientTest, Foo) {
   Envoy::Fetch client;
-  client.fetch({"https://wwwfff.google.com/"});
+  client.fetch({"https://www.google.com/"});
 }
 
 } // namespace
