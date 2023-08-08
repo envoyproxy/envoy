@@ -69,7 +69,7 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
         private_key_method_ =
           factory_context.sslContextManager()
               .privateKeyMethodManager()
-              .createPrivateKeyMethodProvider(provider, factory_context);
+              .createPrivateKeyMethodProvider(provider, factory_context, const_cast<std::string&>(private_key_));
         if(private_key_method_->checkInitialized()){
           break;
         }else{
@@ -81,7 +81,7 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       private_key_method_ =
           factory_context.sslContextManager()
               .privateKeyMethodManager()
-              .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context);
+              .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context, const_cast<std::string&>(private_key_));
         if(!private_key_method_->checkInitialized()){
           private_key_method_ = nullptr;
         }

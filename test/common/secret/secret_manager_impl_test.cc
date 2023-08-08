@@ -1114,7 +1114,7 @@ tls_certificate:
   testing::NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   testing::NiceMock<Ssl::MockContextManager> ssl_context_manager;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _))
       .WillRepeatedly(Return(nullptr));
   EXPECT_CALL(ssl_context_manager, privateKeyMethodManager())
       .WillRepeatedly(ReturnRef(private_key_method_manager));

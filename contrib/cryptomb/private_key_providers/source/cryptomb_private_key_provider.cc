@@ -517,7 +517,7 @@ void CryptoMbPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
 CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::cryptomb::v3alpha::
         CryptoMbPrivateKeyMethodConfig& conf,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
+    Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp, std::string& private_key)
     : api_(factory_context.serverFactoryContext().api()),
       tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(
           factory_context.serverFactoryContext().threadLocal())),
@@ -531,10 +531,10 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 200));
 
-  std::string private_key = Config::DataSource::read(conf.private_key(), false, api_);
+  std::string private_key_temp = private_key.empty()?Config::DataSource::read(conf.private_key(), false, api_):private_key;
 
   bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+      BIO_new_mem_buf(const_cast<char*>(private_key_temp.data()), private_key_temp.size()));
 
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
   if (pkey == nullptr) {

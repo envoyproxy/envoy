@@ -41,7 +41,7 @@ public:
       const envoy::extensions::private_key_providers::qat::v3alpha::QatPrivateKeyMethodConfig&
           config,
       Server::Configuration::TransportSocketFactoryContext& private_key_provider_context,
-      LibQatCryptoSharedPtr libqat);
+      LibQatCryptoSharedPtr libqat, std::string& private_key);
   // Ssl::PrivateKeyMethodProvider
   void registerPrivateKeyMethod(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
                                 Event::Dispatcher& dispatcher) override;

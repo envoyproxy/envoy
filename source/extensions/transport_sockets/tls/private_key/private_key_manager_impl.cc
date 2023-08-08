@@ -11,7 +11,7 @@ namespace Tls {
 Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
 PrivateKeyMethodManagerImpl::createPrivateKeyMethodProvider(
     const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+    Server::Configuration::TransportSocketFactoryContext& factory_context, std::string& private_key) {
 
   Ssl::PrivateKeyMethodProviderInstanceFactory* factory =
       Registry::FactoryRegistry<Ssl::PrivateKeyMethodProviderInstanceFactory>::getFactory(
@@ -19,7 +19,7 @@ PrivateKeyMethodManagerImpl::createPrivateKeyMethodProvider(
 
   // Create a new provider instance with the configuration.
   if (factory) {
-    return factory->createPrivateKeyMethodProviderInstance(config, factory_context);
+    return factory->createPrivateKeyMethodProviderInstance(config, factory_context, private_key);
   }
 
   return nullptr;
