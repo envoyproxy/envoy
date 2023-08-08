@@ -310,8 +310,8 @@ public class JniLibrary {
       long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
       boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsResourceName,
-      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsJwtToken,
-      long xdsJwtTokenLifetime, String xdsRootCerts, String xdsSni, String nodeId,
-      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
-      long cdsTimeoutSeconds, boolean enableCds);
+      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsAuthenticationHeader,
+      String xdsAuthenticationToken, String xdsJwtToken, long xdsJwtTokenLifetime,
+      String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
+      String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
 }
