@@ -14,6 +14,14 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   const auto& composite_action = MessageUtil::downcastAndValidate<
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
+      if (composite_action.has_config_discovery()){
+        auto config_discovery = composite_action.config_discovery();
+            if context.server_factory_context_.has_value(){
+  std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =  Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+            context.getServerFactoryContext());
+            }
+     
+      } else {
 
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
@@ -43,7 +51,8 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   return [cb = std::move(callback)]() -> Matcher::ActionPtr {
     return std::make_unique<ExecuteFilterAction>(cb);
   };
-}
+      }
+|}
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,
                  Matcher::ActionFactory<Http::Matching::HttpFilterActionContext>);
