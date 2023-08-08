@@ -139,11 +139,9 @@ function formatRange(lowerBound, width) {
  * @param {string} bucketPosPercent The bucket position, expressed as a string percentage.
  * @param {!Object} bucket the bucket record from JSON, augmented with an annotations list
  * @param {!Element} bucketSpan a span element for the bucket; used to color it yellow.
- * @param {boolean} showingCount whether the the count is shown on the histogram itself,
- *                  which dictates whether we will also show it in the popup.
  * @return {!Function<!Event>} a function to call when the mouse enters the span.
  */
- function showPopupFn(detailPopup, bucketPosPercent, bucket, bucketSpan, showingCount) {
+ function showPopupFn(detailPopup, bucketPosPercent, bucket, bucketSpan) {
   return (event) => {
     if (globalState.pendingTimeout) {
       window.clearTimeout(globalState.pendingTimeout);
@@ -156,9 +154,7 @@ function formatRange(lowerBound, width) {
 
     detailPopup.replaceChildren();
     appendNewElement(detailPopup, 'div').textContent = formatRange(bucket.lower_bound, bucket.width);
-    if (!showingCount) {
-      appendNewElement(detailPopup, 'div').textContent = 'count=' + bucket.count;
-    }
+    appendNewElement(detailPopup, 'div').textContent = 'count=' + bucket.count;
     if (bucket.annotations) {
       for (annotation of bucket.annotations) {
         const span = appendNewElement(detailPopup, 'div');
@@ -468,6 +464,7 @@ class Painter {
     this.detailPopup.addEventListener('mouseleave', leavePopup);
 
     this.textInterval = Math.ceil(numBuckets / constants.maxBucketsWithText);
+    this.prevAnnotationVpx = null;
   }
 
   /**
@@ -503,7 +500,8 @@ class Painter {
     // Don't draw textual labels for the percentiles and intervals if there are
     // more than one: they'll just get garbled. The user can over over the
     // bucket to see the detail.
-    if (bucket.annotations.length == 1) {
+    if (bucket.annotations.length == 1 &&
+        (!this.prevAnnotationVpx || percentileVpx - this.prevAnnotationVpx > this.widthVpx/20)) {
       const percentilePLabel = appendNewElement(this.annotationsDiv, 'span', 'percentile-label');
       percentilePLabel.style.bottom = 0;
       percentilePLabel.textContent = annotation.toString();
@@ -513,6 +511,7 @@ class Painter {
       percentileVLabel.style.bottom = '30%';
       percentileVLabel.textContent = format(annotation.value);
       percentileVLabel.style.left = percentilePercent;
+      this.prevAnnotationVpx = percentileVpx;
     }
   }
 
@@ -532,16 +531,21 @@ class Painter {
     bucketSpan.style.width = this.bucketWidthPercent;
     bucketSpan.style.left = this.leftPercent;
 
-    let showingCount = false;
     if (++this.textIntervalIndex == this.textInterval) {
-      showingCount = true;
       this.textIntervalIndex = 0;
       this.drawBucketLabels(bucket, heightPercent);
     }
 
+    // Position the popup so it's left edge aligns with the left edge of the
+    // bucket by default. Adjust it to the left by a bit so it doesn't get
+    // clipped by the right edge of the viewport. This is heuristic but seems to
+    // work well for a few test cases.
+    let popupPos = this.leftVpx;
+    if (popupPos / this.widthVpx > 0.9) {
+      popupPos -= this.widthVpx/15;
+    }
     bucketSpan.addEventListener('mouseenter', showPopupFn(
-        this.detailPopup, formatPercent(this.vpxToPosition(this.leftVpx)), bucket,
-        bucketSpan, showingCount));
+        this.detailPopup, formatPercent(this.vpxToPosition(popupPos)), bucket, bucketSpan));
 
     bucketSpan.addEventListener('mouseleave', timeoutFn(this.detailPopup));
 
