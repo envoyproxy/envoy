@@ -1,5 +1,8 @@
 name: mobile_core
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -7,17 +10,28 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
   unittests:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
     name: unit_tests
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:321658b6b50abda6869f89fac275f59bf3b1e757
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
     - uses: actions/checkout@v3
     - name: Ensure no listener leaks
@@ -28,11 +42,11 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw test \
+        cd mobile
+        ./bazelw test \
             --build_tests_only \
             --action_env=LD_LIBRARY_PATH \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
-            --test_output=all \
             --define envoy_mobile_listener=disabled \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --config=mobile-remote-ci \
             //test/common/...

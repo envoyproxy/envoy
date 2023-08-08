@@ -43,6 +43,9 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return base_route_->typedMetadata();
   }
+  bool filterDisabled(absl::string_view name) const override {
+    return base_route_->filterDisabled(name);
+  }
 
 private:
   const Router::RouteConstSharedPtr base_route_;
@@ -112,6 +115,7 @@ public:
   const ConnectConfigOptRef connectConfig() const override;
   const std::string& routeName() const override;
   const EarlyDataPolicy& earlyDataPolicy() const override;
+  const RouteStatsContextOptRef routeStatsContext() const override;
 
 private:
   const Router::RouteConstSharedPtr base_route_;

@@ -48,7 +48,6 @@ void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded)
   cert_validation_result_ =
       succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
   if (cert_validate_result_callback_.has_value()) {
-    ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
     // This is an async cert validation.
     cert_validate_result_callback_.reset();
     // Resume handshake.
@@ -99,6 +98,12 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
+    case SSL_ERROR_SYSCALL:
+      // By default, when SSL_ERROR_SYSCALL occurred, the underlying transport does not participate
+      // in the error queue. Therefore, setting `syscall_error_occurred` to true to report the error
+      // in `drainErrorQueue`.
+      handshake_callbacks_->onFailure(/*syscall_error_occurred=*/true);
+      return PostIoAction::Close;
     default:
       handshake_callbacks_->onFailure();
       return PostIoAction::Close;

@@ -1155,6 +1155,39 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
   redis_client->close();
 }
 
+TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredTransaction) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
+
+  std::string request = makeBulkStringArray({"MULTI"}) +
+                        makeBulkStringArray({"set", "foo", "bar"}) +
+                        makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
+  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+
+  // roundtrip to cluster_0 (catch_all route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(request));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
+
+  // mirror to cluster_1 and cluster_2
+  expectUpstreamRequestResponse(fake_upstreams_[2], request, "$4\r\nbar1\r\n",
+                                fake_upstream_connection[1]);
+  expectUpstreamRequestResponse(fake_upstreams_[4], request, "$4\r\nbar2\r\n",
+                                fake_upstream_connection[2]);
+
+  redis_client->waitForData(response);
+  // The original response from the cluster_0 should be received by the fake Redis client and the
+  // response from mirrored requests are ignored.
+  EXPECT_EQ(response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  EXPECT_TRUE(fake_upstream_connection[1]->close());
+  EXPECT_TRUE(fake_upstream_connection[2]->close());
+  redis_client->close();
+}
+
 TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
   initialize();
 

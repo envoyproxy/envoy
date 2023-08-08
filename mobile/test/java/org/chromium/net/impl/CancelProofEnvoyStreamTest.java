@@ -357,7 +357,7 @@ public class CancelProofEnvoyStreamTest {
 
   private class MockedStream extends EnvoyHTTPStream {
 
-    private MockedStream() { super(0, 0, null, false); }
+    private MockedStream() { super(0, 0, null, false, 0); }
 
     @Override
     public void sendHeaders(Map<String, List<String>> headers, boolean endStream) {

@@ -1,12 +1,13 @@
 * See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
 * See [GOVERNANCE.md](GOVERNANCE.md) for governance guidelines and maintainer responsibilities.
+* See [CODEOWNERS](CODEOWNERS) for a detailed list of owners for the various source directories.
 
 This page lists all active maintainers and their areas of expertise. This can be used for
 routing PRs, questions, etc. to the right place.
 
 # Senior maintainers
 
-* Matt Klein ([mattklein123](https://github.com/mattklein123)) (mklein@lyft.com)
+* Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
@@ -20,8 +21,6 @@ routing PRs, questions, etc. to the right place.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
-* Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
-  * Upstream, host/priority sets, load balancing, and retry plugins.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
@@ -74,6 +73,8 @@ without further review.
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
 * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (nezdolik@spotify.com)
+* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 
 In addition to the permanent Envoy security team, we have additional temporary
 contributors to envoy-setec and relevant Slack channels from:
@@ -110,6 +111,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
 * JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
 * Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
+* Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
 
 # Friends of Envoy
 

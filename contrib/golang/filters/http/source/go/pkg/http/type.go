@@ -19,9 +19,10 @@ package http
 
 import (
 	"strconv"
+	"sync"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 // panic error messages when C API return not ok
@@ -38,6 +39,7 @@ type headerMapImpl struct {
 	headers     map[string][]string
 	headerNum   uint64
 	headerBytes uint64
+	mutex       sync.Mutex
 }
 
 // ByteSize return size of HeaderMap
@@ -62,6 +64,8 @@ func (h *requestOrResponseHeaderMapImpl) GetRaw(key string) string {
 }
 
 func (h *requestOrResponseHeaderMapImpl) Get(key string) (string, bool) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 	h.initHeaders()
 	value, ok := h.headers[key]
 	if !ok {
@@ -71,6 +75,8 @@ func (h *requestOrResponseHeaderMapImpl) Get(key string) (string, bool) {
 }
 
 func (h *requestOrResponseHeaderMapImpl) Values(key string) []string {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 	h.initHeaders()
 	value, ok := h.headers[key]
 	if !ok {
@@ -83,6 +89,8 @@ func (h *requestOrResponseHeaderMapImpl) Set(key, value string) {
 	// Get all header values first before setting a value, since the set operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 	h.initHeaders()
 	if h.headers != nil {
 		h.headers[key] = []string{value}
@@ -91,6 +99,8 @@ func (h *requestOrResponseHeaderMapImpl) Set(key, value string) {
 }
 
 func (h *requestOrResponseHeaderMapImpl) Add(key, value string) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 	h.initHeaders()
 	if h.headers != nil {
 		if hdrs, found := h.headers[key]; found {
@@ -106,14 +116,37 @@ func (h *requestOrResponseHeaderMapImpl) Del(key string) {
 	// Get all header values first before removing a key, since the del operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 	h.initHeaders()
 	delete(h.headers, key)
 	cAPI.HttpRemoveHeader(unsafe.Pointer(h.request.req), &key)
 }
 
 func (h *requestOrResponseHeaderMapImpl) Range(f func(key, value string) bool) {
+	// To avoid dead lock, methods with lock(Get, Values, Set, Add, Del) should not be used in func f.
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 	h.initHeaders()
 	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
+}
+
+func (h *requestOrResponseHeaderMapImpl) RangeWithCopy(f func(key, value string) bool) {
+	// There is no dead lock risk in RangeWithCopy, but copy may introduce performance cost.
+	h.mutex.Lock()
+	h.initHeaders()
+	copied_headers := make(map[string][]string)
+	for key, values := range h.headers {
+		copied_headers[key] = values
+	}
+	h.mutex.Unlock()
+	for key, values := range copied_headers {
 		for _, value := range values {
 			if !f(key, value) {
 				return
@@ -173,18 +206,22 @@ type requestOrResponseTrailerMapImpl struct {
 	headerMapImpl
 }
 
-func (h *requestOrResponseTrailerMapImpl) initHeaders() {
+func (h *requestOrResponseTrailerMapImpl) initTrailers() {
 	if h.headers == nil {
 		h.headers = cAPI.HttpCopyTrailers(unsafe.Pointer(h.request.req), h.headerNum, h.headerBytes)
 	}
 }
 
 func (h *requestOrResponseTrailerMapImpl) GetRaw(key string) string {
-	panic("unsupported yet")
+	var value string
+	cAPI.HttpGetHeader(unsafe.Pointer(h.request.req), &key, &value)
+	return value
 }
 
 func (h *requestOrResponseTrailerMapImpl) Get(key string) (string, bool) {
-	h.initHeaders()
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initTrailers()
 	value, ok := h.headers[key]
 	if !ok {
 		return "", false
@@ -193,7 +230,9 @@ func (h *requestOrResponseTrailerMapImpl) Get(key string) (string, bool) {
 }
 
 func (h *requestOrResponseTrailerMapImpl) Values(key string) []string {
-	h.initHeaders()
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initTrailers()
 	value, ok := h.headers[key]
 	if !ok {
 		return nil
@@ -205,25 +244,62 @@ func (h *requestOrResponseTrailerMapImpl) Set(key, value string) {
 	// Get all header values first before setting a value, since the set operation may not take affects immediately
 	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
 	// Otherwise, we may get outdated values in a following Get call.
-	h.initHeaders()
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initTrailers()
 	if h.headers != nil {
 		h.headers[key] = []string{value}
 	}
 
-	cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value)
+	cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value, false)
 }
 
 func (h *requestOrResponseTrailerMapImpl) Add(key, value string) {
-	panic("unsupported yet")
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initTrailers()
+	if h.headers != nil {
+		if trailers, found := h.headers[key]; found {
+			h.headers[key] = append(trailers, value)
+		} else {
+			h.headers[key] = []string{value}
+		}
+	}
+	cAPI.HttpSetTrailer(unsafe.Pointer(h.request.req), &key, &value, true)
 }
 
 func (h *requestOrResponseTrailerMapImpl) Del(key string) {
-	panic("unsupported yet")
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initTrailers()
+	delete(h.headers, key)
+	cAPI.HttpRemoveTrailer(unsafe.Pointer(h.request.req), &key)
 }
 
 func (h *requestOrResponseTrailerMapImpl) Range(f func(key, value string) bool) {
-	h.initHeaders()
+	// To avoid dead lock, methods with lock(Get, Values, Set, Add, Del) should not be used in func f.
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initTrailers()
 	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
+}
+
+func (h *requestOrResponseTrailerMapImpl) RangeWithCopy(f func(key, value string) bool) {
+	// There is no dead lock risk in RangeWithCopy, but copy may introduce performance cost.
+	h.mutex.Lock()
+	h.initTrailers()
+	copied_headers := make(map[string][]string)
+	for key, values := range h.headers {
+		copied_headers[key] = values
+	}
+	h.mutex.Unlock()
+	for key, values := range copied_headers {
 		for _, value := range values {
 			if !f(key, value) {
 				return

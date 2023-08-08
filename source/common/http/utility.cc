@@ -66,10 +66,8 @@ absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
     bool remove_port = !new_port.empty();
 
     if (new_scheme != request_protocol) {
-      remove_port |=
-          (request_protocol == Http::Headers::get().SchemeValues.Https) && request_port == ":443";
-      remove_port |=
-          (request_protocol == Http::Headers::get().SchemeValues.Http) && request_port == ":80";
+      remove_port |= Http::Utility::schemeIsHttps(request_protocol) && request_port == ":443";
+      remove_port |= Http::Utility::schemeIsHttp(request_protocol) && request_port == ":80";
     }
 
     if (remove_port) {
@@ -463,9 +461,28 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
                               const bool append_xfh) {
-  if (append_xfh && !headers.getHostValue().empty()) {
-    headers.appendForwardedHost(headers.getHostValue(), ",");
+  const auto host = headers.getHostValue();
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.append_xfh_idempotent")) {
+    // Only append to x-forwarded-host if the value was not the last value appended.
+    const auto xfh = headers.getForwardedHostValue();
+
+    if (append_xfh && !host.empty()) {
+      if (!xfh.empty()) {
+        const auto xfh_split = StringUtil::splitToken(xfh, ",");
+        if (!xfh_split.empty() && xfh_split.back() != host) {
+          headers.appendForwardedHost(host, ",");
+        }
+      } else {
+        headers.appendForwardedHost(host, ",");
+      }
+    }
+  } else {
+    if (append_xfh && !host.empty()) {
+      headers.appendForwardedHost(host, ",");
+    }
   }
+
   headers.setHost(hostname);
 }
 
@@ -569,7 +586,8 @@ std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const s
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
                                         const std::string& path, const std::chrono::seconds max_age,
-                                        bool httponly) {
+                                        bool httponly,
+                                        const Http::CookieAttributeRefVector attributes) {
   std::string cookie_value;
   // Best effort attempt to avoid numerous string copies.
   cookie_value.reserve(value.size() + path.size() + 30);
@@ -581,6 +599,15 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   if (!path.empty()) {
     absl::StrAppend(&cookie_value, "; Path=", path);
   }
+
+  for (auto const& attribute : attributes) {
+    if (attribute.get().value().empty()) {
+      absl::StrAppend(&cookie_value, "; ", attribute.get().name());
+    } else {
+      absl::StrAppend(&cookie_value, "; ", attribute.get().name(), "=", attribute.get().value());
+    }
+  }
+
   if (httponly) {
     absl::StrAppend(&cookie_value, "; HttpOnly");
   }
@@ -1358,6 +1385,24 @@ Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
                                 // Http::Code::RequestTimeout is more expensive because HTTP1 client
                                 // cannot use the connection any more.
                                 : Http::Code::RequestTimeout;
+}
+
+bool Utility::schemeIsValid(const absl::string_view scheme) {
+  return schemeIsHttp(scheme) || schemeIsHttps(scheme);
+}
+
+bool Utility::schemeIsHttp(const absl::string_view scheme) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
+    return scheme == Headers::get().SchemeValues.Http;
+  }
+  return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Http);
+}
+
+bool Utility::schemeIsHttps(const absl::string_view scheme) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
+    return scheme == Headers::get().SchemeValues.Https;
+  }
+  return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Https);
 }
 
 std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redirect_config,

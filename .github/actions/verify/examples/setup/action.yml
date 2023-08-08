@@ -1,0 +1,37 @@
+inputs:
+  ref:
+    type: string
+    required: true
+  bucket:
+    type: string
+    default: envoy-pr
+
+runs:
+  using: composite
+  steps:
+  - id: url
+    run: |
+        echo "base=https://storage.googleapis.com/${{ inputs.bucket }}/${REF:0:7}/docker" \
+            >> "$GITHUB_OUTPUT"
+    env:
+      REF: ${{ inputs.ref }}
+    shell: bash
+  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.0.10
+    with:
+      url: "${{ steps.url.outputs.base }}/envoy.tar"
+      variant: dev
+  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.0.10
+    with:
+      url: "${{ steps.url.outputs.base }}/envoy-contrib.tar"
+      variant: contrib-dev
+  - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.0.10
+    with:
+      url: "${{ steps.url.outputs.base }}/envoy-google-vrp.tar"
+      variant: google-vrp-dev
+  - run: docker images | grep envoy
+    shell: bash
+  - run: |
+      export DEBIAN_FRONTEND=noninteractive
+      sudo apt-get -qq update -y
+      sudo apt-get -qq install -y --no-install-recommends expect
+    shell: bash

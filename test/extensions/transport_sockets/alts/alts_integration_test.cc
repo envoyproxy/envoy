@@ -133,7 +133,7 @@ public:
         capturing_handshaker_service_ = nullptr;
         // If max_expected_concurrent_rpcs is zero, the fake handshaker service will not track
         // concurrent RPCs and abort if it exceeds the value.
-        service = grpc::gcp::CreateFakeHandshakerService(/* max_expected_concurrent_rpcs */ 0);
+        service = grpc::gcp::CreateFakeHandshakerService("peer_identity");
       }
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
@@ -160,7 +160,7 @@ public:
       }
     };
     FakeSingletonManager fsm;
-    ON_CALL(mock_factory_ctx, singletonManager()).WillByDefault(ReturnRef(fsm));
+    ON_CALL(mock_factory_ctx.server_context_, singletonManager()).WillByDefault(ReturnRef(fsm));
     UpstreamAltsTransportSocketConfigFactory factory;
 
     envoy::extensions::transport_sockets::alts::v3::Alts alts_config;

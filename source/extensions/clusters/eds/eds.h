@@ -10,6 +10,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/registry/registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
@@ -47,8 +48,9 @@ private:
                             const EnvoyException* e) override;
   using LocalityWeightsMap = absl::node_hash_map<envoy::config::core::v3::Locality, uint32_t,
                                                  LocalityHash, LocalityEqualTo>;
-  bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
-                              const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
+  bool updateHostsPerLocality(const uint32_t priority, bool weighted_priority_health,
+                              const uint32_t overprovisioning_factor, const HostVector& new_hosts,
+                              LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
                               PriorityStateManager& priority_state_manager,
                               const HostMap& all_hosts,
@@ -117,6 +119,8 @@ private:
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
+
+DECLARE_FACTORY(EdsClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

@@ -19,9 +19,7 @@ public:
     if (end_stream) {
       onPreDecodeComplete();
     }
-
     inner_.decodeHeaders(std::move(headers), end_stream);
-
     if (end_stream) {
       onDecodeComplete();
     }
@@ -31,9 +29,7 @@ public:
     if (end_stream) {
       onPreDecodeComplete();
     }
-
     inner_.decodeData(data, end_stream);
-
     if (end_stream) {
       onDecodeComplete();
     }

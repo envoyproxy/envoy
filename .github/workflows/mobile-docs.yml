@@ -1,5 +1,8 @@
 name: mobile_docs
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -7,16 +10,27 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
   docs:
-    if: github.repository == 'envoyproxy/envoy'
-    runs-on: ubuntu-20.04
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 20
     container:
-      image: envoyproxy/envoy-build-ubuntu:321658b6b50abda6869f89fac275f59bf3b1e757
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
     - uses: actions/checkout@v3
     - name: Add safe directory

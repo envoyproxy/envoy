@@ -52,6 +52,7 @@ filegroup(
     name = "test_server_files",
     srcs = [
         "active_stats_test.js",
+        "histograms_test.js",
         "web_test.html",
         "web_test.js",
         "web_test.yaml",

@@ -22,16 +22,8 @@ using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::UhvResponseCodeDetail;
-using ValidationResult = ::Envoy::Http::HeaderValidatorBase::ValidationResult;
-
-struct Http1ResponseCodeDetailValues {
-  const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
-  const std::string TransferEncodingNotAllowed = "uhv.http1.transfer_encoding_not_allowed";
-  const std::string ContentLengthNotAllowed = "uhv.http1.content_length_not_allowed";
-  const std::string ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
-};
-
-using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
+using ValidationResult = ::Envoy::Http::HeaderValidator::ValidationResult;
+using Http1ResponseCodeDetail = ::Envoy::Http::Http1ResponseCodeDetail;
 
 /*
  * Header validation implementation for the Http/1 codec. This class follows guidance from
@@ -43,17 +35,73 @@ using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
  *
  */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stats),
+                                           ::Envoy::Http::HeaderValidatorStats& stats,
+                                           const ConfigOverrides& config_overrides)
+    : HeaderValidator(config, protocol, stats, config_overrides),
       request_header_validator_map_{
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
           {":authority", absl::bind_front(&HeaderValidator::validateHostHeader, this)},
           {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
-          {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {":path", getPathValidationMethod()},
           {"transfer-encoding",
            absl::bind_front(&Http1HeaderValidator::validateTransferEncodingHeader, this)},
           {"content-length", absl::bind_front(&HeaderValidator::validateContentLengthHeader, this)},
       } {}
+
+HeaderValidator::HeaderValidatorFunction Http1HeaderValidator::getPathValidationMethod() {
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
+    return absl::bind_front(&Http1HeaderValidator::validatePathHeaderWithAdditionalCharacters,
+                            this);
+  }
+  return absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this);
+}
+
+HeaderValidator::HeaderValueValidationResult
+Http1HeaderValidator::validatePathHeaderWithAdditionalCharacters(
+    const HeaderString& path_header_value) {
+  ASSERT(config_overrides_.allow_non_compliant_characters_in_path_);
+  // Same table as the kPathHeaderCharTable but with the following additional character allowed
+  // " < > [ ] ^ ` { } \ |
+  // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
+  // runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000000000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b01101111111111111111111111111110,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+
+  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // allowed " < > [ ] ^ ` { } \ | # This table is used when the
+  // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kQueryAndFragmentCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000000000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b01111111111111111111111111111111,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+  return HeaderValidator::validatePathHeaderCharacterSet(
+      path_header_value, kPathHeaderCharTableWithAdditionalCharacters,
+      kQueryAndFragmentCharTableWithAdditionalCharacters);
+}
 
 HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -97,6 +145,30 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 
   // Validate the header value
   return validateGenericHeaderValue(value);
+}
+
+ValidationResult Http1HeaderValidator::validateContentLengthAndTransferEncoding(
+    const ::Envoy::Http::RequestOrResponseHeaderMap& header_map) {
+  /**
+   * Validate Transfer-Encoding and Content-Length headers.
+   * HTTP/1.1 disallows a Transfer-Encoding and Content-Length headers,
+   * https://www.rfc-editor.org/rfc/rfc9112.html#section-6.2:
+   *
+   * A sender MUST NOT send a Content-Length header field in any message that
+   * contains a Transfer-Encoding header field.
+   *
+   * The http1_protocol_options.allow_chunked_length config setting can
+   * override the RFC compliance to allow a Transfer-Encoding of "chunked" with
+   * a Content-Length set. In this exception case, we remove the Content-Length
+   * header in the transform[Request/Response]Headers() method.
+   */
+  if (header_map.TransferEncoding() && header_map.ContentLength() &&
+      hasChunkedTransferEncoding(header_map.TransferEncoding()->value()) &&
+      !config_.http1_protocol_options().allow_chunked_length()) {
+    // Configuration does not allow chunked encoding and content-length, reject the request
+    return {ValidationResult::Action::Reject, Http1ResponseCodeDetail::get().ChunkedContentLength};
+  }
+  return ValidationResult::success();
 }
 
 ValidationResult Http1HeaderValidator::validateRequestHeaders(const RequestHeaderMap& header_map) {
@@ -166,16 +238,6 @@ ValidationResult Http1HeaderValidator::validateRequestHeaders(const RequestHeade
   }
 
   // Step 2: Validate Transfer-Encoding and Content-Length headers.
-  // HTTP/1.1 disallows a Transfer-Encoding and Content-Length headers,
-  // https://www.rfc-editor.org/rfc/rfc9112.html#section-6.2:
-  //
-  // A sender MUST NOT send a Content-Length header field in any message that
-  // contains a Transfer-Encoding header field.
-  //
-  // The http1_protocol_options.allow_chunked_length config setting can
-  // override the RFC compliance to allow a Transfer-Encoding of "chunked" with
-  // a Content-Length set. In this exception case, we remove the Content-Length
-  // header.
   if (header_map.TransferEncoding()) {
     // CONNECT methods must not contain any content so reject the request if Transfer-Encoding or
     // Content-Length is provided, per RFC 9110,
@@ -188,12 +250,9 @@ ValidationResult Http1HeaderValidator::validateRequestHeaders(const RequestHeade
               Http1ResponseCodeDetail::get().TransferEncodingNotAllowed};
     }
 
-    if (header_map.ContentLength() &&
-        hasChunkedTransferEncoding(header_map.TransferEncoding()->value()) &&
-        !config_.http1_protocol_options().allow_chunked_length()) {
-      // Configuration does not allow chunked length, reject the request
-      return {ValidationResult::Action::Reject,
-              Http1ResponseCodeDetail::get().ChunkedContentLength};
+    ValidationResult result = validateContentLengthAndTransferEncoding(header_map);
+    if (!result.ok()) {
+      return result;
     }
   }
 
@@ -275,37 +334,47 @@ ValidationResult Http1HeaderValidator::validateRequestHeaders(const RequestHeade
   return ValidationResult::success();
 }
 
-void Http1HeaderValidator::sanitizeContentLength(::Envoy::Http::RequestHeaderMap& header_map) {
+void Http1HeaderValidator::sanitizeContentLength(
+    ::Envoy::Http::RequestOrResponseHeaderMap& header_map) {
   // The http1_protocol_options.allow_chunked_length config setting can
   // override the RFC compliance to allow a Transfer-Encoding of "chunked" with
   // a Content-Length set. In this exception case, we remove the Content-Length
   // header.
-  if (header_map.TransferEncoding()) {
-    if (header_map.ContentLength() &&
-        hasChunkedTransferEncoding(header_map.TransferEncoding()->value())) {
-      if (config_.http1_protocol_options().allow_chunked_length()) {
-        // Allow a chunked transfer encoding and remove the content length.
-        header_map.removeContentLength();
-      }
-    }
-  } else if (header_map.ContentLength() && header_map.getContentLengthValue() == "0" &&
-             ::Envoy::Http::HeaderUtility::isConnect(header_map)) {
-    // Remove a 0 content length from a CONNECT request
+  if (header_map.TransferEncoding() && header_map.ContentLength() &&
+      hasChunkedTransferEncoding(header_map.TransferEncoding()->value()) &&
+      config_.http1_protocol_options().allow_chunked_length()) {
+    // Allow a chunked transfer encoding and remove the content length.
     header_map.removeContentLength();
   }
 }
 
-::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult
+void ServerHttp1HeaderValidator::sanitizeContentLength(
+    ::Envoy::Http::RequestHeaderMap& header_map) {
+  if (header_map.ContentLength() && header_map.getContentLengthValue() == "0" &&
+      ::Envoy::Http::HeaderUtility::isConnect(header_map)) {
+    // Remove a 0 content length from a CONNECT request
+    header_map.removeContentLength();
+  } else {
+    Http1HeaderValidator::sanitizeContentLength(header_map);
+  }
+}
+
+::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult
 ServerHttp1HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
   sanitizeContentLength(header_map);
   sanitizeHeadersWithUnderscores(header_map);
-  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
-    auto path_result = path_normalizer_.normalizePathUri(header_map);
-    if (!path_result.ok()) {
-      return path_result;
-    }
+  sanitizePathWithFragment(header_map);
+  auto path_result = transformUrlPath(header_map);
+  if (!path_result.ok()) {
+    return path_result;
   }
-  return ::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult::success();
+  return ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::success();
+}
+
+::Envoy::Http::HeaderValidator::TransformationResult
+ClientHttp1HeaderValidator::transformResponseHeaders(::Envoy::Http::ResponseHeaderMap& header_map) {
+  sanitizeContentLength(header_map);
+  return TransformationResult::success();
 }
 
 ValidationResult
@@ -331,6 +400,11 @@ Http1HeaderValidator::validateResponseHeaders(const ::Envoy::Http::ResponseHeade
     // of 1xx (Informational) or 204 (No Content).
     return {ValidationResult::Action::Reject,
             Http1ResponseCodeDetail::get().TransferEncodingNotAllowed};
+  }
+
+  ValidationResult result = validateContentLengthAndTransferEncoding(header_map);
+  if (!result.ok()) {
+    return result;
   }
 
   // Step 3: Verify each response header

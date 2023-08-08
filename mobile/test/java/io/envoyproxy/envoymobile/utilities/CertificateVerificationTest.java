@@ -5,6 +5,7 @@ import static org.junit.Assert.assertEquals;
 import android.content.Context;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
+import io.envoyproxy.envoymobile.utilities.ContextUtils;
 import androidx.test.platform.app.InstrumentationRegistry;
 import java.nio.charset.StandardCharsets;
 
@@ -25,6 +26,9 @@ public final class CertificateVerificationTest {
   static {
     AndroidJniLibrary.loadTestLibrary();
     Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    if (ContextUtils.getApplicationContext() == null) {
+      ContextUtils.initApplicationContext(context.getApplicationContext());
+    }
     AndroidJniLibrary.load(context.getApplicationContext());
   }
 

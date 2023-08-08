@@ -58,17 +58,21 @@ jobs:
       msan:
         CI_TARGET: "bazel.msan"
         ENVOY_FILTER_EXAMPLE: true
-      clang_tidy:
-        CI_TARGET: "bazel.clang_tidy"
-        REPO_FETCH_DEPTH: 0
-        REPO_FETCH_TAGS: true
-        PUBLISH_TEST_RESULTS: false
-        PUBLISH_ENVOY: false
+      #
+      # Temporarily disabled to facilitate release CI, should be resolved
+      #    as part of https://github.com/envoyproxy/envoy/issues/28566
+      #
+      # clang_tidy:
+      #   CI_TARGET: "bazel.clang_tidy"
+      #   REPO_FETCH_DEPTH: 0
+      #   REPO_FETCH_TAGS: true
+      #   PUBLISH_TEST_RESULTS: false
+      #   PUBLISH_ENVOY: false
       api:
         CI_TARGET: "bazel.api"
   timeoutInMinutes: 180
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   steps:
   - template: ../bazel.yml
     parameters:
@@ -77,8 +81,8 @@ jobs:
       cacheTestResults: ${{ parameters.cacheTestResults }}
       repoFetchDepth: $(REPO_FETCH_DEPTH)
       repoFetchTags: $(REPO_FETCH_TAGS)
-      publishTestResults: $(PUBLISH_TEST_RESULTS)
-      publishEnvoy: $(PUBLISH_ENVOY)
+      publishTestResults: variables.PUBLISH_TEST_RESULTS
+      publishEnvoy: variables.PUBLISH_ENVOY
       stepsPost:
 
       # TODO(phlax): consolidate "fix" paths/jobs
@@ -95,6 +99,7 @@ jobs:
   condition: |
     and(not(canceled()),
         eq(${{ parameters.runChecks }}, 'true'))
+  # TODO(phlax): Make this configurable and ratchet down!
   timeoutInMinutes: 240
   pool: "envoy-x64-large"
   strategy:
@@ -114,19 +119,24 @@ jobs:
       bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
       cacheTestResults: ${{ parameters.cacheTestResults }}
 
-  - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)-upload'
     displayName: "Upload $(CI_TARGET) Report to GCS"
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
       GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-    condition: always()
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci"
+      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
+      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+        BAZEL_REMOTE_INSTANCE_BRANCH: "$(Build.SourceBranchName)"
+    condition: not(canceled())
 
 - job: complete
   displayName: "Checks complete"
   dependsOn: ["bazel", "coverage"]
-  pool:
-    vmImage: "ubuntu-20.04"
+  pool: x64-nano
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:

@@ -34,6 +34,8 @@ public:
     const auto& fields = filter_it->second.fields();
     std::string val = fields.at("foo").string_value();
     EXPECT_EQ(val, "bar");
+    EXPECT_TRUE(
+        decoder_callbacks_->streamInfo().filterState()->hasDataWithName("go_state_test_key"));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -150,12 +152,23 @@ typed_config:
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
               "test-route-name");
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->set_domains(0, domain);
+
+          auto* virtual_cluster =
+              hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_virtual_clusters();
+          virtual_cluster->set_name("test_vcluster");
+          auto* headers = virtual_cluster->add_headers();
+          // use test_vcluster if presents
+          headers->set_name("existed-header");
+          headers->set_present_match(true);
+
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)
               ->mutable_route()
               ->set_cluster("cluster_0");
         });
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
     initialize();
   }
 
@@ -236,9 +249,17 @@ typed_config:
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     codec_client_->sendData(request_encoder, "helloworld", false);
-    codec_client_->sendData(request_encoder, "", true);
+    codec_client_->sendData(request_encoder, "", false);
+
+    Http::TestRequestTrailerMapImpl request_trailers{
+        {"x-test-trailer-0", "foo"}, {"existed-trailer", "foo"}, {"x-test-trailer-1", "foo"}};
+    codec_client_->sendTrailers(request_encoder, request_trailers);
 
     waitForNextUpstreamRequest();
+
+    EXPECT_EQ("go_state_test_value",
+              getHeader(upstream_request_->headers(), "go-state-test-header-key"));
+
     // original header: x-test-header-0
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-test-header-0"));
 
@@ -275,6 +296,25 @@ typed_config:
     std::string expected = "prepend_HELLOWORLD_append";
     // only match the prefix since data buffer may be combined into a single.
     EXPECT_EQ(expected, upstream_request_->body().toString());
+
+    // check trailer value which is appended in golang: existed-trailer
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("existed-trailer"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check trailer value which set in golang: x-test-trailer-0
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
+
+    EXPECT_EQ(
+        true,
+        upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
+
+    // check trailer value which add in golang: x-test-trailer-2
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-2"));
+
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
 
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
@@ -341,6 +381,9 @@ typed_config:
     // check response attempt count in encode phase
     EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));
 
+    // check virtual cluster name
+    EXPECT_EQ("test_vcluster", getHeader(response->headers(), "rsp-virtual-cluster-name"));
+
     // verify response status
     EXPECT_EQ("200", getHeader(response->headers(), "rsp-status"));
 
@@ -358,6 +401,9 @@ typed_config:
 
     // verify host
     EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
+
+    // verify log level
+    EXPECT_EQ("error", getHeader(response->headers(), "test-log-level"));
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());
@@ -431,6 +477,12 @@ typed_config:
     // forbidden from go in %s\r\n
     auto body = StringUtil::toUpper(absl::StrFormat("forbidden from go in %s\r\n", phase));
     EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+
+    // verify phase
+    EXPECT_EQ(phase, getHeader(response->headers(), "test-phase"));
+
+    // verify content-type
+    EXPECT_EQ("text/html", getHeader(response->headers(), "content-type"));
 
     cleanup();
   }

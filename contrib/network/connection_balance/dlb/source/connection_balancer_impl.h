@@ -92,11 +92,17 @@ public:
 
   std::string name() const override { return "envoy.network.connection_balance.dlb"; }
 
+  // Log error info in warn level and fallback based on fallback policy.
+  Envoy::Network::ConnectionBalancerSharedPtr fallback(const std::string& message);
+
   // Init those only when Envoy start.
   int domain_id, ldb_pool_id, dir_pool_id, tx_queue_id;
+  // The default value is None.
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::FallbackPolicy
+      fallback_policy{};
 #ifndef DLB_DISABLED
   dlb_domain_hdl_t domain;
-  dlb_hdl_t dlb;
+  dlb_hdl_t dlb{};
   dlb_dev_cap_t cap;
 
   // Share those cross worker threads.
@@ -124,12 +130,13 @@ public:
     return dlb_create_ldb_port(domain, &args);
   }
 
-  static int createSchedDomain(dlb_hdl_t dlb, dlb_resources_t rsrcs, dlb_dev_cap_t cap) {
+  static int createSchedDomain(dlb_hdl_t dlb, dlb_resources_t rsrcs, dlb_dev_cap_t cap,
+                               uint32_t num_ldb_ports) {
     int p_rsrsc = 100;
     dlb_create_sched_domain_t args;
 
     args.num_ldb_queues = 1;
-    args.num_ldb_ports = 64;
+    args.num_ldb_ports = num_ldb_ports;
     args.num_dir_ports = 0;
     args.num_ldb_event_state_entries = 2 * args.num_ldb_ports * cq_depth;
     if (!cap.combined_credits) {

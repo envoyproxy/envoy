@@ -2,7 +2,7 @@
 
 set -e -o pipefail
 
-LLVM_VERSION="14.0.0"
+LLVM_VERSION=${LLVM_VERSION:-"14.0.0"}
 CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ */\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
@@ -59,12 +59,10 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     while read -r line; do COVERAGE_TARGETS+=("$line"); done \
         <<< "$_targets"
     BAZEL_COVERAGE_OPTIONS+=(
-        "--config=fuzz-coverage"
-        "--test_tag_filters=-nocoverage")
+        "--config=fuzz-coverage")
 else
     BAZEL_COVERAGE_OPTIONS+=(
-        "--config=test-coverage"
-        "--test_tag_filters=-nocoverage,-fuzz_target")
+        "--config=test-coverage")
 fi
 
 # Output unusually long logs due to trace logging.
@@ -138,21 +136,24 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   fi
 fi
 
-# We want to allow per_file_coverage to fail without exiting this script.
-set +e
-if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
-  echo "Checking per-extension coverage"
-  output=$(./test/per_file_coverage.sh)
-  response=$?
+if [[ -e ./test/per_file_coverage.sh ]]; then
+    # We want to allow per_file_coverage to fail without exiting this script.
+    set +e
+    if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
+        echo "Checking per-extension coverage"
+        output=$(./test/per_file_coverage.sh)
+        response=$?
 
-  if [ $response -ne 0 ]; then
-    echo Per-extension coverage failed:
-    echo "$output"
-    COVERAGE_FAILED=1
-    echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
-    exit 1
-  fi
-  echo Per-extension coverage passed.
+        if [ $response -ne 0 ]; then
+            echo Per-extension coverage failed:
+            echo "$output"
+            COVERAGE_FAILED=1
+            echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
+            exit 1
+        fi
+        echo Per-extension coverage passed.
+    fi
+else
+    echo "No per-file-coverage file found"
 fi
-
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"

@@ -56,6 +56,7 @@ envoy_cc_test(
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
@@ -65,7 +66,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -259,6 +259,7 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "server_fuzz_test",
+    size = "large",
     srcs = ["server_fuzz_test.cc"],
     corpus = "server_corpus",
     deps = [
@@ -396,5 +397,6 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["utils_test.cc"]),
     deps = [
         "//source/server:utils_lib",
+        "//test/mocks/server:options_mocks",
     ],
 )

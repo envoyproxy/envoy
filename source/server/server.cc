@@ -29,11 +29,8 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
-#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -108,41 +105,41 @@ InstanceImpl::InstanceImpl(
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
       enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+  std::function set_up_logger = [&] {
+    TRY_ASSERT_MAIN_THREAD {
+      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
+          options.logPath(), access_log_manager_, Logger::Registry::getSink());
+    }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      throw EnvoyException(
+          fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
+    });
+  };
+
   TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
-      TRY_ASSERT_MAIN_THREAD {
-        file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-            options.logPath(), access_log_manager_, Logger::Registry::getSink());
-      }
-      END_TRY
-      catch (const EnvoyException& e) {
-        throw EnvoyException(
-            fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
-      }
+      set_up_logger();
     }
-
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
     initialize(std::move(local_address), component_factory);
   }
   END_TRY
-  catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
-              options.configProto().DebugString(), options.configYaml(), options.configPath(),
-              e.what());
-    terminate();
-    throw;
-  }
-  catch (const std::exception& e) {
-    ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
-    terminate();
-    throw;
-  }
-  catch (...) {
-    ENVOY_LOG(critical, "error initializing due to unknown exception");
-    terminate();
-    throw;
-  }
+  MULTI_CATCH(
+      const EnvoyException& e,
+      {
+        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+                  options.configProto().DebugString(), options.configYaml(), options.configPath(),
+                  e.what());
+        terminate();
+        throw;
+      },
+      {
+        ENVOY_LOG(critical, "error initializing due to unknown exception");
+        terminate();
+        throw;
+      });
 }
 
 InstanceImpl::~InstanceImpl() {
@@ -424,6 +421,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
+
+  if (bootstrap_.has_application_log_config()) {
+    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
+    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+  }
 
 #ifdef ENVOY_PERFETTO
   perfetto::TracingInitArgs args;
@@ -778,10 +780,10 @@ void InstanceImpl::onRuntimeReady() {
   // Initializing can throw exceptions, so catch these.
   TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
     shutdown();
-  }
+  });
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
@@ -797,10 +799,10 @@ void InstanceImpl::onRuntimeReady() {
           stats_store_, *ssl_context_manager_, info_factory_);
     }
     END_TRY
-    catch (const EnvoyException& e) {
+    CATCH(const EnvoyException& e, {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
       shutdown();
-    }
+    });
   }
 
   // If there is no global limit to the number of active connections, warn on startup.
@@ -957,10 +959,15 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
-  Config::GrpcMuxImpl::shutdownAll();
-  Config::NewGrpcMuxImpl::shutdownAll();
-  Config::XdsMux::GrpcMuxSotw::shutdownAll();
-  Config::XdsMux::GrpcMuxDelta::shutdownAll();
+  std::vector<std::string> muxes = {
+      "envoy.config_mux.new_grpc_mux_factory", "envoy.config_mux.grpc_mux_factory",
+      "envoy.config_mux.delta_grpc_mux_factory", "envoy.config_mux.sotw_grpc_mux_factory"};
+  for (const auto& name : muxes) {
+    auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
+    if (factory) {
+      factory->shutdownAll();
+    }
+  }
 
   if (overload_manager_) {
     overload_manager_->stop();
@@ -968,13 +975,6 @@ void InstanceImpl::terminate() {
 
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_ != nullptr) {
-    // Also shutdown the listener manager's ApiListener, if there is one, which runs on the main
-    // thread. This needs to happen ahead of calling thread_local_.shutdown() below to prevent any
-    // objects in the ApiListener destructor to reference any objects in thread local storage.
-    if (listener_manager_->apiListener().has_value()) {
-      listener_manager_->apiListener()->get().shutdown();
-    }
-
     listener_manager_->stopWorkers();
   }
 

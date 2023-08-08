@@ -99,6 +99,7 @@ envoy_cc_library(
         ":http2_adapter_http2_visitor_interface",
         ":http2_adapter_nghttp2_include",
         ":http2_adapter_nghttp2_util",
+        ":quiche_common_callbacks",
         ":quiche_common_platform_export",
     ],
 )
@@ -136,6 +137,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":quiche_common_callbacks",
         ":quiche_common_platform_export",
         ":spdy_core_http2_deframer_lib",
     ],
@@ -196,6 +198,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/types:variant",
     ],
 )
 
@@ -469,12 +472,14 @@ envoy_cc_library(
         ":http2_adapter_window_manager",
         ":http2_core_http2_trace_logging_lib",
         ":http2_core_priority_write_scheduler_lib",
+        ":quiche_common_callbacks",
         ":spdy_core_framer_lib",
         ":spdy_core_http2_deframer_lib",
         ":spdy_core_http2_header_block_lib",
         ":spdy_core_protocol_lib",
         ":spdy_header_byte_listener_interface_lib",
         ":spdy_no_op_headers_handler_lib",
+        "@com_google_absl//absl/cleanup",
     ],
 )
 
@@ -619,6 +624,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":quiche_common_callbacks",
         ":quiche_common_platform",
         ":quiche_common_platform_export",
     ],
@@ -1475,6 +1481,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":http2_hpack_huffman_hpack_huffman_encoder_lib",
+        ":quiche_common_callbacks",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
         ":spdy_core_protocol_lib",
@@ -2975,6 +2982,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_callbacks",
+    hdrs = ["quiche/common/quiche_callbacks.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@com_google_absl//absl/functional:any_invocable",
+        "@com_google_absl//absl/functional:function_ref",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_data_lib",
     srcs = [
         "quiche/quic/core/quic_data_reader.cc",
@@ -3155,6 +3175,21 @@ envoy_cc_library(
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_wire_serialization",
         ":quiche_web_transport_web_transport_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_connect_udp_datagram_payload_lib",
+    srcs = ["quiche/common/masque/connect_udp_datagram_payload.cc"],
+    hdrs = ["quiche/common/masque/connect_udp_datagram_payload.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_data_lib",
+        ":quiche_common_platform_bug_tracker",
+        ":quiche_common_platform_logging",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -3484,13 +3519,13 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_core_io_socket_lib",
-    srcs = select({
-        "@envoy//bazel:windows_x86_64": [],
-        "//conditions:default": ["quiche/quic/core/io/socket_posix.cc"],
-    }),
+    srcs = ["quiche/quic/core/io/socket.cc"],
     hdrs = [
         "quiche/quic/core/connecting_client_socket.h",
         "quiche/quic/core/io/socket.h",
+        "quiche/quic/core/io/socket_internal.h",
+        "quiche/quic/core/io/socket_posix.inc",
+        "quiche/quic/core/io/socket_win.inc",
         "quiche/quic/core/socket_factory.h",
     ],
     copts = quiche_copts,
@@ -3614,6 +3649,7 @@ envoy_cc_library(
         ":quic_core_syscall_wrapper_lib",
         ":quic_core_types_lib",
         ":quic_platform",
+        ":quiche_common_callbacks",
     ],
 )
 
@@ -4182,6 +4218,7 @@ envoy_cc_library(
         ":quic_core_version_manager_lib",
         ":quic_platform",
         ":quic_server_session_lib",
+        ":quiche_common_callbacks",
         ":quiche_common_text_utils_lib",
     ],
 )
@@ -4271,6 +4308,7 @@ envoy_cc_library(
         ":quic_platform",
         ":quic_server_crypto_crypto_handshake_lib",
         ":quic_stream_priority_lib",
+        ":quiche_common_callbacks",
         ":quiche_common_structured_headers_lib",
         ":quiche_common_text_utils_lib",
         ":spdy_core_protocol_lib",
@@ -4501,6 +4539,7 @@ envoy_cc_library(
         ":quic_platform_base",
         ":quiche_common_endian_lib",
         ":quiche_common_print_elements_lib",
+        ":quiche_web_transport_web_transport_lib",
     ],
 )
 
@@ -4522,11 +4561,14 @@ envoy_cc_library(
     name = "quic_core_udp_socket_lib",
     srcs = select({
         "@envoy//bazel:windows_x86_64": [],
-        "//conditions:default": ["quiche/quic/core/quic_udp_socket_posix.cc"],
+        "//conditions:default": ["quiche/quic/core/quic_udp_socket.cc"],
     }),
     hdrs = select({
         "@envoy//bazel:windows_x86_64": [],
-        "//conditions:default": ["quiche/quic/core/quic_udp_socket.h"],
+        "//conditions:default": [
+            "quiche/quic/core/quic_udp_socket.h",
+            "quiche/quic/core/quic_udp_socket_posix.inc",
+        ],
     }),
     copts = quiche_copts + select({
         # On OSX/iOS, constants from RFC 3542 (e.g. IPV6_RECVPKTINFO) are not usable
@@ -4931,6 +4973,7 @@ envoy_cc_test_library(
         ":quic_test_tools_stream_peer_lib",
         ":quic_test_tools_test_certificates_lib",
         ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_callbacks",
         ":quiche_common_test_tools_test_utils_lib",
         ":spdy_core_framer_lib",
     ],
@@ -5107,6 +5150,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -5283,13 +5327,13 @@ envoy_cc_library(
         ":quiche_common_platform_default_quiche_platform_impl_flag_utils_impl_lib",
         ":quiche_common_platform_default_quiche_platform_impl_reference_counted_impl_lib",
         ":quiche_common_platform_default_quiche_platform_impl_testvalue_impl_lib",
-        ":quiche_common_platform_default_quiche_platform_impl_time_utils_impl_lib",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_prefetch",
         "@envoy//source/common/quic/platform:quic_base_impl_lib",
         "@envoy//source/common/quic/platform:quiche_flags_impl_lib",
         "@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib",
+        "@envoy//source/common/quic/platform:quiche_time_utils_impl_lib",
     ],
 )
 
@@ -5329,19 +5373,6 @@ envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_testvalue_impl_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_testvalue_impl.h",
-    ],
-    deps = [
-        ":quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_default_quiche_platform_impl_time_utils_impl_lib",
-    srcs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.cc",
-    ],
-    hdrs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_time_utils_impl.h",
     ],
     deps = [
         ":quiche_common_platform_export",
@@ -5442,7 +5473,10 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = [":quiche_common_platform_export"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@com_google_absl//absl/hash",
+    ],
 )
 
 envoy_cc_library(
@@ -5711,6 +5745,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quiche_common_callbacks",
         ":quiche_common_platform_export",
         ":quiche_common_platform_lower_case_string",
         "@com_google_absl//absl/strings",
@@ -5787,6 +5822,7 @@ envoy_cc_library(
         ":quiche_balsa_header_api_lib",
         ":quiche_balsa_header_properties_lib",
         ":quiche_balsa_standard_header_map_lib",
+        ":quiche_common_callbacks",
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
         ":quiche_common_platform_header_policy",
@@ -5871,6 +5907,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quiche_common_callbacks",
         ":quiche_common_platform_export",
         ":quiche_common_quiche_stream_lib",
         ":spdy_core_http2_header_block_lib",

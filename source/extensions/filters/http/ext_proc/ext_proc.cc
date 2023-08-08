@@ -61,7 +61,40 @@ void ExtProcLoggingInfo::recordGrpcCall(
     ProcessorState::CallbackState callback_state,
     envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
-  grpcCalls(traffic_direction).emplace_back(latency, call_status, callback_state);
+
+  // Record the gRPC call stats for the header.
+  if (callback_state == ProcessorState::CallbackState::HeadersCallback) {
+    if (grpcCalls(traffic_direction).header_stats_ == nullptr) {
+      grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status);
+    }
+    return;
+  }
+
+  // Record the gRPC call stats for the trailer.
+  if (callback_state == ProcessorState::CallbackState::TrailersCallback) {
+    if (grpcCalls(traffic_direction).trailer_stats_ == nullptr) {
+      grpcCalls(traffic_direction).trailer_stats_ =
+          std::make_unique<GrpcCall>(latency, call_status);
+    }
+    return;
+  }
+
+  // Record the gRPC call stats for the bodies.
+  if (grpcCalls(traffic_direction).body_stats_ == nullptr) {
+    grpcCalls(traffic_direction).body_stats_ =
+        std::make_unique<GrpcCallBody>(1, call_status, latency, latency, latency);
+  } else {
+    auto& body_stats = grpcCalls(traffic_direction).body_stats_;
+    body_stats->call_count_++;
+    body_stats->total_latency_ += latency;
+    body_stats->last_call_status_ = call_status;
+    if (latency > body_stats->max_latency_) {
+      body_stats->max_latency_ = latency;
+    }
+    if (latency < body_stats->min_latency_) {
+      body_stats->min_latency_ = latency;
+    }
+  }
 }
 
 ExtProcLoggingInfo::GrpcCalls&
@@ -103,12 +136,13 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
-  if (!filter_state->hasData<ExtProcLoggingInfo>(ExtProcLoggingInfoName)) {
-    filter_state->setData(ExtProcLoggingInfoName, std::make_shared<ExtProcLoggingInfo>(),
+  if (!filter_state->hasData<ExtProcLoggingInfo>(callbacks.filterConfigName())) {
+    filter_state->setData(callbacks.filterConfigName(),
+                          std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata()),
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
-  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(ExtProcLoggingInfoName);
+  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(callbacks.filterConfigName());
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -117,14 +151,28 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 }
 
 Filter::StreamOpenState Filter::openStream() {
-  ENVOY_BUG(!processing_complete_, "openStream should not have been called");
+  // External processing is completed. This means there is no need to send any further
+  // message to the server for processing. Just return IgnoreError so the filter
+  // will return FilterHeadersStatus::Continue.
+  if (processing_complete_) {
+    ENVOY_LOG(debug, "External processing is completed when trying to open the gRPC stream");
+    return StreamOpenState::IgnoreError;
+  }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
-    stats_.streams_started_.inc();
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
+      // Asserts that `stream_` is nullptr since it is not valid to be used any further
+      // beyond this point.
+      ASSERT(stream_ == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
+    }
+    stats_.streams_started_.inc();
+    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
+    // have a proper implementation of streamInfo.
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
     }
   }
   return StreamOpenState::Ok;
@@ -132,6 +180,11 @@ Filter::StreamOpenState Filter::openStream() {
 
 void Filter::closeStream() {
   if (stream_) {
+    if (grpc_service_.has_envoy_grpc()) {
+      logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
+      logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -168,7 +221,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
+                                *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
@@ -209,18 +263,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     ENVOY_LOG(trace, "Continuing (processing complete)");
     return FilterDataStatus::Continue;
   }
-  bool just_added_trailers = false;
-  Http::HeaderMap* new_trailers = nullptr;
-  if (end_stream && state.sendTrailers()) {
-    // We're at the end of the stream, but the filter wants to process trailers.
-    // According to the filter contract, this is the only place where we can
-    // add trailers, even if we will return right after this and process them
-    // later.
-    ENVOY_LOG(trace, "Creating new, empty trailers");
-    new_trailers = state.addTrailers();
-    state.setTrailersAvailable(true);
-    just_added_trailers = true;
-  }
+
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
     ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
     // We don't know what to do with the body until the response comes back.
@@ -369,21 +412,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::Continue;
     break;
   }
-  if (just_added_trailers) {
-    // If we get here, then we need to send the trailers message now
-    switch (openStream()) {
-    case StreamOpenState::Error:
-      return FilterDataStatus::StopIterationNoBuffer;
-    case StreamOpenState::IgnoreError:
-      return FilterDataStatus::Continue;
-    case StreamOpenState::Ok:
-      // Fall through
-      break;
-    }
-    sendTrailers(state, *new_trailers);
-    state.setPaused(true);
-    return FilterDataStatus::StopIterationAndBuffer;
-  }
+
   return result;
 }
 
@@ -434,11 +463,22 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
-  if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
+  if (!body_delivered && state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) {
+    // If no gRPC stream yet, opens it before sending data.
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterTrailersStatus::StopIteration;
+    case StreamOpenState::IgnoreError:
+      return FilterTrailersStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
-    sendBufferedData(state, ProcessorState::CallbackState::BufferedBodyCallback, true);
+    sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback,
+                  false);
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
@@ -505,7 +545,7 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                            ProcessorState::CallbackState new_state, bool end_stream) {
-  ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
+  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
   ProcessingRequest req;
@@ -519,7 +559,8 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
-  MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
+  MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
+                                *trailers_req->mutable_trailers());
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
@@ -527,12 +568,20 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::onNewTimeout(const uint32_t message_timeout_ms) {
+void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout) {
+  const auto result = DurationUtil::durationToMillisecondsNoThrow(override_message_timeout);
+  if (!result.ok()) {
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of duration range. "
+                    "Ignoring the message.");
+    stats_.override_message_timeout_ignored_.inc();
+    return;
+  }
+  const auto message_timeout_ms = result.value();
   // The new timeout has to be >=1ms and <= max_message_timeout configured in filter.
-  const uint32_t min_timeout_ms = 1;
-  const uint32_t max_timeout_ms = config_->maxMessageTimeout();
+  const uint64_t min_timeout_ms = 1;
+  const uint64_t max_timeout_ms = config_->maxMessageTimeout();
   if (message_timeout_ms < min_timeout_ms || message_timeout_ms > max_timeout_ms) {
-    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of range. "
+    ENVOY_LOG(warn, "Ext_proc server new timeout setting is out of config range. "
                     "Ignoring the message.");
     stats_.override_message_timeout_ignored_.inc();
     return;
@@ -559,14 +608,15 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   // Check whether the server is asking to extend the timer.
   if (response->has_override_message_timeout()) {
-    onNewTimeout(DurationUtil::durationToMilliseconds(response->override_message_timeout()));
+    onNewTimeout(response->override_message_timeout());
     return;
   }
 
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
-  // being invoked in line.
-  if (response->has_mode_override()) {
+  // being invoked in line. This only happens when filter has allow_mode_override
+  // set to true. Otherwise, the response mode_override proto field is ignored.
+  if (config_->allowModeOverride() && response->has_mode_override()) {
     ENVOY_LOG(debug, "Processing mode overridden by server for this request");
     decoding_state_.setProcessingMode(response->mode_override());
     encoding_state_.setProcessingMode(response->mode_override());
@@ -732,10 +782,21 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      const auto mut_status = MutationUtils::applyHeaderMutations(
-          response.headers(), headers, false, immediateResponseChecker().checker(),
-          stats_.rejected_header_mutations_);
-      ENVOY_BUG(mut_status.ok(), "Immediate response mutations should not fail");
+      absl::Status mut_status;
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.immediate_response_use_filter_mutation_rule")) {
+        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
+                                                         config().mutationChecker(),
+                                                         stats_.rejected_header_mutations_);
+      } else {
+        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
+                                                         immediateResponseChecker().checker(),
+                                                         stats_.rejected_header_mutations_);
+      }
+      if (!mut_status.ok()) {
+        ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
+                              mut_status.message());
+      }
     }
   };
 

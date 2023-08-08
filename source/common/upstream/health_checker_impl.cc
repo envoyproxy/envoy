@@ -47,49 +47,15 @@ const std::string& HealthCheckerFactory::getHostname(const HostSharedPtr& host,
   return cluster->name();
 }
 
-class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
-public:
-  HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
-                                  Event::Dispatcher& dispatcher,
-                                  HealthCheckEventLoggerPtr&& event_logger,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api)
-      : cluster_(cluster), runtime_(runtime), dispatcher_(dispatcher),
-        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor), api_(api) {
-  }
-  Upstream::Cluster& cluster() override { return cluster_; }
-  Envoy::Runtime::Loader& runtime() override { return runtime_; }
-  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
-  HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return validation_visitor_;
-  }
-  Api::Api& api() override { return api_; }
-
-private:
-  Upstream::Cluster& cluster_;
-  Envoy::Runtime::Loader& runtime_;
-  Event::Dispatcher& dispatcher_;
-  HealthCheckEventLoggerPtr event_logger_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
-  Api::Api& api_;
-};
-
-HealthCheckerSharedPtr HealthCheckerFactory::create(
-    const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
-    Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-    AccessLog::AccessLogManager& log_manager,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
-  HealthCheckEventLoggerPtr event_logger;
-  if (!health_check_config.event_log_path().empty()) {
-    event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
-        log_manager, dispatcher.timeSource(), health_check_config.event_log_path());
-  }
+absl::StatusOr<HealthCheckerSharedPtr>
+HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_check_config,
+                             Upstream::Cluster& cluster,
+                             Server::Configuration::ServerFactoryContext& server_context) {
   Server::Configuration::CustomHealthCheckerFactory* factory = nullptr;
 
   switch (health_check_config.health_checker_case()) {
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::HEALTH_CHECKER_NOT_SET:
-    throw EnvoyException("invalid cluster config");
+    return absl::InvalidArgumentError("invalid cluster config");
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     factory = &Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::CustomHealthCheckerFactory>("envoy.health_checkers.http");
@@ -100,8 +66,8 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     break;
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
-      throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
-                                       cluster.info()->name()));
+      return absl::InvalidArgumentError(fmt::format(
+          "{} cluster must support HTTP/2 for gRPC healthchecking", cluster.info()->name()));
     }
     factory = &Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::CustomHealthCheckerFactory>("envoy.health_checkers.grpc");
@@ -112,13 +78,20 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
             health_check_config.custom_health_check());
   }
   }
+
   std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
-      new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, std::move(event_logger),
-                                          validation_visitor, api));
+      new HealthCheckerFactoryContextImpl(cluster, server_context));
+
+  if (!health_check_config.event_log_path().empty() /* deprecated */ ||
+      !health_check_config.event_logger().empty()) {
+    HealthCheckEventLoggerPtr event_logger;
+    event_logger = std::make_unique<HealthCheckEventLoggerImpl>(health_check_config, *context);
+    context->setEventLogger(std::move(event_logger));
+  }
   return factory->createCustomHealthChecker(health_check_config, *context);
 }
 
-PayloadMatcher::MatchSegments PayloadMatcher::loadProtoBytes(
+absl::StatusOr<PayloadMatcher::MatchSegments> PayloadMatcher::loadProtoBytes(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array) {
   MatchSegments result;
 
@@ -127,7 +100,7 @@ PayloadMatcher::MatchSegments PayloadMatcher::loadProtoBytes(
     if (entry.has_text()) {
       decoded = Hex::decode(entry.text());
       if (decoded.empty()) {
-        throw EnvoyException(fmt::format("invalid hex string '{}'", entry.text()));
+        return absl::InvalidArgumentError(fmt::format("invalid hex string '{}'", entry.text()));
       }
     } else {
       decoded.assign(entry.binary().begin(), entry.binary().end());

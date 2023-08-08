@@ -2,7 +2,8 @@
 
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
-#include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
+#include "test/extensions/http/header_validators/envoy_default/header_validator_utils.h"
+#include "test/mocks/http/header_validator.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -21,14 +22,16 @@ using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-class Http1HeaderValidatorTest : public HeaderValidatorTest, public testing::Test {
+class Http1HeaderValidatorTest : public HeaderValidatorUtils, public testing::Test {
 protected:
   ServerHttp1HeaderValidatorPtr createH1(absl::string_view config_yaml) {
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    ConfigOverrides overrides(scoped_runtime_.loader().snapshot());
+    return std::make_unique<ServerHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                        overrides);
   }
 
   ClientHttp1HeaderValidatorPtr createH1Client(absl::string_view config_yaml) {
@@ -36,7 +39,9 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<ClientHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_);
+    ConfigOverrides overrides(scoped_runtime_.loader().snapshot());
+    return std::make_unique<ClientHttp1HeaderValidator>(typed_config, Protocol::Http11, stats_,
+                                                        overrides);
   }
 
   TestRequestHeaderMapImpl makeGoodRequestHeaders() {
@@ -48,6 +53,7 @@ protected:
     return TestResponseHeaderMapImpl{{":status", "200"}};
   }
 
+  ::testing::NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
   TestScopedRuntime scoped_runtime_;
 };
 
@@ -66,7 +72,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncodingInRequest) {
 
   request_headers.setCopy(LowerCaseString("transfer-encoding"), "gzip");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
-                             "uhv.http1.invalid_transfer_encoding");
+                             "http1.invalid_transfer_encoding");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateTransferEncodingInResponse) {
@@ -78,7 +84,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncodingInResponse) {
 
   request_headers.setCopy(LowerCaseString("transfer-encoding"), "gzip");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(request_headers),
-                             "uhv.http1.invalid_transfer_encoding");
+                             "http1.invalid_transfer_encoding");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryCustomMethod) {
@@ -357,6 +363,36 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthConnectRej
                              "uhv.http1.content_length_not_allowed");
 }
 
+TEST_F(Http1HeaderValidatorTest, ResponseTransferEncodingContentLengthReject) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"transfer-encoding", "chunked"}, {"content-length", "10"}};
+  auto uhv = createH1Client(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+                             "http1.content_length_and_chunked_not_allowed");
+}
+
+TEST_F(Http1HeaderValidatorTest, ResponseTransferEncodingContentLengthAllowed) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"transfer-encoding", "chunked"}, {"content-length", "10"}};
+  auto uhv = createH1Client(allow_chunked_length_config);
+
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+  // The transform method should remove content-length
+  EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
+  EXPECT_EQ(headers.ContentLength(), nullptr);
+}
+
+TEST_F(Http1HeaderValidatorTest, ResponseContentLengthNoTransferEncoding) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"content-length", "10"}};
+  auto uhv = createH1Client(allow_chunked_length_config);
+
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+  // The transform method should keep content-length
+  EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
+  EXPECT_EQ(headers.getContentLengthValue(), "10");
+}
+
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectRegNameMissingPort) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":method", "CONNECT"}, {":authority", "envoy.com"}};
@@ -561,7 +597,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncoding
   auto uhv = createH1Client(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
-                             "uhv.http1.invalid_transfer_encoding");
+                             "http1.invalid_transfer_encoding");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
@@ -585,31 +621,6 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
   // Path normalization should fail
   EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers),
                              UhvResponseCodeDetail::get().InvalidUrl);
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/dir1%2fdir2"},
-                                                  {":authority", "envoy.com"}};
-  auto uhv = createH1(redirect_encoded_slash_config);
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
-  auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_EQ(result.action(),
-            ::Envoy::Http::HeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
-  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
-  EXPECT_EQ(headers.path(), "/dir1/dir2");
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeadersNoPathNormalization) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/dir1%2fdir2/.."},
-                                                  {":authority", "envoy.com"}};
-  auto uhv = createH1(no_path_normalization);
-  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
-  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/dir1%2fdir2/..");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestTrailerMap) {
@@ -750,30 +761,78 @@ TEST_F(Http1HeaderValidatorTest, InvalidResponseHeaderBeforeSendingDownstream) {
   EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
 }
 
-TEST_F(Http1HeaderValidatorTest, BackslashInPathIsTranslatedToSlash) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "true"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path\\with/back\\/slash%5C"},
-                                                  {":authority", "envoy.com"},
-                                                  {":method", "GET"}};
-  auto uhv = createH1(empty_config);
+namespace {
+constexpr absl::string_view AdditionallyAllowedCharacters = R"str("<>[]^`{}\|)str";
+} // namespace
 
+// Validate that H/1 UHV allows additional characters "<>[]^`{}\| and encodes
+// them when path normalization is enabled.
+TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInPathAllowed) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
+  auto uhv = createH1(fragment_in_path_allowed);
+  validateAllCharactersInUrlPath(*uhv, "/path/with/additional/characters",
+                                 absl::StrCat("?#", AdditionallyAllowedCharacters));
+
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},
+      {":authority", "envoy.com"},
+      {":method", "GET"},
+      {":path", absl::StrCat("/path/with", AdditionallyAllowedCharacters)}};
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
+  // Note that \ is translated to / and [] remain unencoded
+  EXPECT_EQ(headers.path(), "/path/with%22%3C%3E[]%5E%60%7B%7D/%7C");
 }
 
-TEST_F(Http1HeaderValidatorTest, BackslashInPathIsRejectedWithOverride) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.uhv_translate_backslash_to_slash", "false"}});
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":path", "/path\\with/back\\/slash%5c"},
-                                                  {":authority", "envoy.com"},
-                                                  {":method", "GET"}};
-  auto uhv = createH1(empty_config);
+// Validate that without path normalization additional characters remain untouched
+TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInPathAllowedWithoutPathNormalization) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
+  auto uhv = createH1(no_path_normalization);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers), "uhv.invalid_url");
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},
+      {":authority", "envoy.com"},
+      {":method", "GET"},
+      {":path", absl::StrCat("/path/with", AdditionallyAllowedCharacters)}};
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(headers.path(), R"str(/path/with"<>[]^`{}\|)str");
+}
+
+TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInQueryAllowed) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
+  auto uhv = createH1(fragment_in_path_allowed);
+
+  validateAllCharactersInUrlPath(*uhv, "/query?key=additional/characters",
+                                 absl::StrCat("?#", AdditionallyAllowedCharacters));
+
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},
+      {":authority", "envoy.com"},
+      {":method", "GET"},
+      {":path", absl::StrCat("/path/with?value=", AdditionallyAllowedCharacters)}};
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  // Additional characters in query always remain untouched
+  EXPECT_EQ(headers.path(), R"str(/path/with?value="<>[]^`{}\|)str");
+}
+
+TEST_F(Http1HeaderValidatorTest, AdditionalCharactersInFragmentAllowed) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
+  auto uhv = createH1(fragment_in_path_allowed);
+
+  validateAllCharactersInUrlPath(*uhv, "/q?k=v#fragment/additional/characters",
+                                 absl::StrCat("?#", AdditionallyAllowedCharacters));
+
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},
+      {":authority", "envoy.com"},
+      {":method", "GET"},
+      {":path", absl::StrCat("/path/with?value=aaa#", AdditionallyAllowedCharacters)}};
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  // UHV strips fragment from URL path
+  EXPECT_EQ(headers.path(), "/path/with?value=aaa");
 }
 
 } // namespace

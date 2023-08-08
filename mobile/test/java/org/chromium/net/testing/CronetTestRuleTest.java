@@ -7,7 +7,7 @@ import static org.junit.Assert.fail;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
-import org.chromium.net.impl.CronetUrlRequestContext;
+import org.chromium.net.impl.CronvoyUrlRequestContext;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.junit.After;
@@ -67,6 +67,6 @@ public class CronetTestRuleTest {
   public void testRunOnlyNativeMustRun() {
     assertFalse(mTestWasRun);
     mTestWasRun = true;
-    assertEquals(mTestFramework.mCronetEngine.getClass(), CronetUrlRequestContext.class);
+    assertEquals(mTestFramework.mCronetEngine.getClass(), CronvoyUrlRequestContext.class);
   }
 }

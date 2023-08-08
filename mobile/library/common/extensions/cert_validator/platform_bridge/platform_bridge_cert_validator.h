@@ -19,7 +19,7 @@ namespace Tls {
 class PlatformBridgeCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   PlatformBridgeCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                              SslStats& stats, const envoy_cert_validator* platform_validator);
+                              SslStats& stats);
 
   ~PlatformBridgeCertValidator() override;
 
@@ -35,14 +35,6 @@ public:
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& /*md*/,
                                 uint8_t* /*hash_buffer[EVP_MAX_MD_SIZE]*/,
                                 unsigned /*hash_length*/) override {
-    PANIC("Should not be reached");
-  }
-  int doSynchronousVerifyCertChain(
-      X509_STORE_CTX* /*store_ctx*/,
-      Ssl::SslExtendedSocketInfo*
-      /*ssl_extended_info*/,
-      X509& /*leaf_cert*/,
-      const Network::TransportSocketOptions* /*transport_socket_options*/) override {
     PANIC("Should not be reached");
   }
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override { return absl::nullopt; }
@@ -73,9 +65,8 @@ private:
   // Once the validation is done, the result will be posted back to the current
   // thread to trigger callback and update verify stats.
   // Must be called on the validation thread.
-  static void verifyCertChainByPlatform(const envoy_cert_validator* platform_validator,
-                                        Event::Dispatcher* dispatcher,
-                                        std::vector<envoy_data> cert_chain, std::string hostname,
+  static void verifyCertChainByPlatform(Event::Dispatcher* dispatcher,
+                                        std::vector<std::string> cert_chain, std::string hostname,
                                         std::vector<std::string> subject_alt_names,
                                         PlatformBridgeCertValidator* parent);
 
@@ -83,7 +74,6 @@ private:
   static void postVerifyResultAndCleanUp(bool success, std::string hostname,
                                          absl::string_view error_details, uint8_t tls_alert,
                                          ValidationFailureType failure_type,
-                                         const envoy_cert_validator* platform_validator,
                                          Event::Dispatcher* dispatcher,
                                          PlatformBridgeCertValidator* parent);
 
@@ -98,7 +88,6 @@ private:
   };
 
   const bool allow_untrusted_certificate_;
-  const envoy_cert_validator* platform_validator_;
   SslStats& stats_;
   absl::flat_hash_map<std::thread::id, ValidationJob> validation_jobs_;
   std::shared_ptr<size_t> alive_indicator_{new size_t(1)};

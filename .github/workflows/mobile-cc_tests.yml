@@ -1,5 +1,8 @@
 name: mobile_cc_tests
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -7,17 +10,28 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
   cctests:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_cc_tests == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
     name: cc_tests
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:321658b6b50abda6869f89fac275f59bf3b1e757
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
     - uses: actions/checkout@v3
     - name: Add safe directory
@@ -27,9 +41,9 @@ jobs:
       name: 'Run tests'
         # Regression test using the new API listener. TODO(#2711) clean up.
       run: |
-        cd mobile && ./bazelw test \
+        cd mobile
+        ./bazelw test \
             --action_env=LD_LIBRARY_PATH \
-            --test_output=all \
             --copt=-DUSE_API_LISTENER \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --config=mobile-remote-ci \
             //test/cc/...

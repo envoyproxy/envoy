@@ -122,7 +122,7 @@ public:
   bool onSSLRequest() override;
   bool shouldEncryptUpstream() const override;
   void sendUpstream(Buffer::Instance&) override;
-  void encryptUpstream(bool, Buffer::Instance&) override;
+  bool encryptUpstream(bool, Buffer::Instance&) override;
 
   Network::FilterStatus doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);

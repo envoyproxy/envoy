@@ -1,5 +1,8 @@
 name: mobile_format
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -7,17 +10,28 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
   formatall:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
     name: format_all
-    runs-on: ubuntu-20.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 45
     container:
-      image: envoyproxy/envoy-build-ubuntu:321658b6b50abda6869f89fac275f59bf3b1e757
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
       env:
         CLANG_FORMAT: /opt/llvm/bin/clang-format
         BUILDIFIER_BIN: /usr/local/bin/buildifier
@@ -25,38 +39,39 @@ jobs:
         ENVOY_BAZEL_PREFIX: "@envoy"
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
     - name: 'Run formatters'
-      if: steps.should_run.outputs.run_ci_job == 'true'
-      run: cd mobile && ./tools/check_format.sh
+      run: |
+        cd mobile
+        ./tools/check_format.sh
+
   precommit:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
     name: precommit
     runs-on: macos-12
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
     - name: 'Install precommit'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       run: brew install pre-commit
     - name: 'Run precommit'
-      if: steps.should_run.outputs.run_ci_job == 'true'
-      run: cd mobile && find mobile/* | pre-commit run --files
+      run: |
+        cd mobile
+        find mobile/* | pre-commit run --files
+
   swiftlint:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
     name: swift_lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 5
     container:
       image: ghcr.io/realm/swiftlint:0.50.3
@@ -65,54 +80,56 @@ jobs:
     - name: 'Run Swift Lint (SwiftLint)'
       run: swiftlint lint --strict
       working-directory: mobile
+
   drstring:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
     name: drstring
     runs-on: macos-12
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
     - name: 'Run DrString'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         DEVELOPER_DIR: /Applications/Xcode_14.1.app
-      run: cd mobile && ./bazelw run @DrString//:drstring check
+      run: |
+        cd mobile
+        ./bazelw run --config=remote-ci @DrString//:drstring check
+
   kotlinlint:
-    if: github.repository == 'envoyproxy/envoy'
+    if: ${{ needs.env.outputs.mobile_formatting == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
     name: kotlin_lint
     runs-on: macos-12
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@5ffc13f4174014e2d4d4572b3d74c3fa61aeb2c2
-      if: steps.should_run.outputs.run_ci_job == 'true'
+    - uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
         distribution: zulu
-    - run: cd mobile && ./ci/mac_ci_setup.sh
-      if: steps.should_run.outputs.run_ci_job == 'true'
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Run Kotlin Lint (Detekt)'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-ci-macos \
             //library/kotlin/io/envoyproxy/envoymobile:envoy_lib_lint \
             //examples/kotlin/hello_world:hello_envoy_kt_lint
     - name: 'Run Kotlin Formatter (ktlint)'
-      if: steps.should_run.outputs.run_ci_job == 'true'
-      run: cd mobile && ./bazelw build kotlin_format
+      run: |
+        cd mobile
+        ./bazelw build --config=remote-ci kotlin_format

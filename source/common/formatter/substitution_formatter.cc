@@ -56,7 +56,6 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
 const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
-const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
 } // namespace
 
@@ -348,9 +347,9 @@ void SubstitutionFormatParser::parseSubcommandHeaders(const std::string& subcomm
   }
 
   // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
-  if (std::regex_search(main_header, getNewlinePattern()) ||
-      std::regex_search(alternative_header, getNewlinePattern())) {
-    throw EnvoyException("Invalid header configuration. Format string contains newline.");
+  if (!Envoy::Http::validHeaderString(main_header) ||
+      !Envoy::Http::validHeaderString(alternative_header)) {
+    throw EnvoyException("Invalid header configuration. Format string contains null or newline.");
   }
 }
 
@@ -969,12 +968,29 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     return stream_info.bytesReceived();
                                   });
                             }}},
+                          {"BYTES_RETRANSMITTED",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoUInt64FieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return stream_info.bytesRetransmitted();
+                                  });
+                            }}},
+                          {"PACKETS_RETRANSMITTED",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoUInt64FieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return stream_info.packetsRetransmitted();
+                                  });
+                            }}},
                           {"UPSTREAM_WIRE_BYTES_RECEIVED",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getUpstreamBytesMeter()->wireBytesReceived();
+                                    auto bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->wireBytesReceived() : 0;
                                   });
                             }}},
                           {"UPSTREAM_HEADER_BYTES_RECEIVED",
@@ -982,8 +998,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getUpstreamBytesMeter()
-                                        ->headerBytesReceived();
+                                    auto bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
                                   });
                             }}},
                           {"DOWNSTREAM_WIRE_BYTES_RECEIVED",
@@ -991,8 +1007,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getDownstreamBytesMeter()
-                                        ->wireBytesReceived();
+                                    auto bytes_meter = stream_info.getDownstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->wireBytesReceived() : 0;
                                   });
                             }}},
                           {"DOWNSTREAM_HEADER_BYTES_RECEIVED",
@@ -1000,8 +1016,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getDownstreamBytesMeter()
-                                        ->headerBytesReceived();
+                                    auto bytes_meter = stream_info.getDownstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
                                   });
                             }}},
                           {"PROTOCOL",
@@ -1061,7 +1077,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getUpstreamBytesMeter()->wireBytesSent();
+                                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->wireBytesSent() : 0;
                                   });
                             }}},
                           {"UPSTREAM_HEADER_BYTES_SENT",
@@ -1069,7 +1086,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getUpstreamBytesMeter()->headerBytesSent();
+                                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                                   });
                             }}},
                           {"DOWNSTREAM_WIRE_BYTES_SENT",
@@ -1077,7 +1095,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getDownstreamBytesMeter()->wireBytesSent();
+                                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->wireBytesSent() : 0;
                                   });
                             }}},
                           {"DOWNSTREAM_HEADER_BYTES_SENT",
@@ -1085,7 +1104,8 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
-                                    return stream_info.getDownstreamBytesMeter()->headerBytesSent();
+                                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
+                                    return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                                   });
                             }}},
                           {"DURATION",
@@ -1103,6 +1123,14 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     return StreamInfo::ResponseFlagUtils::toShortString(
                                         stream_info);
+                                  });
+                            }}},
+                          {"RESPONSE_FLAGS_LONG",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return StreamInfo::ResponseFlagUtils::toString(stream_info);
                                   });
                             }}},
                           {"UPSTREAM_HOST",
@@ -1405,12 +1433,48 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                                          ",");
                                   });
                             }}},
+                          {"DOWNSTREAM_PEER_DNS_SAN",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return absl::StrJoin(connection_info.dnsSansPeerCertificate(),
+                                                         ",");
+                                  });
+                            }}},
+                          {"DOWNSTREAM_PEER_IP_SAN",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return absl::StrJoin(connection_info.ipSansPeerCertificate(),
+                                                         ",");
+                                  });
+                            }}},
                           {"DOWNSTREAM_LOCAL_URI_SAN",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
                                   [](const Ssl::ConnectionInfo& connection_info) {
                                     return absl::StrJoin(connection_info.uriSanLocalCertificate(),
+                                                         ",");
+                                  });
+                            }}},
+                          {"DOWNSTREAM_LOCAL_DNS_SAN",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return absl::StrJoin(connection_info.dnsSansLocalCertificate(),
+                                                         ",");
+                                  });
+                            }}},
+                          {"DOWNSTREAM_LOCAL_IP_SAN",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return absl::StrJoin(connection_info.ipSansLocalCertificate(),
                                                          ",");
                                   });
                             }}},
@@ -1845,9 +1909,15 @@ GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
     : HeaderFormatter(main_header, alternative_header, max_length), format_(format) {}
 
 absl::optional<std::string> GrpcStatusFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info,
     absl::string_view, AccessLog::AccessLogType) const {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
+    if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
+      return absl::nullopt;
+    }
+  }
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
@@ -1877,9 +1947,15 @@ absl::optional<std::string> GrpcStatusFormatter::format(
 }
 
 ProtobufWkt::Value GrpcStatusFormatter::formatValue(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info,
     absl::string_view, AccessLog::AccessLogType) const {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_grpc_header_before_log_grpc_status")) {
+    if (!Grpc::Common::isGrpcRequestHeaders(request_headers)) {
+      return unspecifiedValue();
+    }
+  }
   const auto grpc_status =
       Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
@@ -1927,11 +2003,12 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     str = value.string_value();
   } else {
 #ifdef ENVOY_ENABLE_YAML
-    ProtobufUtil::StatusOr<std::string> json_or_error =
+    absl::StatusOr<std::string> json_or_error =
         MessageUtil::getJsonStringFromMessage(value, false, true);
-    ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
     if (json_or_error.ok()) {
       str = json_or_error.value();
+    } else {
+      str = json_or_error.status().message();
     }
 #else
     IS_ENVOY_BUG("Json support compiled out");
@@ -2088,6 +2165,7 @@ absl::optional<std::string> FilterStateFormatter::format(
     return absl::nullopt;
   }
 
+#ifdef ENVOY_ENABLE_FULL_PROTOS
   std::string value;
   const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
   if (!status.ok()) {
@@ -2098,6 +2176,10 @@ absl::optional<std::string> FilterStateFormatter::format(
 
   truncate(value, max_length_);
   return value;
+#else
+  PANIC("FilterStateFormatter::format requires full proto support");
+  return absl::nullopt;
+#endif
 }
 
 ProtobufWkt::Value FilterStateFormatter::formatValue(

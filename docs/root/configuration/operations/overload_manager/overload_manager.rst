@@ -156,6 +156,15 @@ The following core load shed points are supported:
       right after the http codec has finished parsing headers but before the
       :ref:`HTTP Filter Chain is instantiated <life_of_a_request>`.
 
+  * - envoy.load_shed_points.http1_server_abort_dispatch
+    - Envoy will reject processing HTTP1 at the codec level. If a response has
+      not yet started, Envoy will send a local reply. Envoy will then close the
+      connection.
+
+  * - envoy.load_shed_points.http2_server_go_away_on_dispatch
+    - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
+      level which will eventually drain the HTTP/2 connection.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
@@ -344,3 +353,13 @@ with the following statistics:
 
   active, Gauge, "Active state of the action (0=scaling, 1=saturated)"
   scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
+
+Each configured Load Shed Point has a statistics tree rooted at *overload.<name>.*
+with the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
+

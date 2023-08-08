@@ -192,10 +192,6 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   return match != header_data.invert_match_;
 }
 
-bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
-  return scheme == Headers::get().SchemeValues.Https || scheme == Headers::get().SchemeValues.Http;
-}
-
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return http2::adapter::HeaderValidator::IsValidHeaderValue(header_value,
                                                              http2::adapter::ObsTextOption::kAllow);
@@ -243,11 +239,60 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }
 
+bool HeaderUtility::isConnectUdp(const RequestHeaderMap& headers) {
+  return headers.Upgrade() &&
+         headers.Upgrade()->value() == Http::Headers::get().UpgradeValues.ConnectUdp;
+}
+
 bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
                                       const ResponseHeaderMap& response_headers) {
   return request_headers && isConnect(*request_headers) &&
          static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
              Http::Code::OK;
+}
+
+bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
+  // Per RFC 9298, the URI template must only contain ASCII characters in the range 0x21-0x7E.
+  absl::string_view path = headers.getPathValue();
+  for (char c : path) {
+    unsigned char ascii_code = static_cast<unsigned char>(c);
+    if (ascii_code < 0x21 || ascii_code > 0x7e) {
+      ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a bad character in the path {}", path);
+      return false;
+    }
+  }
+
+  // Extract target host and port from path using default template.
+  if (!absl::StartsWith(path, "/.well-known/masque/udp/")) {
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request path is not a well-known URI: {}", path);
+    return false;
+  }
+
+  std::vector<absl::string_view> path_split = absl::StrSplit(path, '/');
+  if (path_split.size() != 7 || path_split[4].empty() || path_split[5].empty() ||
+      !path_split[6].empty()) {
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a malformed URI template in the path {}", path);
+    return false;
+  }
+
+  // Utility::PercentEncoding::decode never returns an empty string if the input argument is not
+  // empty.
+  std::string target_host = Utility::PercentEncoding::decode(path_split[4]);
+  // Per RFC 9298, IPv6 Zone ID is not supported.
+  if (target_host.find('%') != std::string::npos) {
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a non-escpaed char (%) in the path {}", path);
+    return false;
+  }
+  std::string target_port = Utility::PercentEncoding::decode(path_split[5]);
+
+  // If the host is an IPv6 address, surround the address with square brackets.
+  in6_addr sin6_addr;
+  bool is_ipv6 = (inet_pton(AF_INET6, target_host.c_str(), &sin6_addr) == 1);
+  std::string new_host =
+      absl::StrCat((is_ipv6 ? absl::StrCat("[", target_host, "]") : target_host), ":", target_port);
+  headers.setHost(new_host);
+
+  return true;
 }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -299,6 +344,19 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
   if (host[dot_index + 1] == ':') {
     headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
   }
+}
+
+bool HeaderUtility::hostHasPort(absl::string_view original_host) {
+  const absl::string_view::size_type port_start = getPortStart(original_host);
+  const absl::string_view port_str = original_host.substr(port_start + 1);
+  if (port_start == absl::string_view::npos) {
+    return false;
+  }
+  uint32_t port = 0;
+  if (!absl::SimpleAtoi(port_str, &port)) {
+    return false;
+  }
+  return true;
 }
 
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,

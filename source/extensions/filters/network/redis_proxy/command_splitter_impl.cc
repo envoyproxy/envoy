@@ -29,10 +29,14 @@ Common::Redis::Client::PoolRequest* makeSingleServerRequest(
     const RouteSharedPtr& route, const std::string& command, const std::string& key,
     Common::Redis::RespValueConstSharedPtr incoming_request, ConnPool::PoolCallbacks& callbacks,
     Common::Redis::Client::Transaction& transaction) {
+  // If a transaction is active, clients_[0] is the primary connection to the cluster.
+  // The subsequent clients in the array are used for mirroring.
+  transaction.current_client_idx_ = 0;
   auto handler = route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
                                                 callbacks, transaction);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
+      transaction.current_client_idx_++;
       if (mirror_policy->shouldMirror(command)) {
         mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
                                                null_pool_callbacks, transaction);
@@ -504,6 +508,7 @@ SplitRequestPtr TransactionRequest::create(Router& router,
   // key, and then send a MULTI command to the node that handles that key.
   // The response for the MULTI command will be discarded since we pass the null_pool_callbacks
   // to the handler.
+
   RouteSharedPtr route;
   if (transaction.key_.empty()) {
     transaction.key_ = incoming_request->asArray()[1].asString();
@@ -511,8 +516,11 @@ SplitRequestPtr TransactionRequest::create(Router& router,
     Common::Redis::RespValueSharedPtr multi_request =
         std::make_shared<Common::Redis::Client::MultiRequest>();
     if (route) {
+      // We reserve a client for the main connection and for each mirror connection.
+      transaction.clients_.resize(1 + route->mirrorPolicies().size());
       makeSingleServerRequest(route, "MULTI", transaction.key_, multi_request, null_pool_callbacks,
                               callbacks.transaction());
+      transaction.connection_established_ = true;
     }
   } else {
     route = router.upstreamPool(transaction.key_);
@@ -520,6 +528,7 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 
   std::unique_ptr<TransactionRequest> request_ptr{
       new TransactionRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
   if (route) {
     Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
     request_ptr->handle_ =
@@ -614,6 +623,31 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  if (command_name == Common::Redis::SupportedCommands::time()) {
+    // Respond to TIME locally.
+    Common::Redis::RespValuePtr time_resp(new Common::Redis::RespValue());
+    time_resp->type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> resp_array;
+
+    auto now = dispatcher.timeSource().systemTime().time_since_epoch();
+
+    Common::Redis::RespValue time_in_secs;
+    time_in_secs.type(Common::Redis::RespType::BulkString);
+    time_in_secs.asString() =
+        std::to_string(std::chrono::duration_cast<std::chrono::seconds>(now).count());
+    resp_array.push_back(time_in_secs);
+
+    Common::Redis::RespValue time_in_micro_secs;
+    time_in_micro_secs.type(Common::Redis::RespType::BulkString);
+    time_in_micro_secs.asString() =
+        std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
+    resp_array.push_back(time_in_micro_secs);
+
+    time_resp->asArray().swap(resp_array);
+    callbacks.onResponse(std::move(time_resp));
+    return nullptr;
+  }
+
   if (command_name == Common::Redis::SupportedCommands::quit()) {
     callbacks.onQuit();
     return nullptr;
@@ -621,7 +655,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
   if (request->asArray().size() < 2 &&
       Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0) {
-    // Commands other than PING and transaction commands all have at least two arguments.
+    // Commands other than PING, TIME and transaction commands all have at least two arguments.
     onInvalidRequest(callbacks);
     return nullptr;
   }

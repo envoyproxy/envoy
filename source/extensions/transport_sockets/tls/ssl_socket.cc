@@ -197,11 +197,11 @@ void SslSocket::onSuccess(SSL* ssl) {
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
-void SslSocket::onFailure() { drainErrorQueue(); }
+void SslSocket::onFailure(bool syscall_error_occurred) { drainErrorQueue(syscall_error_occurred); }
 
 PostIoAction SslSocket::doHandshake() { return info_->doHandshake(); }
 
-void SslSocket::drainErrorQueue() {
+void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
   bool saw_error = false;
   bool saw_counted_error = false;
   while (uint64_t err = ERR_get_error()) {
@@ -228,6 +228,19 @@ void SslSocket::drainErrorQueue() {
                                         absl::NullSafeStringView(ERR_func_error_string(err)), ":",
                                         absl::NullSafeStringView(ERR_reason_error_string(err))));
   }
+
+  if (syscall_error_occurred) {
+    if (failure_reason_.empty()) {
+      failure_reason_ = "TLS error:";
+    }
+    failure_reason_.append(
+        "SSL_ERROR_SYSCALL error has occured, which indicates the operation failed externally to "
+        "the library. This is typically |errno| but may be something custom if using a custom "
+        "|BIO|. It may also be signaled if the transport returned EOF, in which case the "
+        "operation's return value will be zero.");
+    saw_error = true;
+  }
+
   if (!failure_reason_.empty()) {
     ENVOY_CONN_LOG(debug, "remote address:{},{}", callbacks_->connection(),
                    callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),

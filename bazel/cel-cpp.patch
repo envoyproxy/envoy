@@ -1,15 +1,168 @@
-#
-# Temporary patch to cel-cpp to accomodate switch from ABSL types to STL types.
-#
-# Patch will be removed once build issues in new cel-cpp are addressed.
-#
---- a/eval/public/ast_traverse.cc	2023-01-23 17:38:48.730240356 +0000
-+++ b/eval/public/ast_traverse.cc	2023-01-23 17:39:27.182207871 +0000
-@@ -17,6 +17,7 @@
- #include <stack>
+diff --git a/base/memory_manager.cc b/base/memory_manager.cc
+index 1b7b355..4c7810c 100644
+--- a/base/memory_manager.cc
++++ b/base/memory_manager.cc
+@@ -234,7 +234,7 @@ class GlobalMemoryManager final : public MemoryManager {
+   void* Allocate(size_t size, size_t align) override {
+     static_cast<void>(size);
+     static_cast<void>(align);
+-    ABSL_INTERNAL_UNREACHABLE;
++    ABSL_UNREACHABLE();
+     return nullptr;
+   }
  
- #include "google/api/expr/v1alpha1/syntax.pb.h"
-+#include "absl/base/attributes.h"
- #include "absl/types/variant.h"
- #include "eval/public/ast_visitor.h"
- #include "eval/public/source_position.h"
+@@ -242,7 +242,7 @@ class GlobalMemoryManager final : public MemoryManager {
+   void OwnDestructor(void* pointer, void (*destructor)(void*)) override {
+     static_cast<void>(pointer);
+     static_cast<void>(destructor);
+-    ABSL_INTERNAL_UNREACHABLE;
++    ABSL_UNREACHABLE();
+   }
+ };
+ 
+diff --git a/eval/eval/evaluator_stack.h b/eval/eval/evaluator_stack.h
+index 1ecab27..9df65d7 100644
+--- a/eval/eval/evaluator_stack.h
++++ b/eval/eval/evaluator_stack.h
+@@ -5,6 +5,7 @@
+ #include <utility>
+ #include <vector>
+ 
++#include "absl/log/log.h"
+ #include "absl/types/span.h"
+ #include "eval/eval/attribute_trail.h"
+ #include "eval/public/cel_value.h"
+diff --git a/eval/public/cel_expr_builder_factory.h b/eval/public/cel_expr_builder_factory.h
+index 7321e29..0d0d5e6 100644
+--- a/eval/public/cel_expr_builder_factory.h
++++ b/eval/public/cel_expr_builder_factory.h
+@@ -1,6 +1,7 @@
+ #ifndef THIRD_PARTY_CEL_CPP_EVAL_PUBLIC_CEL_EXPR_BUILDER_FACTORY_H_
+ #define THIRD_PARTY_CEL_CPP_EVAL_PUBLIC_CEL_EXPR_BUILDER_FACTORY_H_
+ 
++#include "absl/log/log.h"
+ #include "google/protobuf/descriptor.h"
+ #include "eval/public/cel_expression.h"
+ #include "eval/public/cel_options.h"
+diff --git a/eval/public/cel_value.h b/eval/public/cel_value.h
+index b2d13f8..73e1909 100644
+--- a/eval/public/cel_value.h
++++ b/eval/public/cel_value.h
+@@ -25,7 +25,6 @@
+ #include "absl/base/attributes.h"
+ #include "absl/base/macros.h"
+ #include "absl/base/optimization.h"
+-#include "absl/log/log.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/str_cat.h"
+@@ -481,8 +480,8 @@ class CelValue {
+   }
+ 
+   // Crashes with a null pointer error.
+-  static void CrashNullPointer(Type type) ABSL_ATTRIBUTE_COLD {
+-    LOG(FATAL) << "Null pointer supplied for " << TypeName(type);  // Crash ok
++  static void CrashNullPointer(Type) ABSL_ATTRIBUTE_COLD {
++    ABSL_ASSERT(false);
+   }
+ 
+   // Null pointer checker for pointer-based types.
+@@ -493,11 +492,9 @@ class CelValue {
+   }
+ 
+   // Crashes with a type mismatch error.
+-  static void CrashTypeMismatch(Type requested_type,
+-                                Type actual_type) ABSL_ATTRIBUTE_COLD {
+-    LOG(FATAL) << "Type mismatch"                             // Crash ok
+-               << ": expected " << TypeName(requested_type)   // Crash ok
+-               << ", encountered " << TypeName(actual_type);  // Crash ok
++  static void CrashTypeMismatch(Type,
++                                Type) ABSL_ATTRIBUTE_COLD {
++    ABSL_ASSERT(false);
+   }
+ 
+   // Gets value of type specified
+diff --git a/eval/public/portable_cel_expr_builder_factory.cc b/eval/public/portable_cel_expr_builder_factory.cc
+index 80ac45c..7dceb93 100644
+--- a/eval/public/portable_cel_expr_builder_factory.cc
++++ b/eval/public/portable_cel_expr_builder_factory.cc
+@@ -20,6 +20,7 @@
+ #include <string>
+ #include <utility>
+ 
++#include "absl/log/log.h"
+ #include "absl/status/status.h"
+ #include "eval/compiler/flat_expr_builder.h"
+ #include "eval/public/cel_options.h"
+diff --git a/eval/public/structs/BUILD b/eval/public/structs/BUILD
+index 9187518..5151bb0 100644
+--- a/eval/public/structs/BUILD
++++ b/eval/public/structs/BUILD
+@@ -192,7 +192,6 @@ cc_library(
+     hdrs = ["legacy_type_provider.h"],
+     deps = [
+         ":legacy_type_adapter",
+-        "//base:type_provider",
+         "@com_google_absl//absl/types:optional",
+     ],
+ )
+diff --git a/eval/public/structs/field_access_impl.cc b/eval/public/structs/field_access_impl.cc
+index 788a476..e4b70b3 100644
+--- a/eval/public/structs/field_access_impl.cc
++++ b/eval/public/structs/field_access_impl.cc
+@@ -25,6 +25,7 @@
+ #include "google/protobuf/arena.h"
+ #include "google/protobuf/map_field.h"
+ #include "absl/container/flat_hash_set.h"
++#include "absl/log/log.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/str_cat.h"
+diff --git a/eval/public/structs/legacy_type_provider.h b/eval/public/structs/legacy_type_provider.h
+index b1623fc..d3d88d6 100644
+--- a/eval/public/structs/legacy_type_provider.h
++++ b/eval/public/structs/legacy_type_provider.h
+@@ -16,7 +16,6 @@
+ #define THIRD_PARTY_CEL_CPP_EVAL_PUBLIC_STRUCTS_TYPE_PROVIDER_H_
+ 
+ #include "absl/types/optional.h"
+-#include "base/type_provider.h"
+ #include "eval/public/structs/legacy_type_adapter.h"
+ 
+ namespace google::api::expr::runtime {
+@@ -25,8 +24,10 @@ namespace google::api::expr::runtime {
+ //
+ // Note: This API is not finalized. Consult the CEL team before introducing new
+ // implementations.
+-class LegacyTypeProvider : public cel::TypeProvider {
++class LegacyTypeProvider {
+  public:
++  virtual ~LegacyTypeProvider() = default;
++
+   // Return LegacyTypeAdapter for the fully qualified type name if available.
+   //
+   // nullopt values are interpreted as not present.
+@@ -45,7 +46,7 @@ class LegacyTypeProvider : public cel::TypeProvider {
+   // created ones, the TypeInfoApis returned from this method should be the same
+   // as the ones used in value creation.
+   virtual absl::optional<const LegacyTypeInfoApis*> ProvideLegacyTypeInfo(
+-      absl::string_view name) const {
++      absl::string_view) const {
+     return absl::nullopt;
+   }
+ };
+diff --git a/base/function_result.h b/base/function_result.h
+index 9bc2d67..bf6110c 100644
+--- a/base/function_result.h
++++ b/base/function_result.h
+@@ -26,7 +26,10 @@ namespace cel {
+ // allows for lazy evaluation of expensive functions.
+ class FunctionResult final {
+  public:
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wdefaulted-function-deleted"
+   FunctionResult() = default;
++#pragma GCC diagnostic pop
+   FunctionResult(const FunctionResult&) = default;
+   FunctionResult(FunctionResult&&) = default;
+   FunctionResult& operator=(const FunctionResult&) = default;

@@ -22,6 +22,14 @@ namespace NetworkFilters {
 namespace GenericProxy {
 namespace {
 
+class GenericProxyIntegrationTest : public BaseIntegrationTest {
+public:
+  GenericProxyIntegrationTest(const std::string config_yaml)
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, config_yaml) {
+    skip_tag_extraction_rule_check_ = true;
+  };
+};
+
 class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -99,8 +107,7 @@ public:
   using TestResponseDecoderCallbackSharedPtr = std::shared_ptr<TestResponseDecoderCallback>;
 
   void initialize(const std::string& config_yaml, CodecFactoryPtr codec_factory) {
-    integration_ =
-        std::make_unique<BaseIntegrationTest>(Network::Address::IpVersion::v4, config_yaml);
+    integration_ = std::make_unique<GenericProxyIntegrationTest>(config_yaml);
     integration_->initialize();
 
     // Create codec for downstream client.
@@ -198,6 +205,8 @@ public:
   void waitForUpstreamRequestForTest(uint64_t num_bytes, std::string* data) {
     auto result = upstream_connection_->waitForData(num_bytes, data);
     RELEASE_ASSERT(result, result.failure_message());
+    // Clear data for next test.
+    upstream_connection_->clearData();
   }
 
   // Send upstream response.
@@ -254,7 +263,7 @@ public:
   TestResponseEncoderCallbackSharedPtr response_encoder_callback_;
 
   // Integration test server.
-  std::unique_ptr<BaseIntegrationTest> integration_;
+  std::unique_ptr<GenericProxyIntegrationTest> integration_;
 
   // Callbacks for downstream connection.
   ConnectionCallbacksSharedPtr connection_callbacks_;
@@ -410,8 +419,12 @@ TEST_P(IntegrationTest, MultipleRequests) {
   request_2.protocol_ = "fake_fake_fake";
   request_2.data_ = {{"version", "v1"}, {"stream_id", "2"}};
 
-  // Send the second request with the same stream id and expect the connection to be closed.
+  // Reset request encoder callback.
+  request_encoder_callback_ = std::make_shared<TestRequestEncoderCallback>();
+
+  // Send the second request with the different stream id and expect the connection to be alive.
   sendRequestForTest(request_2);
+  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
 
   FakeStreamCodecFactory::FakeResponse response_2;
   response_2.protocol_ = "fake_fake_fake";

@@ -13,7 +13,8 @@ namespace Envoy {
 namespace Http {
 
 HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
-    : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
+    : fake_stats_(*symbol_table_), http_context_(fake_stats_.symbolTable()),
+      access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
           Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
@@ -286,7 +287,6 @@ void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
 
 void HttpConnectionManagerImplMixin::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
-  InSequence s;
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -296,6 +296,10 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
     data.drain(4);
     return Http::okStatus();
   }));
+
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -309,12 +313,34 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
   conn_manager_->onData(fake_input, false);
 }
 
+void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
+  header_validator_config_.mutable_uri_path_normalization_options()->set_skip_path_normalization(
+      !normalize_path_);
+  header_validator_config_.mutable_uri_path_normalization_options()->set_skip_merging_slashes(
+      !merge_slashes_);
+  header_validator_config_.mutable_uri_path_normalization_options()
+      ->set_path_with_escaped_slashes_action(
+          static_cast<
+              ::envoy::extensions::http::header_validators::envoy_default::v3::
+                  HeaderValidatorConfig::UriPathNormalizationOptions::PathWithEscapedSlashesAction>(
+              path_with_escaped_slashes_action_));
+  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
+      .WillOnce(InvokeWithoutArgs([this]() {
+        auto header_validator = std::make_unique<
+            Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
+            header_validator_config_, Protocol::Http11, header_validator_stats_,
+            header_validator_config_overrides_);
+
+        return header_validator;
+      }));
+}
+
 void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
     HeaderValidator::ValidationResult validation_result,
-    HeaderValidator::RequestHeadersTransformationResult transformation_result) {
+    ServerHeaderValidator::RequestHeadersTransformationResult transformation_result) {
   EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([validation_result, transformation_result]() {
-        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaders(_))
             .WillOnce(InvokeWithoutArgs([validation_result]() { return validation_result; }));
 
@@ -322,7 +348,7 @@ void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
           EXPECT_CALL(*header_validator, transformRequestHeaders(_))
               .WillOnce(Invoke([transformation_result](RequestHeaderMap& headers) {
                 if (transformation_result.action() ==
-                    HeaderValidator::RequestHeadersTransformationResult::Action::Redirect) {
+                    ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect) {
                   headers.setPath("/some/new/path");
                 }
                 return transformation_result;
@@ -330,8 +356,9 @@ void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
         }
 
         EXPECT_CALL(*header_validator, transformResponseHeaders(_))
-            .WillOnce(InvokeWithoutArgs(
-                []() { return HeaderValidator::ResponseHeadersTransformationResult::success(); }));
+            .WillOnce(InvokeWithoutArgs([]() {
+              return ServerHeaderValidator::ResponseHeadersTransformationResult::success();
+            }));
 
         return header_validator;
       }));
@@ -342,13 +369,13 @@ void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
     HeaderValidator::TransformationResult transformation_result, bool expect_response) {
   EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([validation_result, transformation_result, expect_response]() {
-        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaders(_)).WillOnce(InvokeWithoutArgs([]() {
           return HeaderValidator::ValidationResult::success();
         }));
 
         EXPECT_CALL(*header_validator, transformRequestHeaders(_)).WillOnce(InvokeWithoutArgs([]() {
-          return HeaderValidator::RequestHeadersTransformationResult::success();
+          return ServerHeaderValidator::RequestHeadersTransformationResult::success();
         }));
 
         EXPECT_CALL(*header_validator, validateRequestTrailers(_))
@@ -361,7 +388,7 @@ void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
         if (expect_response) {
           EXPECT_CALL(*header_validator, transformResponseHeaders(_))
               .WillOnce(InvokeWithoutArgs([]() {
-                return HeaderValidator::ResponseHeadersTransformationResult::success();
+                return ServerHeaderValidator::ResponseHeadersTransformationResult::success();
               }));
         }
         return header_validator;

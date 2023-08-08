@@ -1108,9 +1108,9 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  for (const auto& [flag_string, response_flag] :
-       StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
-    UNREFERENCED_PARAMETER(flag_string);
+  for (const auto& [flag_strings, response_flag] :
+       StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+    UNREFERENCED_PARAMETER(flag_strings);
 
     TestStreamInfo stream_info(time_source_);
     stream_info.setResponseFlag(response_flag);
@@ -1216,6 +1216,7 @@ typed_config:
       inline_string: "%GRPC_STATUS% %GRPC_STATUS_NUMBER% %GRPC_STATUS()% %GRPC_STATUS(CAMEL_STRING)% %GRPC_STATUS(SNAKE_STRING)% %GRPC_STATUS(NUMBER)%\n"
   )EOF";
 
+  request_headers_ = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
   {
     EXPECT_CALL(*file_, write(_));
@@ -1246,7 +1247,7 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {
-  const std::string yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 name: accesslog
 filter:
   grpc_status_filter:
@@ -1316,7 +1317,7 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterHttpCodes) {
-  const std::string yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 name: accesslog
 filter:
   grpc_status_filter:
@@ -1437,6 +1438,94 @@ typed_config:
   response_headers_.addCopy(Http::Headers::get().GrpcStatus, "0");
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
+}
+
+TEST_F(AccessLogImplTest, LogTypeFilterUnsupportedValue) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_type_filter:
+    types:
+      - NOT_A_VALID_CODE
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                          EnvoyException, "NOT_A_VALID_CODE");
+}
+
+TEST_F(AccessLogImplTest, LogTypeFilterBlock) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_type_filter:
+    types:
+      - TcpUpstreamConnected
+      - DownstreamEnd
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::TcpConnectionEnd); // Blocked
+}
+
+TEST_F(AccessLogImplTest, LogTypeFilterAllow) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_type_filter:
+    types:
+      - TcpUpstreamConnected
+      - DownstreamEnd
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(2);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::TcpUpstreamConnected); // Allowed
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::DownstreamEnd); // Allowed
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::UpstreamPoolReady); // Blocked
+}
+
+TEST_F(AccessLogImplTest, LogTypeFilterExclude) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  log_type_filter:
+    exclude: true
+    types:
+      - TcpUpstreamConnected
+      - DownstreamEnd
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::TcpUpstreamConnected); // Blocked
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::DownstreamEnd); // Blocked
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
+           AccessLog::AccessLogType::UpstreamPoolReady); // Allowed
 }
 
 TEST_F(AccessLogImplTest, MetadataFilter) {
@@ -1572,9 +1661,9 @@ public:
   ~TestHeaderFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Runtime::Loader&, Random::RandomGenerator&) override {
+                         Server::Configuration::CommonFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
-        config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+        config, context.messageValidationVisitor(), *this);
     const auto& header_config =
         TestUtility::downcastAndValidate<const envoy::config::accesslog::v3::HeaderFilter&>(
             *factory_config);
@@ -1651,9 +1740,9 @@ public:
   ~SampleExtensionFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Runtime::Loader&, Random::RandomGenerator&) override {
+                         Server::Configuration::CommonFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
-        config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+        config, context.messageValidationVisitor(), *this);
 
     ProtobufWkt::Struct struct_config =
         *dynamic_cast<const ProtobufWkt::Struct*>(factory_config.get());

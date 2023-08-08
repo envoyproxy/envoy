@@ -10,6 +10,7 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_runtime.h"
 
 #include "absl/strings/string_view.h"
@@ -23,8 +24,8 @@ namespace {
 static const uint32_t MAX_HEADERS = 32;
 static const size_t MAX_HD_TABLE_BUF_SIZE = 4096;
 
-void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& fragment,
-                     std::string& payload) {
+void deflateHeaders(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& fragment,
+                    std::string& payload) {
 #define MAX_HDRS 32
   nghttp2_nv h2hdrs[MAX_HEADERS];
   uint8_t buf[MAX_HD_TABLE_BUF_SIZE];
@@ -56,8 +57,8 @@ void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& f
   }
 }
 
-Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
-                          const test::common::http::http2::Http2FrameOrJunk& pb_frame) {
+Http2Frame pbToH2Frame(nghttp2_hd_deflater* deflater,
+                       const test::common::http::http2::Http2FrameOrJunk& pb_frame) {
   if (pb_frame.has_junk()) {
     // Junk frame
     const auto& junk = pb_frame.junk();
@@ -91,7 +92,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
         payload.append(reinterpret_cast<char*>(&weight), sizeof(weight));
       }
 
-      deflate_headers(deflater, f.headers(), payload);
+      deflateHeaders(deflater, f.headers(), payload);
       if (use_padding) {
         payload.append(f.padding().data(), padding_len);
       }
@@ -124,7 +125,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       }
       uint32_t stream_id = htonl(f.stream_id());
       payload.append(reinterpret_cast<char*>(&stream_id), sizeof(stream_id));
-      deflate_headers(deflater, f.headers(), payload);
+      deflateHeaders(deflater, f.headers(), payload);
       if (use_padding) {
         payload.append(f.padding().data(), padding_len);
       }
@@ -149,15 +150,15 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
     } else if (h2frame.has_continuation()) {
       type = Http2Frame::Type::Continuation;
       const auto& f = h2frame.continuation();
-      deflate_headers(deflater, f.headers(), payload);
+      deflateHeaders(deflater, f.headers(), payload);
     } else {
       // Empty frame
-      return Http2Frame();
+      return {};
     }
     return Http2Frame::makeRawFrame(type, flags, streamid, payload);
   } else {
     // Empty frame
-    return Http2Frame();
+    return {};
   }
 }
 
@@ -173,25 +174,25 @@ envoy::config::core::v3::Http2ProtocolOptions http2Settings() {
 
 class Http2Harness {
 public:
-  Http2Harness() : server_settings(http2Settings()) {
-    ON_CALL(mock_server_callbacks, newStream(_, _))
+  Http2Harness() : server_settings_(http2Settings()) {
+    ON_CALL(mock_server_callbacks_, newStream(_, _))
         .WillByDefault(Invoke(
-            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder; }));
+            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; }));
   }
 
-  void fuzz_request(std::vector<Http2Frame>& frames, bool use_oghttp2) {
+  void fuzzRequest(std::vector<Http2Frame>& frames, bool use_oghttp2) {
     TestScopedRuntime scoped_runtime;
     if (use_oghttp2) {
       scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
     } else {
       scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
     }
-    Stats::Scope& scope = *stats_store.rootScope();
+    Stats::Scope& scope = *stats_store_.rootScope();
     server_ = std::make_unique<Http2::ServerConnectionImpl>(
-        mock_server_connection, mock_server_callbacks,
-        Http2::CodecStats::atomicGet(http2_stats, scope), random, server_settings,
+        mock_server_connection_, mock_server_callbacks_,
+        Http2::CodecStats::atomicGet(http2_stats_, scope), random_, server_settings_,
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW, overload_manager_);
 
     Buffer::OwnedImpl payload;
     payload.add(Http2Frame::Preamble, 24);
@@ -204,20 +205,21 @@ public:
   }
 
 private:
-  const envoy::config::core::v3::Http2ProtocolOptions server_settings;
-  Stats::IsolatedStoreImpl stats_store;
-  Http2::CodecStats::AtomicPtr http2_stats;
+  const envoy::config::core::v3::Http2ProtocolOptions server_settings_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Http2::CodecStats::AtomicPtr http2_stats_;
 
-  NiceMock<MockRequestDecoder> orphan_request_decoder;
-  NiceMock<Network::MockConnection> mock_server_connection;
-  NiceMock<MockServerConnectionCallbacks> mock_server_callbacks;
-  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockRequestDecoder> orphan_request_decoder_;
+  NiceMock<Network::MockConnection> mock_server_connection_;
+  NiceMock<MockServerConnectionCallbacks> mock_server_callbacks_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 
   ServerConnectionPtr server_;
 };
 
 static std::unique_ptr<Http2Harness> harness;
-static void reset_harness() { harness = nullptr; }
+static void resetHarness() { harness = nullptr; }
 
 // HTTP/2 fuzzer
 //
@@ -226,7 +228,7 @@ static void reset_harness() { harness = nullptr; }
 DEFINE_PROTO_FUZZER(const test::common::http::http2::Http2ConnectionFuzzCase& input) {
   if (harness == nullptr) {
     harness = std::make_unique<Http2Harness>();
-    atexit(reset_harness);
+    atexit(resetHarness);
   }
 
   // Convert input to Http2Frame wire format
@@ -240,13 +242,13 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::Http2ConnectionFuzzCase& in
     return;
   }
   for (auto& pbframe : input.frames()) {
-    Http2Frame frame = pb_to_h2_frame(deflater, pbframe);
+    Http2Frame frame = pbToH2Frame(deflater, pbframe);
     frames.push_back(frame);
   }
   nghttp2_hd_deflate_del(deflater);
 
-  harness->fuzz_request(frames, true /* use oghttp2 rather than nghttp2 */);
-  harness->fuzz_request(frames, false);
+  harness->fuzzRequest(frames, true /* use oghttp2 rather than nghttp2 */);
+  harness->fuzzRequest(frames, false);
 }
 
 } // namespace

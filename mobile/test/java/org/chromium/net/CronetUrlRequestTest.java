@@ -36,10 +36,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
-import org.chromium.net.impl.CronetUrlRequest;
+import org.chromium.net.impl.CronvoyUrlRequest;
 import org.chromium.net.impl.Errors.EnvoyMobileError;
 import org.chromium.net.impl.Errors.NetError;
-import org.chromium.net.impl.UrlResponseInfoImpl;
+import org.chromium.net.impl.CronvoyUrlResponseInfoImpl;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
@@ -186,9 +186,9 @@ public class CronetUrlRequestTest {
       headersList.add(
           new AbstractMap.SimpleImmutableEntry<String, String>(headers[i], headers[i + 1]));
     }
-    UrlResponseInfoImpl unknown =
-        new UrlResponseInfoImpl(Arrays.asList(urls), statusCode, message, headersList, false,
-                                "unknown", ":0", receivedBytes);
+    CronvoyUrlResponseInfoImpl unknown =
+        new CronvoyUrlResponseInfoImpl(Arrays.asList(urls), statusCode, message, headersList, false,
+                                       "unknown", ":0", receivedBytes);
     return unknown;
   }
 
@@ -1922,7 +1922,7 @@ public class CronetUrlRequestTest {
     callback.setAutoAdvance(false);
     UrlRequest.Builder builder = mMockUrlRequestJobFactory.getCronetEngine().newUrlRequestBuilder(
         NativeTestServer.getEchoBodyURL(), callback, callback.getExecutor());
-    CronetUrlRequest urlRequest = (CronetUrlRequest)builder.build();
+    CronvoyUrlRequest urlRequest = (CronvoyUrlRequest)builder.build();
     urlRequest.start();
     callback.waitForNextStep();
     assertFalse(callback.isDone());
@@ -2024,7 +2024,7 @@ public class CronetUrlRequestTest {
         TestUploadDataProvider.SuccessCallbackMode.SYNC, callback.getExecutor());
     builder.setUploadDataProvider(dataProvider, callback.getExecutor());
     builder.addHeader("content-type", "useless/string");
-    CronetUrlRequest request = (CronetUrlRequest)builder.build();
+    CronvoyUrlRequest request = (CronvoyUrlRequest)builder.build();
     final ConditionVariable uploadDataStreamAdapterDestroyed = new ConditionVariable();
     // request.setOnDestroyedUploadCallbackForTesting(new Runnable() {
     //     @Override
@@ -2209,7 +2209,8 @@ public class CronetUrlRequestTest {
                  ((NetworkException)callback.mError).getCronetInternalErrorCode());
     assertEquals(errorCode, ((NetworkException)callback.mError).getErrorCode());
     assertEquals(immediatelyRetryable, ((NetworkException)callback.mError).immediatelyRetryable());
-    assertContains("Exception in CronetUrlRequest: net::ERR_" + name, callback.mError.getMessage());
+    assertContains("Exception in CronvoyUrlRequest: net::ERR_" + name,
+                   callback.mError.getMessage());
     assertEquals(0, callback.mRedirectCount);
     assertTrue(callback.mOnErrorCalled);
     assertEquals(ResponseStep.ON_FAILED, callback.mResponseStep);

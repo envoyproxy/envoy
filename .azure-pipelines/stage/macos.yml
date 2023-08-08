@@ -31,19 +31,19 @@ jobs:
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      ENVOY_RBE: 1
 
   - task: PublishTestResults@2
     inputs:
       testResultsFiles: "**/bazel-testlogs/**/test.xml"
       testRunTitle: "macOS"
     timeoutInMinutes: 10
-    condition: always()
+    condition: not(canceled())
 
 - job: tested
   displayName: Complete
   dependsOn: ["test"]
-  pool:
-    vmImage: "ubuntu-20.04"
+  pool: x64-nano
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:
