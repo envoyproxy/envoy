@@ -68,6 +68,8 @@ def kotlin_repos():
         sha256 = "241822bf5fad614e3e1c42431002abd9af757136fa590a6a7870c6e0640a82e3",
         strip_prefix = "rules_java-6.4.0",
         url = "https://github.com/bazelbuild/rules_java/archive/6.4.0.tar.gz",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
     )
 
     http_archive(
