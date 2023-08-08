@@ -101,7 +101,7 @@ template <class T> struct OptRef {
    *
    * @return a reference_wrapper around the value.
    */
-  std::reference_wrapper<const T> value() const { return std::reference_wrapper<T>(*ptr_); }
+  std::reference_wrapper<const T> value() const { return std::reference_wrapper<const T>(*ptr_); }
   std::reference_wrapper<T> value() { return std::reference_wrapper<T>(*ptr_); }
 
   /**
