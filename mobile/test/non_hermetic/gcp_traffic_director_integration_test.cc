@@ -12,10 +12,11 @@
 
 #include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/clusters/eds/eds.h"
+#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/extensions/health_checkers/http/health_checker_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"
@@ -58,7 +59,8 @@ public:
     Config::forceRegisterNewGrpcMuxFactory();
     Config::forceRegisterAdsConfigSubscriptionFactory();
     // Force register the cluster factories used by the test.
-    Upstream::forceRegisterEdsClusterFactory();
+    Upstream::forceRegisterStrictDnsClusterFactory();
+    Upstream::forceRegisterHttpHealthCheckerFactory();
 
     std::string root_certs(TestEnvironment::readFileToStringForTest(
         TestEnvironment::runfilesPath("test/config/integration/certs/google_root_certs.pem")));
@@ -110,14 +112,12 @@ TEST_P(GcpTrafficDirectorIntegrationTest, AdsDynamicClusters) {
   //
   // There are 5 total active clusters after the Envoy engine has finished initialization.
   //
-  // (A) There are three dynamic clusters retrieved from Traffic Director:
-  //      1. cloud-internal-istio:cloud_mp_798832730858_1578897841695688881
-  //      2. cloud-internal-istio:cloud_mp_798832730858_523871542841416155
-  //      3. cloud-internal-istio:cloud_mp_798832730858_4497773746904456309
-  // (B) There are two static clusters added by the EngineBuilder by default:
-  //      4. base
-  //      5. base_clear
-  ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", 5));
+  // 1. There is one strict dns cluster retrieved from Traffic Director:
+  //      backend-svc-do-not-delete
+  // 2. There are two static clusters added by the EngineBuilder by default:
+  //      base
+  //      base_clear
+  ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", 3));
 
   // TODO(abeyad): Once we have a Envoy Mobile stats API, we can use it to check the
   // actual cluster names.
