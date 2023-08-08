@@ -76,7 +76,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
 
   // Send another RTDS request and get back the RTDS response.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_resource"},
-                                    {"some_rtds_resource"}, {}, true));
+                                      {"some_rtds_resource"}, {}, true));
   some_rtds_resource = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_resource
     layer:
