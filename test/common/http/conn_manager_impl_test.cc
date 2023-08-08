@@ -2401,7 +2401,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        // Even the request is invalid, will still try to find a route before response filter chain path.
+        // Even the request is invalid, will still try to find a route before response filter chain
+        // path.
         EXPECT_EQ(route_config_provider_.route_config_->route_, stream_info.route());
       }));
 
