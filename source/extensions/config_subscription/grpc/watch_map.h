@@ -5,11 +5,13 @@
 #include <utility>
 
 #include "envoy/config/custom_config_validators.h"
+#include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/resource_name.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -59,12 +61,25 @@ struct Watch {
 // update the subscription accordingly.
 //
 // A WatchMap is assumed to be dedicated to a single type_url type of resource (EDS, CDS, etc).
+//
+// The WatchMap can also store the fetched resources in a cache, and allow others to fetch
+// resources directly from the cache. This is done for EDS in the following case:
+// Assume an active EDS cluster exists with some load-assignment that is kept in the cache.
+// If the cluster is updated, and no load-assignment is sent from the xDS server, the
+// cached version will be used.
+// The WatchMap is responsible to update the cache with the resource contents, and it is
+// up to the specific xDS type subscription handler (i.e., EdsClusterImpl), to fetch
+// the resource from the cache.
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap(const bool use_namespace_matching, const std::string& type_url,
-           CustomConfigValidators& config_validators)
+           CustomConfigValidators& config_validators, EdsResourcesCacheOptRef eds_resources_cache)
       : use_namespace_matching_(use_namespace_matching), type_url_(type_url),
-        config_validators_(config_validators) {}
+        config_validators_(config_validators), eds_resources_cache_(eds_resources_cache) {
+    // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
+    ASSERT(!eds_resources_cache_.has_value() ||
+           (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()));
+  }
 
   // Adds 'callbacks' to the WatchMap, with every possible resource being watched.
   // (Use updateWatchInterest() to narrow it down to some specific names).
@@ -133,6 +148,7 @@ private:
   const bool use_namespace_matching_;
   const std::string type_url_;
   CustomConfigValidators& config_validators_;
+  EdsResourcesCacheOptRef eds_resources_cache_;
 };
 
 } // namespace Config

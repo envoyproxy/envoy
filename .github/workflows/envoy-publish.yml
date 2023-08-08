@@ -12,7 +12,11 @@ on:
         description: "Ref for grouping PRs"
 
 concurrency:
-  group: ${{ github.event.inputs.head_ref || github.run_id }}-${{ github.workflow }}
+  group: |
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}
   cancel-in-progress: true
 
 permissions:
@@ -32,6 +36,7 @@ jobs:
       check_mobile_run: false
       prime_build_image: true
       start_check_status: Verify/examples
+      repo_ref: ${{ inputs.ref }}
       repo_ref_sha: ${{ inputs.sha }}
       repo_ref_name: ${{ inputs.head_ref }}
 
@@ -61,4 +66,4 @@ jobs:
     with:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
+      repo_ref: ${{ needs.env.outputs.trusted != 'true' && needs.env.outputs.repo_ref || '' }}

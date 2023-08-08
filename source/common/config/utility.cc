@@ -27,25 +27,6 @@ std::string Utility::truncateGrpcStatusMessage(absl::string_view error_message) 
                      error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
 }
 
-void Utility::translateApiConfigSource(
-    const std::string& cluster, uint32_t refresh_delay_ms, const std::string& api_type,
-    envoy::config::core::v3::ApiConfigSource& api_config_source) {
-  // TODO(junr03): document the option to chose an api type once we have created
-  // stronger constraints around v2.
-  if (api_type == ApiType::get().Grpc) {
-    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    envoy::config::core::v3::GrpcService* grpc_service = api_config_source.add_grpc_services();
-    grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
-  } else {
-    ASSERT(api_type == ApiType::get().Rest);
-    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
-    api_config_source.add_cluster_names(cluster);
-  }
-
-  api_config_source.mutable_refresh_delay()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
-}
-
 Upstream::ClusterConstOptRef Utility::checkCluster(absl::string_view error_prefix,
                                                    absl::string_view cluster_name,
                                                    Upstream::ClusterManager& cm,
@@ -90,8 +71,14 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Ap
   }
 }
 
-void Utility::checkApiConfigSourceNames(
-    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+namespace {
+/**
+ * Check the grpc_services and cluster_names for API config sanity. Throws on error.
+ * @param api_config_source the config source to validate.
+ * @throws EnvoyException when an API config has the wrong number of gRPC
+ * services or cluster names, depending on expectations set by its API type.
+ */
+void checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC ||
        api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
@@ -126,6 +113,7 @@ void Utility::checkApiConfigSourceNames(
     }
   }
 }
+} // namespace
 
 void Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
                                   const std::string& cluster_name,
@@ -148,7 +136,7 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
           envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
     return;
   }
-  Utility::checkApiConfigSourceNames(api_config_source);
+  checkApiConfigSourceNames(api_config_source);
 
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -246,7 +234,7 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
     bool skip_cluster_check) {
-  Utility::checkApiConfigSourceNames(api_config_source);
+  checkApiConfigSourceNames(api_config_source);
 
   if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
       api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {

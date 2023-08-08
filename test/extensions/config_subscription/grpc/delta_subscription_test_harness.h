@@ -55,13 +55,15 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           *stats_store_.rootScope(), rate_limit_settings_, local_info_, false,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(), std::move(backoff_strategy),
-          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
+          /*eds_resources_cache=*/nullptr);
     } else {
       xds_context_ = std::make_shared<NewGrpcMuxImpl>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           *stats_store_.rootScope(), rate_limit_settings_, local_info_,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(), std::move(backoff_strategy),
-          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
+          /*eds_resources_cache=*/nullptr);
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         xds_context_, callbacks_, resource_decoder_, stats_,

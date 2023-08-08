@@ -44,23 +44,35 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   envoy::config::core::v3::Metadata metadata_context;
 
   // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_authz
-  // service.
+  // service. If metadata key is set in both the connection and request metadata then the value
+  // will be the request metadata value.
+  const auto& connection_metadata =
+      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
   const auto& request_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
-    if (const auto& metadata_it = request_metadata.find(context_key);
+    if (const auto metadata_it = request_metadata.find(context_key);
         metadata_it != request_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_metadata.find(context_key);
+               metadata_it != connection_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
 
   // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
-  // ext_authz service.
+  // ext_authz service. If metadata key is set in both the connection and request metadata then
+  // the value will be the request metadata value.
+  const auto& connection_typed_metadata =
+      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
   const auto& request_typed_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
   for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
-    if (const auto& metadata_it = request_typed_metadata.find(context_key);
+    if (const auto metadata_it = request_typed_metadata.find(context_key);
         metadata_it != request_typed_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_typed_metadata.find(context_key);
+               metadata_it != connection_typed_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
@@ -130,14 +142,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (buffer_data_ && !skip_check_) {
-    const bool buffer_is_full = isBufferFull();
+    const bool buffer_is_full = isBufferFull(data.length());
     if (end_stream || buffer_is_full) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
                        *decoder_callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
-      if (!buffer_is_full) {
-        // Make sure data is available in initiateCall.
-        decoder_callbacks_->addDecodedData(data, true);
-      }
+      // Make sure data is available in initiateCall.
+      decoder_callbacks_->addDecodedData(data, true);
       initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
@@ -432,12 +442,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 }
 
-bool Filter::isBufferFull() const {
-  const auto* buffer = decoder_callbacks_->decodingBuffer();
-  if (config_->allowPartialMessage() && buffer != nullptr) {
-    return buffer->length() >= config_->maxRequestBytes();
+bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
+  if (!config_->allowPartialMessage()) {
+    return false;
   }
-  return false;
+
+  uint64_t num_bytes_buffered = num_bytes_processing;
+  const auto* buffer = decoder_callbacks_->decodingBuffer();
+  if (buffer != nullptr) {
+    num_bytes_buffered += buffer->length();
+  }
+
+  return num_bytes_buffered >= config_->maxRequestBytes();
 }
 
 void Filter::continueDecoding() {

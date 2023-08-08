@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -201,8 +201,14 @@ func (s *streamInfo) DownstreamRemoteAddress() string {
 	return address
 }
 
-func (s *streamInfo) UpstreamHostAddress() (string, bool) {
-	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamHostAddress)
+// UpstreamLocalAddress return the upstream local address.
+func (s *streamInfo) UpstreamLocalAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamLocalAddress)
+}
+
+// UpstreamRemoteAddress return the upstream remote address.
+func (s *streamInfo) UpstreamRemoteAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamRemoteAddress)
 }
 
 func (s *streamInfo) UpstreamClusterName() (string, bool) {
