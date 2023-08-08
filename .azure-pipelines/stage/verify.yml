@@ -52,9 +52,13 @@ jobs:
       AZP_BRANCH: $(Build.SourceBranch)
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_DOCKER_IN_DOCKER: 1
-      ENVOY_RBE: 1
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
+      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci"
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        CI_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
+      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+        CI_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
     displayName: "Verify packages"
 
 - job: verified
