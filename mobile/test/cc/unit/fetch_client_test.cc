@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#include "gtest/gtest.h"
 #include "examples/cc/fetch_client/fetch_client.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Platform {
