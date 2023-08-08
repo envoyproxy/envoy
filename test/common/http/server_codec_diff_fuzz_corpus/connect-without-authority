@@ -1,0 +1,27 @@
+configuration {
+  normalize_path: true
+  http1_options {
+    accept_http_10: true
+  }
+}
+request {
+  method {
+    value: "CONNECT"
+  }
+  authority {
+    value: "foo.bar.com:80"
+  }
+  headers {
+    key: "foo"
+    value: "bar"
+  }
+  headers {
+    key: "baz"
+    value: "fuz"
+  }
+}
+response {
+  status {
+    value: "200"
+  }
+}

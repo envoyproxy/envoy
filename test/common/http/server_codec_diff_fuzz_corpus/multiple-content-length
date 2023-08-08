@@ -1,0 +1,59 @@
+configuration {
+  normalize_path: true
+  http1_options {
+    enable_trailers: true
+  }
+}
+request {
+  scheme {
+    value: "foo.bar.com"
+  }
+  method {
+    value: "POST"
+  }
+  path {
+    value: "/database?key=value&key2=value2&etc&etc2"
+  }
+  authority {
+    value: "foo.bar.com"
+  }
+  protocol {
+    value: "GET"
+  }
+  headers {
+    key: "content-length"
+    value: "10"
+  }
+  headers {
+    key: "content-length"
+    value: "10"
+  }
+}
+send_request_body: true
+request_trailers {
+  trailers {
+    key: "something"
+    value: "other"
+  }
+  trailers {
+    key: "key"
+    value: "valUe"
+  }
+}
+response {
+  headers {
+    key: "transfer-encoding"
+    value: "chunked"
+  }
+}
+send_response_body: true
+response_trailers {
+  trailers {
+    key: "start"
+    value: "stop"
+  }
+  trailers {
+    key: "data"
+    value: "01234now"
+  }
+}

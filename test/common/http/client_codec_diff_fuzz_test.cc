@@ -487,7 +487,7 @@ public:
       codec_under_test_1_->sendResponse();
       codec_under_test_2_->sendResponse();
 
-      // printBytes(codec_under_test_1_->written_wire_bytes_);
+      //printBytes(codec_under_test_1_->written_wire_bytes_);
       codec_under_test_1_->compareOutputWireBytes(codec_under_test_2_->written_wire_bytes_);
 
       FUZZ_ASSERT(codec_under_test_1_->stream_reset_ == codec_under_test_2_->stream_reset_);
@@ -551,12 +551,14 @@ DEFINE_PROTO_FUZZER(const test::common::http::ServerCodecDiffFuzzTestCase& input
     return;
   }
 
-  //  CodecClientTest http1_test(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser, input);
-  //  http1_test.test();
+  CodecClientTest http1_test(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser, input);
+  http1_test.test();
 
+  /*
   CodecClientTest http2_test(Http2CodecClientTestContext::Http2Impl::Nghttp2,
                              Http2CodecClientTestContext::Http2Impl::Oghttp2, input);
   http2_test.test();
+  */
 }
 
 } // namespace Http

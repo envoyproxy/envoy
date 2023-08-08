@@ -525,6 +525,14 @@ public:
   void sendResponse() {
     ResponseHeaderMapPtr response_headers_1 = makeResponseHeaders();
     ResponseHeaderMapPtr response_headers_2 = makeResponseHeaders();
+    if (!Utility::getResponseStatusOrNullopt(*response_headers_1).has_value()) {
+      // TODO(yanavlasov): Lack of or invalid :status header causes ASSERTs in the FM.
+      // It is possible a bad filter can remove or make :status invalid, so this scenario needs
+      // further testing.
+      response_headers_1->setStatus(200);
+      response_headers_2->setStatus(200);
+    }
+
     const bool end_stream = !input_.send_response_body() && !input_.has_response_trailers();
     if (HeaderUtility::isSpecial1xx(*response_headers_1)) {
       hcm_under_test_1_.decoder_filter_->callbacks_->encode1xxHeaders(
@@ -616,6 +624,13 @@ public:
   }
 
   void compareOutputWireBytes() override {
+    if (hcm_under_test_1_.written_wire_bytes_.length() > 7 &&
+        hcm_under_test_2_.written_wire_bytes_.length()) {
+      // TODO(#28902): remove version masking after Issue is fixed
+      // Make response version always 1.1
+      hcm_under_test_1_.written_wire_bytes_[7] = hcm_under_test_2_.written_wire_bytes_[7] = '1';
+    }
+
     FUZZ_ASSERT(hcm_under_test_1_.written_wire_bytes_ == hcm_under_test_2_.written_wire_bytes_);
   }
 
@@ -639,7 +654,7 @@ private:
           absl::StrContainsIgnoreCase(header.value(), "chunked")) {
         chunked_encoding = true;
       }
-      absl::string_view value = header.value();
+      std::string value = header.value();
       if (input_.send_request_body() && absl::EqualsIgnoreCase(header.key(), "content-length")) {
         value = std::to_string(request_body.size());
       }
@@ -668,7 +683,6 @@ private:
       }
       absl::StrAppend(&wire_bytes, "\r\n");
     }
-
     return wire_bytes;
   }
 };
