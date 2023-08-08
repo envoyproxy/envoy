@@ -143,8 +143,11 @@ Filter::StreamOpenState Filter::openStream() {
 }
 
 void Filter::closeStream() {
+  // TODO(tyxia) The logging here is needed for immediate response case where
+  // `onFinishProcessorCalls` is called after `closeStream` here. Investigate to see if we can
+  // switch the order of those two so that the logging here can be avoided.
+  logGrpcStreamInfo();
   if (stream_) {
-    logGrpcStreamInfo();
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -565,8 +568,13 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 
 void Filter::logGrpcStreamInfo() {
   if (stream_ && grpc_service_.has_envoy_grpc()) {
-    logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
-    logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
+    const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
+    if (upstream_meter != nullptr) {
+      std::cout << "tyxia_bytes_sent: " << upstream_meter->wireBytesSent() << "\n";
+      std::cout << "tyxia_bytes_recv: " << upstream_meter->wireBytesReceived() << "\n";
+      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+    }
     // Only set upstream host in logging info once.
     if (logging_info_->upstreamHost() == nullptr) {
       logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
@@ -698,6 +706,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
   ENVOY_LOG(debug, "Received gRPC error on stream: {}", status);
+
   stats_.streams_failed_.inc();
 
   if (processing_complete_) {
@@ -724,6 +733,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
 void Filter::onGrpcClose() {
   ENVOY_LOG(debug, "Received gRPC stream close");
+
   processing_complete_ = true;
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
@@ -734,6 +744,7 @@ void Filter::onGrpcClose() {
 
 void Filter::onMessageTimeout() {
   ENVOY_LOG(debug, "message timeout reached");
+  logGrpcStreamInfo();
   stats_.message_timeouts_.inc();
   if (config_->failureModeAllow()) {
     // The user would like a timeout to not cause message processing to fail.

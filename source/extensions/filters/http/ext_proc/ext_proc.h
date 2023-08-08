@@ -237,13 +237,11 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
   // ExternalProcessorCallbacks
-
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
-
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
-
   void onGrpcClose() override;
+  void logGrpcStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
@@ -255,8 +253,6 @@ public:
                      ProcessorState::CallbackState new_state, bool end_stream);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
-
-  void logGrpcStreamInfo();
 
 private:
   void mergePerRouteConfig();

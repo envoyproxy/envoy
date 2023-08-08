@@ -17,9 +17,7 @@ namespace EncodeCompleteFilter {
 // to cluster name), clear the route cache.
 class EncodeCompleteFilter : public Http::PassThroughFilter {
 public:
-  void encodeComplete() override{
-
-  }
+  void encodeComplete() override {}
 };
 
 class EncodeCompleteFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {

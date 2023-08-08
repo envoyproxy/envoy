@@ -7,6 +7,8 @@
 #include "source/extensions/filters/http/ext_proc/config.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
+#include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
@@ -67,13 +69,14 @@ protected:
     cleanupUpstreamAndDownstream();
   }
 
-  void initializeConfig() {
+  void initializeConfig(bool add_logging_filter = false) {
 
     // Add the encode-complete-filter to read
     // config_helper_.addFilter("name: encode-complete-filter");
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_value_in_bytes", filter_mutation_rule_}});
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this, add_logging_filter](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
       ConfigHelper::setHttp2(
           *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
@@ -89,13 +92,15 @@ protected:
 
       // Load configuration of the server from YAML and use a helper to add a grpc_service
       // stanza pointing to the cluster that we just made
-      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server_0",
+      std::string grpc_cluster_name = "ext_proc_server_0";
+      setGrpcService(*proto_config_.mutable_grpc_service(), grpc_cluster_name,
                      grpc_upstreams_[0]->localAddress());
 
       // Construct a configuration proto for our filter and then re-write it
       // to JSON so that we can add it to the overall config
       envoy::config::listener::v3::Filter ext_proc_filter;
-      ext_proc_filter.set_name("envoy.filters.http.ext_proc");
+      std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
+      ext_proc_filter.set_name(ext_proc_filter_name);
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
 
@@ -103,6 +108,19 @@ protected:
       // assumptions of data flow, prior relying on eager processing.
       config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                         deferredProcessing() ? "true" : "false");
+
+      // Add logging test filter only 1) in Envoy gRPC and 2) `add_logging_filter` is true.
+      // gRPC side stream logging is only supported in Envoy gRPC mode at the moment.
+      if (clientType() == Grpc::ClientType::EnvoyGrpc && add_logging_filter) {
+        test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+        logging_filter_config.set_logging_id(ext_proc_filter_name);
+        logging_filter_config.set_upstream_cluster_name(grpc_cluster_name);
+        envoy::config::listener::v3::Filter logging_filter;
+        logging_filter.set_name("logging-test-filter");
+        logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+
+        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
+      }
     });
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -414,11 +432,38 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
+  initializeConfig(/*add_logging_filter=*/true);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  // Just close the stream without doing anything
+  processor_stream_->startGrpcStream();
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by returning a failure before the first stream response can be sent.
 TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  // Fail the stream immediately
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithLogging) {
+  initializeConfig(/*add_logging_filter=*/true);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
@@ -548,6 +593,40 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersWithLogging) {
+  initializeConfig(/*add_logging_filter=*/true);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_value("new");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -1086,6 +1165,28 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithLogging) {
+  initializeConfig(/*add_logging_filter=*/true);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+    auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_header()->set_key("x-failure-reason");
+    hdr1->mutable_header()->set_value("testing");
+    auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_header()->set_key("content-type");
+    hdr2->mutable_header()->set_value("application/json");
+  });
+
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
 
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithInvalidCharacter) {
   initializeConfig();
@@ -1455,12 +1556,48 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
   verifyDownstreamResponse(*response, 500);
 }
 
+TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
+  // ensure 200 ms timeout
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig(/*add_logging_filter=*/true);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+
+  // We should immediately have an error response now
+  verifyDownstreamResponse(*response, 500);
+}
+
 // Same as the previous test but on the response path, since there are separate
 // timers for each.
 TEST_P(ExtProcIntegrationTest, ResponseMessageTimeout) {
   // ensure 200 ms timeout
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
   initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false,
+                                [this](const HttpHeaders&, HeadersResponse&) {
+                                  // Travel forward 400 ms
+                                  timeSystem().advanceTimeWaitImpl(400ms);
+                                  return false;
+                                });
+
+  // We should immediately have an error response now
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutWithLogging) {
+  // ensure 200 ms timeout
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig(/*add_logging_filter=*/true);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
@@ -1876,6 +2013,18 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
     setGrpcService(*per_route.mutable_overrides()->mutable_grpc_service(), "ext_proc_server_1",
                    grpc_upstreams_[1]->localAddress());
     setPerRouteConfig(route, per_route);
+
+    // Add logging test filter here in place since it has a different GrpcService from route.
+    if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+      test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+      logging_filter_config.set_logging_id("envoy.filters.http.ext_proc");
+      logging_filter_config.set_upstream_cluster_name("ext_proc_server_1");
+      envoy::config::listener::v3::Filter logging_filter;
+      logging_filter.set_name("logging-test-filter");
+      logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
+    }
   });
   HttpIntegrationTest::initialize();
 
