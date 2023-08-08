@@ -397,6 +397,31 @@ TEST_F(RedisSingleServerRequestTest, PingSuccess) {
   EXPECT_EQ(nullptr, handle_);
 };
 
+TEST_F(RedisSingleServerRequestTest, Time) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"time"});
+
+  auto now = dispatcher_.timeSource().systemTime().time_since_epoch();
+  auto secs = std::to_string(std::chrono::duration_cast<std::chrono::seconds>(now).count());
+  auto msecs = std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> elements(2);
+  elements[0].type(Common::Redis::RespType::BulkString);
+  elements[0].asString() = secs;
+  elements[1].type(Common::Redis::RespType::BulkString);
+  elements[1].asString() = msecs;
+  response.asArray().swap(elements);
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
 TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   InSequence s;
 

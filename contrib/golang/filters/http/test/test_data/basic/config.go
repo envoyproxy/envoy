@@ -8,6 +8,7 @@ import (
 const Name = "basic"
 
 func init() {
+	api.LogCritical("init")
 	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, nil)
 }
 

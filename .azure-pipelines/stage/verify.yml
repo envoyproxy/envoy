@@ -29,8 +29,7 @@ jobs:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_DOCKER_IN_DOCKER: 1
       ENVOY_RBE: 1
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
     displayName: "Verify packages"
 
@@ -54,8 +53,7 @@ jobs:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_DOCKER_IN_DOCKER: 1
       ENVOY_RBE: 1
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
     displayName: "Verify packages"
 
