@@ -276,9 +276,9 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filter_chain,
         stats_sinks, enablePlatformCertificatesValidation, runtime_guards, rtdsResourceName,
-        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsJwtToken, xdsJwtTokenLifetime, xdsRootCerts,
-        xdsSni, nodeId, nodeRegion, nodeZone, nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds,
-        enableCds);
+        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsJwtToken,
+        xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId, nodeRegion, nodeZone, nodeSubZone,
+        cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {
