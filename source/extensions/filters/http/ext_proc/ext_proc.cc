@@ -570,8 +570,6 @@ void Filter::logGrpcStreamInfo() {
   if (stream_ && grpc_service_.has_envoy_grpc()) {
     const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
     if (upstream_meter != nullptr) {
-      std::cout << "tyxia_bytes_sent: " << upstream_meter->wireBytesSent() << "\n";
-      std::cout << "tyxia_bytes_recv: " << upstream_meter->wireBytesReceived() << "\n";
       logging_info_->setBytesSent(upstream_meter->wireBytesSent());
       logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
     }

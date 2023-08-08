@@ -32,8 +32,6 @@ public:
     const ExtProcLoggingInfo* ext_proc_logging_info =
         filter_state->getDataReadOnly<ExtProcLoggingInfo>(logging_id_);
     if (ext_proc_logging_info != nullptr) {
-      std::cout << "tyxia_bytes " << ext_proc_logging_info->bytesReceived() << "\n";
-      std::cout << "tyxia_bytes " << ext_proc_logging_info->bytesSent() << "\n";
       EXPECT_NE(ext_proc_logging_info->bytesSent(), 0);
       EXPECT_NE(ext_proc_logging_info->bytesReceived(), 0);
       ASSERT_TRUE(ext_proc_logging_info->upstreamHost() != nullptr);
