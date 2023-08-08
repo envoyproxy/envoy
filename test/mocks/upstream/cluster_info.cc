@@ -162,6 +162,13 @@ MockClusterInfo::MockClusterInfo()
                 upstream_config_.get());
           }));
 
+  ON_CALL(*this, queuingConfig())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::QueuingConfig> {
+            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::QueuingConfig>(
+                queuing_config_.get());
+          }));
+
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())

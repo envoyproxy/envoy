@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 57]
+// [#next-free-field: 58]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -750,6 +750,43 @@ message Cluster {
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
+  message QueuingConfig {
+    enum QueueType {
+      // Specifies using a FIFO queue for pending requests.
+      FIFO = 0;
+
+      // Specifies using a FIFO queue that turns into LIFO after exceeding a threshold.
+      ADAPTIVE_LIFO = 1;
+    }
+
+    // Specifies the configuration for the adaptive LIFO queue for pending requests.
+    message AdaptiveLifoConfig {
+      // The threshold of the number of pending requests in the queue before the queue turns
+      // from FIFO to LIFO. The default is 100.
+      google.protobuf.UInt32Value threshold = 1;
+    }
+
+    message CodelConfig {
+      // Specifies target queueing delay for each request. Requests pending longer than
+      // this threshold may get dropped. Default is 5ms.
+      google.protobuf.UInt32Value target_delay_ms = 1;
+
+      // Specifies the interval at which the algorithm uses to determine whether the queue
+      // is overloaded or not. The default is 100ms.
+      google.protobuf.UInt32Value interval_ms = 2;
+    }
+
+    QueueType queue_type = 1 [(validate.rules).enum = {defined_only: true}];
+
+    AdaptiveLifoConfig adaptive_lifo_config = 2;
+
+    // Enables CoDel (controlled-delay) to time out older requests more aggressively than
+    // newer requests. See http://queue.acm.org/detail.cfm?id=2209336.
+    bool enable_codel = 3;
+
+    CodelConfig codel_config = 4;
+  }
+
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -1190,6 +1227,11 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // The connection pool queuing configuration use for pending requests.
+  // The default uses a FIFO queue. To enable adaptive-LIFO and controlled latency (CoDel), set
+  // the corresponding fields.
+  QueuingConfig queuing_config = 57;
 }
 
 // Extensible load balancing policy configuration.

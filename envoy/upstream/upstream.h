@@ -705,6 +705,7 @@ public:
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
+  COUNTER(upstream_rq_pending_dropped_codel)                                                       \
   COUNTER(upstream_rq_0rtt)                                                                        \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_per_try_idle_timeout)                                                        \
@@ -724,6 +725,7 @@ public:
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
+  GAUGE(upstream_queue_overloaded, Accumulate)                                                     \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
   HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 
@@ -1032,6 +1034,13 @@ public:
    */
   virtual OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::config::cluster::v3::Cluster::QueuingConfig>& the
+   * configuration for the upstream, if queuing_config is set.
+   */
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::QueuingConfig>
+  queuingConfig() const PURE;
 
   /**
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration

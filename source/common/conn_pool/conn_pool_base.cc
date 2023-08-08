@@ -1,6 +1,7 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/codel.h"
 #include "source/common/common/debug_recursion_checker.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -17,6 +18,49 @@ namespace {
   }
   return ret;
 }
+
+PendingStreamQueuePtr
+pendingStreams(OptRef<const envoy::config::cluster::v3::Cluster::QueuingConfig> config) {
+  if (config.has_value() &&
+      config->queue_type() == envoy::config::cluster::v3::Cluster::QueuingConfig::ADAPTIVE_LIFO) {
+    const uint32_t threshold =
+        config->has_adaptive_lifo_config()
+            ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->adaptive_lifo_config(), threshold, 100)
+            : 100;
+    ENVOY_LOG_MISC(info, "Using adaptive LIFO queue with threshold={}.", threshold);
+    return std::make_unique<Envoy::Queuing::AdaptiveLifoQueue<PendingStream>>(threshold);
+  } else {
+    ENVOY_LOG_MISC(info, "Using adaptive LIFO queue with default threshold.");
+    return std::make_unique<Envoy::Queuing::FifoQueue<PendingStream>>();
+  }
+}
+
+std::unique_ptr<Codel::Codel>
+codel(OptRef<const envoy::config::cluster::v3::Cluster::QueuingConfig> config,
+      TimeSource& time_source) {
+  if (config.has_value() && config->enable_codel()) {
+    if (config->has_codel_config()) {
+      const std::chrono::milliseconds interval = std::chrono::milliseconds(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->codel_config(), interval_ms, 100));
+      const std::chrono::milliseconds target_delay = std::chrono::milliseconds(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->codel_config(), target_delay_ms, 5));
+      Codel::Codel::Options opts(interval, target_delay);
+      ENVOY_LOG_MISC(info, "Using CoDel with interval={}ms and target_delay={}ms.",
+                     interval.count(), target_delay.count());
+      return std::make_unique<Codel::Codel>(time_source, opts);
+    } else {
+      auto codel = std::make_unique<Codel::Codel>(time_source);
+      ENVOY_LOG_MISC(info, "Using CoDel with interval={}ms and target_delay={}ms.",
+                     codel->getOptions().interval().count(),
+                     codel->getOptions().targetDelay().count());
+
+      return codel;
+    }
+  }
+
+  return std::unique_ptr<Codel::Codel>(nullptr);
+}
+
 } // namespace
 
 ConnPoolImplBase::ConnPoolImplBase(
@@ -26,7 +70,9 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::ClusterConnectivityState& state)
     : state_(state), host_(host), priority_(priority), dispatcher_(dispatcher),
       socket_options_(options), transport_socket_options_(transport_socket_options),
-      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
+      pending_streams_(pendingStreams(host->cluster().queuingConfig())),
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
+      codel_(codel(host->cluster().queuingConfig(), dispatcher.timeSource())) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(isIdleImpl());
@@ -67,7 +113,7 @@ bool ConnPoolImplBase::shouldConnect(size_t pending_streams, size_t active_strea
   // connecting stream capacity plus the number of active streams.
   //
   // If preconnect ratio is not set, it defaults to 1, and this simplifies to the
-  // legacy value of pending_streams_.size() > connecting_stream_capacity_
+  // legacy value of pending_streams_->size() > connecting_stream_capacity_
   return (pending_streams + active_streams + anticipated_streams) * preconnect_ratio >
          connecting_and_connected_capacity + active_streams;
 }
@@ -78,7 +124,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
   // If an Envoy user wants preconnecting for degraded upstreams this could be
   // added later via extending the preconnect config.
   if (host_->coarseHealth() != Upstream::Host::Health::Healthy) {
-    return pending_streams_.size() > connecting_stream_capacity_;
+    return pending_streams_->size() > connecting_stream_capacity_;
   }
 
   // Determine if we are trying to prefetch for global preconnect or local preconnect.
@@ -89,7 +135,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     // prefetching for the next upcoming stream, which will likely be assigned to this pool.
     // We may eventually want to track preconnect_attempts to allow more preconnecting for
     // heavily weighted upstreams or sticky picks.
-    return shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
+    return shouldConnect(pending_streams_->size(), num_active_streams_, connecting_stream_capacity_,
                          global_preconnect_ratio, true);
   } else {
     // Ensure this local pool has adequate connections for the given load.
@@ -97,7 +143,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     // Local preconnect does not need to anticipate a stream. It is called as
     // new streams are established or torn down and simply attempts to maintain
     // the correct ratio of streams and anticipated capacity.
-    return shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
+    return shouldConnect(pending_streams_->size(), num_active_streams_, connecting_stream_capacity_,
                          perUpstreamPreconnectRatio());
   }
 }
@@ -297,7 +343,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
   const ConnectionResult result = tryCreateNewConnections();
   // If there is not enough connecting capacity, the only reason to not
   // increase capacity is if the connection limits are exceeded.
-  ENVOY_BUG(pending_streams_.size() <= connecting_stream_capacity_ ||
+  ENVOY_BUG(pending_streams_->size() <= connecting_stream_capacity_ ||
                 connecting_stream_capacity_ > old_capacity ||
                 (result == ConnectionResult::NoConnectionRateLimited ||
                  result == ConnectionResult::FailedToCreateConnection),
@@ -323,15 +369,31 @@ void ConnPoolImplBase::scheduleOnUpstreamReady() {
 }
 
 void ConnPoolImplBase::onUpstreamReady() {
-  while (!pending_streams_.empty() && !ready_clients_.empty()) {
+  while (!pending_streams_->empty() && !ready_clients_.empty()) {
+    auto& stream = pending_streams_->next();
+    auto delay = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        dispatcher_.timeSource().monotonicTime() - stream->enqueuedTimestamp());
+    if (codel_ && codel_->overloaded(delay)) {
+      // Drop older requests in favor of newer requests.
+      host_->cluster().trafficStats()->upstream_rq_pending_dropped_codel_.inc();
+      ENVOY_LOG(debug, "Dropping stream due to controlled delay={}ms.",
+                std::chrono::duration_cast<std::chrono::milliseconds>(delay).count());
+      onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Timeout,
+                    stream->context());
+      stream->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+      continue;
+    }
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
-    // Pending streams are pushed onto the front, so pull from the back.
-    attachStreamToClient(*client, pending_streams_.back()->context());
+    attachStreamToClient(*client, stream->context());
     state_.decrPendingStreams(1);
-    pending_streams_.pop_back();
+    if (pending_streams_->isOverloaded()) {
+      host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
+    }
+
+    pending_streams_->remove(*stream);
   }
-  if (!pending_streams_.empty()) {
+  if (!pending_streams_->empty()) {
     tryCreateNewConnections();
   }
 }
@@ -383,7 +445,7 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
     }
   }
 
-  if (pending_streams_.empty()) {
+  if (pending_streams_->empty()) {
     for (auto& client : connecting_clients_) {
       to_close.push_back(client.get());
     }
@@ -423,7 +485,7 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
   // streams and if no pending streams, all connections in early_data_clients_ with no active
   // streams as well, so all remaining entries in ready_clients_ are serving streams. Move them and
   // all entries in busy_clients_ to draining.
-  if (pending_streams_.empty()) {
+  if (pending_streams_->empty()) {
     // The remaining early data clients are non-idle.
     drainClients(early_data_clients_);
   }
@@ -444,7 +506,7 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
 }
 
 bool ConnPoolImplBase::isIdleImpl() const {
-  return pending_streams_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
+  return pending_streams_->empty() && ready_clients_.empty() && busy_clients_.empty() &&
          connecting_clients_.empty() && early_data_clients_.empty();
 }
 
@@ -551,7 +613,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.setState(ActiveClient::State::Closed);
 
     // If we have pending streams and we just lost a connection we should make a new one.
-    if (!pending_streams_.empty()) {
+    if (!pending_streams_->empty()) {
       tryCreateNewConnections();
     }
     break;
@@ -608,30 +670,18 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   }
 }
 
-PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
-    : parent_(parent), can_send_early_data_(can_send_early_data) {
-  Upstream::ClusterTrafficStats& traffic_stats = *parent_.host()->cluster().trafficStats();
-  traffic_stats.upstream_rq_pending_total_.inc();
-  traffic_stats.upstream_rq_pending_active_.inc();
-  parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();
-}
-
-PendingStream::~PendingStream() {
-  parent_.host()->cluster().trafficStats()->upstream_rq_pending_active_.dec();
-  parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().dec();
-}
-
-void PendingStream::cancel(Envoy::ConnectionPool::CancelPolicy policy) {
-  parent_.onPendingStreamCancel(*this, policy);
-}
-
 void ConnPoolImplBase::purgePendingStreams(
     const Upstream::HostDescriptionConstSharedPtr& host_description,
     absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason) {
   // NOTE: We move the existing pending streams to a temporary list. This is done so that
   //       if retry logic submits a new stream to the pool, we don't fail it inline.
-  state_.decrPendingStreams(pending_streams_.size());
-  pending_streams_to_purge_ = std::move(pending_streams_);
+  state_.decrPendingStreams(pending_streams_->size());
+  if (pending_streams_->isOverloaded()) {
+    host_->cluster().trafficStats()->upstream_queue_overloaded_.set(0);
+  }
+
+  pending_streams_to_purge_ = std::move(*pending_streams_);
+  pending_streams_ = pendingStreams(host_->cluster().queuingConfig());
   while (!pending_streams_to_purge_.empty()) {
     PendingStreamPtr stream =
         pending_streams_to_purge_.front()->removeFromList(pending_streams_to_purge_);
@@ -650,7 +700,7 @@ bool ConnPoolImplBase::connectingConnectionIsExcess(const ActiveClient& client) 
   // If preconnect ratio is set, it also factors in the anticipated load based on both queued
   // streams and active streams, and makes sure the connecting capacity would still be sufficient to
   // serve that even with the most recent client removed.
-  return (pending_streams_.size() + num_active_streams_) * perUpstreamPreconnectRatio() <=
+  return (pending_streams_->size() + num_active_streams_) * perUpstreamPreconnectRatio() <=
          (connecting_stream_capacity_ - client.currentUnusedCapacity() + num_active_streams_);
 }
 
@@ -665,7 +715,11 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
     stream.removeFromList(pending_streams_to_purge_);
   } else {
     state_.decrPendingStreams(1);
-    stream.removeFromList(pending_streams_);
+    if (pending_streams_->isOverloaded()) {
+      host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
+    }
+
+    pending_streams_->remove(stream);
   }
   if (policy == Envoy::ConnectionPool::CancelPolicy::CloseExcess) {
     if (!connecting_clients_.empty() &&
@@ -716,28 +770,24 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
   // Check pending streams backward for safe request.
   // Note that this is a O(n) search, but the expected size of pending_streams_ should be small. If
   // this becomes a problem, we could split pending_streams_ into 2 lists.
-  auto it = pending_streams_.end();
-  if (it == pending_streams_.begin()) {
-    return;
-  }
-  --it;
-  while (client.currentUnusedCapacity() > 0) {
+
+  // We must store end locally since pending_streams_ can change in size. Adaptive LIFO may switch
+  // between a Lifo and a Fifo. Hence, we want to iterate in a single direction.
+  auto it = pending_streams_->begin();
+  const auto end = pending_streams_->end();
+  while (client.currentUnusedCapacity() > 0 && it != end) {
     PendingStream& stream = **it;
-    bool stop_iteration{false};
-    if (it != pending_streams_.begin()) {
-      --it;
-    } else {
-      stop_iteration = true;
-    }
+    ++it;
 
     if (stream.can_send_early_data_) {
       ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
       attachStreamToClient(client, stream.context());
       state_.decrPendingStreams(1);
-      stream.removeFromList(pending_streams_);
-    }
-    if (stop_iteration) {
-      return;
+      if (pending_streams_->isOverloaded()) {
+        host_->cluster().trafficStats()->upstream_queue_overloaded_.dec();
+      }
+
+      pending_streams_->remove(stream);
     }
   }
 }

@@ -58,6 +58,7 @@ namespace Stats {
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
+  COUNTER(upstream_rq_pending_dropped_codel)                                                       \
   COUNTER(upstream_rq_0rtt)                                                                        \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_per_try_idle_timeout)                                                        \

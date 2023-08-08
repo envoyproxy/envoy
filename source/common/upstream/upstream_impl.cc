@@ -1074,6 +1074,10 @@ ClusterInfoImpl::ClusterInfoImpl(
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
                            : nullptr),
+      queuing_config_(config.has_queuing_config()
+                          ? std::make_unique<envoy::config::cluster::v3::Cluster::QueuingConfig>(
+                                config.queuing_config())
+                          : nullptr),
       lb_subset_(config.has_lb_subset_config()
                      ? std::make_unique<LoadBalancerSubsetInfoImpl>(config.lb_subset_config())
                      : nullptr),

@@ -50,6 +50,7 @@ cbor
 CDN
 CDS
 CEL
+Codel
 CWND
 DLE
 DPE
@@ -1456,3 +1457,8 @@ SSLKEYLOGFILE
 DLB
 PCIE
 EDNS
+sqrt
+fifo
+lifo
+cacheline
+dequeue

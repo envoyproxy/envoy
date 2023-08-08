@@ -918,6 +918,12 @@ public:
     }
     return *upstream_config_;
   }
+  OptRef<const envoy::config::cluster::v3::Cluster::QueuingConfig> queuingConfig() const override {
+    if (queuing_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *queuing_config_;
+  }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
@@ -1090,6 +1096,7 @@ private:
   std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
   const std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
+  std::unique_ptr<envoy::config::cluster::v3::Cluster::QueuingConfig> queuing_config_;
   std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   std::unique_ptr<ClusterTypedMetadata> typed_metadata_;

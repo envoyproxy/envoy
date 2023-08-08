@@ -31,6 +31,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "codel_lib",
+    srcs = ["codel.cc"],
+    hdrs = ["codel.h"],
+    deps = [":assert_lib"],
+)
+
+envoy_cc_library(
     name = "containers_lib",
     hdrs = ["containers.h"],
     deps = [
