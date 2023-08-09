@@ -78,9 +78,9 @@ public:
   StaticUpstreamHttpFilterIntegrationTest() : UpstreamHttpFilterIntegrationTestBase(GetParam()) {}
 };
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, StaticUpstreamHttpFilterIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, StaticUpstreamHttpFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(StaticUpstreamHttpFilterIntegrationTest, ClusterOnlyFilters) {
   HttpFilterProto add_header_filter;
@@ -158,48 +158,47 @@ public:
     config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
                                       second_connection,
                                       this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          ConfigHelper::HttpProtocolOptions protocol_options =
-              MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-                  (*cluster->mutable_typed_extension_protocol_options())
-                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      ConfigHelper::HttpProtocolOptions protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+              (*cluster->mutable_typed_extension_protocol_options())
+                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
 
-          auto* filter = protocol_options.add_http_filters();
-          filter->set_name(name);
+      auto* filter = protocol_options.add_http_filters();
+      filter->set_name(name);
 
-          auto* discovery = filter->mutable_config_discovery();
-          discovery->add_type_urls(
-              "type.googleapis.com/test.integration.filters.AddHeaderFilterConfig");
-          if (set_default_config) {
-            auto default_configuration =
-                test::integration::filters::AddHeaderFilterConfig();
-            default_configuration.set_header_key("default-key");
-            default_configuration.set_header_value("default-value");
-            discovery->mutable_default_config()->PackFrom(default_configuration);
-          }
+      auto* discovery = filter->mutable_config_discovery();
+      discovery->add_type_urls(
+          "type.googleapis.com/test.integration.filters.AddHeaderFilterConfig");
+      if (set_default_config) {
+        auto default_configuration = test::integration::filters::AddHeaderFilterConfig();
+        default_configuration.set_header_key("default-key");
+        default_configuration.set_header_value("default-value");
+        discovery->mutable_default_config()->PackFrom(default_configuration);
+      }
 
-          discovery->set_apply_default_config_without_warming(apply_without_warming);
-          discovery->mutable_config_source()->set_resource_api_version(
-              envoy::config::core::v3::ApiVersion::V3);
-          auto* api_config_source = discovery->mutable_config_source()->mutable_api_config_source();
-          api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-          api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-          if (rate_limit) {
-            api_config_source->mutable_rate_limit_settings()->mutable_max_tokens()->set_value(10);
-          }
-          auto* grpc_service = api_config_source->add_grpc_services();
-          if (!second_connection) {
-            setGrpcService(*grpc_service, std::string(EcdsClusterName),
-                          getEcdsFakeUpstream().localAddress());
-          } else {
-            setGrpcService(*grpc_service, std::string(Ecds2ClusterName),
-                          getEcds2FakeUpstream().localAddress());
-          }
+      discovery->set_apply_default_config_without_warming(apply_without_warming);
+      discovery->mutable_config_source()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+      auto* api_config_source = discovery->mutable_config_source()->mutable_api_config_source();
+      api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+      if (rate_limit) {
+        api_config_source->mutable_rate_limit_settings()->mutable_max_tokens()->set_value(10);
+      }
+      auto* grpc_service = api_config_source->add_grpc_services();
+      if (!second_connection) {
+        setGrpcService(*grpc_service, std::string(EcdsClusterName),
+                       getEcdsFakeUpstream().localAddress());
+      } else {
+        setGrpcService(*grpc_service, std::string(Ecds2ClusterName),
+                       getEcds2FakeUpstream().localAddress());
+      }
 
-          (*cluster->mutable_typed_extension_protocol_options())
-              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-                  .PackFrom(protocol_options);
-        });
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(protocol_options);
+    });
   }
 
   void addCodecFilter() {
@@ -363,6 +362,7 @@ public:
     }
   }
 
+  const std::string filter_name_ = "foo";
   bool two_ecds_filters_{false};
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
   FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[2]; }
@@ -386,13 +386,33 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, UpstreamHttpExtensionDiscoveryInt
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicFilter("foo", true);
+  addDynamicFilter(filter_name_, true);
   addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   registerTestServerPorts({"http"});
+
+  // Send 1st config update to have filter drain 5 bytes of data.
+  sendXdsResponse(filter_name_, "1", "test-header", "test-val");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  std::cout << *upstream_headers;
+  ASSERT_TRUE(upstream_headers != nullptr);
+  cleanupUpstreamAndDownstream();
+  auto header = upstream_headers->get(Http::LowerCaseString("test-header"));
+  ASSERT_FALSE(header.empty());
+  EXPECT_EQ("test-val", header[0]->value().getStringView());
 };
 
 } // namespace

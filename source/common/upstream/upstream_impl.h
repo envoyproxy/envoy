@@ -1106,6 +1106,7 @@ private:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   UpstreamHttpFactoryContextImpl upstream_context_;
+  std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment
