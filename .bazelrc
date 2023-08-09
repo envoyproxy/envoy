@@ -10,6 +10,7 @@
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx3g
 
+fetch --color=yes
 run --color=yes
 
 build --color=yes
