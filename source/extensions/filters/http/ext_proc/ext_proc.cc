@@ -564,9 +564,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 }
 
 void Filter::logGrpcStreamInfo() {
-  if (stream_ && grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
-    // Logging must be performed when stream is open.
-    ASSERT(stream_ != nullptr);
+  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
     const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
     if (upstream_meter != nullptr) {
       logging_info_->setBytesSent(upstream_meter->wireBytesSent());
