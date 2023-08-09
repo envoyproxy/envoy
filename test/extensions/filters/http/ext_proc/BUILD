@@ -283,7 +283,6 @@ envoy_extension_cc_test_library(
     name = "logging_test_filter_lib",
     srcs = [
         "logging_test_filter.cc",
-        "//test/test_common:utility_lib",
     ],
     extension_names = ["envoy.filters.http.ext_proc"],
     deps = [
