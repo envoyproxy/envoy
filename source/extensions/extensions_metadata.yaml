@@ -406,6 +406,13 @@ envoy.filters.http.ip_tagging:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+envoy.filters.http.json_to_metadata:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata
 envoy.filters.http.jwt_authn:
   categories:
   - envoy.filters.http

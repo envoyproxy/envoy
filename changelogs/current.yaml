@@ -30,9 +30,20 @@ new_features:
   change: |
     added %RESPONSE_FLAGS_LONG% substitution string, that will output a pascal case string representing the resonse flags.
     The output response flags will correspond with %RESPONSE_FLAGS%, only with a long textual string representation.
+- area: config
+  change: |
+    Added the capability to defer broadcasting of certain cluster (CDS, EDS) to
+    worker threads from the main thread. This optimization can save significant
+    amount of memory in cases where there are (1) a large number of workers and
+    (2) a large amount of config, most of which is unused. This capability is
+    guarded by :ref:`enable_deferred_cluster_creation
+    <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.enable_deferred_cluster_creation>`.
 - area: extension_discovery_service
   change: |
     added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
+- area: http
+  change: |
+    added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
 - area: extension_discovery_service
   change: |
     added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
