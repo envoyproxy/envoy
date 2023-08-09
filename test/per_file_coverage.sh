@@ -6,16 +6,16 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.2"
 "source/common/api:84.5"
 "source/common/api/posix:81.8"
-"source/common/config:94.8"
+"source/common/config:95.4"
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.2"
-"source/common/json:93.7"
+"source/common/json:93.9"
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.6"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/protobuf:96.4"
+"source/common/protobuf:96.5"
 "source/common/quic:93.3"
 "source/common/secret:95.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
@@ -24,12 +24,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:90.7"
-"source/extensions/access_loggers/grpc:95.8"
 "source/extensions/access_loggers/wasm:93.5"
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
 "source/extensions/common/tap:94.2"
-"source/extensions/common/wasm:87.5" # flaky: be careful adjusting
+"source/extensions/common/wasm:88.0" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
@@ -40,11 +39,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/wasm:1.9"
 "source/extensions/filters/listener/original_dst:82.9"
 "source/extensions/filters/listener/original_src:92.1"
-"source/extensions/filters/network/common:96.2"
-"source/extensions/filters/network/common/redis:96.4"
+"source/extensions/filters/network/common:96.4"
 "source/extensions/filters/network/mongo_proxy:96.0"
 "source/extensions/filters/network/sni_cluster:88.9"
-"source/extensions/filters/network/thrift_proxy/router:96.5"
 "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.3"
 "source/extensions/filters/network/wasm:76.9"
 "source/extensions/http/cache/simple_http_cache:95.9"
@@ -57,7 +54,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/common/ot:71.8"
 "source/extensions/tracers/opencensus:93.2"
 "source/extensions/tracers/zipkin:95.8"
-"source/extensions/transport_sockets:95.7"
+"source/extensions/transport_sockets:95.8"
 "source/extensions/transport_sockets/tls:95.0"
 "source/extensions/transport_sockets/tls/cert_validator:95.2"
 "source/extensions/transport_sockets/tls/private_key:88.9"
