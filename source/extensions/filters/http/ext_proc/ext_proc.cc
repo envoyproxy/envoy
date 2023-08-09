@@ -179,10 +179,6 @@ Filter::StreamOpenState Filter::openStream() {
 }
 
 void Filter::closeStream() {
-  // TODO(tyxia) The logging here is needed for immediate response case where
-  // `onFinishProcessorCalls` is called after `closeStream` here. Investigate to see if we can
-  // switch the order of those two so that the logging here can be avoided.
-  logGrpcStreamInfo();
   if (stream_) {
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
@@ -660,6 +656,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // We won't be sending anything more to the stream after we
     // receive this message.
     ENVOY_LOG(debug, "Sending immediate response");
+    // TODO(tyxia) The logging here is needed for immediate response case because
+    // `onFinishProcessorCalls` is called after `closeStream` below.
+    // Investigate to see if we can switch the order of those two so that the logging here can be
+    // avoided.
+    logGrpcStreamInfo();
     processing_complete_ = true;
     closeStream();
     onFinishProcessorCalls(Grpc::Status::Ok);

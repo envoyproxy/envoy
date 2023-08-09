@@ -123,8 +123,8 @@ envoy_extension_cc_test(
         "cpu:3",
     ],
     deps = [
-        ":utils_lib",
         ":logging_test_filter_lib",
+        ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
@@ -274,7 +274,6 @@ envoy_extension_cc_test(
     ],
 )
 
-
 envoy_proto_library(
     name = "logging_test_filter_proto",
     srcs = ["logging_test_filter.proto"],
@@ -292,10 +291,10 @@ envoy_extension_cc_test_library(
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/extensions/filters/http/ext_proc",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/ext_proc",
         "//test/test_common:utility_lib",
     ],
 )
