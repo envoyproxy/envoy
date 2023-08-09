@@ -57,12 +57,13 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     return;
   }
   const auto& route_config = resources[0].get().resource();
-  if (route_config.GetDescriptor()->full_name() !=
+  Protobuf::ReflectableMessage reflectable_config = createReflectableMessage(route_config);
+  if (reflectable_config->GetDescriptor()->full_name() !=
       route_config_provider_manager_.protoTraits().resourceType()) {
     throw EnvoyException(fmt::format("Unexpected {} configuration type (expecting {}): {}",
                                      rds_type_,
                                      route_config_provider_manager_.protoTraits().resourceType(),
-                                     route_config.GetDescriptor()->full_name()));
+                                     reflectable_config->GetDescriptor()->full_name()));
   }
   if (resourceName(route_config_provider_manager_.protoTraits(), route_config) !=
       route_config_name_) {
