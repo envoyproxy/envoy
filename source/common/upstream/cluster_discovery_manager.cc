@@ -9,13 +9,15 @@ namespace Upstream {
 
 namespace {
 
-using ClusterAddedCb = std::function<void(ThreadLocalCluster&)>;
+using ClusterAddedCb = std::function<void(absl::string_view)>;
 
 class ClusterCallbacks : public ClusterUpdateCallbacks {
 public:
   ClusterCallbacks(ClusterAddedCb cb) : cb_(std::move(cb)) {}
 
-  void onClusterAddOrUpdate(ThreadLocalCluster& cluster) override { cb_(cluster); };
+  void onClusterAddOrUpdate(absl::string_view cluster_name, ThreadLocalClusterCommand&) override {
+    cb_(cluster_name);
+  };
 
   void onClusterRemoval(const std::string&) override {}
 
@@ -28,12 +30,12 @@ private:
 ClusterDiscoveryManager::ClusterDiscoveryManager(
     std::string thread_name, ClusterLifecycleCallbackHandler& lifecycle_callbacks_handler)
     : thread_name_(std::move(thread_name)) {
-  callbacks_ = std::make_unique<ClusterCallbacks>([this](ThreadLocalCluster& cluster) {
+  callbacks_ = std::make_unique<ClusterCallbacks>([this](absl::string_view cluster_name) {
     ENVOY_LOG(trace,
               "cm cdm: starting processing cluster name {} (status {}) from cluster lifecycle "
               "callback in {}",
-              cluster.info()->name(), enumToInt(ClusterDiscoveryStatus::Available), thread_name_);
-    processClusterName(cluster.info()->name(), ClusterDiscoveryStatus::Available);
+              cluster_name, enumToInt(ClusterDiscoveryStatus::Available), thread_name_);
+    processClusterName(cluster_name, ClusterDiscoveryStatus::Available);
   });
   callbacks_handle_ = lifecycle_callbacks_handler.addClusterUpdateCallbacks(*callbacks_);
 }

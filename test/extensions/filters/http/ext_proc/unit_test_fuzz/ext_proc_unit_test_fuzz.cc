@@ -30,6 +30,12 @@ public:
     ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
     ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(1024));
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(1024));
+    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
+        .WillByDefault(
+            Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
+    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+        .WillByDefault(
+            Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

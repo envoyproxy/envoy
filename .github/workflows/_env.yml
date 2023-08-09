@@ -42,6 +42,8 @@ on:
         default:
 
     outputs:
+      debug:
+        value: false
       agent_ubuntu:
         value: ubuntu-22.04
       build_image_ubuntu:
@@ -95,7 +97,11 @@ on:
         value: ${{ jobs.repo.outputs.version_patch }}
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-env
+  group: |
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-env
   cancel-in-progress: true
 
 jobs:
@@ -128,9 +134,11 @@ jobs:
       version_patch: ${{ steps.env.outputs.version_patch }}
     steps:
     - uses: actions/checkout@v3
+      name: Checkout Envoy repository
       with:
         fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
     - uses: ./.github/actions/env
+      name: Generate environment variables
       id: env
       with:
         check_mobile_run: ${{ inputs.check_mobile_run }}
@@ -168,7 +176,7 @@ jobs:
       statuses: write
     with:
       workflow_name: ${{ inputs.start_check_status }}
-      sha: ${{ inputs.repo_ref }}
+      sha: ${{ inputs.repo_ref_sha }}
 
   cache:
     if: ${{ inputs.prime_build_image }}

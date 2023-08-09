@@ -159,14 +159,16 @@ private:
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::ClientCallbacks& callbacks);
 
-    void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
+    void onClusterAddOrUpdateNonVirtual(absl::string_view cluster_name,
+                                        Upstream::ThreadLocalClusterCommand& get_cluster);
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
     void drainClients();
 
     // Upstream::ClusterUpdateCallbacks
-    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
-      onClusterAddOrUpdateNonVirtual(cluster);
+    void onClusterAddOrUpdate(absl::string_view cluster_name,
+                              Upstream::ThreadLocalClusterCommand& get_cluster) override {
+      onClusterAddOrUpdateNonVirtual(cluster_name, get_cluster);
     }
     void onClusterRemoval(const std::string& cluster_name) override;
 

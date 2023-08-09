@@ -493,3 +493,21 @@ envoy_cc_test(
         "//source/common/common:random_generator_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "inline_map_test",
+    srcs = ["inline_map_test.cc"],
+    deps = ["//source/common/common:inline_map"],
+)
+
+envoy_cc_benchmark_binary(
+    name = "inline_map_speed_test",
+    srcs = ["inline_map_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = ["//source/common/common:inline_map"],
+)
+
+envoy_benchmark_test(
+    name = "inline_map_speed_test_benchmark_test",
+    benchmark_binary = "inline_map_speed_test",
+)

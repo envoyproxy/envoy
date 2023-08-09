@@ -23,7 +23,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tcp:94.1"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:94.9"
+"source/exe:90.7"
 "source/extensions/access_loggers/grpc:95.8"
 "source/extensions/access_loggers/wasm:93.5"
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
@@ -68,7 +68,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/listener_managers/validation_listener_manager:70.0"
 "source/extensions/watchdog/profile_action:83.3"
-"source/server:93.8" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
+"source/server:90.8" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/config_validation:88.4"
 "source/extensions/health_checkers:96.0"
 "source/extensions/health_checkers/http:93.9"

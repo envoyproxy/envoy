@@ -111,7 +111,12 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                      /*server_name=*/config_.serverName(),
                                      /*proxy_status_config=*/config_.proxyStatusConfig())),
       refresh_rtt_after_request_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {}
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {
+  ENVOY_LOG_ONCE_IF(
+      trace, accept_new_http_stream_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
+      "found. Is it configured?");
+}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -345,6 +350,12 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 }
 
+RequestDecoderHandlePtr ConnectionManagerImpl::newStreamHandle(ResponseEncoder& response_encoder,
+                                                               bool is_internally_created) {
+  RequestDecoder& decoder = newStream(response_encoder, is_internally_created);
+  return std::make_unique<ActiveStreamHandle>(static_cast<ActiveStream&>(decoder));
+}
+
 RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
                                                  bool is_internally_created) {
   TRACE_EVENT("core", "ConnectionManagerImpl::newStream");
@@ -365,8 +376,8 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
     response_encoder.getStream().setAccount(downstream_stream_account);
   }
 
-  ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
-                                              std::move(downstream_stream_account)));
+  auto new_stream = std::make_unique<ActiveStream>(
+      *this, response_encoder.getStream().bufferLimit(), std::move(downstream_stream_account));
 
   accumulated_requests_++;
   if (config_.maxRequestsPerConnection() > 0 &&
@@ -967,11 +978,23 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   return ip->port();
 }
 
+namespace {
+bool streamErrorOnlyErrors(absl::string_view error_details) {
+  // Pre UHV HCM did not respect stream_error_on_invalid_http_message
+  // and only sent 400 for specific errors.
+  // TODO(#28555): make these errors respect the stream_error_on_invalid_http_message
+  return error_details == UhvResponseCodeDetail::get().FragmentInUrlPath ||
+         error_details == UhvResponseCodeDetail::get().EscapedSlashesInPath ||
+         error_details == UhvResponseCodeDetail::get().Percent00InPath;
+}
+} // namespace
+
 bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   if (header_validator_) {
     auto validation_result = header_validator_->validateRequestHeaders(*request_headers_);
     bool failure = !validation_result.ok();
     bool redirect = false;
+    bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
     std::string failure_details(validation_result.details());
     if (!failure) {
       auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
@@ -979,6 +1002,11 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       redirect = transformation_result.action() ==
                  Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
       failure_details = std::string(transformation_result.details());
+      if (redirect && !is_grpc) {
+        connection_manager_.stats_.named_.downstream_rq_redirected_with_normalized_path_.inc();
+      } else if (failure) {
+        connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
+      }
     }
     if (failure) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
@@ -986,7 +1014,6 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
                                ? Code::NotImplemented
                                : Code::BadRequest;
       absl::optional<Grpc::Status::GrpcStatus> grpc_status;
-      bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
       if (redirect && !is_grpc) {
         response_code = Code::TemporaryRedirect;
         modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
@@ -1006,7 +1033,8 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         resetStream();
       } else {
         sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
-        if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+        if (!response_encoder_->streamErrorOnInvalidHttpMessage() &&
+            !streamErrorOnlyErrors(failure_details)) {
           connection_manager_.handleCodecError(failure_details);
         }
       }
@@ -1200,6 +1228,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
+#ifndef ENVOY_ENABLE_UHV
+  // In UHV mode path normalization is done in the UHV
   // Path sanitization should happen before any path access other than the above sanity check.
   const auto action =
       ConnectionManagerUtility::maybeNormalizePath(*request_headers_, connection_manager_.config_);
@@ -1225,6 +1255,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   ASSERT(action == ConnectionManagerUtility::NormalizePathAction::Continue);
+#endif
   auto optional_port = ConnectionManagerUtility::maybeNormalizeHost(
       *request_headers_, connection_manager_.config_, localPort());
   if (optional_port.has_value() &&

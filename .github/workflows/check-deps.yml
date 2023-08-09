@@ -1,16 +1,17 @@
 name: Check dependencies
 
+permissions:
+  contents: read
+
 on:
   schedule:
-    - cron: '0 8 * * *'
+  - cron: '0 8 * * *'
   workflow_dispatch:
-
-permissions: read-all
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.schedule

@@ -1,6 +1,6 @@
-#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
+#pragma once
 
-#include "test/mocks/http/header_validator.h"
+#include "envoy/http/header_validator.h"
 
 #include "gtest/gtest.h"
 
@@ -21,14 +21,16 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-class HeaderValidatorTest {
+class HeaderValidatorUtils {
 protected:
   void setHeaderStringUnvalidated(Envoy::Http::HeaderString& header_string,
                                   absl::string_view value) {
     header_string.setCopyUnvalidatedForTestOnly(value);
   }
 
-  ::testing::NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
+  void validateAllCharactersInUrlPath(::Envoy::Http::ServerHeaderValidator& validator,
+                                      absl::string_view path,
+                                      absl::string_view additionally_allowed_characters);
 
   static constexpr absl::string_view empty_config = "{}";
 
@@ -57,6 +59,28 @@ protected:
     uri_path_normalization_options:
       skip_path_normalization: true
       path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
+    )EOF";
+
+  static constexpr absl::string_view fragment_in_path_allowed = R"EOF(
+    strip_fragment_from_path: true
+    )EOF";
+
+  static constexpr absl::string_view no_path_normalization_no_decoding_slashes = R"EOF(
+    uri_path_normalization_options:
+      skip_path_normalization: true
+      path_with_escaped_slashes_action: KEEP_UNCHANGED
+    )EOF";
+
+  static constexpr absl::string_view decode_slashes_and_forward = R"EOF(
+    uri_path_normalization_options:
+      skip_path_normalization: true
+      path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
+    )EOF";
+
+  static constexpr absl::string_view reject_encoded_slashes = R"EOF(
+    uri_path_normalization_options:
+      skip_path_normalization: true
+      path_with_escaped_slashes_action: REJECT_REQUEST
     )EOF";
 };
 
