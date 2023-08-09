@@ -289,6 +289,15 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
   }
 
   Json::ObjectSharedPtr body_json = std::move(result.value());
+  // A pure string or number is considered as a valid application/json body, so we should
+  // treat this case as on_missing for all rules but a successful json body.
+  if (!body_json) {
+    ENVOY_LOG(debug, "a valid non-object json body which is error prone");
+    handleAllOnMissing(rules, request_processing_finished_);
+    success.inc();
+    return;
+  }
+
   StructMap struct_map;
   for (const auto& rule : rules) {
     const auto& keys = rule.keys_;
