@@ -480,7 +480,7 @@ build:rbe-engflow --remote_cache=grpcs://envoy.cluster.engflow.com
 build:rbe-engflow --remote_executor=grpcs://envoy.cluster.engflow.com
 build:rbe-engflow --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:rbe-engflow --bes_results_url=https://envoy.cluster.engflow.com/invocation/
-build:rbe-engflow --experimental_credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
+build:rbe-engflow --experimental_credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
 build:rbe-engflow --grpc_keepalive_time=30s
 build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s
