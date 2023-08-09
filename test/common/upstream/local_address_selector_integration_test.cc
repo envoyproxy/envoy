@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-
 #include "envoy/upstream/upstream.h"
 
 #include "test/integration/http_protocol_integration.h"
