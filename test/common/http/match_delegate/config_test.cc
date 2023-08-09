@@ -7,6 +7,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -394,6 +395,47 @@ TEST(DelegatingFilterTest, MatchTreeOnNoMatchSkipActionDecodingHeaders) {
                                                 {":method", "GET"},
                                                 {"match-header", "not_match"},
                                                 {"content-type", "application/grpc"}}};
+  Envoy::Http::RequestTrailerMapPtr request_trailers{
+      new Envoy::Http::TestRequestTrailerMapImpl{{"test", "test"}}};
+  Envoy::Http::MetadataMap metadata_map;
+  Buffer::OwnedImpl buffer;
+
+  delegating_filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            delegating_filter->decodeHeaders(*request_headers, false));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->decodeData(buffer, false));
+  EXPECT_EQ(Envoy::Http::FilterMetadataStatus::Continue,
+            delegating_filter->decodeMetadata(metadata_map));
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
+            delegating_filter->decodeTrailers(*request_trailers));
+  delegating_filter->decodeComplete();
+}
+
+// Test that the DelegatingStreamFilter is skipped when runtime flag is disabled.
+TEST(DelegatingFilterTest, MatchTreeDecodingHeadersSkippedWithRuntimeFlag) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_extension_with_matcher", "false"}});
+  // The filter is added, but will be skipped since the runtime flag above is disabled.
+  std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
+      new Envoy::Http::MockStreamDecoderFilter());
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
+
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeMetadata(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeTrailers(_)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeComplete()).Times(0);
+
+  auto match_tree =
+      createMatchingTree<Envoy::Http::Matching::HttpRequestQueryParamsDataInput, TestAction>(
+          "match_query", "match");
+  auto delegating_filter =
+      std::make_shared<DelegatingStreamFilter>(match_tree, decoder_filter, nullptr);
+
+  Envoy::Http::RequestHeaderMapPtr request_headers{new Envoy::Http::TestRequestHeaderMapImpl{
+      {":authority", "host"}, {":path", "/?match_query=match"}, {":method", "GET"}}};
   Envoy::Http::RequestTrailerMapPtr request_trailers{
       new Envoy::Http::TestRequestTrailerMapImpl{{"test", "test"}}};
   Envoy::Http::MetadataMap metadata_map;

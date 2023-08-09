@@ -105,8 +105,9 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
     return;
   }
 
-  // If no match tree is set, interpret as a skip.
-  if (!has_match_tree_) {
+  // If no match tree is set or it is disabled by runtime guard, interpret as a skip.
+  if (!has_match_tree_ ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_extension_with_matcher")) {
     skip_filter_ = true;
     match_tree_evaluated_ = true;
     return;
