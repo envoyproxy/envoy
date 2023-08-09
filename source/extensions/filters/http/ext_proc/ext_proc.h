@@ -247,7 +247,7 @@ public:
   const FilterConfig& config() const { return *config_; }
 
   ExtProcFilterStats& stats() { return stats_; }
-  ExtProcLoggingInfo& loggingInfo() { return *logging_info_; }
+  ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
