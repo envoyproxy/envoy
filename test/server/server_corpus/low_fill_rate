@@ -36,4 +36,3 @@ layered_runtime {
   }
 }
 header_prefix: "`"
-use_tcp_for_dns_lookups: true
