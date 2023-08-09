@@ -94,18 +94,11 @@ private:
     MUTABLE_CONSTRUCT_ON_FIRST_USE(ClusterManagerContainer);
   }
 
-  struct TimeSourceContainer {
-    TimeSource* time_source_{nullptr};
-  };
-  static TimeSourceContainer& timeSourceContainer() {
-    MUTABLE_CONSTRUCT_ON_FIRST_USE(TimeSourceContainer);
-  }
-
   Dso::NetworkFilterDsoPtr dynamic_lib_{nullptr};
   unsigned long long int goConnID_{0};
   UpstreamConnWrapper* wrapper_{nullptr};
   Event::Dispatcher* dispatcher_{nullptr};
-  std::unique_ptr<StreamInfo::StreamInfoImpl> stream_info_{nullptr};
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_{nullptr};
   Tcp::ConnectionPool::ConnectionDataPtr conn_{nullptr};
   Upstream::HostDescriptionConstSharedPtr host_{nullptr};
   Tcp::ConnectionPool::Cancellable* handler_{nullptr};

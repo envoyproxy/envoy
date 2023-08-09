@@ -1125,6 +1125,14 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                         stream_info);
                                   });
                             }}},
+                          {"RESPONSE_FLAGS_LONG",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return StreamInfo::ResponseFlagUtils::toString(stream_info);
+                                  });
+                            }}},
                           {"UPSTREAM_HOST",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
@@ -2157,6 +2165,7 @@ absl::optional<std::string> FilterStateFormatter::format(
     return absl::nullopt;
   }
 
+#ifdef ENVOY_ENABLE_FULL_PROTOS
   std::string value;
   const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
   if (!status.ok()) {
@@ -2167,6 +2176,10 @@ absl::optional<std::string> FilterStateFormatter::format(
 
   truncate(value, max_length_);
   return value;
+#else
+  PANIC("FilterStateFormatter::format requires full proto support");
+  return absl::nullopt;
+#endif
 }
 
 ProtobufWkt::Value FilterStateFormatter::formatValue(

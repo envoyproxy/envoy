@@ -154,18 +154,23 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
   auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
       SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random);
 
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client),
+      /*dispatcher_=*/dispatcher,
+      /*service_method_=*/*method_descriptor,
+      /*local_info_=*/local_info,
+      /*rate_limit_settings_=*/rate_limit_settings,
+      /*scope_=*/*stats_store.rootScope(),
+      /*config_validators_=*/std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/std::move(backoff_strategy),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/nullptr};
   if (GetParam() == LegacyOrUnified::Unified) {
-    xds_context = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
-        std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
-        *stats_store.rootScope(), rate_limit_settings, local_info, false,
-        std::make_unique<NiceMock<MockCustomConfigValidators>>(), std::move(backoff_strategy),
-        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+    xds_context = std::make_shared<Config::XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
   } else {
-    xds_context = std::make_shared<NewGrpcMuxImpl>(
-        std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
-        *stats_store.rootScope(), rate_limit_settings, local_info,
-        std::make_unique<NiceMock<MockCustomConfigValidators>>(), std::move(backoff_strategy),
-        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+    xds_context = std::make_shared<NewGrpcMuxImpl>(grpc_mux_context);
   }
 
   GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(

@@ -55,60 +55,75 @@ An example configuration of the filter may look like the following:
 
 By *default* request compression is disabled, but when enabled it will be *skipped* if:
 
-- A request does not contain a *content-type* value that matches one of the selected
-  mime-types, which default to *application/javascript*, *application/json*,
-  *application/xhtml+xml*, *image/svg+xml*, *text/css*, *text/html*, *text/plain*,
-  *text/xml*.
-- *content-length* header is not present in the request.
-- A request contains a *content-encoding* header.
-- A request contains a *transfer-encoding* header whose value includes a known
+- A request does **not** contain a ``content-type`` value that matches one of the selected
+  mime-types, which default to the following:
+
+  - ``application/javascript``
+  - ``application/json``
+  - ``application/xhtml+xml``
+  - ``image/svg+xml``
+  - ``text/css``
+  - ``text/html``
+  - ``text/plain``
+  - ``text/xml``
+
+- A request does **not** contain a ``content-length`` header.
+- A request contains a ``content-encoding`` header.
+- A request contains a ``transfer-encoding`` header whose value includes a known
   compression name.
 
 By *default* response compression is enabled, but it will be *skipped* when:
 
-- A request does NOT contain *accept-encoding* header.
-- A request includes *accept-encoding* header, but it does not contain "gzip" or "\*".
-- A request includes *accept-encoding* with "gzip" or "\*" with the weight "q=0". Note
-  that the "gzip" will have a higher weight then "\*". For example, if *accept-encoding*
-  is "gzip;q=0,\*;q=1", the filter will not compress. But if the header is set to
-  "\*;q=0,gzip;q=1", the filter will compress.
-- A request whose *accept-encoding* header includes any encoding type with a higher
-  weight than "gzip"'s given the corresponding compression filter is present in the chain.
-- A response contains a *content-encoding* header.
-- A response contains a *cache-control* header whose value includes "no-transform".
-- A response contains a *transfer-encoding* header whose value includes a known
+- A request does **not** contain ``accept-encoding`` header.
+- A request contains an ``accept-encoding`` header, but it does not contain ``gzip`` or ``\*``.
+- A request contains an ``accept-encoding`` header with ``gzip`` or ``\*```` with the weight ``q=0``. Note
+  that the ``gzip`` will have a higher weight than ``\*``. For example, if ``accept-encoding``
+  is ``gzip;q=0,\*;q=1``, the filter will not compress. But if the header is set to
+  ``\*;q=0,gzip;q=1``, the filter will compress.
+- A request whose ``accept-encoding`` header includes any encoding type with a higher
+  weight than ``gzip``'s given the corresponding compression filter is present in the chain.
+- A response contains a ``content-encoding`` header.
+- A response contains a ``cache-control```` header whose value includes ``no-transform``.
+- A response contains a ``transfer-encoding```` header whose value includes a known
   compression name.
-- A response does not contain a *content-type* value that matches one of the selected
-  mime-types, which default to *application/javascript*, *application/json*,
-  *application/xhtml+xml*, *image/svg+xml*, *text/css*, *text/html*, *text/plain*,
-  *text/xml*.
-- Neither *content-length* nor *transfer-encoding* headers are present in
-  the response.
-- Response size is smaller than 30 bytes (only applicable when *transfer-encoding*
+- A response does **not** contain a ``content-type`` value that matches one of the selected
+  mime-types, which default to:
+
+  - ``application/javascript``
+  - ``application/json``
+  - ``application/xhtml+xml``
+  - ``image/svg+xml``
+  - ``text/css``
+  - ``text/html``
+  - ``text/plain``
+  - ``text/xml``
+
+- A response does **not** contain a ``content-length`` or ``transfer-encoding`` headers.
+- Response size is smaller than 30 bytes (only applicable when ``transfer-encoding``
   is not chunked).
 
 Please note that in case the filter is configured to use a compression library extension
-other than gzip it looks for content encoding in the *accept-encoding* header provided by
+other than gzip it looks for content encoding in the ``accept-encoding`` header provided by
 the extension.
 
 When response compression is *applied*:
 
-- The *content-length* is removed from response headers.
-- Response headers contain "*transfer-encoding: chunked*", and
-  "*content-encoding*" with the compression scheme used (e.g., ``gzip``).
-- The "*vary: accept-encoding*" header is inserted on every response.
+- The ``content-length`` is removed from response headers.
+- Response headers contain ``transfer-encoding: chunked``, and
+  ``content-encoding`` with the compression scheme used (e.g., ``gzip``).
+- The ``vary: accept-encoding`` header is inserted on every response.
 
-Also the "*vary: accept-encoding*" header may be inserted even if compression is *not*
-applied due to incompatible "*accept-encoding*" header in a request. This happens
-when the requested resource still can be compressed given compatible "*accept-encoding*".
+Also the ``vary: accept-encoding`` header may be inserted even if compression is **not**
+applied due to incompatible ``accept-encoding`` header in a request. This happens
+when the requested resource can still be compressed given compatible ``accept-encoding``.
 Otherwise, if an uncompressed response is cached by a caching proxy in front of Envoy,
-the proxy won't know to fetch a new incoming request with compatible "*accept-encoding*"
+the proxy won't know to fetch a new incoming request with compatible ``accept-encoding``
 from upstream.
 
 When request compression is *applied*:
 
-- *content-length* is removed from request headers.
-- *content-encoding* with the compression scheme used (e.g., ``gzip``) is added to
+- ``content-length`` is removed from request headers.
+- ``content-encoding`` with the compression scheme used (e.g., ``gzip``) is added to
   request headers.
 
 Per-Route Configuration
@@ -215,12 +230,12 @@ specific to responses only:
   :widths: 1, 1, 2
 
   no_accept_header, Counter, Number of requests with no accept header sent.
-  header_identity, Counter, Number of requests sent with "identity" set as the *accept-encoding*.
-  header_compressor_used, Counter, Number of requests sent with filter's configured encoding set as the *accept-encoding*.
+  header_identity, Counter, Number of requests sent with "identity" set as the ``accept-encoding``.
+  header_compressor_used, Counter, Number of requests sent with filter's configured encoding set as the ``accept-encoding``.
   header_compressor_overshadowed, Counter, Number of requests skipped by this filter instance because they were handled by another filter in the same filter chain.
-  header_wildcard, Counter, Number of requests sent with "\*" set as the *accept-encoding*.
-  header_not_valid, Counter, Number of requests sent with a not valid *accept-encoding* header (aka "q=0" or an unsupported encoding type).
-  not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. *disable_on_etag_header* must be turned on for this to happen.
+  header_wildcard, Counter, Number of requests sent with ``\*`` set as the ``accept-encoding``.
+  header_not_valid, Counter, Number of requests sent with a not valid ``accept-encoding`` header (aka ``q=0`` or an unsupported encoding type).
+  not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. ``disable_on_etag_header`` must be turned on for this to happen.
 
 .. attention:
 
