@@ -421,7 +421,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
           local_info, std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), {}, used_eds_cache);
+          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
