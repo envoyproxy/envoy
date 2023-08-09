@@ -32,7 +32,8 @@ const int UpstreamIndex2 = 2;
 #define ALL_TEST_XDS_TRACKER_STATS(COUNTER)                                                        \
   COUNTER(on_config_accepted)                                                                      \
   COUNTER(on_config_rejected)                                                                      \
-  COUNTER(on_config_metadata_readed)
+  COUNTER(on_config_metadata_read)                                                                 \
+  COUNTER(on_config_metadata_packed)
 
 /**
  * Struct definition for stats. @see stats_macros.h
@@ -52,12 +53,19 @@ public:
   void onConfigAccepted(const absl::string_view,
                         const std::vector<Config::DecodedResourcePtr>& decoded_resources) override {
     stats_.on_config_accepted_.inc();
+    test::envoy::config::xds::TestTrackerMetadata test_metadata;
     for (const auto& resource : decoded_resources) {
       if (resource->metadata().has_value()) {
         const auto& config_typed_metadata = resource->metadata()->typed_filter_metadata();
         if (const auto& metadata_it = config_typed_metadata.find(kTestKey);
             metadata_it != config_typed_metadata.end()) {
-          stats_.on_config_metadata_readed_.inc();
+          stats_.on_config_metadata_read_.inc();
+          const auto status =
+              Envoy::MessageUtil::unpackToNoThrow(metadata_it->second, test_metadata);
+          if (!status.ok()) {
+            continue;
+          }
+          stats_.on_config_metadata_packed_.inc();
         }
       }
     }
@@ -68,12 +76,19 @@ public:
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
       const Protobuf::RepeatedPtrField<std::string>&) override {
     stats_.on_config_accepted_.inc();
+    test::envoy::config::xds::TestTrackerMetadata test_metadata;
     for (const auto& resource : resources) {
       if (resource.has_metadata()) {
         const auto& config_typed_metadata = resource.metadata().typed_filter_metadata();
         if (const auto& metadata_it = config_typed_metadata.find(kTestKey);
             metadata_it != config_typed_metadata.end()) {
-          stats_.on_config_metadata_readed_.inc();
+          stats_.on_config_metadata_read_.inc();
+          const auto status =
+              Envoy::MessageUtil::unpackToNoThrow(metadata_it->second, test_metadata);
+          if (!status.ok()) {
+            continue;
+          }
+          stats_.on_config_metadata_packed_.inc();
         }
       }
     }
@@ -199,10 +214,12 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
 
   // onConfigAccepted is called when all the resources are accepted.
   test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_readed", 0);
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_read", 0);
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_packed", 0);
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
+// This is to test the Resource wrapper usage with metadata field.
 TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper) {
   TestXdsConfigTrackerFactory factory;
   Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
@@ -210,16 +227,21 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
 
+  // Add a typed metadata to the Resource wrapper.
+  test::envoy::config::xds::TestTrackerMetadata test_metadata;
+  Protobuf::Map<std::string, ProtobufWkt::Any> metadata;
+  metadata[kTestKey].PackFrom(test_metadata);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1", true,
-      kTestKey, ProtobufWkt::Any());
+      metadata);
 
   // 3 because the statically specified CDS server itself counts as a cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
 
   // onConfigAccepted is called when all the resources are accepted.
   test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_readed", 2);
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_read", 2);
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_packed", 2);
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 

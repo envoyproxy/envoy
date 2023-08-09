@@ -186,20 +186,19 @@ public:
       const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
+
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
                              bool use_wrapper = false,
-                             absl::string_view metadata_key = absl::string_view(),
-                             const ProtobufWkt::Any packed_value = ProtobufWkt::Any()) {
+                             const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata = {}) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
         sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version, nullptr, use_wrapper,
-                                metadata_key, packed_value);
+                                metadata);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, metadata_key,
-                                 packed_value);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, metadata);
     }
   }
 
@@ -229,10 +228,13 @@ public:
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, FakeStream* stream = nullptr,
-                                 bool use_wrapper = false,
-                                 absl::string_view metadata_key = absl::string_view(),
-                                 const ProtobufWkt::Any packed_value = ProtobufWkt::Any()) {
+                                 const std::string& version, FakeStream* stream = nullptr) {
+    sendSotwDiscoveryResponse(type_url, messages, version, stream, false, {});
+  }
+  template <class T>
+  void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                                 const std::string& version, FakeStream* stream, bool use_wrapper,
+                                 const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata) {
     if (stream == nullptr) {
       stream = xds_stream_.get();
     }
@@ -245,9 +247,9 @@ public:
         resource.mutable_resource()->PackFrom(message);
         resource.set_name(intResourceName(message));
         resource.set_version(version);
-        if (!metadata_key.empty()) {
+        for (const auto& kvp : metadata) {
           auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
-          (*map)[std::string(metadata_key)] = packed_value;
+          (*map)[std::string(kvp.first)] = kvp.second;
         }
         discovery_response.add_resources()->PackFrom(resource);
       } else {
@@ -263,27 +265,34 @@ public:
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version) {
-    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {});
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {}, {});
   }
 
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             absl::string_view metadata_key, const ProtobufWkt::Any& packed_value) {
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, stream, aliases, {});
+  }
+
+  template <class T>
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version,
+                             const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata) {
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
-                               std::string(metadata_key), packed_value);
+                               metadata);
   }
 
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
-                             absl::string_view metadata_key = absl::string_view(),
-                             const ProtobufWkt::Any packed_value = ProtobufWkt::Any()) {
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases,
+                             const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata) {
     auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
-                                                    aliases, metadata_key, packed_value);
+                                                    aliases, metadata);
     stream->sendGrpcMessage(response);
   }
 
@@ -308,8 +317,7 @@ public:
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases,
-                               absl::string_view metadata_key = absl::string_view(),
-                               const ProtobufWkt::Any packed_value = ProtobufWkt::Any()) {
+                               const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata) {
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
@@ -319,9 +327,9 @@ public:
       for (const auto& alias : aliases) {
         resource.add_aliases(alias);
       }
-      if (!metadata_key.empty()) {
+      for (const auto& kvp : metadata) {
         auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
-        (*map)[std::string(metadata_key)] = packed_value;
+        (*map)[std::string(kvp.first)] = kvp.second;
       }
       resources.emplace_back(resource);
     }
