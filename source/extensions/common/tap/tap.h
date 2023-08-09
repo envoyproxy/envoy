@@ -83,6 +83,7 @@ using SinkPtr = std::unique_ptr<Sink>;
 class TapSinkFactory : public Config::TypedFactory {
 public:
   ~TapSinkFactory() override = default;
+  std::string category() const override { return "envoy.tap.sinks"; }
 
   /**
    * @return a new tap SinkPtr
