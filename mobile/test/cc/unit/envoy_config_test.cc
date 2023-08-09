@@ -33,6 +33,10 @@ TEST(TestConfig, ConfigIsApplied) {
       .addGrpcStatsDomain("asdf.fake.website")
       .addStatsFlushSeconds(654)
 #endif
+#ifdef ENVOY_ENABLE_QUIC
+      .setHttp3ConnectionOptions("5RTO")
+      .setHttp3ClientConnectionOptions("MPQC")
+#endif
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
       .addDnsMinRefreshSeconds(567)
@@ -62,6 +66,10 @@ TEST(TestConfig, ConfigIsApplied) {
 #ifdef ENVOY_MOBILE_STATS_REPORTING
       "asdf.fake.website",
       "stats_flush_interval { seconds: 654 }",
+#endif
+#ifdef ENVOY_ENABLE_QUIC
+      "connection_options: \"5RTO\"",
+      "client_connection_options: \"MPQC\"",
 #endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",
