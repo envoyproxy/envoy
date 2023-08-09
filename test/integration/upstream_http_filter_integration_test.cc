@@ -386,7 +386,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, UpstreamHttpExtensionDiscoveryInt
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicFilter("foo", false);
+  addDynamicFilter("foo", true);
   addCodecFilter();
   initialize();
 
