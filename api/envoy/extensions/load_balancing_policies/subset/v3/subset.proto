@@ -202,7 +202,6 @@ message Subset {
   //   try the ``{"version": "v1"}`` as the request metadata.
   bool allow_redundant_keys = 10;
 
-
   // If true, routing to subsets will take into account the localities and locality weights of the
   // endpoints when making the routing decision.
   //
