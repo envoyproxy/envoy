@@ -28,7 +28,6 @@ public:
     ASSERT(decoder_callbacks_ != nullptr);
     const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
         decoder_callbacks_->streamInfo().filterState();
-
     const ExtProcLoggingInfo* ext_proc_logging_info =
         filter_state->getDataReadOnly<ExtProcLoggingInfo>(logging_id_);
     if (ext_proc_logging_info != nullptr) {
