@@ -159,7 +159,7 @@ TEST(PrefixRoutesTest, TestFormatterWithPrefixRoute) {
   EXPECT_EQ("{abc:bar}-test-subjectCN-{abc:bar}", key);
 }
 
-// This test validates the formatter works correctly when downstream is connection is closed
+// This test validates the formatter works correctly when downstream connection is closed
 // while the formatter is being evaluated. This is to validate the lifetime issues with the
 // downstream connection.
 TEST(PrefixRoutesTest, TestFormatterWhenConnectionClosed) {
