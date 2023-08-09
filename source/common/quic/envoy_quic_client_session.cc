@@ -64,6 +64,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
       quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope),
       transport_socket_options_(transport_socket_options) {
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so makes it bypass
+  // the default Datagram queue.
+  SetForceFlushForDefaultQueue(true);
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
