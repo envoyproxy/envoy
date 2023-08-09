@@ -421,6 +421,7 @@ TEST(DelegatingFilterTest, MatchTreeDecodingHeadersSkippedWithRuntimeFlag) {
       new Envoy::Http::MockStreamDecoderFilter());
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
 
+  // No callback is invoked.
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
   EXPECT_CALL(*decoder_filter, decodeData(_, _)).Times(0);
@@ -442,6 +443,7 @@ TEST(DelegatingFilterTest, MatchTreeDecodingHeadersSkippedWithRuntimeFlag) {
   Buffer::OwnedImpl buffer;
 
   delegating_filter->setDecoderFilterCallbacks(callbacks);
+  // Filter chain iteration has been continued.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
             delegating_filter->decodeHeaders(*request_headers, false));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->decodeData(buffer, false));
