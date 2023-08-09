@@ -203,7 +203,7 @@ message ExternalProcessor {
   // If set to true, ignore the
   // :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
   // message in an external processor response. In such case, no local reply will be sent.
-  // Instead, The stream to the external processor will be closed. There will be no
+  // Instead, the stream to the external processor will be closed. There will be no
   // more external processing for this stream from now on.
   // [#not-implemented-hide:]
   bool disable_immediate_response = 15;
