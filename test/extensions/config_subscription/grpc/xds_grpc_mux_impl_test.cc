@@ -1075,13 +1075,13 @@ TEST_F(GrpcMuxImplTest, AllMuxesStateTest) {
 TEST_F(GrpcMuxImplTest, EdsResourcesCacheForEds) {
   eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
   setup();
-  EXPECT_NE({}, grpc_mux_->edsResourcesCache());
+  EXPECT_TRUE(grpc_mux_->edsResourcesCache().has_value());
 }
 
 // Validates that the EDS cache getter returns empty if there is no cache.
 TEST_F(GrpcMuxImplTest, EdsResourcesCacheForEdsNoCache) {
   setup();
-  EXPECT_EQ({}, grpc_mux_->edsResourcesCache());
+  EXPECT_FALSE(grpc_mux_->edsResourcesCache().has_value());
 }
 
 // Validate that an EDS resource is cached if there's a cache.
