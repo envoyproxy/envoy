@@ -41,6 +41,9 @@ new_features:
 - area: extension_discovery_service
   change: |
     added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
+- area: http
+  change: |
+    added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
 - area: extension_discovery_service
   change: |
     added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
