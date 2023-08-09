@@ -10,8 +10,16 @@ envoy_package()
 
 envoy_cc_library(
     name = "substitution_formatter_lib",
-    srcs = ["substitution_formatter.cc"],
-    hdrs = ["substitution_formatter.h"],
+    srcs = [
+        "http_specific_formatter.cc",
+        "stream_info_formatter.cc",
+        "substitution_formatter.cc",
+    ],
+    hdrs = [
+        "http_specific_formatter.h",
+        "stream_info_formatter.h",
+        "substitution_formatter.h",
+    ],
     external_deps = ["abseil_str_format"],
     deps = [
         "//envoy/api:api_interface",
