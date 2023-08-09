@@ -22,6 +22,7 @@
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
@@ -30,14 +31,6 @@
 #define DISABLE_UNDER_COVERAGE return
 #else
 #define DISABLE_UNDER_COVERAGE                                                                     \
-  do {                                                                                             \
-  } while (0)
-#endif
-
-#ifdef WIN32
-#define DISABLE_UNDER_WINDOWS return
-#else
-#define DISABLE_UNDER_WINDOWS                                                                      \
   do {                                                                                             \
   } while (0)
 #endif
@@ -287,8 +280,6 @@ public:
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
-      ProtobufWkt::Any temp_any;
-      temp_any.PackFrom(message);
       resource.mutable_resource()->PackFrom(message);
       resource.set_name(intResourceName(message));
       resource.set_version(version);

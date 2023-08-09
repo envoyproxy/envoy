@@ -96,7 +96,9 @@ protected:
       return Api::IoCallUint64Result(result.return_value_,
                                      Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
     }
-    RELEASE_ASSERT(result.errno_ != SOCKET_ERROR_INVAL, "Invalid argument passed in.");
+    if (result.errno_ == SOCKET_ERROR_INVAL) {
+      ENVOY_LOG(error, "Invalid argument passed in.");
+    }
     return Api::IoCallUint64Result(
         /*rc=*/0,
         (result.errno_ == SOCKET_ERROR_AGAIN

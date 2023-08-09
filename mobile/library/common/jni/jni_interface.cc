@@ -1287,7 +1287,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean trust_chain_verification, jobjectArray filter_chain, jobjectArray stat_sinks,
     jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
     jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
-    jstring xds_jwt_token, jlong xds_jwt_token_lifetime, jstring xds_root_certs, jstring node_id,
+    jstring xds_auth_header, jstring xds_auth_token, jstring xds_jwt_token,
+    jlong xds_jwt_token_lifetime, jstring xds_root_certs, jstring xds_sni, jstring node_id,
     jstring node_region, jstring node_zone, jstring node_sub_zone, jstring cds_resources_locator,
     jlong cds_timeout_seconds, jboolean enable_cds) {
   Envoy::Platform::EngineBuilder builder;
@@ -1308,6 +1309,11 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   std::string native_xds_address = getCppString(env, xds_address);
   if (!native_xds_address.empty()) {
     Envoy::Platform::XdsBuilder xds_builder(std::move(native_xds_address), xds_port);
+    std::string native_xds_auth_header = getCppString(env, xds_auth_header);
+    if (!native_xds_auth_header.empty()) {
+      xds_builder.setAuthenticationToken(std::move(native_xds_auth_header),
+                                         getCppString(env, xds_auth_token));
+    }
     std::string native_jwt_token = getCppString(env, xds_jwt_token);
     if (!native_jwt_token.empty()) {
       xds_builder.setJwtAuthenticationToken(std::move(native_jwt_token), xds_jwt_token_lifetime);
@@ -1315,6 +1321,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     std::string native_root_certs = getCppString(env, xds_root_certs);
     if (!native_root_certs.empty()) {
       xds_builder.setSslRootCerts(std::move(native_root_certs));
+    }
+    std::string native_sni = getCppString(env, xds_sni);
+    if (!native_sni.empty()) {
+      xds_builder.setSni(std::move(native_sni));
     }
     std::string native_rtds_resource_name = getCppString(env, rtds_resource_name);
     if (!native_rtds_resource_name.empty()) {

@@ -220,13 +220,13 @@ TEST(InternalRegexGen, LiteralMatches) {
 }
 
 TEST(InternalRegexGen, LiteralMatchesInNamedCapture) {
-  re2::StringPiece kPattern = "abcABC123/-._~%20!$&'()+,;:@";
+  absl::string_view kPattern = "abcABC123/-._~%20!$&'()+,;:@";
 
   RE2 regex = RE2(absl::StrCat("(?P<var>", toRegexPattern(kPattern), ")"));
   ASSERT_EQ(regex.NumberOfCapturingGroups(), 1);
 
   // Full matched string + capture groups
-  std::vector<re2::StringPiece> captures(2);
+  std::vector<absl::string_view> captures(2);
   ASSERT_TRUE(regex.Match(kPattern, /*startpos=*/0, /*endpos=*/kPattern.size(), RE2::ANCHOR_BOTH,
                           captures.data(), captures.size()));
 
@@ -332,7 +332,7 @@ TEST(InternalRegexGen, VariableRegexTextGlobMatch) {
 }
 
 TEST(InternalRegexGen, VariableRegexNamedCapture) {
-  re2::StringPiece kPattern = "abc";
+  absl::string_view kPattern = "abc";
   absl::StatusOr<ParsedResult<Variable>> var = parseVariable("{var=*}");
   ASSERT_OK(var);
 
@@ -340,7 +340,7 @@ TEST(InternalRegexGen, VariableRegexNamedCapture) {
   ASSERT_EQ(regex.NumberOfCapturingGroups(), 1);
 
   // Full matched string + capture groups
-  std::vector<re2::StringPiece> captures(2);
+  std::vector<absl::string_view> captures(2);
   ASSERT_TRUE(regex.Match(kPattern, /*startpos=*/0, /*endpos=*/kPattern.size(), RE2::ANCHOR_BOTH,
                           captures.data(), captures.size()));
 
@@ -429,7 +429,7 @@ TEST_P(GenPatternRegexWithMatch, WithCapture) {
   ASSERT_EQ(regex.NumberOfCapturingGroups(), varValues().size());
 
   int capture_num = regex.NumberOfCapturingGroups() + 1;
-  std::vector<re2::StringPiece> captures(capture_num);
+  std::vector<absl::string_view> captures(capture_num);
   ASSERT_TRUE(regex.Match(requestPath(), /*startpos=*/0,
                           /*endpos=*/requestPath().size(), RE2::ANCHOR_BOTH, captures.data(),
                           captures.size()));

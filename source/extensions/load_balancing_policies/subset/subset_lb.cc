@@ -828,12 +828,12 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_host
   auto excluded_hosts_per_locality =
       original_host_set_.excludedHostsPerLocality().filter({cached_predicate})[0];
 
-  HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
-                               hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
-                               degraded_hosts, degraded_hosts_per_locality, excluded_hosts,
-                               excluded_hosts_per_locality),
-                           determineLocalityWeights(*hosts_per_locality), hosts_added,
-                           hosts_removed, absl::nullopt, absl::nullopt);
+  HostSetImpl::updateHosts(
+      HostSetImpl::updateHostsParams(
+          hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality, degraded_hosts,
+          degraded_hosts_per_locality, excluded_hosts, excluded_hosts_per_locality),
+      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed,
+      original_host_set_.weightedPriorityHealth(), original_host_set_.overprovisioningFactor());
 }
 
 LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(
@@ -903,7 +903,7 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   // Create a new worker local LB if needed.
   // TODO(mattklein123): See the PrioritySubsetImpl constructor for additional comments on how
   // we can do better here.
-  if (thread_aware_lb_ != nullptr) {
+  if (thread_aware_lb_ != nullptr && thread_aware_lb_->factory()->recreateOnHostChange()) {
     lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
   }
 }

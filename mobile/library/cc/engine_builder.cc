@@ -45,6 +45,12 @@ namespace Platform {
 XdsBuilder::XdsBuilder(std::string xds_server_address, const int xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
+XdsBuilder& XdsBuilder::setAuthenticationToken(std::string token_header, std::string token) {
+  authentication_token_header_ = std::move(token_header);
+  authentication_token_ = std::move(token);
+  return *this;
+}
+
 XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
                                                   const int token_lifetime_in_seconds) {
   jwt_token_ = std::move(token);
@@ -54,7 +60,12 @@ XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
 }
 
 XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
-  ssl_root_certs_ = root_certs;
+  ssl_root_certs_ = std::move(root_certs);
+  return *this;
+}
+
+XdsBuilder& XdsBuilder::setSni(std::string sni) {
+  sni_ = std::move(sni);
   return *this;
 }
 
@@ -89,12 +100,22 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
         ->mutable_root_certs()
         ->set_inline_string(ssl_root_certs_);
   }
-  if (!jwt_token_.empty()) {
+
+  if (!authentication_token_header_.empty() && !authentication_token_.empty()) {
+    auto* auth_token_metadata = grpc_service.add_initial_metadata();
+    auth_token_metadata->set_key(authentication_token_header_);
+    auth_token_metadata->set_value(authentication_token_);
+  } else if (!jwt_token_.empty()) {
     auto& jwt = *grpc_service.mutable_google_grpc()
                      ->add_call_credentials()
                      ->mutable_service_account_jwt_access();
     jwt.set_json_key(jwt_token_);
     jwt.set_token_lifetime_seconds(jwt_token_lifetime_in_seconds_);
+  }
+  if (!sni_.empty()) {
+    auto& channel_args =
+        *grpc_service.mutable_google_grpc()->mutable_channel_args()->mutable_args();
+    channel_args["grpc.default_authority"].set_string_value(sni_);
   }
 
   if (!rtds_resource_name_.empty()) {

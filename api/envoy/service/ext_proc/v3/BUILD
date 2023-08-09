@@ -11,6 +11,5 @@ api_proto_package(
         "//envoy/extensions/filters/http/ext_proc/v3:pkg",
         "//envoy/type/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
-        "@com_github_cncf_udpa//xds/annotations/v3:pkg",
     ],
 )

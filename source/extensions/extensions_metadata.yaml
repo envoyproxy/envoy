@@ -342,6 +342,13 @@ envoy.filters.http.gcp_authn:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig
+envoy.filters.http.grpc_field_extraction:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.grpc_field_extraction.v3.GrpcFieldExtractionConfig
 envoy.filters.http.grpc_http1_bridge:
   categories:
   - envoy.filters.http
@@ -399,6 +406,13 @@ envoy.filters.http.ip_tagging:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+envoy.filters.http.json_to_metadata:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata
 envoy.filters.http.jwt_authn:
   categories:
   - envoy.filters.http
@@ -1221,6 +1235,11 @@ envoy.upstreams.http.tcp:
   - envoy.upstreams
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.upstreams.http.udp:
+  categories:
+  - envoy.upstreams
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
 envoy.upstreams.tcp.generic:
   categories:
   - envoy.upstreams

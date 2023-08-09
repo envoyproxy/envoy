@@ -25,6 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.tls]
 // The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.
 
+// [#next-free-field: 6]
 message UpstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.UpstreamTlsContext";
@@ -53,6 +54,13 @@ message UpstreamTlsContext {
   //
   // Defaults to 1, setting this to 0 disables session resumption.
   google.protobuf.UInt32Value max_session_keys = 4;
+
+  // This field is used to control the enforcement, whereby the handshake will fail if the keyUsage extension
+  // is present and incompatible with the TLS usage. Currently, the default value is false (i.e., enforcement off)
+  // but it is expected to be changed to true by default in a future release.
+  // ``ssl.was_key_usage_invalid`` in :ref:`listener metrics <config_listener_stats>` will be set for certificate
+  // configurations that would fail if this option were set to true.
+  google.protobuf.BoolValue enforce_rsa_key_usage = 5;
 }
 
 // [#next-free-field: 10]

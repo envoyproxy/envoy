@@ -22,6 +22,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/access_log/access_log_impl.h"
@@ -265,7 +266,8 @@ public:
           server_factory_ctx, context.initManager(), context.scope());
       Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
-          helper(*filter_config_provider_manager, server_factory_ctx, *upstream_ctx_, prefix);
+          helper(*filter_config_provider_manager, server_factory_ctx, context.clusterManager(),
+                 *upstream_ctx_, prefix);
       helper.processFilters(upstream_http_filters, "router upstream http", "router upstream http",
                             upstream_http_filter_factories_);
     }
@@ -447,6 +449,9 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection().ptr();
   }
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &callbacks_->streamInfo();
+  }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
@@ -561,7 +566,7 @@ public:
   const FilterStats& stats() { return stats_; }
 
 protected:
-  void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
+  void setRetryShadowBufferLimit(uint32_t retry_shadow_buffer_limit) {
     ASSERT(retry_shadow_buffer_limit_ > retry_shadow_buffer_limit);
     retry_shadow_buffer_limit_ = retry_shadow_buffer_limit;
   }

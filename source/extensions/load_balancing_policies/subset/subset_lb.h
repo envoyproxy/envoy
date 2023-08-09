@@ -13,6 +13,7 @@
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/macros.h"
@@ -291,6 +292,9 @@ public:
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
     }
+    const StreamInfo::StreamInfo* requestStreamInfo() const override {
+      return wrapped_->requestStreamInfo();
+    }
     const Http::RequestHeaderMap* downstreamHeaders() const override {
       return wrapped_->downstreamHeaders();
     }
@@ -461,9 +465,6 @@ private:
   void processSubsets(uint32_t priority, const HostVector& all_hosts);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
-  HostConstSharedPtr
-  tryChooseHostFromMetadataMatchCriteriaSingle(const Router::MetadataMatchCriteria& match_criteria,
-                                               bool& host_chosen);
 
   absl::optional<SubsetSelectorFallbackParamsRef>
   tryFindSelectorFallbackParams(LoadBalancerContext* context);

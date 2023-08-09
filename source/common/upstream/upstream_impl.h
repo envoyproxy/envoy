@@ -346,11 +346,10 @@ public:
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority, time_source),
-        disable_active_health_check_(health_check_config.disable_active_health_check()),
-        health_status_(health_status) {
+        disable_active_health_check_(health_check_config.disable_active_health_check()) {
     // This EDS flags setting is still necessary for stats, configuration dump, canonical
     // coarseHealth() etc.
-    setEdsHealthFlag(health_status);
+    HostImpl::setEdsHealthStatus(health_status);
     HostImpl::weight(initial_weight);
   }
 
@@ -379,6 +378,8 @@ public:
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) final { health_flags_ |= enumToInt(flag); }
+  uint32_t healthFlagsGetAll() const override { return health_flags_; }
+  void healthFlagsSetAll(uint32_t bits) override { health_flags_ |= bits; }
 
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     setHealthCheckerImpl(std::move(health_checker));
@@ -395,36 +396,52 @@ public:
     // Evaluate active health status first.
 
     // Active unhealthy.
-    if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
-        healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK)) {
+    if (healthFlagsGet(enumToInt(HealthFlag::FAILED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::FAILED_OUTLIER_CHECK))) {
       return HealthStatus::UNHEALTHY;
     }
+
+    // Eds unhealthy.
+    if (eds_health_status_ == envoy::config::core::v3::UNHEALTHY ||
+        eds_health_status_ == envoy::config::core::v3::DRAINING ||
+        eds_health_status_ == envoy::config::core::v3::TIMEOUT) {
+      return eds_health_status_;
+    }
+
     // Active degraded.
     if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC)) {
       return HealthStatus::DEGRADED;
     }
 
-    // Use EDS status if no any active status.
-    return health_status_;
+    // Eds degraded or healthy.
+    return eds_health_status_;
   }
 
   Host::Health coarseHealth() const override {
     // If any of the unhealthy flags are set, host is unhealthy.
-    if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
-        healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
-        healthFlagGet(HealthFlag::FAILED_EDS_HEALTH)) {
+    if (healthFlagsGet(enumToInt(HealthFlag::FAILED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::FAILED_OUTLIER_CHECK) |
+                       enumToInt(HealthFlag::FAILED_EDS_HEALTH))) {
       return Host::Health::Unhealthy;
     }
 
     // If any of the degraded flags are set, host is degraded.
-    if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC) ||
-        healthFlagGet(HealthFlag::DEGRADED_EDS_HEALTH)) {
+    if (healthFlagsGet(enumToInt(HealthFlag::DEGRADED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::DEGRADED_EDS_HEALTH))) {
       return Host::Health::Degraded;
     }
 
     // The host must have no flags or be pending removal.
     ASSERT(health_flags_ == 0 || healthFlagGet(HealthFlag::PENDING_DYNAMIC_REMOVAL));
     return Host::Health::Healthy;
+  }
+
+  void setEdsHealthStatus(envoy::config::core::v3::HealthStatus eds_health_status) override {
+    eds_health_status_ = eds_health_status;
+    setEdsHealthFlag(eds_health_status);
+  }
+  Host::HealthStatus edsHealthStatus() const override {
+    return Host::HealthStatus(eds_health_status_.load());
   }
 
   uint32_t weight() const override { return weight_; }
@@ -445,6 +462,9 @@ protected:
                    HostDescriptionConstSharedPtr host);
 
 private:
+  // Helper function to check multiple health flags at once.
+  bool healthFlagsGet(uint32_t flags) const { return health_flags_ & flags; }
+
   void setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status);
 
   std::atomic<uint32_t> health_flags_{};
@@ -453,7 +473,7 @@ private:
   // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
-  HealthStatus health_status_{};
+  std::atomic<Host::HealthStatus> eds_health_status_{};
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImpl>& parent) : parent_(parent) {
@@ -787,8 +807,9 @@ public:
                   Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
                   Server::Configuration::TransportSocketFactoryContext&);
 
-  static LazyClusterTrafficStats generateStats(Stats::Scope& scope,
-                                               const ClusterTrafficStatNames& cluster_stat_names);
+  static DeferredCreationCompatibleClusterTrafficStats
+  generateStats(Stats::ScopeSharedPtr scope, const ClusterTrafficStatNames& cluster_stat_names,
+                bool defer_creation);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats
@@ -909,7 +930,9 @@ public:
   }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
-  LazyClusterTrafficStats& trafficStats() const override { return traffic_stats_; }
+  DeferredCreationCompatibleClusterTrafficStats& trafficStats() const override {
+    return traffic_stats_;
+  }
   ClusterConfigUpdateStats& configUpdateStats() const override { return config_update_stats_; }
   ClusterLbStats& lbStats() const override { return lb_stats_; }
   ClusterEndpointStats& endpointStats() const override { return endpoint_stats_; }
@@ -1054,7 +1077,7 @@ private:
   const float peekahead_ratio_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
-  mutable LazyClusterTrafficStats traffic_stats_;
+  mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
   mutable ClusterConfigUpdateStats config_update_stats_;
   mutable ClusterLbStats lb_stats_;
   mutable ClusterEndpointStats endpoint_stats_;
@@ -1076,7 +1099,8 @@ private:
       common_lb_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
-  std::vector<Network::FilterFactoryCb> filter_factories_;
+  Filter::NetworkFilterFactoriesList filter_factories_;
+  Filter::UpstreamNetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
