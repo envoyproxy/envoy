@@ -64,7 +64,7 @@ private:
     return !name.empty() ? name : info_->name();
   }
 
-  // Updates the internal data-structures with a given cluster load assignment.
+  // Updates the internal data structures with a given cluster load assignment.
   void update(const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
   // EdsResourceRemovalCallback

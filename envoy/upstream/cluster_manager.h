@@ -449,7 +449,7 @@ public:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) PURE;
 
   /**
-   * Returns an EdsResourcesCache that is unique for the cluster-manager.
+   * Returns an EdsResourcesCache that is unique for the cluster manager.
    */
   virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
 };

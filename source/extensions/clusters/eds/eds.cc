@@ -212,7 +212,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   }
 
   update(cluster_load_assignment);
-  // If previously used a cached version, remove the subscription form the cache's
+  // If previously used a cached version, remove the subscription from the cache's
   // callbacks.
   if (using_cached_resource_) {
     eds_resources_cache_->removeCallback(edsServiceName(), this);
@@ -325,7 +325,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
 
 void EdsClusterImpl::onCachedResourceRemoved(absl::string_view resource_name) {
   ASSERT(resource_name == edsServiceName());
-  // Disable time if previously started.
+  // Disable the timer if previously started.
   if (assignment_timeout_->enabled()) {
     assignment_timeout_->disableTimer();
     eds_resources_cache_->disableExpiryTimer(edsServiceName());
