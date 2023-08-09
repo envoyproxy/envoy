@@ -189,14 +189,20 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 }
 
 void StatsJsonRender::populateSupportedPercentiles() {
-  auto x100 = [](double fraction) -> std::string { return Json::Streamer::number(fraction * 100); };
-  auto view = [](const std::string& str) -> absl::string_view { return str; };
+  //auto x100 = [](double fraction) -> std::string { return Json::Streamer::number(fraction * 100); };
+  //auto view = [](const std::string& str) -> absl::string_view { return str; };
   Stats::HistogramStatisticsImpl empty_statistics;
   std::vector<double> supported = empty_statistics.supportedQuantiles();
-  std::vector<std::string> supported_strings;
-  std::vector<absl::string_view> views;
-  std::transform(supported.begin(), supported.end(), supported_strings.begin(), x100);
-  std::transform(supported_strings.begin(), supported_strings.end(), views.begin(), view);
+  std::vector<std::string> supported_strings(supported.size());
+  std::vector<absl::string_view> views(supported.size());
+  uint32_t i = 0;
+  for (double quantile : supported) {
+    supported_strings[i] = Json::Streamer::number(quantile * 100);
+    views[i] = supported_strings[i];
+    ++i;
+  }
+  //std::transform(supported.begin(), supported.end(), supported_strings.end(), x100);
+  //std::transform(supported_strings.begin(), supported_strings.end(), views.end(), view);
   json_streamer_.arrayEntries(views);
 }
 
@@ -208,6 +214,9 @@ void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogra
   ASSERT(totals.size() == min_size);
   ASSERT(intervals.size() == min_size);
   for (uint32_t i = 0; i < min_size; ++i) {
+    if (i != 0) {
+      array.newEntry();
+    }
     json_streamer_.mapEntries({{"cumulative", Json::Streamer::number(totals[i])},
                                {"interval", Json::Streamer::number(intervals[i])}});
   }

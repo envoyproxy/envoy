@@ -22,16 +22,16 @@ Streamer::Map& Streamer::newMap() {
 }
 
 void Streamer::mapEntries(const Map::Entries& entries) {
-  if (!levels_.empty()) {
+  /*  if (!levels_.empty()) {
     levels_.top()->newEntry();
-  }
+    }*/
   std::make_unique<Map>(*this)->newEntries(entries);
 }
 
 void Streamer::arrayEntries(const Array::Strings& strings) {
-  if (!levels_.empty()) {
+  /*  if (!levels_.empty()) {
     levels_.top()->newEntry();
-  }
+    }*/
   std::make_unique<Array>(*this)->newEntries(strings);
 }
 
