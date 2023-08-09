@@ -721,6 +721,8 @@ case $CI_TARGET in
         ;;
 
     verify_distro)
+        # this can be required if any python deps require compilation
+        setup_clang_toolchain
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
             PACKAGE_BUILD=/build/bazel.distribution/x64/packages.x64.tar.gz
         else
