@@ -656,7 +656,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // We won't be sending anything more to the stream after we
     // receive this message.
     ENVOY_LOG(debug, "Sending immediate response");
-    // TODO(tyxia) The logging here is needed for immediate response case because
+    // TODO(tyxia) For immediate response case here and below, logging is needed because
     // `onFinishProcessorCalls` is called after `closeStream` below.
     // Investigate to see if we can switch the order of those two so that the logging here can be
     // avoided.
@@ -695,6 +695,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
+    logGrpcStreamInfo();
     closeStream();
     onFinishProcessorCalls(processing_status.raw_code());
     ImmediateResponse invalid_mutation_response;
