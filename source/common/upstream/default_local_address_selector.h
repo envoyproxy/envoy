@@ -12,6 +12,10 @@ namespace Upstream {
 
 /**
  * Default implementation of UpstreamLocalAddressSelector.
+ *
+ * See :ref:`DefaultLocalAddressSelector
+ * <envoy_v3_api_msg_config.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`
+ * for a description of the behavior of this implementation.
  */
 class DefaultUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:

@@ -26,11 +26,6 @@ public:
     return std::make_unique<
         envoy::config::upstream::local_address_selector::v3::DefaultLocalAddressSelector>();
   }
-
-private:
-  void
-  validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_local_addresses,
-           absl::optional<std::string> cluster_name) const;
 };
 
 DECLARE_FACTORY(DefaultUpstreamLocalAddressSelectorFactory);

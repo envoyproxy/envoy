@@ -776,3 +776,18 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "local_address_selector_integration_test",
+    size = "large",
+    srcs = ["local_address_selector_integration_test.cc"],
+    deps = [
+        "//test/integration:http_integration_lib",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)

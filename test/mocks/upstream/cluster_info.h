@@ -82,6 +82,20 @@ public:
   Network::Address::InstanceConstSharedPtr& address_;
 };
 
+class MockUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
+public:
+  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, createLocalAddressSelector,
+              (std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
+               absl::optional<std::string> cluster_name),
+              (const));
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Empty>();
+  }
+
+  std::string name() const override { return "mock.upstream.local.address.selector"; }
+};
+
 class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();

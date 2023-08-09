@@ -8,11 +8,9 @@ namespace Upstream {
 namespace {
 constexpr absl::string_view kDefaultLocalAddressSelectorName =
     "envoy.upstream.local_address_selector.default_local_address_selector";
-} // namespace
 
-void DefaultUpstreamLocalAddressSelectorFactory::validate(
-    const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_local_addresses,
-    absl::optional<std::string> cluster_name) const {
+void validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_local_addresses,
+              absl::optional<std::string> cluster_name) {
 
   if (upstream_local_addresses.size() == 0) {
     throw EnvoyException(fmt::format("{}'s upstream binding config has no valid source address.",
@@ -53,6 +51,8 @@ void DefaultUpstreamLocalAddressSelectorFactory::validate(
     }
   }
 }
+
+} // namespace
 
 std::string DefaultUpstreamLocalAddressSelectorFactory::name() const {
   return std::string(kDefaultLocalAddressSelectorName);
