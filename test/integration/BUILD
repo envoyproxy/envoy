@@ -2467,7 +2467,7 @@ envoy_cc_test(
     srcs = [
         "default_header_validator_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],

@@ -284,6 +284,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
+# Json to metadata
+/*/extensions/filters/http/json_to_metadata @JuniorHsu @kbaichoo
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter

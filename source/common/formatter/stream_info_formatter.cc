@@ -201,6 +201,7 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     return absl::nullopt;
   }
 
+#ifdef ENVOY_ENABLE_FULL_PROTOS
   std::string value;
   const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
   if (!status.ok()) {
@@ -211,6 +212,10 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
 
   SubstitutionFormatUtils::truncate(value, max_length_);
   return value;
+#else
+  PANIC("FilterStateFormatter::format requires full proto support");
+  return absl::nullopt;
+#endif
 }
 
 ProtobufWkt::Value

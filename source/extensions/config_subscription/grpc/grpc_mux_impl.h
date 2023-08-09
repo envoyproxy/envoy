@@ -26,6 +26,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_stream.h"
 
 #include "absl/container/node_hash_map.h"
@@ -40,13 +41,7 @@ class GrpcMuxImpl : public GrpcMux,
                     public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
-              Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-              BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
-              XdsResourcesDelegateOptRef xds_resources_delegate,
-              EdsResourcesCachePtr eds_resources_cache, const std::string& target_xds_authority);
+  GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
 
   ~GrpcMuxImpl() override;
 
@@ -123,10 +118,7 @@ private:
       if (!resources_.empty()) {
         parent_.queueDiscoveryRequest(type_url_);
         if (eds_resources_cache_.has_value()) {
-          // All resources are to be removed, so remove them from the cache.
-          for (const auto& resource_name : resources_) {
-            eds_resources_cache_->removeResource(resource_name);
-          }
+          removeResourcesFromCache(resources_);
         }
       }
     }
@@ -173,16 +165,38 @@ private:
           });
       if (eds_resources_cache_.has_value()) {
         // Compute the removed resources and remove them from the cache.
-        std::vector<std::string> removed_resources;
+        std::set<std::string> removed_resources;
         std::set_difference(previous_resources.begin(), previous_resources.end(),
                             resources_.begin(), resources_.end(),
-                            std::back_inserter(removed_resources));
-        for (const auto& resource_name : removed_resources) {
-          eds_resources_cache_->removeResource(resource_name);
-        }
+                            std::inserter(removed_resources, removed_resources.begin()));
+        removeResourcesFromCache(removed_resources);
       }
       // move this watch to the beginning of the list
       iter_ = watches_.emplace(watches_.begin(), this);
+    }
+
+    void removeResourcesFromCache(const std::set<std::string>& resources_to_remove) {
+      ASSERT(eds_resources_cache_.has_value());
+      // Iterate over the resources to remove, and if no other watcher
+      // registered for that resource, remove it from the cache.
+      for (const auto& resource_name : resources_to_remove) {
+        // Counts the number of watchers that watch the resource.
+        uint32_t resource_watchers_count = 0;
+        for (const auto& watch : watches_) {
+          // Skip the current watcher as it is intending to remove the resource.
+          if (watch == this) {
+            continue;
+          }
+          if (watch->resources_.find(resource_name) != watch->resources_.end()) {
+            resource_watchers_count++;
+          }
+        }
+        // Other than "this" watcher, the resource is not watched by any other
+        // watcher, so it can be removed.
+        if (resource_watchers_count == 0) {
+          eds_resources_cache_->removeResource(resource_name);
+        }
+      }
     }
 
     using WatchList = std::list<GrpcMuxWatchImpl*>;
