@@ -96,10 +96,11 @@ protected:
         server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
       }
 
+      const std::string valid_grpc_cluster_name = "ext_proc_server_0";
       if (config_option.valid_grpc_server) {
         // Load configuration of the server from YAML and use a helper to add a grpc_service
         // stanza pointing to the cluster that we just made
-        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server_0",
+        setGrpcService(*proto_config_.mutable_grpc_service(), valid_grpc_cluster_name,
                        grpc_upstreams_[0]->localAddress());
       } else {
         // Set up the gRPC service with wrong cluster name and address.
@@ -114,12 +115,13 @@ protected:
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
 
-      // Add logging test filter only 1) in Envoy gRPC and 2) `add_logging_filter` is true.
+      // Add logging test filter only in Envoy gRPC mode.
       // gRPC side stream logging is only supported in Envoy gRPC mode at the moment.
-      if (clientType() == Grpc::ClientType::EnvoyGrpc && config_option.add_logging_filter) {
+      if (clientType() == Grpc::ClientType::EnvoyGrpc && config_option.add_logging_filter &&
+          config_option.valid_grpc_server) {
         test::integration::filters::LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id(ext_proc_filter_name);
-        logging_filter_config.set_upstream_cluster_name(grpc_cluster_name);
+        logging_filter_config.set_upstream_cluster_name(valid_grpc_cluster_name);
         envoy::config::listener::v3::Filter logging_filter;
         logging_filter.set_name("logging-test-filter");
         logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
@@ -477,20 +479,6 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// Test the filter connecting to an invalid ext_proc server that will result in open stream failure.
-TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidSever) {
-  ConfigOptions config_option = {};
-  config_option.add_logging_filter = true;
-  initializeConfig(config_option);
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-  ProcessingRequest request_headers_msg;
-  // Failure is expected when it is connecting to invalid gRPC server. Therefore, default timeout
-  // is not used here.
-  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
-                                                         std::chrono::milliseconds(25000)));
-}
-
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by returning a failure before the first stream response can be sent.
@@ -504,6 +492,34 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   // Fail the stream immediately
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
   verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithLogging) {
+  ConfigOptions config_option = {};
+  config_option.add_logging_filter = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  // Fail the stream immediately
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
+  verifyDownstreamResponse(*response, 500);
+}
+
+// Test the filter connecting to an invalid ext_proc server that will result in open stream failure.
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidSever) {
+  ConfigOptions config_option = {};
+  config_option.valid_grpc_server = false;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  ProcessingRequest request_headers_msg;
+  // Failure is expected when it is connecting to invalid gRPC server. Therefore, default timeout
+  // is not used here.
+  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
+                                                         std::chrono::milliseconds(25000)));
 }
 
 // Test the filter using the default configuration by connecting to
