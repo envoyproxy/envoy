@@ -673,7 +673,7 @@ void ConnectionImpl::onReadReady() {
   uint64_t new_buffer_size = read_buffer_->length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
 
-  // The socket is closed immediately when receving RST.
+  // The socket is closed immediately when receiving RST.
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     if (Runtime::runtimeFeatureEnabled(
@@ -756,12 +756,12 @@ void ConnectionImpl::onWriteReady() {
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
-  // The socket is closed immediately when receving RST.
+  // The socket is closed immediately when receiving RST.
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.detect_and_raise_rst_tcp_connection")) {
-      // Desgard anything in the buffer.
+      // Discard anything in the buffer.
       ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);
       closeSocket(ConnectionEvent::RemoteReset);
       return;

@@ -1110,7 +1110,7 @@ TEST_P(ConnectionImplTest, RstCloseOnNotReadDisabledConnection) {
   setUpBasicConnection();
   connect(true);
 
-  // Conneciton is not readDisabled, and detect_early_close_ is true.
+  // Connection is not readDisabled, and detect_early_close_ is true.
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset))
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
 
@@ -1124,7 +1124,7 @@ TEST_P(ConnectionImplTest, RstCloseOnReadDisabledConnectionThenWrite) {
   setUpBasicConnection();
   connect(true);
 
-  // Conneciton is readDisabled, and detect_early_close_ is true.
+  // Connection is readDisabled, and detect_early_close_ is true.
   EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
             client_connection_->readDisable(true));
 
@@ -1132,7 +1132,7 @@ TEST_P(ConnectionImplTest, RstCloseOnReadDisabledConnectionThenWrite) {
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalReset));
   server_connection_->close(ConnectionCloseType::AbortReset);
 
-  // This the reset error is only trigerred by write event.
+  // This the reset error is only triggered by write event.
   // write error: Connection reset by peer, code: 9
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset))
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
@@ -1147,7 +1147,7 @@ TEST_P(ConnectionImplTest, RstCloseOnReadEarlyCloseDisabledThenWrite) {
   setUpBasicConnection();
   connect(true);
 
-  // Conneciton is readDisabled, and detect_early_close_ is false.
+  // Connection is readDisabled, and detect_early_close_ is false.
   client_connection_->detectEarlyCloseWhenReadDisabled(false);
   EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
             client_connection_->readDisable(true));
@@ -1156,7 +1156,7 @@ TEST_P(ConnectionImplTest, RstCloseOnReadEarlyCloseDisabledThenWrite) {
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalReset));
   server_connection_->close(ConnectionCloseType::AbortReset);
 
-  // This the reset error is only trigerred by write event.
+  // This the reset error is only triggered by write event.
   // write error: Connection reset by peer, code: 9
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset))
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
