@@ -172,8 +172,8 @@ public:
           "type.googleapis.com/test.integration.filters.AddHeaderFilterConfig");
       if (set_default_config) {
         auto default_configuration = test::integration::filters::AddHeaderFilterConfig();
-        default_configuration.set_header_key("default-key");
-        default_configuration.set_header_value("default-value");
+        default_configuration.set_header_key(header_key_);
+        default_configuration.set_header_value(header_default_value_);
         discovery->mutable_default_config()->PackFrom(default_configuration);
       }
 
@@ -362,6 +362,25 @@ public:
     }
   }
 
+  void sentRequestAndExpectHeaderValue(const std::string& header_value) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    IntegrationStreamDecoderPtr response =
+        codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    auto upstream_headers =
+        reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+    std::cout << *upstream_headers;
+    ASSERT_TRUE(upstream_headers != nullptr);
+    cleanupUpstreamAndDownstream();
+    auto header = upstream_headers->get(Http::LowerCaseString(header_key_));
+    ASSERT_FALSE(header.empty());
+    EXPECT_EQ(header_value, header[0]->value().getStringView());
+  }
+
+  const std::string header_key_ = "header-key";
+  const std::string header_default_value_ = "default-value";
+
   const std::string filter_name_ = "foo";
   bool two_ecds_filters_{false};
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
@@ -394,24 +413,37 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   registerTestServerPorts({"http"});
 
-  // Send 1st config update to have filter drain 5 bytes of data.
-  sendXdsResponse(filter_name_, "1", "test-header", "test-val");
+  // No config update yet, expect the default.
+  sentRequestAndExpectHeaderValue(header_default_value_);
+
+  // Send 1st config update.
+  sendXdsResponse(filter_name_, "1", header_key_, "test-val1");
   test_server_->waitForCounterGe(
       "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  sentRequestAndExpectHeaderValue("test-val1");
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  auto upstream_headers =
-      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
-  std::cout << *upstream_headers;
-  ASSERT_TRUE(upstream_headers != nullptr);
-  cleanupUpstreamAndDownstream();
-  auto header = upstream_headers->get(Http::LowerCaseString("test-header"));
-  ASSERT_FALSE(header.empty());
-  EXPECT_EQ("test-val", header[0]->value().getStringView());
+  // Send 2nd config update.
+  sendXdsResponse(filter_name_, "1", header_key_, "test-val2");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 2);
+  sentRequestAndExpectHeaderValue("test-val2");
+};
+
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarmingWithConfigFail) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  registerTestServerPorts({"http"});
+
+  // Send config update with invalid config (header value length has to >=2).
+  sendXdsResponse(filter_name_, "1", header_key_, "x");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_fail", 1);
+  sentRequestAndExpectHeaderValue(header_default_value_);
 };
 
 } // namespace

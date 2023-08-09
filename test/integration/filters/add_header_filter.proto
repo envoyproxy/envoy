@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package test.integration.filters;
 
+import "validate/validate.proto";
+
 message AddHeaderFilterConfig {
   string header_key = 1;
-  string header_value = 2;
+  string header_value = 2 [(validate.rules).string = {min_len: 2}];
 }
