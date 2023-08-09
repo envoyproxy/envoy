@@ -233,7 +233,7 @@ message Subset {
   // ``stage`` and ``version`` are matched because of the redundant key/value pair in the request
   // metadata.
   //
-  // By set this to true, only the necessary key/value pairs will be evaluated and redundant key/value
+  // By setting this to true, only the necessary key/value pairs will be evaluated and redundant key/value
   // pairs will be ignored. Take the above example, if the request metadata is ``{"redundant-key": "any",
   // "stage": "prod", "version": "v1"}``, the subset lb will keep the ``{"stage": "prod", "version": "v1"}``
   // as the request metadata for the evaluation. If the request metadata is ``{"redundant-key": "any",
