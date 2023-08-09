@@ -705,7 +705,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
   ENVOY_LOG(debug, "Received gRPC error on stream: {}", status);
-
   stats_.streams_failed_.inc();
 
   if (processing_complete_) {

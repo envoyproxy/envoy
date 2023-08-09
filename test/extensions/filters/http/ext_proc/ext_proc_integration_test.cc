@@ -476,6 +476,20 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Test the filter connecting to an invalid ext_proc server that will result in open stream failure.
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidSever) {
+  ConfigOptions config_option = {};
+  config_option.add_logging_filter = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  ProcessingRequest request_headers_msg;
+  // Failure is expected when it is connecting to invalid gRPC server. Therefore, default timeout
+  // is not used here.
+  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
+                                                         std::chrono::milliseconds(25000)));
+}
+
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by returning a failure before the first stream response can be sent.
