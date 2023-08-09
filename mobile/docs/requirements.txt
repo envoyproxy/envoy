@@ -828,6 +828,7 @@ sphinx==7.1.2 \
     #   sphinxcontrib-googleanalytics
     #   sphinxcontrib-httpdomain
     #   sphinxcontrib-jquery
+    #   sphinxcontrib-qthelp
     #   sphinxext-rediraffe
 sphinx-copybutton==0.5.2 \
     --hash=sha256:4cf17c82fb9646d1bc9ca92ac280813a3b605d8c421225fd9913154103ee1fbd \
@@ -875,9 +876,9 @@ sphinxcontrib-jsmath==1.0.1 \
     # via
     #   -r requirements.in
     #   sphinx
-sphinxcontrib-qthelp==1.0.3 \
-    --hash=sha256:4c33767ee058b70dba89a6fc5c1892c0d57a54be67ddd3e7875a18d14cba5a72 \
-    --hash=sha256:bd9fc24bcb748a8d51fd4ecaade681350aa63009a347a8c14e637895444dfab6
+sphinxcontrib-qthelp==1.0.4 \
+    --hash=sha256:82f0871fb042efa309ee8c7929d228ed5c4be478d9914492b4bad5bfa469c160 \
+    --hash=sha256:f0a1c141420499af2f1a1ff438f9fc910a3548f7a82a1169d9efcc674fcf79c6
     # via
     #   -r requirements.in
     #   sphinx
