@@ -384,7 +384,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, UpstreamHttpExtensionDiscoveryIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
-TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccess) {
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, true);
   addCodecFilter();
@@ -400,7 +400,6 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccess) {
       "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
