@@ -362,20 +362,37 @@ public:
     }
   }
 
-  void sentRequestAndExpectHeaderValue(const std::string& header_value) {
+  void assertHeaders(std::unique_ptr<Http::TestRequestHeaderMapImpl>& headers) {
+    std::cout << *headers;
+    ASSERT_TRUE(headers != nullptr);
+  }
+
+  void assertResponse(IntegrationStreamDecoderPtr& response) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+  }
+
+  std::unique_ptr<Http::RequestHeaderMap> sentRequestAndGetHeaders() {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_TRUE(response->complete());
+    assertResponse(response);
     auto upstream_headers =
         reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
-    std::cout << *upstream_headers;
-    ASSERT_TRUE(upstream_headers != nullptr);
+    assertHeaders(upstream_headers);
     cleanupUpstreamAndDownstream();
-    auto header = upstream_headers->get(Http::LowerCaseString(header_key_));
+    return upstream_headers;
+  }
+
+  void expectHeaderKeyAndValue(std::unique_ptr<Http::RequestHeaderMap>& headers, const std::string value) {
+    expectHeaderKeyAndValue(headers, header_key_, value);
+  }
+
+  void expectHeaderKeyAndValue(std::unique_ptr<Http::RequestHeaderMap>& headers, const std::string key,
+                               const std::string value) {
+    auto header = headers->get(Http::LowerCaseString(key));
     ASSERT_FALSE(header.empty());
-    EXPECT_EQ(header_value, header[0]->value().getStringView());
+    EXPECT_EQ(value, header[0]->value().getStringView());
   }
 
   const std::string header_key_ = "header-key";
@@ -413,20 +430,29 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   registerTestServerPorts({"http"});
 
-  // No config update yet, expect the default.
-  sentRequestAndExpectHeaderValue(header_default_value_);
+  {
+    // No config update yet, expect the default.
+    auto headers = sentRequestAndGetHeaders();
+    expectHeaderKeyAndValue(headers, header_default_value_);
+  }
 
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", header_key_, "test-val1");
   test_server_->waitForCounterGe(
       "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
-  sentRequestAndExpectHeaderValue("test-val1");
+  {
+    auto headers = sentRequestAndGetHeaders();
+    expectHeaderKeyAndValue(headers, "test-val1");
+  }
 
   // Send 2nd config update.
   sendXdsResponse(filter_name_, "1", header_key_, "test-val2");
   test_server_->waitForCounterGe(
       "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 2);
-  sentRequestAndExpectHeaderValue("test-val2");
+  {
+    auto headers = sentRequestAndGetHeaders();
+    expectHeaderKeyAndValue(headers, "test-val2");
+  }
 };
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarmingWithConfigFail) {
@@ -443,8 +469,70 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarmingWithCon
   sendXdsResponse(filter_name_, "1", header_key_, "x");
   test_server_->waitForCounterGe(
       "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_fail", 1);
-  sentRequestAndExpectHeaderValue(header_default_value_);
+  {
+    auto headers = sentRequestAndGetHeaders();
+    expectHeaderKeyAndValue(headers, header_default_value_);
+  }
 };
+
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(filter_name_, true);
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  registerTestServerPorts({"http"});
+
+  sendXdsResponse(filter_name_, "1", header_key_, "test-val");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  {
+    auto headers = sentRequestAndGetHeaders();
+    expectHeaderKeyAndValue(headers, "test-val,test-val");
+  }
+}
+
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName) {
+  two_ecds_filters_ = true;
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", true);
+  addDynamicFilter("bar", true, true, false, true);
+  addCodecFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  registerTestServerPorts({"http"});
+  {
+    auto headers = sentRequestAndGetHeaders();
+    expectHeaderKeyAndValue(headers, header_default_value_ + "," + header_default_value_);
+  }
+
+  // Send 1st config update.
+  sendXdsResponse("foo", "1", "header-key1", "test-val1");
+  sendXdsResponse("bar", "1", "header-key2", "test-val1", false, true);
+  test_server_->waitForCounterGe("extension_config_discovery.upstream_http_filter.foo.config_reload", 1);
+  test_server_->waitForCounterGe("extension_config_discovery.upstream_http_filter.bar.config_reload", 1);
+  {
+    auto headers = sentRequestAndGetHeaders();
+    expectHeaderKeyAndValue(headers, "header-key1", "test-val1");
+    expectHeaderKeyAndValue(headers, "header-key2", "test-val1");
+  }
+
+  // Send 2nd config update.
+  sendXdsResponse("foo", "2", "header-key1", "test-val2");
+  sendXdsResponse("bar", "2", "header-key2", "test-val2", false, true);
+  test_server_->waitForCounterGe("extension_config_discovery.upstream_http_filter.foo.config_reload", 2);
+  test_server_->waitForCounterGe("extension_config_discovery.upstream_http_filter.bar.config_reload", 2);
+  {
+    auto headers = sentRequestAndGetHeaders();
+    expectHeaderKeyAndValue(headers, "header-key1", "test-val2");
+    expectHeaderKeyAndValue(headers, "header-key2", "test-val2");
+  }
+}
 
 } // namespace
 } // namespace Envoy

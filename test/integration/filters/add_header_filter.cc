@@ -50,7 +50,7 @@ public:
   AddConfigurableHeaderFilter() = default;
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    headers.addCopy(Http::LowerCaseString(header_key_), header_value_);
+    headers.appendCopy(Http::LowerCaseString(header_key_), header_value_);
     return Http::FilterHeadersStatus::Continue;
   }
 
