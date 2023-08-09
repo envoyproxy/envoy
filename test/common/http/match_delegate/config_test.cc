@@ -411,12 +411,12 @@ TEST(DelegatingFilterTest, MatchTreeOnNoMatchSkipActionDecodingHeaders) {
   delegating_filter->decodeComplete();
 }
 
-// Test that the DelegatingStreamFilter is skipped when runtime flag is disabled.
+// Test that the DelegatingStreamFilter is skipped when runtime flag is set to false.
 TEST(DelegatingFilterTest, MatchTreeDecodingHeadersSkippedWithRuntimeFlag) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_extension_with_matcher", "false"}});
-  // The filter is added, but will be skipped since the runtime flag above is disabled.
+  // The filter is added, but will be skipped since the runtime flag above is false.
   std::shared_ptr<Envoy::Http::MockStreamDecoderFilter> decoder_filter(
       new Envoy::Http::MockStreamDecoderFilter());
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks;
