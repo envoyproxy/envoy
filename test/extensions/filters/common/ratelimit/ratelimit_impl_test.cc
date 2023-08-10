@@ -168,7 +168,8 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
   client_.cancel();
 }
 
-TEST_F(RateLimitGrpcClientTest, WeightedRequest) {
+// Makes request with hits_addend > 0.
+TEST_F(RateLimitGrpcClientTest, RequestWithHitsAddend) {
   std::unique_ptr<envoy::service::ratelimit::v3::RateLimitResponse> response;
   envoy::service::ratelimit::v3::RateLimitRequest request;
   Http::TestRequestHeaderMapImpl headers;
