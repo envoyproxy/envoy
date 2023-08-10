@@ -62,7 +62,7 @@ private:
   void HandleWarning(quiche::BalsaFrameEnums::ErrorCode error_code) override;
 
   // Shared implementation for ProcessHeaders() and ProcessTrailers().
-  void processHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers);
+  void validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers, bool trailers);
 
   // Return ParserStatus::Error if `result` is CallbackResult::Error.
   // Return current value of `status_` otherwise.
@@ -75,6 +75,7 @@ private:
 
   const MessageType message_type_ = MessageType::Request;
   ParserCallbacks* connection_ = nullptr;
+  const bool enable_trailers_ = false;
   const bool allow_custom_methods_ = false;
   bool first_byte_processed_ = false;
   bool headers_done_ = false;

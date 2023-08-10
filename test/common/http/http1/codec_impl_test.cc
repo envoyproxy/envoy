@@ -188,7 +188,7 @@ public:
   void testRequestHeadersExceedLimit(std::string header_string, std::string error_message,
                                      absl::string_view details);
   void testTrailersExceedLimit(std::string trailer_string, std::string error_message,
-                               bool enable_trailers);
+                               bool enable_trailers, bool expect_error);
   void testRequestHeadersAccepted(std::string header_string);
   // Used to test if trailers are decoded/encoded
   void expectTrailersTest(bool enable_trailers);
@@ -337,7 +337,8 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
 
 void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_string,
                                                             std::string error_message,
-                                                            bool enable_trailers) {
+                                                            bool enable_trailers,
+                                                            bool expect_error) {
   initialize();
   // Make a new 'codec' with the right settings
   codec_settings_.enable_trailers_ = enable_trailers;
@@ -349,7 +350,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  if (enable_trailers) {
+  if (expect_error) {
     EXPECT_CALL(decoder, decodeHeaders_(_, false));
     EXPECT_CALL(decoder, decodeData(_, false));
   } else {
@@ -365,7 +366,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
   buffer = Buffer::OwnedImpl(trailer_string);
-  if (enable_trailers) {
+  if (expect_error) {
     EXPECT_CALL(decoder, sendLocalReply(Http::Code::RequestHeaderFieldsTooLarge,
                                         "Request Header Fields Too Large", _, _, _));
     status = codec_->dispatch(buffer);
@@ -1171,69 +1172,6 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
-}
-
-TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailersIgnored) {
-  if (parser_impl_ == Http1ParserImpl::HttpParser) {
-    // HttpParser signals error even if `enable_trailers_` is false.
-    return;
-  }
-
-  initialize();
-  StrictMock<MockRequestDecoder> decoder;
-
-  // First request contains invalid trailers.
-  // Trailers are ignored by default, therefore processing can continue.
-  {
-    Buffer::OwnedImpl buffer("POST /foobar HTTP/1.1\r\n"
-                             "Host: www.somewhere.com\r\n"
-                             "connection: keep-alive\r\n"
-                             "Transfer-Encoding: chunked\r\n\r\n"
-                             "5\r\ndata1\r\n"
-                             "0\r\n"
-                             "invalid-trailer\r\n\r\n");
-
-    Http::ResponseEncoder* response_encoder = nullptr;
-    EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-          response_encoder = &encoder;
-          return decoder;
-        }));
-
-    EXPECT_CALL(decoder, decodeHeaders_(_, false));
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual("data1"), false));
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
-
-    auto status = codec_->dispatch(buffer);
-    EXPECT_TRUE(status.ok());
-
-    std::string output;
-    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
-    TestResponseHeaderMapImpl headers{{":status", "200"}};
-    response_encoder->encodeHeaders(headers, true);
-    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
-  }
-
-  testing::Mock::VerifyAndClearExpectations(&decoder);
-
-  // Second request is successfully parsed.
-  {
-    Buffer::OwnedImpl buffer("POST /foobar HTTP/1.1\r\n"
-                             "Host: www.somewhere.com\r\n"
-                             "connection: keep-alive\r\n"
-                             "Transfer-Encoding: chunked\r\n\r\n"
-                             "5\r\ndata2\r\n"
-                             "0\r\n\r\n");
-
-    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-    EXPECT_CALL(decoder, decodeHeaders_(_, false));
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual("data2"), false));
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
-
-    auto status = codec_->dispatch(buffer);
-    EXPECT_TRUE(status.ok());
-  }
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
@@ -3317,14 +3255,14 @@ TEST_P(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
 TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
-  testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
+  testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit", true,
                           true);
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
   // Construct partial headers with a long field name that exceeds the default limit of 60KiB.
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q');
-  testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
+  testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit", true,
                           true);
 }
 
@@ -3332,28 +3270,28 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
 TEST_P(Http1ServerConnectionImplTest, ManyTrailersRejected) {
   // Send a request with 101 headers.
   testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n",
-                          "http/1.1 protocol error: trailers count exceeds limit", true);
+                          "http/1.1 protocol error: trailers count exceeds limit", true, true);
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
   testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
-                          false);
+                          false, /* expect_error = */ parser_impl_ == Http1ParserImpl::BalsaParser);
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejectedIgnored) {
   // Default limit of 60 KiB
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q') + ": value\r\n\r\n\r\n";
   testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
-                          false);
+                          false, /* expect_error = */ parser_impl_ == Http1ParserImpl::BalsaParser);
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_P(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
   // Send a request with 101 headers.
   testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n",
-                          "http/1.1 protocol error: trailers count exceeds limit", false);
+                          "http/1.1 protocol error: trailers count exceeds limit", false, false);
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
@@ -4820,6 +4758,54 @@ TEST_P(Http1ServerConnectionImplTest, Char22InHeaderValue) {
   auto status = codec_->dispatch(buffer);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+}
+
+TEST_P(Http1ClientConnectionImplTest, MalformedTrailerLine) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("foo"), false));
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "transfer-encoding: chunked\r\n"
+                             "\r\n"
+                             "3\r\n"
+                             "foo\r\n"
+                             "0\r\n"
+                             "invalid-trailer-line\r\n\r\n");
+
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+}
+
+TEST_P(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("foo"), false));
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "transfer-encoding: chunked\r\n"
+                             "\r\n"
+                             "3\r\n"
+                             "foo\r\n"
+                             "0\r\n"
+                             "föö: bar\r\n\r\n");
+
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
 } // namespace Http
