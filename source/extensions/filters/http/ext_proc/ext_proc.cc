@@ -206,7 +206,9 @@ void Filter::onDestroy() {
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
+                                      Http::RequestOrResponseHeaderMap& headers, 
+                                      bool end_stream,
+                                      absl::optional<google::protobuf::Struct> proto) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -224,6 +226,9 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
+  if (proto.has_value()) {
+    (*headers_req->mutable_attributes())[FilterName] = proto.value();
+  }
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -231,6 +236,44 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   stats_.stream_msgs_sent_.inc();
   state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
+}
+
+const absl::optional<google::protobuf::Struct> 
+Filter::evaluateAttributes(Filters::Common::Expr::ActivationPtr activation, 
+                     const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>& expr) {
+  absl::optional<google::protobuf::Struct> proto;
+  if (expr.size() > 0) {
+    proto.emplace(google::protobuf::Struct{});
+    for (const auto& hash_entry: expr) {
+      ProtobufWkt::Arena arena;
+      const auto result = hash_entry.second.get()->Evaluate(*activation, &arena);
+      if (!result.ok()) {
+        // TODO: Stats?
+        continue;
+      }
+
+      if (result.value().IsError()) {
+        ENVOY_LOG(trace, "error parsing cel expression {}", hash_entry.first);
+        continue;
+      }
+
+      google::protobuf::Value value;
+      switch (result.value().type()) {
+      case google::api::expr::runtime::CelValue::Type::kBool:
+        value.set_bool_value(result.value().BoolOrDie());
+      case google::api::expr::runtime::CelValue::Type::kNullType:
+        value.set_null_value(google::protobuf::NullValue{});
+      case google::api::expr::runtime::CelValue::Type::kDouble:
+        value.set_number_value(result.value().DoubleOrDie());
+      default:
+        value.set_string_value(Filters::Common::Expr::print(result.value()));
+      }
+
+      (*(proto.value()).mutable_fields())[hash_entry.first] = value;
+    }
+  }
+
+  return proto;
 }
 
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
@@ -245,7 +288,10 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     return FilterHeadersStatus::Continue;
   }
 
-  const auto status = onHeaders(decoding_state_, headers, end_stream);
+  auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(), &headers, nullptr, nullptr);
+  auto proto = evaluateAttributes(std::move(activation_ptr), config_->request_expr());
+
+  const auto status = onHeaders(decoding_state_, headers, end_stream, proto);
   ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
   return status;
 }
@@ -524,7 +570,10 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     return FilterHeadersStatus::Continue;
   }
 
-  const auto status = onHeaders(encoding_state_, headers, end_stream);
+  auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(), nullptr, &headers, nullptr);
+  auto proto = evaluateAttributes(std::move(activation_ptr), config_->response_expr());
+
+  const auto status = onHeaders(encoding_state_, headers, end_stream, proto);
   ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
   return status;
 }

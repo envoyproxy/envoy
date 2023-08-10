@@ -165,6 +165,8 @@ public:
   virtual envoy::service::ext_proc::v3::HttpTrailers*
   mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
 
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
@@ -276,6 +278,10 @@ public:
   void requestWatermark() override;
   void clearWatermark() override;
 
+  StreamInfo::StreamInfo& streamInfo() override {
+    return decoder_callbacks_->streamInfo();
+  }
+
 private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
@@ -348,6 +354,11 @@ public:
 
   void requestWatermark() override;
   void clearWatermark() override;
+
+
+  StreamInfo::StreamInfo& streamInfo() override {
+    return encoder_callbacks_->streamInfo();
+  }
 
 private:
   void setProcessingModeInternal(

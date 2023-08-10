@@ -456,7 +456,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
 }
 
 // Test the filter connecting to an invalid ext_proc server that will result in open stream failure.
-TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidSever) {
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidServer) {
   initializeConfig(/*valid_grpc_server=*/false);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -2781,6 +2781,43 @@ TEST_P(ExtProcIntegrationTest, SkipHeaderTrailerSendBodyClientSendAll) {
     return true;
   });
   handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// by requesting to modify the request headers.
+TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_request_attributes()->Add("request.path");
+  proto_config_.mutable_request_attributes()->Add("request.method");
+  proto_config_.mutable_request_attributes()->Add("request.scheme");
+  proto_config_.mutable_response_attributes()->Add("response.code");
+  
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& req, HeadersResponse&) {
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
+        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
+        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
+        return true;
+      });
+
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& req, HeadersResponse&) {
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("response.code").string_value(), "200");
+        return true;
+      });
+
   verifyDownstreamResponse(*response, 200);
 }
 

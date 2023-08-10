@@ -71,7 +71,7 @@ protected:
       (*cb)(proto_config);
     }
     config_.reset(new FilterConfig(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
-                                   *stats_store_.rootScope(), ""));
+                                   *stats_store_.rootScope(), "", std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr))));
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);

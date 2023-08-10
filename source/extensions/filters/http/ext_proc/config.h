@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
