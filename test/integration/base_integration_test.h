@@ -188,10 +188,11 @@ public:
       const std::string& expected_error_message = "");
 
   template <class T>
-  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
-                             const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version,
-                             const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata = {}) {
+  void
+  sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
+                        const std::vector<T>& added_or_updated,
+                        const std::vector<std::string>& removed, const std::string& version,
+                        const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata = {}) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
         sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version, nullptr, metadata);
@@ -230,9 +231,10 @@ public:
     sendSotwDiscoveryResponse(type_url, messages, version, stream, {});
   }
   template <class T>
-  void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, FakeStream* stream,
-                                 const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
+  void
+  sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                            const std::string& version, FakeStream* stream,
+                            const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
     if (stream == nullptr) {
       stream = xds_stream_.get();
     }
