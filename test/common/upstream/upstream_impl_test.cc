@@ -4873,6 +4873,7 @@ class HostsWithLocalityImpl : public Event::TestUsingSimulatedTime, public testi
 
 // Validate HostsPerLocalityImpl constructors.
 TEST_F(HostsWithLocalityImpl, Cons) {
+
   {
     const HostsPerLocalityImpl hosts_per_locality;
     EXPECT_FALSE(hosts_per_locality.hasLocalLocality());
@@ -4880,8 +4881,12 @@ TEST_F(HostsWithLocalityImpl, Cons) {
   }
 
   MockClusterMockPrioritySet cluster;
-  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
-  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), zone_a, 1);
+  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), zone_b, 1);
 
   {
     std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
@@ -4902,8 +4907,12 @@ TEST_F(HostsWithLocalityImpl, Cons) {
 
 TEST_F(HostsWithLocalityImpl, Filter) {
   MockClusterMockPrioritySet cluster;
-  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
-  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), zone_a, 1);
+  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), zone_b, 1);
 
   {
     std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
@@ -4933,12 +4942,6 @@ public:
   LocalityWeightsConstSharedPtr locality_weights_;
   HostSetImpl host_set_{0, false, kDefaultOverProvisioningFactor};
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  HostVector hosts_{makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                    makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                    makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-                    makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
-                    makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
-                    makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
 };
 
 // When no locality weights belong to the host set, there's an empty pick.
@@ -4949,32 +4952,52 @@ TEST_F(HostSetImplLocalityTest, Empty) {
 
 // When no hosts are healthy we should fail to select a locality
 TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)};
+
   HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
+      makeHostsPerLocality({{hosts[0]}, {hosts[1]}, {hosts[2]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
-  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
-  host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality), locality_weights, {}, {},
-                        absl::nullopt);
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality), locality_weights,
+                        {}, {}, absl::nullopt);
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When a locality has endpoints that have not yet been warmed, weight calculation should ignore
 // these hosts.
 TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
-  // We have two localities with 3 hosts in L1, 2 hosts in L2. Two of the hosts in L1 are not
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:83", simTime(), zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:84", simTime(), zone_b)};
+
+  // We have two localities with 3 hosts in A, 2 hosts in B. Two of the hosts in A are not
   // warmed yet, so even though they are unhealthy we should not adjust the locality weight.
   HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{hosts_[0], hosts_[1], hosts_[2]}, {hosts_[3], hosts_[4]}});
+      makeHostsPerLocality({{hosts[0], hosts[1], hosts[2]}, {hosts[3], hosts[4]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
-  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
   HostsPerLocalitySharedPtr healthy_hosts_per_locality =
-      makeHostsPerLocality({{hosts_[0]}, {hosts_[3], hosts_[4]}});
+      makeHostsPerLocality({{hosts[0]}, {hosts[3], hosts[4]}});
   HostsPerLocalitySharedPtr excluded_hosts_per_locality =
-      makeHostsPerLocality({{hosts_[1], hosts_[2]}, {}});
+      makeHostsPerLocality({{hosts[1], hosts[2]}, {}});
 
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(
-          hosts, hosts_per_locality,
+          hosts_const_shared, hosts_per_locality,
           makeHostsFromHostsPerLocality<HealthyHostVector>(healthy_hosts_per_locality),
           healthy_hosts_per_locality, std::make_shared<const DegradedHostVector>(),
           HostsPerLocalityImpl::empty(),
@@ -4990,12 +5013,18 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
 
 // When a locality has zero hosts, it should be treated as if it has zero healthy.
 TEST_F(HostSetImplLocalityTest, EmptyLocality) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_a)};
+
   HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{hosts_[0], hosts_[1], hosts_[2]}, {}});
+      makeHostsPerLocality({{hosts[0], hosts[1], hosts[2]}, {}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
-  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
-  host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
-                                          std::make_shared<const HealthyHostVector>(*hosts),
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
+                                          std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
                         locality_weights, {}, {}, absl::nullopt);
   // Verify that we are not RRing between localities.
@@ -5005,11 +5034,18 @@ TEST_F(HostSetImplLocalityTest, EmptyLocality) {
 
 // When all locality weights are zero we should fail to select a locality.
 TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
-  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}});
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)};
+
+  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts[0]}, {hosts[1]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{0, 0}};
-  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
-  host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
-                                          std::make_shared<const HealthyHostVector>(*hosts),
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
+                                          std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
                         locality_weights, {}, {});
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
@@ -5017,12 +5053,22 @@ TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
 
 // When all locality weights are the same we have unweighted RR behavior.
 TEST_F(HostSetImplLocalityTest, Unweighted) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)};
+
   HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
+      makeHostsPerLocality({{hosts[0]}, {hosts[1]}, {hosts[2]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
-  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
-  host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
-                                          std::make_shared<const HealthyHostVector>(*hosts),
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
+                                          std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
                         locality_weights, {}, {}, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
@@ -5035,11 +5081,18 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
 
 // When locality weights differ, we have weighted RR behavior.
 TEST_F(HostSetImplLocalityTest, Weighted) {
-  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}});
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)};
+
+  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts[0]}, {hosts[1]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
-  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
-  host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
-                                          std::make_shared<const HealthyHostVector>(*hosts),
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
+                                          std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
                         locality_weights, {}, {}, absl::nullopt);
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
@@ -5052,12 +5105,22 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
 
 // Localities with no weight assignment are never picked.
 TEST_F(HostSetImplLocalityTest, MissingWeight) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)};
+
   HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
+      makeHostsPerLocality({{hosts[0]}, {hosts[1]}, {hosts[2]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 0, 1}};
-  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
-  host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
-                                          std::make_shared<const HealthyHostVector>(*hosts),
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
+                                          std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
                         locality_weights, {}, {}, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
@@ -5070,16 +5133,27 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
 
 // Gentle failover between localities as health diminishes.
 TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
-  const auto setHealthyHostCount = [this](uint32_t host_count) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:83", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:84", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:85", simTime(), zone_b)};
+
+  const auto setHealthyHostCount = [this, hosts](uint32_t host_count) {
     LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
-    HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality(
-        {{hosts_[0], hosts_[1], hosts_[2], hosts_[3], hosts_[4]}, {hosts_[5]}});
+    HostsPerLocalitySharedPtr hosts_per_locality =
+        makeHostsPerLocality({{hosts[0], hosts[1], hosts[2], hosts[3], hosts[4]}, {hosts[5]}});
     HostVector healthy_hosts;
     for (uint32_t i = 0; i < host_count; ++i) {
-      healthy_hosts.emplace_back(hosts_[i]);
+      healthy_hosts.emplace_back(hosts[i]);
     }
     HostsPerLocalitySharedPtr healthy_hosts_per_locality =
-        makeHostsPerLocality({healthy_hosts, {hosts_[5]}});
+        makeHostsPerLocality({healthy_hosts, {hosts[5]}});
 
     auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
     host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
@@ -5121,9 +5195,13 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
     HostSetImpl host_set(0, false, overprovisioning_factor);
     std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
     auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-    HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80", *time_source),
-                     makeTestHost(cluster_info, "tcp://127.0.0.1:81", *time_source),
-                     makeTestHost(cluster_info, "tcp://127.0.0.1:82", *time_source)};
+    envoy::config::core::v3::Locality zone_a;
+    zone_a.set_zone("A");
+    envoy::config::core::v3::Locality zone_b;
+    zone_b.set_zone("B");
+    HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80", *time_source, zone_a),
+                     makeTestHost(cluster_info, "tcp://127.0.0.1:81", *time_source, zone_a),
+                     makeTestHost(cluster_info, "tcp://127.0.0.1:82", *time_source, zone_b)};
     LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
     HostsPerLocalitySharedPtr hosts_per_locality =
         makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2]}});
@@ -5163,11 +5241,15 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
 TEST(HostPartitionTest, PartitionHosts) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:81", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:82", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:83", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source)};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", *time_source, zone_a),
+                   makeTestHost(info, "tcp://127.0.0.1:81", *time_source, zone_a),
+                   makeTestHost(info, "tcp://127.0.0.1:82", *time_source, zone_b),
+                   makeTestHost(info, "tcp://127.0.0.1:83", *time_source, zone_b),
+                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b)};
 
   hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
@@ -5259,6 +5341,87 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
 
   EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
   cluster->info()->createFilterChain(manager);
+}
+
+class PriorityStateManagerTest : public Event::TestUsingSimulatedTime,
+                                 public testing::Test,
+                                 public UpstreamImplTestBase {};
+
+TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
+  server_context_.local_info_.node_.mutable_locality()->CopyFrom(zone_a);
+
+  // Construct cluster to use for updates
+  const std::string cluster_yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - locality:
+              zone: B
+            lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 80
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(cluster_yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  StaticClusterImpl cluster(cluster_config, factory_context);
+  cluster.initialize([] {});
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // Make priority state manager and fill it with the initial state of the cluster and the added
+  // hosts
+  PriorityStateManager priority_state_manager(cluster, server_context_.local_info_, nullptr);
+
+  auto current_hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  HostVector hosts_added{makeTestHost(cluster.info(), "tcp://127.0.0.1:81", simTime(), zone_b),
+                         makeTestHost(cluster.info(), "tcp://127.0.0.1:82", simTime(), zone_a)};
+
+  envoy::config::endpoint::v3::LocalityLbEndpoints zone_a_endpoints;
+  zone_a_endpoints.mutable_locality()->CopyFrom(zone_a);
+  envoy::config::endpoint::v3::LocalityLbEndpoints zone_b_endpoints =
+      cluster_config.load_assignment().endpoints()[0];
+
+  priority_state_manager.initializePriorityFor(zone_b_endpoints);
+  priority_state_manager.registerHostForPriority(hosts_added[0], zone_b_endpoints);
+  priority_state_manager.registerHostForPriority(
+      cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], zone_b_endpoints);
+
+  priority_state_manager.initializePriorityFor(zone_a_endpoints);
+  priority_state_manager.registerHostForPriority(hosts_added[1], zone_a_endpoints);
+
+  // Update the cluster's priority set with the added hosts
+  priority_state_manager.updateClusterPrioritySet(
+      0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, absl::nullopt,
+      absl::nullopt);
+
+  // Check that the P=0 host set has the added hosts, and the expected HostsPerLocality state
+  const HostVector& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  const HostsPerLocality& hosts_per_locality =
+      cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
+
+  EXPECT_EQ(3UL, hosts.size());
+  EXPECT_EQ(true, hosts_per_locality.hasLocalLocality());
+  EXPECT_EQ(2UL, hosts_per_locality.get().size());
+
+  EXPECT_EQ(1UL, hosts_per_locality.get()[0].size());
+  EXPECT_EQ(zone_a, hosts_per_locality.get()[0][0]->locality());
+
+  EXPECT_EQ(2UL, hosts_per_locality.get()[1].size());
+  EXPECT_EQ(zone_b, hosts_per_locality.get()[1][0]->locality());
+  EXPECT_EQ(zone_b, hosts_per_locality.get()[1][1]->locality());
 }
 
 } // namespace

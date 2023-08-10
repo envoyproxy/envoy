@@ -370,8 +370,13 @@ TEST_P(MaglevLoadBalancerTest, Weighted) {
 // Locality weighted sanity test when localities have the same weights. Host weights for hosts in
 // different localities shouldn't matter.
 TEST_P(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2)};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b, 2)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.hosts_per_locality_ =
       makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[1]}});
@@ -413,9 +418,16 @@ TEST_P(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
 // Locality weighted sanity test when localities have different weights. Host weights for hosts in
 // different localities shouldn't matter.
 TEST_P(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 3)};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_c, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 3)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.hosts_per_locality_ =
       makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[2]}, {host_set_.hosts_[1]}});
@@ -472,8 +484,13 @@ TEST_P(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
 // Validate that when we are in global panic and have localities, we get sane
 // results (fall back to non-healthy hosts).
 TEST_P(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2)};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b, 2)};
   host_set_.healthy_hosts_ = {};
   host_set_.hosts_per_locality_ =
       makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[1]}});
@@ -515,10 +532,16 @@ TEST_P(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
 // Given extremely lopsided locality weights, and a table that isn't large enough to fit all hosts,
 // expect that the least-weighted hosts appear once, and the most-weighted host fills the remainder.
 TEST_P(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
   host_set_.hosts_.clear();
   HostVector heavy_but_sparse, light_but_dense;
   for (uint32_t i = 0; i < 1024; ++i) {
-    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime()));
+    auto host_locality = i == 0 ? zone_a : zone_b;
+    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime(), host_locality));
     host_set_.hosts_.push_back(host);
     (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }
