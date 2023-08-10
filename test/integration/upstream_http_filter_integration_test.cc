@@ -384,12 +384,13 @@ public:
     return upstream_headers;
   }
 
-  void expectHeaderKeyAndValue(std::unique_ptr<Http::RequestHeaderMap>& headers, const std::string value) {
+  void expectHeaderKeyAndValue(std::unique_ptr<Http::RequestHeaderMap>& headers,
+                               const std::string value) {
     expectHeaderKeyAndValue(headers, header_key_, value);
   }
 
-  void expectHeaderKeyAndValue(std::unique_ptr<Http::RequestHeaderMap>& headers, const std::string key,
-                               const std::string value) {
+  void expectHeaderKeyAndValue(std::unique_ptr<Http::RequestHeaderMap>& headers,
+                               const std::string key, const std::string value) {
     auto header = headers->get(Http::LowerCaseString(key));
     ASSERT_FALSE(header.empty());
     EXPECT_EQ(value, header[0]->value().getStringView());
@@ -514,8 +515,10 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentN
   // Send 1st config update.
   sendXdsResponse("foo", "1", "header-key1", "test-val1");
   sendXdsResponse("bar", "1", "header-key2", "test-val1", false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.upstream_http_filter.foo.config_reload", 1);
-  test_server_->waitForCounterGe("extension_config_discovery.upstream_http_filter.bar.config_reload", 1);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter.foo.config_reload", 1);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter.bar.config_reload", 1);
   {
     auto headers = sentRequestAndGetHeaders();
     expectHeaderKeyAndValue(headers, "header-key1", "test-val1");
@@ -525,8 +528,10 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentN
   // Send 2nd config update.
   sendXdsResponse("foo", "2", "header-key1", "test-val2");
   sendXdsResponse("bar", "2", "header-key2", "test-val2", false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.upstream_http_filter.foo.config_reload", 2);
-  test_server_->waitForCounterGe("extension_config_discovery.upstream_http_filter.bar.config_reload", 2);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter.foo.config_reload", 2);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter.bar.config_reload", 2);
   {
     auto headers = sentRequestAndGetHeaders();
     expectHeaderKeyAndValue(headers, "header-key1", "test-val2");
