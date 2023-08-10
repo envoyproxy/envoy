@@ -1064,6 +1064,7 @@ private:
 
   Runtime::Loader& runtime_;
   const std::string name_;
+  std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
   std::unique_ptr<const std::string> observability_name_;
   std::unique_ptr<const std::string> eds_service_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
@@ -1106,7 +1107,6 @@ private:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   UpstreamHttpFactoryContextImpl upstream_context_;
-  std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment
