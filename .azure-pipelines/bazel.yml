@@ -9,30 +9,33 @@ parameters:
   default: ""
 
 # caching
+- name: cacheKeyBazelisk
+  type: string
+  default: .bazelversion
 - name: cacheKeyDocker
   type: string
   default: ".devcontainer/Dockerfile"
-- name: cacheKeyDockerVersion
+- name: cacheKeyVersion
   type: string
-  default: $(cacheKeyBuildImage)
-- name: cacheKeyDockerName
+  default: $(cacheKeyVersion)
+- name: pathCacheTemp
   type: string
-  default: envoy_build_image
-- name: cacheKeyDockerPath
-  type: string
-  default: /mnt/docker
-- name: cacheKeyDockerTmpDir
-  type: string
-  default: /mnt/docker_cache
-- name: cacheKeyDockerNoTmpfs
+  default: $(pathCacheTemp)
+
+- name: tmpfsCacheDisabled
   type: string
   default: ''
-- name: cacheKey
-  type: string
-  default: $(cacheKeyBazelFiles)
-- name: cacheVersion
+
+- name: cacheKeyBazel
   type: string
   default: $(cacheKeyBazel)
+- name: cacheVersion
+  type: string
+  default: $(cacheKeyVersion)
+
+- name: pathDockerBind
+  type: string
+  default: $(pathDockerBind)
 
 - name: rbe
   displayName: "Enable RBE"
@@ -72,6 +75,10 @@ parameters:
   type: string
   default: true
 
+- name: diskspaceHack
+  type: boolean
+  default: false
+
 - name: stepsPre
   type: stepList
   default: []
@@ -87,6 +94,10 @@ steps:
 - checkout: self
   fetchDepth: ${{ parameters.repoFetchDepth }}
   fetchTags: ${{ parameters.repoFetchTags }}
+
+- bash: ./.azure-pipelines/cleanup.sh
+  displayName: "Free disk space"
+  condition: and(succeeded(), eq('${{ parameters.diskspaceHack }}', true))
 
 # Set up tmpfs directories for self-hosted agents which have a surplus of mem.
 #
@@ -135,27 +146,15 @@ steps:
   condition: and(succeeded(), eq('${{ parameters.managedAgent }}', true))
 
 # Caching
-- task: Cache@2
-  inputs:
-    key: '"${{ parameters.ciTarget }}" | "${{ parameters.cacheVersion }}" | "${{ parameters.artifactSuffix }}" | ${{ parameters.cacheKey }}'
-    path: $(Build.StagingDirectory)/bazel
-    cacheHitVar: BAZEL_CACHE_RESTORED
-  continueOnError: true
-- script: |
-    set -e
-    sudo tar xf $(Build.StagingDirectory)/bazel/cache.tar.zst -C $(Build.StagingDirectory) --warning=no-timestamp
-    sudo rm -rf $(Build.StagingDirectory)/bazel/*
-  displayName: "Cache/restore (${{ parameters.ciTarget }})"
-  condition: and(not(canceled()), eq(variables.BAZEL_CACHE_RESTORED, 'true'))
 - template: cached.yml
   parameters:
-    key: "${{ parameters.cacheKeyDocker }}"
-    version: "${{ parameters.cacheKeyDockerVersion }}"
-    name: "${{ parameters.cacheKeyDockerName }}"
-    path: "${{ parameters.cacheKeyDockerPath }}"
-    tmpDirectory: "${{ parameters.cacheKeyDockerTmpDir }}"
-    tmpNoTmpfs: "${{ parameters.cacheKeyDockerNoTmpfs }}"
+    keyBazel: "${{ parameters.cacheKeyBazel }}"
+    keyBazelisk: "${{ parameters.cacheKeyBazelisk }}"
+    keyDocker: "${{ parameters.cacheKeyDocker }}"
+    pathDockerBind: "${{ parameters.pathDockerBind }}"
     arch: "${{ parameters.artifactSuffix }}"
+    pathTemp: "${{ parameters.pathCacheTemp }}"
+    tmpfsDisabled: "${{ parameters.tmpfsCacheDisabled }}"
 
 - ${{ each step in parameters.stepsPre }}:
   - ${{ each pair in step }}:
@@ -218,20 +217,6 @@ steps:
 - ${{ each step in parameters.stepsPost }}:
   - ${{ each pair in step }}:
       ${{ pair.key }}: ${{ pair.value }}
-
-- script: |
-    set -e
-    CACHE_DIRS=(
-        ".cache"
-        "bazel_root/install"
-        "repository_cache/"
-        "bazel_root/base/external")
-    mkdir -p $(Build.StagingDirectory)/bazel/
-    sudo tar cf - -C $(Build.StagingDirectory) "${CACHE_DIRS[@]}" \
-        | zstd - -T0 -o $(Build.StagingDirectory)/bazel/cache.tar.zst
-    echo "Created tarball ($(Build.StagingDirectory)/bazel/cache.tar.zst): ${CACHE_DIRS[@]}"
-  displayName: "Cache/save (${{ parameters.ciTarget }})"
-  condition: and(not(canceled()), ne(variables.BAZEL_CACHE_RESTORED, 'true'))
 
 - task: PublishTestResults@2
   inputs:

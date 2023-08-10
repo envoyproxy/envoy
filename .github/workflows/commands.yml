@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   retest:
-    if: |
+    if: >-
       ${{
          github.event.issue.pull_request
          && github.repository == 'envoyproxy/envoy'

@@ -1817,6 +1817,55 @@ TEST_F(EdsTest, EndpointLocality) {
   EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
+TEST_F(EdsTest, EndpointCombineDuplicateLocalities) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+
+  auto* endpoints1 = cluster_load_assignment.add_endpoints();
+  auto* locality1 = endpoints1->mutable_locality();
+  locality1->set_region("oceania");
+  locality1->set_zone("hello");
+  locality1->set_sub_zone("world");
+
+  auto* endpoints2 = cluster_load_assignment.add_endpoints();
+  auto* locality2 = endpoints2->mutable_locality();
+  locality2->set_region("oceania");
+  locality2->set_zone("hello");
+  locality2->set_sub_zone("world");
+
+  {
+    auto* endpoint_address = endpoints1->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+  {
+    auto* endpoint_address = endpoints2->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("2.3.4.5");
+    endpoint_address->set_port_value(80);
+  }
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, hosts[i]->priority());
+    const auto& locality = hosts[i]->locality();
+    EXPECT_EQ("oceania", locality.region());
+    EXPECT_EQ("hello", locality.zone());
+    EXPECT_EQ("world", locality.sub_zone());
+  }
+  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
+}
+
 // Validate that onConfigUpdate() updates the endpoint locality of an existing endpoint.
 TEST_F(EdsTest, EndpointLocalityUpdated) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
