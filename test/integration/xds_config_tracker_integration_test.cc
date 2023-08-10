@@ -32,8 +32,7 @@ const int UpstreamIndex2 = 2;
 #define ALL_TEST_XDS_TRACKER_STATS(COUNTER)                                                        \
   COUNTER(on_config_accepted)                                                                      \
   COUNTER(on_config_rejected)                                                                      \
-  COUNTER(on_config_metadata_read)                                                                 \
-  COUNTER(on_config_metadata_packed)
+  COUNTER(on_config_metadata_read)
 
 /**
  * Struct definition for stats. @see stats_macros.h
@@ -59,13 +58,12 @@ public:
         const auto& config_typed_metadata = resource->metadata()->typed_filter_metadata();
         if (const auto& metadata_it = config_typed_metadata.find(kTestKey);
             metadata_it != config_typed_metadata.end()) {
-          stats_.on_config_metadata_read_.inc();
           const auto status =
               Envoy::MessageUtil::unpackToNoThrow(metadata_it->second, test_metadata);
           if (!status.ok()) {
             continue;
           }
-          stats_.on_config_metadata_packed_.inc();
+          stats_.on_config_metadata_read_.inc();
         }
       }
     }
@@ -82,13 +80,12 @@ public:
         const auto& config_typed_metadata = resource.metadata().typed_filter_metadata();
         if (const auto& metadata_it = config_typed_metadata.find(kTestKey);
             metadata_it != config_typed_metadata.end()) {
-          stats_.on_config_metadata_read_.inc();
           const auto status =
               Envoy::MessageUtil::unpackToNoThrow(metadata_it->second, test_metadata);
           if (!status.ok()) {
             continue;
           }
-          stats_.on_config_metadata_packed_.inc();
+          stats_.on_config_metadata_read_.inc();
         }
       }
     }
@@ -215,7 +212,6 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
   // onConfigAccepted is called when all the resources are accepted.
   test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
   test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_read", 0);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_packed", 0);
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
@@ -241,7 +237,6 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
   // onConfigAccepted is called when all the resources are accepted.
   test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
   test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_read", 2);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_packed", 2);
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
