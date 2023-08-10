@@ -8,16 +8,23 @@ TargetHandleImpl::TargetHandleImpl(absl::string_view handle_name, absl::string_v
     : handle_name_(handle_name), name_(name), fn_(std::move(fn)) {}
 
 bool TargetHandleImpl::initialize(const Watcher& watcher) const {
+  std::cerr << "11111\n\n";
   auto locked_fn(fn_.lock());
+  std::cerr << "22222\n\n";
   if (locked_fn) {
+    std::cerr << "33333\n\n";
     // If we can "lock" a shared pointer to the target's callback function, call it
     // with a new handle to the ManagerImpl's watcher that was passed in.
     ENVOY_LOG(debug, "{} initializing {}", handle_name_, name_);
+    std::cerr << "44444\n\n";
     (*locked_fn)(watcher.createHandle(name_));
+    std::cerr << "555555\n\n";
     return true;
   } else {
+    std::cerr << "666666\n\n";
     // If not, the target was already destroyed.
     ENVOY_LOG(debug, "{} can't initialize {} (unavailable)", handle_name_, name_);
+    std::cerr << "77777\n\n";
     return false;
   }
 }
