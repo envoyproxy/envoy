@@ -175,6 +175,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: bazel.distribution
+      tmpfsCacheDisabled: true
       stepsPre:
       - template: ../gpg.yml
         parameters:
@@ -195,7 +196,7 @@ jobs:
     and(not(canceled()),
         eq(${{ parameters.runPackaging }}, 'true'))
   timeoutInMinutes: 120
-  pool: "envoy-arm-large"
+  pool: "envoy-arm-small"
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -211,6 +212,7 @@ jobs:
       rbe: false
       artifactSuffix: ".arm64"
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      tmpfsDockerDisabled: true
       stepsPre:
       - template: ../gpg.yml
         parameters:
