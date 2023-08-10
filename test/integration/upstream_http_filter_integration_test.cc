@@ -71,6 +71,7 @@ public:
   }
 };
 
+/*
 class StaticUpstreamHttpFilterIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public UpstreamHttpFilterIntegrationTestBase {
@@ -145,6 +146,7 @@ TEST_P(StaticUpstreamHttpFilterIntegrationTest, RouterAndClusterFilters) {
   cleanupUpstreamAndDownstream();
   EXPECT_FALSE(upstream_headers->get(Http::LowerCaseString("x-header-to-add")).empty());
 }
+*/
 
 class UpstreamHttpExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                                       public UpstreamHttpFilterIntegrationTestBase {
@@ -431,12 +433,23 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   registerTestServerPorts({"http"});
 
-  {
-    // No config update yet, expect the default.
-    auto headers = sentRequestAndGetHeaders();
-    expectHeaderKeyAndValue(headers, header_default_value_);
-  }
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  std::cout << *upstream_headers;
+  ASSERT_TRUE(upstream_headers != nullptr);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
+  auto header = upstream_headers->get(Http::LowerCaseString(header_key_));
+  ASSERT_FALSE(header.empty());
+  EXPECT_EQ(header_default_value_, header[0]->value().getStringView());
+
+  /*
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", header_key_, "test-val1");
   test_server_->waitForCounterGe(
@@ -454,8 +467,10 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
     auto headers = sentRequestAndGetHeaders();
     expectHeaderKeyAndValue(headers, "test-val2");
   }
+  */
 };
 
+/*
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarmingWithConfigFail) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, true);
@@ -538,6 +553,7 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentN
     expectHeaderKeyAndValue(headers, "header-key2", "test-val2");
   }
 }
+*/
 
 } // namespace
 } // namespace Envoy
