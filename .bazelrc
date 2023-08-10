@@ -24,12 +24,19 @@ build --platform_mappings=bazel/platform_mappings
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
+build --enable_platform_specific_config
 
-# Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
+# Pass CC, CXX and LLVM_CONFIG variables from the environment.
+# We assume they have stable values, so this won't cause action cache misses.
 build --action_env=CC --host_action_env=CC
 build --action_env=CXX --host_action_env=CXX
 build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
-build --action_env=PATH --host_action_env=PATH
+# Do not pass through PATH however.
+# It tends to have machine-specific values, such as dynamically created temp folders.
+# This would make it impossible to share remote action cache hits among machines.
+# build --action_env=PATH --host_action_env=PATH
+# To make our own CI green, we do need that flag on Windows though.
+build:windows --action_env=PATH --host_action_env=PATH
 
 # Allow stamped caches to bust when local filesystem changes.
 # Requires setting `BAZEL_VOLATILE_DIRTY` in the env.
@@ -39,7 +46,6 @@ build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 # Requires setting `BAZEL_FAKE_SCM_REVISION` in the env.
 build --action_env=BAZEL_FAKE_SCM_REVISION --host_action_env=BAZEL_FAKE_SCM_REVISION
 
-build --enable_platform_specific_config
 build --test_summary=terse
 
 # TODO(keith): Remove once these 2 are the default
