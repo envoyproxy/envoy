@@ -129,7 +129,6 @@ def envoy_cc_library(
         tags = tags,
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//envoy/common:base_includes",
             envoy_external_dep_path("abseil_strings"),
         ] + envoy_pch_deps(repository, "//source/common/common:common_pch"),
         alwayslink = alwayslink,
