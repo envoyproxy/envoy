@@ -40,25 +40,32 @@ void ManagerImpl::add(const Target& target) {
 void ManagerImpl::initialize(const Watcher& watcher) {
   // If the manager is already initializing or initialized, consider this a programming error.
   ASSERT(state_ == State::Uninitialized, fmt::format("attempted to initialize {} twice", name_));
-
+  std::cerr << "111111111\n\n\n\n";
   // Create a handle to notify when initialization is complete.
   watcher_handle_ = watcher.createHandle(name_);
-
+  std::cerr << "222222222\n\n\n\n";
   if (count_ == 0) {
+    std::cerr << "3333333\n\n\n\n";
     // If we have no targets, initialization trivially completes. This can happen, and is fine.
     ENVOY_LOG(debug, "{} contains no targets", name_);
     ready();
+    std::cerr << "4444444\n\n\n\n";
   } else {
+    std::cerr << "555555\n\n\n\n";
     // If we have some targets, start initialization...
     ENVOY_LOG(debug, "{} initializing", name_);
     state_ = State::Initializing;
-
+    std::cerr << "666666\n\n\n\n";
     // Attempt to initialize each target. If a target is unavailable, treat it as though it
     // completed immediately.
     for (const auto& target_handle : target_handles_) {
+      std::cerr << "7777777777\n\n\n\n";
       if (!target_handle->initialize(watcher_)) {
+        std::cerr << "888888888\n\n\n\n";
         onTargetReady(target_handle->name());
+        std::cerr << "999999999\n\n\n\n";
       }
+      std::cerr << "aaaaaaaaa\n\n\n\n";
     }
   }
 }
