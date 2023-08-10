@@ -625,6 +625,9 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
 // Validate that an update to a Cluster that doesn't receive updated ClusterLoadAssignment
 // uses the previous (cached) cluster load assignment.
 TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
+  // TODO(adisuissa): this test should stay after the runitme gaurd is deprecated
+  // (only the runtime guard should be removed).
+  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");

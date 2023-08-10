@@ -2787,7 +2787,13 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
 
 class EdsCachedAssignmentTest : public testing::Test {
 public:
-  EdsCachedAssignmentTest() { resetCluster(); }
+  EdsCachedAssignmentTest() {
+    // TODO(adisuissa): setting the runtime guard is done because the runtime
+    // guard is false by default. The runtime environment should be removed
+    // once this guard is removed.
+    runtime_.mergeValues({{"envoy.restart_features.use_eds_cache_for_ads", "true"}});
+    resetCluster();
+  }
 
   void resetCluster() {
     resetCluster(R"EOF(
@@ -2887,6 +2893,7 @@ public:
   // TestScopedRuntime runtime_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Config::MockEdsResourcesCache eds_resources_cache_;
+  TestScopedRuntime runtime_;
 
   // EDS caching works when a cluster update occurs (a CDS update arrives, a new
   // cluster with the same name is created, but the EDS response doesn't
@@ -2988,9 +2995,8 @@ TEST_F(EdsCachedAssignmentTest, UseCachedAssignmentOnWarmingFailure) {
 // Validates that no cached assignments are used if no EDS update for a cluster arrives.
 // This test should be deleted once the enable_eds_cache runtime flag is removed.
 TEST_F(EdsCachedAssignmentTest, UseCachedAssignmentOnWarmingFailureNoCache) {
-  TestScopedRuntime runtime;
   // TODO(adisuissa): this test should be removed once the runtime guard is deprecated.
-  runtime.mergeValues({{"envoy.restart_features.use_eds_cache_for_ads", "false"}});
+  runtime_.mergeValues({{"envoy.restart_features.use_eds_cache_for_ads", "false"}});
   // Set an initial assignment.
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
