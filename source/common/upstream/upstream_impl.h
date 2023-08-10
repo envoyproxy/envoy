@@ -495,9 +495,23 @@ public:
   HostsPerLocalityImpl() : HostsPerLocalityImpl(std::vector<HostVector>(), false) {}
 
   // Single locality constructor
+  //
+  // Parameter requirements:
+  // 1. All entries in hosts must have the same locality.
+  // 2. If has_local_locality is true, then the locality of all entries in hosts
+  //    must be equal to the current envoy's locality.
   HostsPerLocalityImpl(const HostVector& hosts, bool has_local_locality = false)
       : HostsPerLocalityImpl(std::vector<HostVector>({hosts}), has_local_locality) {}
 
+  // Multiple localities constructor
+  //
+  // locality_hosts must adhere to the following ordering constraints:
+  // 1. All hosts within a single HostVector bucket must have the same locality
+  // 2. No hosts in different HostVector buckets can have the same locality
+  // 3. If has_local_locality is true, then the locality of all hosts in the first HostVector bucket
+  //    must be equal to the current envoy's locality.
+  // 4. All non-local HostVector buckets must be sorted in ascending order by the LocalityLess
+  // comparator
   HostsPerLocalityImpl(std::vector<HostVector>&& locality_hosts, bool has_local_locality)
       : local_(has_local_locality), hosts_per_locality_(std::move(locality_hosts)) {
     ASSERT(!has_local_locality || !hosts_per_locality_.empty());

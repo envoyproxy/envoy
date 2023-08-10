@@ -105,12 +105,24 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.callbacks.Log(api.Warn, "log test")
 	f.callbacks.Log(api.Error, "log test")
 	f.callbacks.Log(api.Critical, "log test")
+
 	api.LogTrace("log test")
 	api.LogDebug("log test")
 	api.LogInfo("log test")
 	api.LogWarn("log test")
 	api.LogError("log test")
 	api.LogCritical("log test")
+
+	api.LogTracef("log test %v", endStream)
+	api.LogDebugf("log test %v", endStream)
+	api.LogInfof("log test %v", endStream)
+	api.LogWarnf("log test %v", endStream)
+	api.LogErrorf("log test %v", endStream)
+	api.LogCriticalf("log test %v", endStream)
+
+	if f.callbacks.LogLevel() != api.GetLogLevel() {
+		return f.fail("log level mismatch")
+	}
 
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms

@@ -19,6 +19,18 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
 
+FETCH_TARGETS=(
+    //contrib/...
+    //distribution/...
+    //docs/...
+    //source/...
+    //test/...
+    //tools/...
+    @nodejs//...
+    @envoy_api//...
+    @envoy_build_tools//...)
+
+
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
 elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
@@ -325,6 +337,14 @@ case $CI_TARGET in
         }
         ;;
 
+    clean|expunge)
+        setup_clang_toolchain
+        if [[ "$CI_TARGET" == "expunge" ]]; then
+            CLEAN_ARGS+=(--expunge)
+        fi
+        bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
+        ;;
+
     compile_time_options)
         # See `compile-time-options` in `.bazelrc`
         setup_clang_toolchain
@@ -546,6 +566,27 @@ case $CI_TARGET in
         cat bazel-bin/distribution/dockerhub/readme.md
         ;;
 
+    fetch)
+        setup_clang_toolchain
+        echo "Fetching ${FETCH_TARGETS[*]} ..."
+        FETCH_ARGS=(
+            --noshow_progress
+            --noshow_loading_progress)
+        # TODO(phlax): separate out retry logic
+        n=0
+        until [ "$n" -ge 10 ]; do
+            bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" \
+                  "${FETCH_ARGS[@]}" \
+                  "${FETCH_TARGETS[@]}" \
+                && break
+            n=$((n+1))
+            if [[ "$n" -ne 10 ]]; then
+                sleep 15
+                echo "Retrying fetch ..."
+            fi
+        done
+        ;;
+
     fix_proto_format)
         # proto_format.sh needs to build protobuf.
         setup_clang_toolchain
@@ -580,6 +621,20 @@ case $CI_TARGET in
             -- "${TEST_TARGETS[@]}"
         echo "bazel release build with gcc..."
         bazel_envoy_binary_build fastbuild
+        ;;
+
+    info)
+        setup_clang_toolchain
+        n=0
+        until [ "$n" -ge 10 ]; do
+            bazel info "${BAZEL_GLOBAL_OPTIONS[@]}" \
+                && break
+            n=$((n+1))
+            if [[ "$n" -ne 10 ]]; then
+                sleep 15
+                echo "Retrying fetch ..."
+            fi
+        done
         ;;
 
     msan)
