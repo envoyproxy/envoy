@@ -24,8 +24,9 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
   }
   if (expected_local_address_.has_value()) {
     ASSERT_TRUE(validation_ctx.callbacks != nullptr);
-    EXPECT_EQ(expected_local_address_.value(),
-              validation_ctx.callbacks->connection().connectionInfoProvider().localAddress());
+    EXPECT_EQ(
+        expected_local_address_.value(),
+        validation_ctx.callbacks->connection().connectionInfoProvider().localAddress()->asString());
   }
   // Store cert chain for the delayed validation.
   for (size_t i = 0; i < sk_X509_num(&cert_chain); i++) {
