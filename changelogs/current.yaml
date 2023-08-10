@@ -53,5 +53,10 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: match_delegate
+  change: |
+    added runtime guard ``envoy_reloadable_features_enable_extension_with_matcher``.
+    :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` can be disabled by
+    setting this flag to false. The match_delegate filter then will become a passthrough filter.
 
 deprecated:
