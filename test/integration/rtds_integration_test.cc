@@ -289,7 +289,8 @@ TEST_P(RtdsIntegrationTest, RtdsUpdate) {
 
   // Use the Resource wrapper no matter if it is Sotw or Delta.
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1", true, {});
+      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1",
+      {{"test", ProtobufWkt::Any()}});
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
 
   EXPECT_EQ("bar", getRuntimeKey("foo"));

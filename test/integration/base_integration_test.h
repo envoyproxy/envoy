@@ -191,12 +191,10 @@ public:
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             bool use_wrapper = false,
-                             const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata = {}) {
+                             const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata = {}) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
         sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, nullptr, use_wrapper,
-                                metadata);
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, nullptr, metadata);
     } else {
       sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, metadata);
     }
@@ -229,12 +227,12 @@ public:
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                                  const std::string& version, FakeStream* stream = nullptr) {
-    sendSotwDiscoveryResponse(type_url, messages, version, stream, false, {});
+    sendSotwDiscoveryResponse(type_url, messages, version, stream, {});
   }
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, FakeStream* stream, bool use_wrapper,
-                                 const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata) {
+                                 const std::string& version, FakeStream* stream,
+                                 const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
     if (stream == nullptr) {
       stream = xds_stream_.get();
     }
@@ -242,7 +240,7 @@ public:
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      if (use_wrapper) {
+      if (metadata.size() != 0) {
         envoy::service::discovery::v3::Resource resource;
         resource.mutable_resource()->PackFrom(message);
         resource.set_name(intResourceName(message));
@@ -280,7 +278,7 @@ public:
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata) {
+                             const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
                                metadata);
   }
@@ -290,7 +288,7 @@ public:
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
                              FakeStreamPtr& stream, const std::vector<std::string>& aliases,
-                             const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata) {
+                             const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
     auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
                                                     aliases, metadata);
     stream->sendGrpcMessage(response);
@@ -317,7 +315,7 @@ public:
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases,
-                               const Protobuf::Map<std::string, ProtobufWkt::Any>& metadata) {
+                               const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;

@@ -84,7 +84,8 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   )EOF");
   // Send another response with Resource wrapper.
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_resource}, {some_rtds_resource}, {}, "2", true);
+      Config::TypeUrl::get().Runtime, {some_rtds_resource}, {some_rtds_resource}, {}, "2",
+      {{"test", ProtobufWkt::Any()}});
   // Wait until the RTDS updates from the DiscoveryResponse have been applied.
   ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
 

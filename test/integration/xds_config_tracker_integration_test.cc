@@ -229,11 +229,11 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
 
   // Add a typed metadata to the Resource wrapper.
   test::envoy::config::xds::TestTrackerMetadata test_metadata;
-  Protobuf::Map<std::string, ProtobufWkt::Any> metadata;
-  metadata[kTestKey].PackFrom(test_metadata);
+  ProtobufWkt::Any packed_value;
+  packed_value.PackFrom(test_metadata);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1", true,
-      metadata);
+      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1",
+      {{kTestKey, packed_value}});
 
   // 3 because the statically specified CDS server itself counts as a cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
