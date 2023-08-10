@@ -169,7 +169,8 @@ void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
 
 void SslSocket::resumeHandshake() {
   ASSERT(callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe());
-  ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgress);
+  ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgressByPrivateKeyOperation ||
+         info_->state() == Ssl::SocketState::HandshakeInProgressByCertificateVerification);
 
   // Resume handshake.
   PostIoAction action = doHandshake();
@@ -355,7 +356,8 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  if (info_->state() == Ssl::SocketState::HandshakeInProgress ||
+  if (info_->state() == Ssl::SocketState::HandshakeInProgressByPrivateKeyOperation ||
+      info_->state() == Ssl::SocketState::HandshakeInProgressByCertificateVerification ||
       info_->state() == Ssl::SocketState::HandshakeComplete) {
     shutdownSsl();
   } else {
@@ -371,7 +373,7 @@ absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
 void SslSocket::onAsynchronousCertValidationComplete() {
   ENVOY_CONN_LOG(debug, "Async cert validation completed", callbacks_->connection());
-  if (info_->state() == Ssl::SocketState::HandshakeInProgress) {
+  if (info_->state() == Ssl::SocketState::HandshakeInProgressByCertificateVerification) {
     resumeHandshake();
   }
 }

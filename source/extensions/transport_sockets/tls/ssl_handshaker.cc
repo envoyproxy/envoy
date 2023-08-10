@@ -95,8 +95,10 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_WRITE:
       return PostIoAction::KeepOpen;
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+      state_ = Ssl::SocketState::HandshakeInProgressByPrivateKeyOperation;
+      return PostIoAction::KeepOpen;
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
-      state_ = Ssl::SocketState::HandshakeInProgress;
+      state_ = Ssl::SocketState::HandshakeInProgressByCertificateVerification;
       return PostIoAction::KeepOpen;
     case SSL_ERROR_SYSCALL:
       // By default, when SSL_ERROR_SYSCALL occurred, the underlying transport does not participate
