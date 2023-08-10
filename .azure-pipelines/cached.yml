@@ -41,15 +41,6 @@ parameters:
 
 
 steps:
-- script: |
-    set -e
-
-    env
-
-    az storage blob exists
-
-    exit 1
-
 - script: sudo .azure-pipelines/docker/prepare_cache.sh "${{ parameters.pathTemp }}" "${{ parameters.tmpfsDisabled }}"
   displayName: "Cache/prepare"
 
