@@ -71,7 +71,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
   {
     envoy::service::ratelimit::v3::RateLimitRequest request;
     Http::TestRequestHeaderMapImpl headers;
-    GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}}, 1);
+    GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}}, 0);
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
         .WillOnce(
             Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
