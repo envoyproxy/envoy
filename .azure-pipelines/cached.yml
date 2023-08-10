@@ -27,6 +27,9 @@ parameters:
 - name: tmpfsDisabled
   type: string
   default:
+- name: tmpfsDockerDisabled
+  type: string
+  default:
 
 - name: pathDockerBind
   type: string
@@ -82,6 +85,6 @@ steps:
   condition: and(not(canceled()), eq(${{ parameters.prime }}, true), or(ne(variables.DOCKER_CACHE_RESTORED, 'true'), ne(variables.BAZELISK_CACHE_RESTORED, 'true'), ne(variables.BAZEL_CACHE_RESTORED, 'true')))
 
 # Load the caches for a job
-- script: sudo .azure-pipelines/docker/load_caches.sh "$(Build.StagingDirectory)" "${{ parameters.pathTemp }}" "${{ parameters.pathDockerBind }}"
+- script: sudo .azure-pipelines/docker/load_caches.sh "$(Build.StagingDirectory)" "${{ parameters.pathTemp }}" "${{ parameters.pathDockerBind }}" "${{ parameters.tmpfsDockerDisabled }}"
   displayName: "Cache/restore"
   condition: and(not(canceled()), eq(${{ parameters.prime }}, false))
