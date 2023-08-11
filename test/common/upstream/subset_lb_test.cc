@@ -2128,7 +2128,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
 
   EXPECT_CALL(random_, random())
       .WillOnce(Return(0))
-      .WillOnce(Return(5830)); // 58.31% local routing chance due to rouding error
+      .WillOnce(Return(5830)); // 58.31% local routing chance due to rounding error
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(5831)).WillOnce(Return(475));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
