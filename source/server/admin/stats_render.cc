@@ -120,9 +120,8 @@ void StatsJsonRender::drainIfNeeded(Buffer::Instance& response) {
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
   ASSERT(!histograms_initialized_);
-  json_streamer_.mapEntries({
-      {"name", Json::Streamer::quote(Json::sanitize(name_buffer_, name))},
-      {"value", Json::Streamer::number(value)}});
+  json_streamer_.mapEntries({{"name", Json::Streamer::quote(Json::sanitize(name_buffer_, name))},
+                             {"value", Json::Streamer::number(value)}});
   drainIfNeeded(response);
 }
 
@@ -131,9 +130,9 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
   ASSERT(!histograms_initialized_);
-  json_streamer_.mapEntries({
-      {"name", Json::Streamer::quote(Json::sanitize(name_buffer_, name))},
-      {"value", Json::Streamer::quote(Json::sanitize(value_buffer_, value))}});
+  json_streamer_.mapEntries(
+      {{"name", Json::Streamer::quote(Json::sanitize(name_buffer_, name))},
+       {"value", Json::Streamer::quote(Json::sanitize(value_buffer_, value))}});
   drainIfNeeded(response);
 }
 
@@ -187,8 +186,8 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 }
 
 void StatsJsonRender::populateSupportedPercentiles() {
-  //auto x100 = [](double fraction) -> std::string { return Json::Streamer::number(fraction * 100); };
-  //auto view = [](const std::string& str) -> absl::string_view { return str; };
+  // auto x100 = [](double fraction) -> std::string { return Json::Streamer::number(fraction * 100);
+  // }; auto view = [](const std::string& str) -> absl::string_view { return str; };
   Stats::HistogramStatisticsImpl empty_statistics;
   std::vector<double> supported = empty_statistics.supportedQuantiles();
   std::vector<std::string> supported_strings(supported.size());
@@ -199,8 +198,8 @@ void StatsJsonRender::populateSupportedPercentiles() {
     views[i] = supported_strings[i];
     ++i;
   }
-  //std::transform(supported.begin(), supported.end(), supported_strings.end(), x100);
-  //std::transform(supported_strings.begin(), supported_strings.end(), views.end(), view);
+  // std::transform(supported.begin(), supported.end(), supported_strings.end(), x100);
+  // std::transform(supported_strings.begin(), supported_strings.end(), views.end(), view);
   json_streamer_.arrayEntries(views);
 }
 

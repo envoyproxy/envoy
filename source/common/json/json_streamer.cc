@@ -84,9 +84,7 @@ void Streamer::Map::newSanitizedValue(absl::string_view value) {
   expecting_value_ = false;
 }
 
-void Streamer::Map::endValue() {
-  expecting_value_ = false;
-}
+void Streamer::Map::endValue() { expecting_value_ = false; }
 
 void Streamer::Map::newEntries(const Entries& entries) {
   for (const NameValue& entry : entries) {
@@ -123,9 +121,7 @@ std::string Streamer::number(double number) {
   }
 }
 
-std::string Streamer::quote(absl::string_view str) {
-  return absl::StrCat("\"", str, "\"");
-}
+std::string Streamer::quote(absl::string_view str) { return absl::StrCat("\"", str, "\""); }
 
 void Streamer::flush() {
   response_.addFragments(fragments_);
