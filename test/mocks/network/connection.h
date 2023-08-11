@@ -67,6 +67,7 @@ public:
   MOCK_METHOD(void, noDelay, (bool enable));                                                       \
   MOCK_METHOD(ReadDisableStatus, readDisable, (bool disable));                                     \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
+  MOCK_METHOD(void, enableTcpRstDetectAndSend, (bool));                                            \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
   MOCK_METHOD(ConnectionInfoSetter&, connectionInfoSetter, ());                                    \
   MOCK_METHOD(const ConnectionInfoProvider&, connectionInfoProvider, (), (const));                 \
@@ -100,7 +101,6 @@ class MockConnection : public Connection, public MockConnectionBase {
 public:
   MockConnection();
   ~MockConnection() override;
-  void enableTcpRstDetectAndSend(bool enable) override { this->enable_rst_detect_send_ = enable; };
 
   DEFINE_MOCK_CONNECTION_MOCK_METHODS;
 };
@@ -109,7 +109,6 @@ class MockServerConnection : public ServerConnection, public MockConnectionBase 
 public:
   MockServerConnection();
   ~MockServerConnection() override;
-  void enableTcpRstDetectAndSend(bool enable) override { this->enable_rst_detect_send_ = enable; };
 
   DEFINE_MOCK_CONNECTION_MOCK_METHODS;
 
@@ -125,7 +124,6 @@ class MockClientConnection : public ClientConnection, public MockConnectionBase 
 public:
   MockClientConnection();
   ~MockClientConnection() override;
-  void enableTcpRstDetectAndSend(bool enable) override { this->enable_rst_detect_send_ = enable; };
 
   DEFINE_MOCK_CONNECTION_MOCK_METHODS;
 

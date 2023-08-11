@@ -111,6 +111,7 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
   tcp_client->close();
 }
 
+// Test if RST close can be detected from downstream and upstream is closed by RST.
 TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
   enableHalfClose(true);
   enableRstDetectSend(true);
@@ -143,6 +144,7 @@ TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
   ASSERT_TRUE(fake_upstream_connection->waitForRstDisconnect());
 }
 
+// Test if RST close can be detected from upstream.
 TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
   enableHalfClose(true);
   enableRstDetectSend(true);

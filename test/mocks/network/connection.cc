@@ -64,6 +64,10 @@ template <class T> static void initializeMockConnection(T& connection) {
       .WillByDefault(ReturnPointee(&connection.stream_info_.downstream_connection_info_provider_));
   ON_CALL(connection, dispatcher()).WillByDefault(ReturnRef(connection.dispatcher_));
   ON_CALL(connection, readEnabled()).WillByDefault(ReturnPointee(&connection.read_enabled_));
+  ON_CALL(connection, enableTcpRstDetectAndSend(_))
+      .WillByDefault(Invoke([&connection](bool enable) -> void {
+        connection.enable_rst_detect_send_ = enable;
+      }));
   ON_CALL(connection, addConnectionCallbacks(_))
       .WillByDefault(Invoke([&connection](Network::ConnectionCallbacks& callbacks) -> void {
         connection.callbacks_.push_back(&callbacks);
