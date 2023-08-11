@@ -414,6 +414,7 @@ build:oss-fuzz --linkopt=-pthread
 
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb
+build:compdb --remote_download_outputs=all
 
 # Windows build quirks
 build:windows --action_env=TMPDIR

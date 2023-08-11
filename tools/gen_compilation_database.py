@@ -15,7 +15,7 @@ def generate_compilation_database(args):
     bazel_startup_options = shlex.split(os.environ.get("BAZEL_STARTUP_OPTION_LIST", ""))
     bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTION_LIST", "")) + [
         "--config=compdb",
-        "--remote_download_outputs=all",
+        "--config=clang",
     ]
 
     source_dir_targets = args.bazel_targets
