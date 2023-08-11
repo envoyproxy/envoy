@@ -5,6 +5,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: outlier detection
+  change: |
+    Outlier detection will always respect max_ejection_percent now.
+    This behavioral change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.check_mep_on_first_eject`` to false.
 - area: quic
   change: |
     Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
