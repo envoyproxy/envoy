@@ -46,10 +46,10 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       ocsp_staple_path_(Config::DataSource::getPath(config.ocsp_staple())
                             .value_or(ocsp_staple_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_method_(nullptr) {
-  if (config.has_private_key_provider() && config.has_private_key()) {
-    throw EnvoyException(fmt::format(
-        "Certificate configuration can't have both private_key and private_key_provider"));
-  }
+  // if (config.has_private_key_provider() && config.has_private_key()) {
+  //   throw EnvoyException(fmt::format(
+  //       "Certificate configuration can't have both private_key and private_key_provider"));
+  // }
   if (config.has_pkcs12()) {
     if (config.has_private_key()) {
       throw EnvoyException(
@@ -70,7 +70,7 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
           factory_context.sslContextManager()
               .privateKeyMethodManager()
               .createPrivateKeyMethodProvider(provider, factory_context, const_cast<std::string&>(private_key_));
-        if(private_key_method_->checkInitialized()){
+        if(private_key_method_&&private_key_method_->checkInitialized()){
           break;
         }else{
           private_key_method_ = nullptr;
@@ -82,7 +82,7 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
           factory_context.sslContextManager()
               .privateKeyMethodManager()
               .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context, const_cast<std::string&>(private_key_));
-        if(!private_key_method_->checkInitialized()){
+        if(private_key_method_&&!private_key_method_->checkInitialized()){
           private_key_method_ = nullptr;
         }
     }
@@ -92,7 +92,7 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
                       certificate_chain_path_));
     }
 
-    bool fallback = config.has_private_key_provider_list()?config.private_key_provider_list().fallback():false;
+    bool fallback = config.has_private_key_provider_list()?config.private_key_provider_list().fallback():true;
     if ((private_key_.empty()|| !fallback) && private_key_method_ == nullptr) {
       if (config.has_private_key_provider_list()){
         throw EnvoyException(fmt::format("Failed to load private key provider list."));

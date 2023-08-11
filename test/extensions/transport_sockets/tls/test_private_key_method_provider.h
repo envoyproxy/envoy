@@ -62,12 +62,13 @@ class TestPrivateKeyMethodProvider : public virtual Ssl::PrivateKeyMethodProvide
 public:
   TestPrivateKeyMethodProvider(
       const ProtobufWkt::Any& typed_config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context);
+      Server::Configuration::TransportSocketFactoryContext& factory_context, std::string& private_key);
   // Ssl::PrivateKeyMethodProvider
   void registerPrivateKeyMethod(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
                                 Event::Dispatcher& dispatcher) override;
   void unregisterPrivateKeyMethod(SSL* ssl) override;
   bool checkFips() override;
+  bool checkInitialized() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int rsaConnectionIndex();
@@ -78,6 +79,7 @@ private:
   bssl::UniquePtr<EVP_PKEY> pkey_;
   TestPrivateKeyConnectionTestOptions test_options_;
   std::string mode_;
+  bool initialized{};
 };
 
 class TestPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {
@@ -85,8 +87,8 @@ public:
   // Ssl::PrivateKeyMethodProviderInstanceFactory
   Ssl::PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
       const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context) override {
-    return std::make_shared<TestPrivateKeyMethodProvider>(config.typed_config(), factory_context);
+      Server::Configuration::TransportSocketFactoryContext& factory_context, std::string& private_key) override {
+    return std::make_shared<TestPrivateKeyMethodProvider>(config.typed_config(), factory_context, private_key);
   }
 
   std::string name() const override { return "test"; };

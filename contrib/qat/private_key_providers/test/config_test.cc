@@ -62,7 +62,7 @@ public:
 
     return factory_context_.sslContextManager()
         .privateKeyMethodManager()
-        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_);
+        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_, private_key_);
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -73,6 +73,7 @@ public:
   TransportSockets::Tls::PrivateKeyMethodManagerImpl private_key_method_manager_;
   std::shared_ptr<FakeLibQatCryptoImpl> libqat_;
   FakeSingletonManager fsm_;
+  std::string private_key_;
 };
 
 TEST_F(QatConfigTest, CreateRsa1024) {

@@ -118,7 +118,7 @@ FakeCryptoMbPrivateKeyMethodFactory::FakeCryptoMbPrivateKeyMethodFactory(
 Ssl::PrivateKeyMethodProviderSharedPtr
 FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
     const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& proto_config,
-    Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) {
+    Server::Configuration::TransportSocketFactoryContext& private_key_provider_context, std::string& private_key) {
   ProtobufTypes::MessagePtr message =
       std::make_unique<envoy::extensions::private_key_providers::cryptomb::v3alpha::
                            CryptoMbPrivateKeyMethodConfig>();
@@ -135,11 +135,11 @@ FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
       std::make_shared<FakeIppCryptoImpl>(supported_instruction_set_);
 
   // We need to get more RSA key params in order to be able to use BoringSSL signing functions.
-  std::string private_key = Config::DataSource::read(
+  std::string private_key_temp = Config::DataSource::read(
       conf.private_key(), false, private_key_provider_context.serverFactoryContext().api());
 
   bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+      BIO_new_mem_buf(const_cast<char*>(private_key_temp.data()), private_key_temp.size()));
 
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
   if (pkey != nullptr && EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
@@ -150,7 +150,7 @@ FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
   IppCryptoSharedPtr ipp = std::dynamic_pointer_cast<IppCrypto>(fakeIpp);
 
   return std::make_shared<CryptoMbPrivateKeyMethodProvider>(conf, private_key_provider_context,
-                                                            ipp);
+                                                            ipp, private_key);
 }
 
 } // namespace CryptoMb

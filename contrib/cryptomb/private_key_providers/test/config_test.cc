@@ -42,6 +42,8 @@ public:
         .WillByDefault(ReturnRef(private_key_method_manager_));
   }
 
+  std::string private_key;
+
   Ssl::PrivateKeyMethodProviderSharedPtr createWithConfig(std::string yaml,
                                                           bool supported_instruction_set = true) {
     FakeCryptoMbPrivateKeyMethodFactory cryptomb_factory(supported_instruction_set);
@@ -50,7 +52,7 @@ public:
 
     return factory_context_.sslContextManager()
         .privateKeyMethodManager()
-        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_);
+        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_, private_key);
   }
 
   Event::SimulatedTimeSystem time_system_;

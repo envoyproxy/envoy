@@ -257,6 +257,10 @@ bool TestPrivateKeyMethodProvider::checkFips() {
   return true;
 }
 
+bool TestPrivateKeyMethodProvider::checkInitialized(){
+  return true;
+}
+
 TestPrivateKeyConnection::TestPrivateKeyConnection(
     Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
     bssl::UniquePtr<EVP_PKEY> pkey, TestPrivateKeyConnectionTestOptions& test_options)
@@ -313,7 +317,7 @@ int TestPrivateKeyMethodProvider::ecdsaConnectionIndex() {
 
 TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     const ProtobufWkt::Any& typed_config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+    Server::Configuration::TransportSocketFactoryContext& factory_context, std::string&) {
   std::string private_key_path;
 
   auto config = MessageUtil::anyConvert<ProtobufWkt::Struct>(typed_config);
