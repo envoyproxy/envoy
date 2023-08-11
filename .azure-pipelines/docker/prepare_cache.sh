@@ -22,5 +22,4 @@ if [[ -z "$NO_MOUNT_TMPFS" ]]; then
 fi
 mkdir -p "${DOCKER_CACHE_PATH}/docker"
 mkdir -p "${DOCKER_CACHE_PATH}/bazel"
-mkdir -p "${DOCKER_CACHE_PATH}/bazelisk"
 chown -R "$DOCKER_CACHE_OWNERSHIP" "${DOCKER_CACHE_PATH}"

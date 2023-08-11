@@ -5,7 +5,6 @@ CACHE_PATH="$2"
 CACHE_ARCH="$3"
 
 echo "Docker restored: $DOCKER_RESTORED"
-echo "Bazelisk restored: $BAZELISK_RESTORED"
 echo "Bazel restored: $BAZEL_RESTORED"
 
 if [[ -z "$CACHE_PATH" ]]; then
@@ -22,26 +21,15 @@ fi
 DOCKER_CACHE_TARBALL="${CACHE_PATH}/docker/docker.tar.zst"
 BAZEL_CACHE_TARBALL="${CACHE_PATH}/bazel/bazel.tar.zst"
 BAZEL_PATH=/tmp/envoy-docker-build
-BAZELISK_CACHE_TARBALL="${CACHE_PATH}/bazelisk/bazelisk.tar.zst"
-BAZELISK_PATHS=(
-    "${BAZEL_PATH}/.cache/bazelisk"
-    "${BAZEL_PATH}/bazel_root/install")
 
 echo
 echo "================ Load caches ==================="
-if [[ "$DOCKER_RESTORED" == "true" ]] || [[ "$BAZELISK_RESTORED" == "true" ]] || [[ "$BAZEL_RESTORED" == "true" ]]; then
+if [[ "$DOCKER_RESTORED" == "true" ]] || [[ "$BAZEL_RESTORED" == "true" ]]; then
     sudo ./.azure-pipelines/docker/load_caches.sh "$ENVOY_DOCKER_BUILD_DIR" "$CACHE_PATH" "" true
 else
     sudo ./.azure-pipelines/docker/clean_docker.sh
     echo "No caches to restore"
 fi
-echo "==================================================="
-echo
-
-echo
-echo "================ Bazel info ======================="
-# Get bazelisk and print bazel info
-./ci/run_envoy_docker.sh './ci/do_ci.sh info'
 echo "==================================================="
 echo
 
@@ -69,12 +57,7 @@ if [[ "$DOCKER_RESTORED" != "true" ]]; then
     sudo ./.azure-pipelines/docker/create_cache.sh "${DOCKER_CACHE_TARBALL}" /var/lib/docker
 fi
 
-if [[ "$BAZELISK_RESTORED" != "true" ]]; then
-    sudo ./.azure-pipelines/docker/create_cache.sh "${BAZELISK_CACHE_TARBALL}" "${BAZELISK_PATHS[@]}"
-fi
-
 if [[ "$BAZEL_RESTORED" != "true" ]]; then
-    rm -rf "{BAZELISK_PATHS[@]}"
     sudo ./.azure-pipelines/docker/create_cache.sh "${BAZEL_CACHE_TARBALL}" "${BAZEL_PATH}"
 fi
 sudo chmod o+r -R "${CACHE_PATH}"

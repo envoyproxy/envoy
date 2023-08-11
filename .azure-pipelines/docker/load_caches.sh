@@ -17,9 +17,6 @@ DOCKER_CACHE_TARBALL="${DOCKER_CACHE_PATH}/docker.tar.zst"
 BAZEL_CACHE_PATH="${CACHE_PATH}/bazel"
 BAZEL_CACHE_TARBALL="${BAZEL_CACHE_PATH}/bazel.tar.zst"
 
-BAZELISK_CACHE_PATH="${CACHE_PATH}/bazelisk"
-BAZELISK_CACHE_TARBALL="${BAZELISK_CACHE_PATH}/bazelisk.tar.zst"
-
 echo "Stopping Docker daemon ..."
 systemctl stop docker docker.socket
 
@@ -68,15 +65,6 @@ if [[ -e "${BAZEL_CACHE_TARBALL}" ]]; then
     zstd --stdout -d "$BAZEL_CACHE_TARBALL" | tar --warning=no-timestamp -xf - -C "${ENVOY_DOCKER_BUILD_DIR}"
 else
     echo "No bazel cache to restore, starting bazel with no data"
-fi
-
-mkdir -p "${ENVOY_DOCKER_BUILD_DIR}/.cache/bazelisk"
-
-if [[ -e "${BAZELISK_CACHE_TARBALL}" ]]; then
-    echo "Extracting bazelisk cache ${BAZELISK_CACHE_TARBALL} -> ${ENVOY_DOCKER_BUILD_DIR}/.cache/bazelisk ..."
-    zstd --stdout -d "$BAZELISK_CACHE_TARBALL" | tar --warning=no-timestamp -xf - -C "${ENVOY_DOCKER_BUILD_DIR}/.cache/bazelisk"
-else
-    echo "No bazelisk cache to restore, starting bazelisk with no data"
 fi
 
 if mountpoint -q "${CACHE_PATH}"; then
