@@ -63,3 +63,5 @@ def _milestone():
   github.issue_label('milestone/review')
 
 handlers.command(name='milestone', func=_milestone)
+
+# moo
