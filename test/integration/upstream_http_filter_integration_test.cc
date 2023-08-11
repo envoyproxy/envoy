@@ -33,8 +33,10 @@ using HttpFilterProto =
 
 class UpstreamHttpFilterIntegrationTestBase : public HttpIntegrationTest {
 public:
-  UpstreamHttpFilterIntegrationTestBase(Network::Address::IpVersion version)
-      : HttpIntegrationTest(Http::CodecType::HTTP2, version) {
+  UpstreamHttpFilterIntegrationTestBase(Network::Address::IpVersion version,
+                                        bool use_router_filters)
+      : HttpIntegrationTest(Http::CodecType::HTTP2, version),
+        use_router_filters_(use_router_filters) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
     skip_tag_extraction_rule_check_ = true;
     autonomous_upstream_ = true;
@@ -90,8 +92,27 @@ public:
         });
   }
 
+  void addStaticFilter(const std::string& name, const std::string& key = "",
+                       const std::string& value = "") {
+    if (useRouterFilters()) {
+      addStaticRouterFilter(name, key, value);
+    } else {
+      addStaticClusterFilter(name, key, value);
+    }
+  }
+
   void addCodecClusterFilter() { addStaticClusterFilter("envoy.filters.http.upstream_codec"); }
   void addCodecRouterFilter() { addStaticRouterFilter("envoy.filters.http.upstream_codec"); }
+
+  void addCodecFilter() {
+    if (useRouterFilters()) {
+      addCodecRouterFilter();
+    } else {
+      addCodecClusterFilter();
+    }
+  }
+
+  bool useRouterFilters() const { return use_router_filters_; }
 
   void expectHeaderKeyAndValue(std::unique_ptr<Http::RequestHeaderMap>& headers,
                                const std::string value) {
@@ -119,67 +140,68 @@ public:
     return upstream_headers;
   }
 
+  bool use_router_filters_{false};
   const std::string default_header_key_ = "header-key";
   const std::string default_header_value_ = "default-value";
 };
 
 class StaticUpstreamHttpFilterIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public UpstreamHttpFilterIntegrationTestBase {
 public:
-  StaticUpstreamHttpFilterIntegrationTest() : UpstreamHttpFilterIntegrationTestBase(GetParam()) {}
+  StaticUpstreamHttpFilterIntegrationTest()
+      : UpstreamHttpFilterIntegrationTestBase(std::get<0>(GetParam()), std::get<1>(GetParam())) {}
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, StaticUpstreamHttpFilterIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(StaticUpstreamHttpFilterIntegrationTest, ClusterOnlyFilters) {
-  addStaticClusterFilter("foo", default_header_key_, default_header_value_);
-  addCodecClusterFilter();
+TEST_P(StaticUpstreamHttpFilterIntegrationTest, BasicSuccess) {
+  addStaticFilter("foo", default_header_key_, default_header_value_);
+  addCodecFilter();
   initialize();
 
   auto headers = sentRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, default_header_value_);
 }
 
-TEST_P(StaticUpstreamHttpFilterIntegrationTest, TwoClusterOnlyFilters) {
-  addStaticClusterFilter("foo", default_header_key_, "value1");
-  addStaticClusterFilter("bar", default_header_key_, "value2");
-  addCodecClusterFilter();
+TEST_P(StaticUpstreamHttpFilterIntegrationTest, TwoFilters) {
+  addStaticFilter("foo", default_header_key_, "value1");
+  addStaticFilter("bar", default_header_key_, "value2");
+  addCodecFilter();
   initialize();
 
   auto headers = sentRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, "value1,value2");
 }
 
-TEST_P(StaticUpstreamHttpFilterIntegrationTest, RouterOnlyFilters) {
-  addStaticRouterFilter("foo", default_header_key_, "value1");
-  addStaticRouterFilter("bar", default_header_key_, "value2");
-  addCodecRouterFilter();
-  initialize();
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, StaticUpstreamHttpFilterIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
 
-  auto headers = sentRequestAndGetHeaders();
-  expectHeaderKeyAndValue(headers, default_header_key_, "value1,value2");
-}
+class GrpcClientIntegrationParamTestWithVariantUpstreamConfig
+    : public Grpc::BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<
+          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>> {
+public:
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<
+          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>>& p) {
+    return fmt::format(
+        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(std::get<0>(p.param))),
+        std::get<1>(std::get<0>(p.param)) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                          : "EnvoyGrpc",
+        std::get<1>(p.param) ? "WithRouterFilters" : "WithClusterFilters");
+  }
+  Network::Address::IpVersion ipVersion() const override {
+    return std::get<0>(std::get<0>(GetParam()));
+  }
+  Grpc::ClientType clientType() const override { return std::get<1>(std::get<0>(GetParam())); }
+};
 
-// Only cluster-specified filters should be applied.
-TEST_P(StaticUpstreamHttpFilterIntegrationTest, RouterAndClusterFilters) {
-  addStaticClusterFilter("foo", default_header_key_, "value-from-cluster");
-  addStaticRouterFilter("bar", default_header_key_, "value-from-router");
-  addCodecClusterFilter();
-  addCodecRouterFilter();
-  initialize();
-
-  auto headers = sentRequestAndGetHeaders();
-  expectHeaderKeyAndValue(headers, default_header_key_, "value-from-cluster");
-}
-
-class UpstreamHttpExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
-                                                      public UpstreamHttpFilterIntegrationTestBase {
+class UpstreamHttpExtensionDiscoveryIntegrationTest
+    : public GrpcClientIntegrationParamTestWithVariantUpstreamConfig,
+      public UpstreamHttpFilterIntegrationTestBase {
 public:
   UpstreamHttpExtensionDiscoveryIntegrationTest()
-      : UpstreamHttpFilterIntegrationTestBase(ipVersion()) {}
+      : UpstreamHttpFilterIntegrationTestBase(ipVersion(), std::get<1>(GetParam())) {}
 
   void setDynamicFilterConfig(HttpFilterProto* filter, const std::string& name,
                               bool apply_without_warming, bool set_default_config = true,
@@ -251,6 +273,18 @@ public:
           router_filter.mutable_typed_config()->PackFrom(router);
           std::cout << hcm.DebugString() << std::endl;
         });
+  }
+
+  void addDynamicFilter(const std::string& name, bool apply_without_warming,
+                        bool set_default_config = true, bool rate_limit = false,
+                        bool second_connection = false) {
+    if (useRouterFilters()) {
+      addRouterDynamicFilter(name, apply_without_warming, set_default_config, rate_limit,
+                             second_connection);
+    } else {
+      addDynamicClusterFilter(name, apply_without_warming, set_default_config, rate_limit,
+                              second_connection);
+    }
   }
 
   void addEcdsCluster(const std::string& cluster_name) {
@@ -436,13 +470,10 @@ public:
 
 // All upstream HTTP filters that are applied to cluster config must apply default config
 // without warming. Otherwise, clusters initialization enters deadlock.
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, UpstreamHttpExtensionDiscoveryIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
-
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicClusterFilter(filter_name_, true);
-  addCodecClusterFilter();
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -470,8 +501,8 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccess) {
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicClusterFilter(filter_name_, true);
-  addCodecClusterFilter();
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -494,8 +525,8 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithConfigFail) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicClusterFilter(filter_name_, true);
-  addCodecClusterFilter();
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -512,9 +543,9 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithConfigFail) {
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicClusterFilter(filter_name_, true);
-  addDynamicClusterFilter(filter_name_, true);
-  addCodecClusterFilter();
+  addDynamicFilter(filter_name_, true);
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -531,9 +562,9 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName) {
   two_ecds_filters_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicClusterFilter("foo", true);
-  addDynamicClusterFilter("bar", true, true, false, true);
-  addCodecClusterFilter();
+  addDynamicFilter("foo", true);
+  addDynamicFilter("bar", true, true, false, true);
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -567,11 +598,11 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentN
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicClusterFilter(filter_name_, true);
-  addStaticClusterFilter("bar", default_header_key_, "static-val1");
-  addDynamicClusterFilter(filter_name_, true);
-  addStaticClusterFilter("foobar", "header2", "static-val2");
-  addCodecClusterFilter();
+  addDynamicFilter(filter_name_, true);
+  addStaticFilter("bar", default_header_key_, "static-val1");
+  addDynamicFilter(filter_name_, true);
+  addStaticFilter("foobar", "header2", "static-val2");
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -588,11 +619,11 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterM
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedDifferentOrder) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addStaticClusterFilter("bar", default_header_key_, "static-val1");
-  addStaticClusterFilter("foobar", "header2", "static-val2");
-  addDynamicClusterFilter(filter_name_, true);
-  addDynamicClusterFilter(filter_name_, true);
-  addCodecClusterFilter();
+  addStaticFilter("bar", default_header_key_, "static-val1");
+  addStaticFilter("foobar", "header2", "static-val2");
+  addDynamicFilter(filter_name_, true);
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -609,8 +640,8 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedDi
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, UpdateDuringConnection) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicClusterFilter(filter_name_, true);
-  addCodecClusterFilter();
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -652,8 +683,8 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, UpdateDuringConnection) {
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicClusterFilter(filter_name_, true);
-  addCodecClusterFilter();
+  addDynamicFilter(filter_name_, true);
+  addCodecFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -693,6 +724,11 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump
   EXPECT_EQ(default_header_key_, http_filter_config.header_key());
   EXPECT_EQ("xds-val", http_filter_config.header_value());
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientType, UpstreamHttpExtensionDiscoveryIntegrationTest,
+    testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool()),
+    GrpcClientIntegrationParamTestWithVariantUpstreamConfig::protocolTestParamsToString);
 
 } // namespace
 } // namespace Envoy
