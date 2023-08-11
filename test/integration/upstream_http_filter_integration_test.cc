@@ -316,6 +316,7 @@ public:
   }
 
   void initialize() override {
+    defer_listener_finalization_ = true;
     setUpstreamCount(1);
     addEcdsCluster(std::string(EcdsClusterName));
     // Use gRPC LDS instead of default file LDS.
@@ -350,6 +351,8 @@ public:
     });
 
     HttpIntegrationTest::initialize();
+    test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+    EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
     registerTestServerPorts({"http"});
   }
 
