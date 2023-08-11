@@ -45,7 +45,7 @@ jobs:
       rbe: ${{ parameters.rbe }}
       stepsPre:
       - bash: |
-          ./tools/vscode/refresh_compdb.sh
+          ./ci/run_envoy_docker.sh ./tools/vscode/refresh_compdb.sh
 
 - job: released
   displayName: Complete
