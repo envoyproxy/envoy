@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Json {
 
 Streamer::Level::Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
-    : streamer_(streamer), closer_(closer), is_first_(true) {
+    : streamer_(streamer), is_first_(true), closer_(closer) {
   streamer_.addNoCopy(opener);
 }
 
@@ -22,16 +22,16 @@ Streamer::Map& Streamer::newMap() {
 }
 
 void Streamer::mapEntries(const Map::Entries& entries) {
-  /*  if (!levels_.empty()) {
+  if (!levels_.empty()) {
     levels_.top()->newEntry();
-    }*/
+  }
   std::make_unique<Map>(*this)->newEntries(entries);
 }
 
 void Streamer::arrayEntries(const Array::Strings& strings) {
-  /*  if (!levels_.empty()) {
+  if (!levels_.empty()) {
     levels_.top()->newEntry();
-    }*/
+  }
   std::make_unique<Array>(*this)->newEntries(strings);
 }
 
@@ -54,8 +54,18 @@ void Streamer::clear() {
   flush();
 }
 
-void Streamer::Level::newEntry() {
+void Streamer::Array::newEntry() {
   if (is_first_) {
+    is_first_ = false;
+  } else {
+    streamer_.addNoCopy(",");
+  }
+}
+
+void Streamer::Map::newEntry() {
+  if (expecting_value_) {
+    expecting_value_ = false;
+  } else if (is_first_) {
     is_first_ = false;
   } else {
     streamer_.addNoCopy(",");
@@ -65,6 +75,17 @@ void Streamer::Level::newEntry() {
 void Streamer::Map::newKey(absl::string_view name) {
   newEntry();
   streamer_.addFragments({"\"", name, "\":"});
+  expecting_value_ = true;
+}
+
+void Streamer::Map::newSanitizedValue(absl::string_view value) {
+  ASSERT(expecting_value_);
+  streamer_.addSanitized(value);
+  expecting_value_ = false;
+}
+
+void Streamer::Map::endValue() {
+  expecting_value_ = false;
 }
 
 void Streamer::Map::newEntries(const Entries& entries) {

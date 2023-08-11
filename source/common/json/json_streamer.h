@@ -21,16 +21,16 @@ public:
   // the first entry has been added.
   struct Level {
     Level(Streamer& streamer, absl::string_view opener, absl::string_view closer);
-    ~Level();
+    virtual ~Level();
 
-    void newEntry();
+    virtual void newEntry() = 0;
 
   protected:
     Streamer& streamer_;
+    bool is_first_;
 
   private:
     absl::string_view closer_;
-    bool is_first_;
   };
   using LevelPtr = std::unique_ptr<Level>;
 
@@ -41,12 +41,18 @@ public:
     Map(Streamer& streamer) : Level(streamer, "{", "}") {}
     void newKey(absl::string_view name);
     void newEntries(const Entries& entries);
+    virtual void newEntry() override;
+    void newSanitizedValue(absl::string_view value);
+    void endValue();
+
+    bool expecting_value_{false};
   };
 
   struct Array : public Level {
     Array(Streamer& streamer) : Level(streamer, "[", "]") {}
     using Strings = absl::Span<const absl::string_view>;
     void newEntries(const Strings& entries);
+    virtual void newEntry() override;
   };
 
   Map& newMap();

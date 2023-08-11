@@ -212,9 +212,9 @@ void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogra
   ASSERT(totals.size() == min_size);
   ASSERT(intervals.size() == min_size);
   for (uint32_t i = 0; i < min_size; ++i) {
-    if (i != 0) {
+    /*if (i != 0) {
       array.newEntry();
-    }
+      }*/
     json_streamer_.mapEntries({{"cumulative", Json::Streamer::number(totals[i])},
                                {"interval", Json::Streamer::number(intervals[i])}});
   }
@@ -224,19 +224,24 @@ void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogra
 void StatsJsonRender::renderHistogramStart() {
   histograms_initialized_ = true;
   json_stats_array_->newEntry();
+  json_histogram_map1_ = json_streamer_.newMap();
+  json_histogram_map1_->newKey("histograms");
 
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Detailed:
     json_histogram_map2_ = json_streamer_.newMap();
     json_histogram_map2_->newKey("supported_percentiles");
     populateSupportedPercentiles();
+    json_histogram_map2_->endValue();
     json_histogram_map2_->newKey("details");
     json_histogram_array_ = json_streamer_.newArray();
+    json_histogram_map2_->endValue();
     break;
   case Utility::HistogramBucketsMode::NoBuckets:
     json_histogram_map2_ = json_streamer_.newMap();
     json_histogram_map2_->newKey("supported_quantiles");
     populateSupportedPercentiles();
+    json_histogram_map2_->endValue();
     json_histogram_map2_->newKey("computed_quantiles");
     json_histogram_array_ = json_streamer_.newArray();
     break;
@@ -256,11 +261,14 @@ void StatsJsonRender::generateHistogramDetail(const std::string& name,
 
   map.newKey("totals");
   populateBucketsVerbose(histogram.detailedTotalBuckets());
+  map.endValue();
   map.newKey("intervals");
   populateBucketsVerbose(histogram.detailedIntervalBuckets());
+  map.endValue();
 
   map.newKey("percentiles");
   populatePercentiles(histogram);
+  map.endValue();
 }
 
 void StatsJsonRender::populateBucketsTerse(
@@ -312,7 +320,7 @@ void StatsJsonRender::collectBuckets(const std::string& name,
 
   Json::Streamer::Map& map = json_streamer_.newMap();
   map.newKey("name");
-  json_streamer_.addSanitized(name);
+  map.newSanitizedValue(name);
   map.newKey("buckets");
   Json::Streamer::Array& buckets = json_streamer_.newArray();
   for (uint32_t i = 0; i < min_size; ++i) {
@@ -325,6 +333,7 @@ void StatsJsonRender::collectBuckets(const std::string& name,
 
     json_streamer_.pop(bucket_map);
   }
+  map.endValue();
   json_streamer_.pop(buckets);
   json_streamer_.pop(map);
 }
