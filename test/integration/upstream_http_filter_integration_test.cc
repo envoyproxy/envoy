@@ -19,6 +19,14 @@ namespace {
 
 constexpr absl::string_view EcdsClusterName = "ecds_cluster";
 constexpr absl::string_view Ecds2ClusterName = "ecds2_cluster";
+constexpr absl::string_view expected_types[] = {
+    "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+    "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+    "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
+    "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+    "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
+    "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
+    "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
 using HttpFilterProto =
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
@@ -82,9 +90,8 @@ public:
         });
   }
 
-  void addClusterCodecFilter() { addStaticClusterFilter("envoy.filters.http.upstream_codec"); }
-
-  void addRouterCodecFilter() { addStaticRouterFilter("envoy.filters.http.upstream_codec"); }
+  void addCodecClusterFilter() { addStaticClusterFilter("envoy.filters.http.upstream_codec"); }
+  void addCodecRouterFilter() { addStaticRouterFilter("envoy.filters.http.upstream_codec"); }
 
   void expectHeaderKeyAndValue(std::unique_ptr<Http::RequestHeaderMap>& headers,
                                const std::string value) {
@@ -109,7 +116,7 @@ public:
     std::cout << *upstream_headers;
     EXPECT_TRUE(upstream_headers != nullptr);
     cleanupUpstreamAndDownstream();
-    return std::move(upstream_headers);
+    return upstream_headers;
   }
 
   const std::string default_header_key_ = "header-key";
@@ -129,28 +136,39 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StaticUpstreamHttpFilterIntegrationTest,
 
 TEST_P(StaticUpstreamHttpFilterIntegrationTest, ClusterOnlyFilters) {
   addStaticClusterFilter("foo", default_header_key_, default_header_value_);
-  addClusterCodecFilter();
+  addCodecClusterFilter();
   initialize();
 
   auto headers = sentRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, default_header_value_);
 }
 
-TEST_P(StaticUpstreamHttpFilterIntegrationTest, RouterOnlyFilters) {
-  addStaticRouterFilter("foo", default_header_key_, default_header_value_);
-  addRouterCodecFilter();
+TEST_P(StaticUpstreamHttpFilterIntegrationTest, TwoClusterOnlyFilters) {
+  addStaticClusterFilter("foo", default_header_key_, "value1");
+  addStaticClusterFilter("bar", default_header_key_, "value2");
+  addCodecClusterFilter();
   initialize();
 
   auto headers = sentRequestAndGetHeaders();
-  expectHeaderKeyAndValue(headers, default_header_key_, default_header_value_);
+  expectHeaderKeyAndValue(headers, default_header_key_, "value1,value2");
+}
+
+TEST_P(StaticUpstreamHttpFilterIntegrationTest, RouterOnlyFilters) {
+  addStaticRouterFilter("foo", default_header_key_, "value1");
+  addStaticRouterFilter("bar", default_header_key_, "value2");
+  addCodecRouterFilter();
+  initialize();
+
+  auto headers = sentRequestAndGetHeaders();
+  expectHeaderKeyAndValue(headers, default_header_key_, "value1,value2");
 }
 
 // Only cluster-specified filters should be applied.
 TEST_P(StaticUpstreamHttpFilterIntegrationTest, RouterAndClusterFilters) {
   addStaticClusterFilter("foo", default_header_key_, "value-from-cluster");
   addStaticRouterFilter("bar", default_header_key_, "value-from-router");
-  addClusterCodecFilter();
-  addRouterCodecFilter();
+  addCodecClusterFilter();
+  addCodecRouterFilter();
   initialize();
 
   auto headers = sentRequestAndGetHeaders();
@@ -196,7 +214,7 @@ public:
     }
   }
 
-  void addClusterDynamicFilter(const std::string& name, bool apply_without_warming,
+  void addDynamicClusterFilter(const std::string& name, bool apply_without_warming,
                                bool set_default_config = true, bool rate_limit = false,
                                bool second_connection = false) {
     config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
@@ -380,6 +398,23 @@ public:
     }
   }
 
+  // Utilities used for config dump.
+  absl::string_view request(const std::string port_key, const std::string method,
+                            const std::string endpoint, BufferingStreamDecoderPtr& response) {
+    response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
+                                                  Http::CodecType::HTTP1, version_);
+    EXPECT_TRUE(response->complete());
+    return response->headers().getStatusValue();
+  }
+
+  absl::string_view contentType(const BufferingStreamDecoderPtr& response) {
+    const Http::HeaderEntry* entry = response->headers().ContentType();
+    if (entry == nullptr) {
+      return "(null)";
+    }
+    return entry->value().getStringView();
+  }
+
   const std::string filter_name_ = "foo";
   bool two_ecds_filters_{false};
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
@@ -399,13 +434,15 @@ public:
   FakeStreamPtr ecds2_stream_{nullptr};
 };
 
+// All upstream HTTP filters that are applied to cluster config must apply default config
+// without warming. Otherwise, clusters initialization enters deadlock.
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, UpstreamHttpExtensionDiscoveryIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
-TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addClusterDynamicFilter(filter_name_, true);
-  addClusterCodecFilter();
+  addDynamicClusterFilter(filter_name_, true);
+  addCodecClusterFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -431,10 +468,34 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   expectHeaderKeyAndValue(headers3, "test-val2");
 };
 
-TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarmingWithConfigFail) {
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addClusterDynamicFilter(filter_name_, true);
-  addClusterCodecFilter();
+  addDynamicClusterFilter(filter_name_, true);
+  addCodecClusterFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  registerTestServerPorts({"http"});
+
+  // Send 1st config update.
+  sendXdsResponse(filter_name_, "1", default_header_key_, "test-val1", true);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  auto headers1 = sentRequestAndGetHeaders();
+  expectHeaderKeyAndValue(headers1, "test-val1");
+
+  // Wait for configuration expiry, the default configuration should be applied.
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 2);
+  auto headers2 = sentRequestAndGetHeaders();
+  expectHeaderKeyAndValue(headers2, default_header_value_);
+};
+
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithConfigFail) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicClusterFilter(filter_name_, true);
+  addCodecClusterFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -451,9 +512,9 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarmingWithCon
 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addClusterDynamicFilter(filter_name_, true);
-  addClusterDynamicFilter(filter_name_, true);
-  addClusterCodecFilter();
+  addDynamicClusterFilter(filter_name_, true);
+  addDynamicClusterFilter(filter_name_, true);
+  addCodecClusterFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -470,9 +531,9 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) 
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName) {
   two_ecds_filters_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addClusterDynamicFilter("foo", true);
-  addClusterDynamicFilter("bar", true, true, false, true);
-  addClusterCodecFilter();
+  addDynamicClusterFilter("foo", true);
+  addDynamicClusterFilter("bar", true, true, false, true);
+  addCodecClusterFilter();
   initialize();
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
@@ -502,6 +563,135 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentN
   auto headers3 = sentRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers3, "header-key1", "test-val2");
   expectHeaderKeyAndValue(headers3, "header-key2", "test-val2");
+}
+
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicClusterFilter(filter_name_, true);
+  addStaticClusterFilter("bar", default_header_key_, "static-val1");
+  addDynamicClusterFilter(filter_name_, true);
+  addStaticClusterFilter("foobar", "header2", "static-val2");
+  addCodecClusterFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  registerTestServerPorts({"http"});
+
+  sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  auto headers = sentRequestAndGetHeaders();
+  expectHeaderKeyAndValue(headers, default_header_key_, "xds-val,static-val1,xds-val");
+  expectHeaderKeyAndValue(headers, "header2", "static-val2");
+}
+
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedDifferentOrder) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addStaticClusterFilter("bar", default_header_key_, "static-val1");
+  addStaticClusterFilter("foobar", "header2", "static-val2");
+  addDynamicClusterFilter(filter_name_, true);
+  addDynamicClusterFilter(filter_name_, true);
+  addCodecClusterFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  registerTestServerPorts({"http"});
+
+  sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+  auto headers = sentRequestAndGetHeaders();
+  expectHeaderKeyAndValue(headers, default_header_key_, "static-val1,xds-val,xds-val");
+  expectHeaderKeyAndValue(headers, "header2", "static-val2");
+}
+
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, UpdateDuringConnection) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicClusterFilter(filter_name_, true);
+  addCodecClusterFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response1 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response1->waitForEndStream());
+  EXPECT_TRUE(response1->complete());
+  std::unique_ptr<Http::RequestHeaderMap> headers1 =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(headers1 != nullptr);
+
+  // Expect default headers before config is updated
+  expectHeaderKeyAndValue(headers1, default_header_value_);
+
+  // Send config update.
+  sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+
+  IntegrationStreamDecoderPtr response2 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  std::unique_ptr<Http::RequestHeaderMap> headers2 =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(headers2 != nullptr);
+
+  // Expect default headers before config is updated
+  expectHeaderKeyAndValue(headers2, "xds-val");
+
+  cleanupUpstreamAndDownstream();
+};
+
+// Basic ECDS config dump test with one filter.
+TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicClusterFilter(filter_name_, true);
+  addCodecClusterFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  registerTestServerPorts({"http"});
+
+  // Send 1st config update.
+  sendXdsResponse(filter_name_, "1", default_header_key_, "xds-val");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.upstream_http_filter." + filter_name_ + ".config_reload", 1);
+
+  // Verify ECDS config dump are working correctly.
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
+  EXPECT_EQ("application/json", contentType(response));
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  size_t index = 0;
+  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+    index++;
+  }
+
+  // Validate we can parse as proto.
+  envoy::admin::v3::ConfigDump config_dump;
+  TestUtility::loadFromJson(response->body(), config_dump);
+  EXPECT_EQ(7, config_dump.configs_size());
+
+  // With /config_dump, the response has the format: EcdsConfigDump.
+  envoy::admin::v3::EcdsConfigDump ecds_config_dump;
+  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
+  envoy::config::core::v3::TypedExtensionConfig filter_config;
+  EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
+  EXPECT_EQ("foo", filter_config.name());
+  test::integration::filters::AddHeaderFilterConfig http_filter_config;
+  filter_config.typed_config().UnpackTo(&http_filter_config);
+  EXPECT_EQ(default_header_key_, http_filter_config.header_key());
+  EXPECT_EQ("xds-val", http_filter_config.header_value());
 }
 
 } // namespace
