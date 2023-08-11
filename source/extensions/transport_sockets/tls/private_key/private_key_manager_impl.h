@@ -14,7 +14,8 @@ public:
   // Ssl::PrivateKeyMethodManager
   Ssl::PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProvider(
       const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context, std::string& private_key) override;
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      std::string& private_key) override;
 };
 
 } // namespace Tls

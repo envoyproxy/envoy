@@ -62,7 +62,8 @@ public:
 
     return factory_context_.sslContextManager()
         .privateKeyMethodManager()
-        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_, private_key_);
+        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_,
+                                        private_key_);
   }
 
   Event::SimulatedTimeSystem time_system_;

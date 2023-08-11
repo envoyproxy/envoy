@@ -257,9 +257,7 @@ bool TestPrivateKeyMethodProvider::checkFips() {
   return true;
 }
 
-bool TestPrivateKeyMethodProvider::checkInitialized(){
-  return true;
-}
+bool TestPrivateKeyMethodProvider::checkInitialized() { return true; }
 
 TestPrivateKeyConnection::TestPrivateKeyConnection(
     Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,

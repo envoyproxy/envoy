@@ -356,14 +356,15 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
 
   ASSERT(manager_);
 
-  if(!manager_->checkQatDevice()){
+  if (!manager_->checkQatDevice()) {
     return;
   }
 
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 5));
 
-  std::string private_key_temp = private_key.empty()?Config::DataSource::read(conf.private_key(), false, api_):private_key;
+  std::string private_key_temp =
+      private_key.empty() ? Config::DataSource::read(conf.private_key(), false, api_) : private_key;
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key_temp.data()), private_key_temp.size()));

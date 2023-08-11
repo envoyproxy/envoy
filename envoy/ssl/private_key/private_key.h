@@ -88,7 +88,8 @@ public:
    */
   virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProvider(
       const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
-      Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context, std::string& private_key) PURE;
+      Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context,
+      std::string& private_key) PURE;
 };
 
 } // namespace Ssl

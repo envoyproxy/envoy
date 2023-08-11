@@ -118,7 +118,8 @@ FakeCryptoMbPrivateKeyMethodFactory::FakeCryptoMbPrivateKeyMethodFactory(
 Ssl::PrivateKeyMethodProviderSharedPtr
 FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
     const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& proto_config,
-    Server::Configuration::TransportSocketFactoryContext& private_key_provider_context, std::string& private_key) {
+    Server::Configuration::TransportSocketFactoryContext& private_key_provider_context,
+    std::string& private_key) {
   ProtobufTypes::MessagePtr message =
       std::make_unique<envoy::extensions::private_key_providers::cryptomb::v3alpha::
                            CryptoMbPrivateKeyMethodConfig>();
@@ -149,8 +150,8 @@ FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
 
   IppCryptoSharedPtr ipp = std::dynamic_pointer_cast<IppCrypto>(fakeIpp);
 
-  return std::make_shared<CryptoMbPrivateKeyMethodProvider>(conf, private_key_provider_context,
-                                                            ipp, private_key);
+  return std::make_shared<CryptoMbPrivateKeyMethodProvider>(conf, private_key_provider_context, ipp,
+                                                            private_key);
 }
 
 } // namespace CryptoMb

@@ -154,7 +154,8 @@ CpaStatus FakeLibQatCryptoImpl::cpaCyStopInstance(CpaInstanceHandle instance_han
 Ssl::PrivateKeyMethodProviderSharedPtr
 FakeQatPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
     const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& proto_config,
-    Server::Configuration::TransportSocketFactoryContext& private_key_provider_context, std::string& private_key) {
+    Server::Configuration::TransportSocketFactoryContext& private_key_provider_context,
+    std::string& private_key) {
   ProtobufTypes::MessagePtr message = std::make_unique<
       envoy::extensions::private_key_providers::qat::v3alpha::QatPrivateKeyMethodConfig>();
 
@@ -166,7 +167,8 @@ FakeQatPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
           *message, private_key_provider_context.messageValidationVisitor());
 
   std::shared_ptr<FakeLibQatCryptoImpl> libqat = std::make_shared<FakeLibQatCryptoImpl>();
-  return std::make_shared<QatPrivateKeyMethodProvider>(conf, private_key_provider_context, libqat, private_key);
+  return std::make_shared<QatPrivateKeyMethodProvider>(conf, private_key_provider_context, libqat,
+                                                       private_key);
 }
 
 } // namespace Qat
