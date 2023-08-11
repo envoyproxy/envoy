@@ -29,7 +29,7 @@ public:
   bool end_stream = false;
   // True if the chunk was actually sent to the gRPC stream
   bool delivered = false;
-  Buffer::OwnedImpl data;
+  uint32_t buffer_length = 0;
 };
 using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
@@ -143,6 +143,7 @@ public:
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream, bool delivered);
   // If the queue has chunks, return the head of the queue.
   absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only) {
+    // we should return both chunk, and the corresponding data as well here.
     return chunk_queue_.pop(undelivered_only);
   }
   // Consolidate all the chunks on the queue into a single one and return a reference.
@@ -164,6 +165,22 @@ public:
   mutableBody(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
   virtual envoy::service::ext_proc::v3::HttpTrailers*
   mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
+
+  std::unique_ptr<Buffer::OwnedImpl> getChunkData(const QueuedChunk& chunk, bool drain = false) {
+    std::cout << "\n yanjun getChunkData buffer_length " << chunk.buffer_length << "\n\n";
+    std::cout << "\n yanjun getChunkData bytes_enqueued_  " << chunk_queue_.bytesEnqueued() << "\n\n";
+
+    uint8_t* buffer = new uint8_t[chunk.buffer_length];
+    received_data_.copyOut(0, chunk.buffer_length, buffer);
+    if (drain) {
+      received_data_.drain(chunk.buffer_length);
+    }
+    auto data = std::make_unique<Buffer::OwnedImpl>(buffer, chunk.buffer_length);
+    delete[] buffer;
+
+    std::cout << "\n yanjun getChunkData new data  " << data->toString() << "\n\n";
+    return data;
+  }
 
 protected:
   void setBodyMode(
@@ -205,7 +222,13 @@ protected:
   // Flag to track whether Envoy already received the new timeout message.
   // Envoy should receive at most one such message in one particular state.
   bool new_timeout_received_{false};
+
+  // The buffer which stores all the received data that had not been shipped.
+  Buffer::OwnedImpl received_data_;
+  // The queue which store the received data chunks in order. It keeps the logical
+  // offset/size information of the chunk. The actual data is kept in the received_data_.
   ChunkQueue chunk_queue_;
+
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
 

@@ -388,12 +388,12 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
                ProcessorState::CallbackState::BufferedPartialBodyCallback) {
       // More data came in while we were waiting for a callback result. We need
       // to queue it and deliver it later in case the callback changes the data.
-      state.enqueueStreamingChunk(data, false, false);
+      state.enqueueStreamingChunk(data, end_stream, false);
       ENVOY_LOG(trace, "Call in progress for partial mode");
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
-      state.enqueueStreamingChunk(data, false, false);
+      state.enqueueStreamingChunk(data, end_stream, false);
       if (end_stream || state.queueOverHighLimit()) {
         // At either end of stream or when the buffer is full, it's time to send what we have
         // to the processor.
@@ -431,8 +431,8 @@ std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& 
   // Put all buffered data so far into one big buffer
   const auto& all_data = state.consolidateStreamedChunks(true);
   ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
-            all_data.data.length(), end_stream);
-  sendBodyChunk(state, all_data.data, ProcessorState::CallbackState::BufferedPartialBodyCallback,
+            all_data.buffer_length, end_stream);
+  sendBodyChunk(state, *state.getChunkData(all_data), ProcessorState::CallbackState::BufferedPartialBodyCallback,
                 end_stream);
   state.setPaused(true);
   return {false, FilterDataStatus::StopIterationNoBuffer};
