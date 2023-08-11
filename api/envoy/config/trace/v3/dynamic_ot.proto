@@ -29,9 +29,9 @@ message DynamicOtConfig {
 
   // Dynamic library implementing the `OpenTracing API
   // <https://github.com/opentracing/opentracing-cpp>`_.
-  string library = 1 [(validate.rules).string = {min_len: 1}];
+  string library = 1 [(validate.rules).string = {min_len: 1}, deprecated = true];
 
   // The configuration to use when creating a tracer from the given dynamic
   // library.
-  google.protobuf.Struct config = 2;
+  google.protobuf.Struct config = 2 [deprecated = true];
 }
