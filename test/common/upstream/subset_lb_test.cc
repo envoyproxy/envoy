@@ -2102,9 +2102,9 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1334));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
 
-  auto local_locality = envoy::config::core::v3::Locality();
+  envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
-  auto locality_2 = envoy::config::core::v3::Locality();
+  envoy::config::core::v3::Locality locality_2;
   locality_2.set_zone("2");
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)}, {},

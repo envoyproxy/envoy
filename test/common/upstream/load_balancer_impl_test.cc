@@ -2120,23 +2120,29 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPani
   HostsPerLocalitySharedPtr upstream_hosts_per_locality =
       makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
                             {makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}});
-  HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{{}}, {{}}});
+  HostsPerLocalitySharedPtr local_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a)},
+                            {makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_b)}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillOnce(Return(50))
-      .WillOnce(Return(50))
       .WillOnce(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillOnce(Return(1));
 
-  hostSet().healthy_hosts_ = {};
+  hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
-  hostSet().healthy_hosts_per_locality_ = makeHostsPerLocality({}, true);
+  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
-  updateHosts(local_hosts, makeHostsPerLocality({}, true));
+  updateHosts(local_hosts, local_hosts_per_locality);
 
-  // Too few local localities, we'll do regular routing (and select no host, since we're in global
+  // Local cluster is not OK, we'll do regular routing (and select no host, since we're in global
   // panic).
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
-  EXPECT_EQ(1U, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
 // Validate that if we have healthy host lists >= 2, but there is no local
