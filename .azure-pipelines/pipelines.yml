@@ -50,8 +50,6 @@ variables:
   value: v0
 - name: cacheKeyBazel
   value: '.bazelversion | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
-- name: cacheKeyBazelisk
-  value: ".bazelversion"
 - name: cacheKeyDocker
   value: ".devcontainer/Dockerfile"
 # Docker build uses separate docker cache
