@@ -40,9 +40,12 @@ public:
   ChunkQueue& operator=(const ChunkQueue&) = delete;
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
-  void push(Buffer::Instance& data, bool end_stream, bool delivered);
-  absl::optional<QueuedChunkPtr> pop(bool undelivered_only);
-  const QueuedChunk& consolidate(bool delivered);
+  void push(Buffer::Instance& data, bool end_stream, bool delivered,
+            Buffer::OwnedImpl& received_data);
+  absl::optional<QueuedChunkPtr> pop(bool undelivered_only, Buffer::OwnedImpl& received_data,
+                                     Buffer::OwnedImpl& out_data);
+  const QueuedChunk& consolidate(const Buffer::OwnedImpl& received_data,
+                                 Buffer::OwnedImpl& out_data);
 
 private:
   // If we are in either streaming mode, store chunks that we received here,
@@ -142,13 +145,14 @@ public:
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream, bool delivered);
   // If the queue has chunks, return the head of the queue.
-  absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only) {
+  absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only,
+                                                       Buffer::OwnedImpl& out_data) {
     // we should return both chunk, and the corresponding data as well here.
-    return chunk_queue_.pop(undelivered_only);
+    return chunk_queue_.pop(undelivered_only, received_data_, out_data);
   }
   // Consolidate all the chunks on the queue into a single one and return a reference.
-  const QueuedChunk& consolidateStreamedChunks(bool delivered) {
-    return chunk_queue_.consolidate(delivered);
+  const QueuedChunk& consolidateStreamedChunks(Buffer::OwnedImpl& out_data) {
+    return chunk_queue_.consolidate(received_data_, out_data);
   }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
@@ -165,22 +169,6 @@ public:
   mutableBody(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
   virtual envoy::service::ext_proc::v3::HttpTrailers*
   mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
-
-  std::unique_ptr<Buffer::OwnedImpl> getChunkData(const QueuedChunk& chunk, bool drain = false) {
-    std::cout << "\n yanjun getChunkData buffer_length " << chunk.buffer_length << "\n\n";
-    std::cout << "\n yanjun getChunkData bytes_enqueued_  " << chunk_queue_.bytesEnqueued() << "\n\n";
-
-    uint8_t* buffer = new uint8_t[chunk.buffer_length];
-    received_data_.copyOut(0, chunk.buffer_length, buffer);
-    if (drain) {
-      received_data_.drain(chunk.buffer_length);
-    }
-    auto data = std::make_unique<Buffer::OwnedImpl>(buffer, chunk.buffer_length);
-    delete[] buffer;
-
-    std::cout << "\n yanjun getChunkData new data  " << data->toString() << "\n\n";
-    return data;
-  }
 
 protected:
   void setBodyMode(

@@ -399,7 +399,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
         // to the processor.
         bool terminate;
         FilterDataStatus chunk_result;
-        std::tie(terminate, chunk_result) = sendStreamChunk(state, end_stream);
+        std::tie(terminate, chunk_result) = sendStreamChunk(state);
         if (terminate) {
           return chunk_result;
         }
@@ -416,8 +416,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   return result;
 }
 
-std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& state,
-                                                                bool end_stream) {
+std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& state) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return {true, FilterDataStatus::StopIterationNoBuffer};
@@ -429,11 +428,12 @@ std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& 
   }
 
   // Put all buffered data so far into one big buffer
-  const auto& all_data = state.consolidateStreamedChunks(true);
+  Buffer::OwnedImpl out_data;
+  const auto& all_data = state.consolidateStreamedChunks(out_data);
   ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
-            all_data.buffer_length, end_stream);
-  sendBodyChunk(state, *state.getChunkData(all_data), ProcessorState::CallbackState::BufferedPartialBodyCallback,
-                end_stream);
+            all_data.buffer_length, all_data.end_stream);
+  sendBodyChunk(state, out_data, ProcessorState::CallbackState::BufferedPartialBodyCallback,
+                all_data.end_stream);
   state.setPaused(true);
   return {false, FilterDataStatus::StopIterationNoBuffer};
 }
