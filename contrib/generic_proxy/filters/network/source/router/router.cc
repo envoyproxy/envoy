@@ -241,9 +241,11 @@ void UpstreamRequest::onConnectionClose(Network::ConnectionEvent event) {
 
   switch (event) {
   case Network::ConnectionEvent::LocalClose:
+  case Network::ConnectionEvent::LocalReset:
     resetStream(StreamResetReason::LocalReset);
     break;
   case Network::ConnectionEvent::RemoteClose:
+  case Network::ConnectionEvent::RemoteReset:
     resetStream(StreamResetReason::ConnectionTermination);
     break;
   default:

@@ -211,10 +211,12 @@ void Router::onEvent(Network::ConnectionEvent event) {
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
+  case Network::ConnectionEvent::RemoteReset:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     upstream_request_->upstream_host_->outlierDetector().putResult(
         Upstream::Outlier::Result::LocalOriginConnectFailed);
     break;
+  case Network::ConnectionEvent::LocalReset:
   case Network::ConnectionEvent::LocalClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;

@@ -1434,9 +1434,11 @@ void Context::onEvent(Network::ConnectionEvent event) {
   }
   switch (event) {
   case Network::ConnectionEvent::LocalClose:
+  case Network::ConnectionEvent::LocalReset:
     onDownstreamConnectionClose(CloseType::Local);
     break;
   case Network::ConnectionEvent::RemoteClose:
+  case Network::ConnectionEvent::RemoteReset:
     onDownstreamConnectionClose(CloseType::Remote);
     break;
   default:

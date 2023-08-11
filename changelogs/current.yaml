@@ -53,5 +53,9 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: tcp
+  change: |
+    added TCP RST detection and actively sending support, this is disabled by default, and it can be enabled by a setting method
+    and the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection`` as well.
 
 deprecated:
