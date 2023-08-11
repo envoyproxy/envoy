@@ -738,7 +738,7 @@ TEST_P(ConnectionImplTest, ClientAbortResetAfterCallback) {
 }
 
 // Test the server connection is AbortReset closed and RST is detected
-// from client
+// from the client.
 TEST_P(ConnectionImplTest, ServerResetClose) {
   setUpBasicConnection();
   connect(true);
@@ -1105,7 +1105,7 @@ TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test normal close without readDisable.
+// Test normal RST close without readDisable.
 TEST_P(ConnectionImplTest, RstCloseOnNotReadDisabledConnection) {
   setUpBasicConnection();
   connect(true);
@@ -1119,7 +1119,7 @@ TEST_P(ConnectionImplTest, RstCloseOnNotReadDisabledConnection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test normal close with readDisable=true.
+// Test normal RST close with readDisable=true.
 TEST_P(ConnectionImplTest, RstCloseOnReadDisabledConnectionThenWrite) {
   setUpBasicConnection();
   connect(true);
@@ -1132,7 +1132,7 @@ TEST_P(ConnectionImplTest, RstCloseOnReadDisabledConnectionThenWrite) {
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalReset));
   server_connection_->close(ConnectionCloseType::AbortReset);
 
-  // This the reset error is only triggered by write event.
+  // The reset error is triggered by write event.
   // write error: Connection reset by peer, code: 9
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset))
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
@@ -3173,6 +3173,19 @@ TEST_F(PostCloseConnectionImplTest, CloseAbort) {
   EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
   EXPECT_CALL(*transport_socket_, closeSocket(_));
   connection_->close(ConnectionCloseType::Abort);
+}
+
+// Test that close(ConnectionCloseType::AbortReset) won't write and flush pending data.
+TEST_F(PostCloseConnectionImplTest, AbortReset) {
+  InSequence s;
+  initialize();
+  writeSomeData();
+
+  // Connection abort. We have data written above in writeSomeData(),
+  // it won't be written and flushed due to ``ConnectionCloseType::AbortReset``.
+  EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  connection_->close(ConnectionCloseType::AbortReset);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {

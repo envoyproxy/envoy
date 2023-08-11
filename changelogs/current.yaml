@@ -55,7 +55,7 @@ new_features:
     added support for lmove command.
 - area: tcp
   change: |
-    added TCP RST detection and actively sending support, this is disabled by default, and it can be enabled by a setting method
-    and the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection`` as well.
+    added the support to detect and send TCP RST for raw buffer socket based connection, and this is disabled by default.
+    It can be enabled or disabled by a setting method and the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
 
 deprecated:

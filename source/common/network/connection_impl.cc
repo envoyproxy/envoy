@@ -141,7 +141,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "closing data_to_write={} type={}", *this,
                        data_to_write, enumToInt(type));
 
-  // RST will be send only if enable_rst_detect_send_ is true, otherwise it is converted to normal
+  // RST will be sent only if enable_rst_detect_send_ is true, otherwise it is converted to normal
   // ConnectionCloseType::Abort
   if ((!enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) ||
       (!Runtime::runtimeFeatureEnabled(
@@ -292,7 +292,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
     }
   }
 
-  // It is safe in the close(), the IO handle can handle.
+  // It is safe to call close() since there is an IO handle check.
   socket_->close();
 
   // Call the base class directly as close() is called in the destructor.
