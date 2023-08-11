@@ -30,6 +30,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+CIO
 DFP
 DOM
 GiB
@@ -248,6 +249,7 @@ hls
 iframe
 ingressed
 integrations
+iouring
 jkl
 lang
 libsxg
@@ -632,6 +634,7 @@ cryptographic
 cryptographically
 cstate
 cstring
+ctad
 ctor
 ctrl
 customizations
@@ -1396,6 +1399,7 @@ versa
 versioned
 vhost
 viewable
+viewport
 vip
 virtualhost
 virtualize

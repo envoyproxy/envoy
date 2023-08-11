@@ -70,7 +70,8 @@ public:
                                const ClusterSetConstSharedPtr& clusters);
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterAddOrUpdate(absl::string_view cluster_name,
+                            Upstream::ThreadLocalClusterCommand& get_cluster) override;
   void onClusterRemoval(const std::string& cluster_name) override;
 
   // Upstream::LoadBalancer

@@ -50,7 +50,7 @@ public:
   ~OriginalDstClusterHandle();
 
 private:
-  const std::shared_ptr<OriginalDstCluster> cluster_;
+  std::shared_ptr<OriginalDstCluster> cluster_;
   friend class OriginalDstCluster;
 };
 
@@ -189,6 +189,8 @@ private:
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };
+
+DECLARE_FACTORY(OriginalDstClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

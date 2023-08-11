@@ -1694,7 +1694,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
 
-  auto local_locality = envoy::config::core::v3::Locality();
+  envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}}, local_locality)},
@@ -1824,7 +1824,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 
-  auto local_locality = envoy::config::core::v3::Locality();
+  envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}}, local_locality)},
@@ -1950,7 +1950,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
 
-  auto local_locality = envoy::config::core::v3::Locality();
+  envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)},

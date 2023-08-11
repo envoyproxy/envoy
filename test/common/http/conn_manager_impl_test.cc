@@ -525,7 +525,6 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
 
 // Invalid paths are rejected with 400.
 TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
-  InSequence s;
   setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;
@@ -540,7 +539,10 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
     data.drain(4);
     return Http::okStatus();
   }));
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(true));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
   auto* filter = new MockStreamFilter();
@@ -557,8 +559,9 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
-        EXPECT_EQ("path_normalization_failed",
-                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
+        // Error details are different in UHV and legacy modes
+        EXPECT_THAT(filter->decoder_callbacks_->streamInfo().responseCodeDetails().value(),
+                    HasSubstr("path"));
       }));
   EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
@@ -575,6 +578,9 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
   normalize_path_ = true;
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
 
   auto* filter = new MockStreamFilter();
 
@@ -619,6 +625,9 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   normalize_path_ = true;
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -715,6 +724,10 @@ TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForward
       v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
   const std::string original_path = "/x/%2E%2e/z%2f%2Fabc%5C../def";
   const std::string normalized_path = "/z/def";
+
+#ifdef ENVOY_ENABLE_UHV
+  expectCheckWithDefaultUhv();
+#endif
 
   auto* filter = new MockStreamFilter();
 
@@ -2380,15 +2393,17 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
       }));
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+      .WillOnce(Invoke([this](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                              const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_EQ(nullptr, stream_info.route());
+        // Even the request is invalid, will still try to find a route before response filter chain
+        // path.
+        EXPECT_EQ(route_config_provider_.route_config_->route_, stream_info.route());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))

@@ -1256,7 +1256,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
-               upstream_context_, prefix);
+               factory_context.clusterManager(), upstream_context_, prefix);
     helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
   }
 }

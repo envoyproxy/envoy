@@ -1,4 +1,5 @@
 #include "test/integration/filters/test_listener_filter.pb.h"
+#include "test/integration/filters/test_network_filter.pb.h"
 #include "test/server/admin/admin_instance.h"
 
 using testing::HasSubstr;
@@ -793,16 +794,27 @@ TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
 
 ProtobufTypes::MessagePtr testDumpEcdsConfig(const Matchers::StringMatcher&) {
   auto msg = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
-  auto* ecds = msg->mutable_ecds_filters()->Add();
-  ecds->set_version_info("1");
-  ecds->mutable_last_updated()->set_seconds(5);
 
-  envoy::config::core::v3::TypedExtensionConfig filter_config;
-  filter_config.set_name("foo");
+  auto* ecds_listener = msg->mutable_ecds_filters()->Add();
+  ecds_listener->set_version_info("1");
+  ecds_listener->mutable_last_updated()->set_seconds(5);
+  envoy::config::core::v3::TypedExtensionConfig listener_filter_config;
+  listener_filter_config.set_name("foo");
   auto listener_config = test::integration::filters::TestTcpListenerFilterConfig();
   listener_config.set_drain_bytes(5);
-  filter_config.mutable_typed_config()->PackFrom(listener_config);
-  ecds->mutable_ecds_filter()->PackFrom(filter_config);
+  listener_filter_config.mutable_typed_config()->PackFrom(listener_config);
+  ecds_listener->mutable_ecds_filter()->PackFrom(listener_filter_config);
+
+  auto* ecds_network = msg->mutable_ecds_filters()->Add();
+  ecds_network->set_version_info("1");
+  ecds_network->mutable_last_updated()->set_seconds(5);
+  envoy::config::core::v3::TypedExtensionConfig network_filter_config;
+  network_filter_config.set_name("bar");
+  auto network_config = test::integration::filters::TestDrainerNetworkFilterConfig();
+  network_config.set_bytes_to_drain(5);
+  network_filter_config.mutable_typed_config()->PackFrom(network_config);
+  ecds_network->mutable_ecds_filter()->PackFrom(network_filter_config);
+
   return msg;
 }
 
@@ -821,6 +833,19 @@ TEST_P(AdminInstanceTest, ConfigDumpEcds) {
     "typed_config": {
      "@type": "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig",
      "drain_bytes": 5
+    }
+   },
+   "last_updated": "1970-01-01T00:00:05Z"
+  },
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EcdsConfigDump.EcdsFilterConfig",
+   "version_info": "1",
+   "ecds_filter": {
+    "@type": "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig",
+    "name": "bar",
+    "typed_config": {
+     "@type": "type.googleapis.com/test.integration.filters.TestDrainerNetworkFilterConfig",
+     "bytes_to_drain": 5
     }
    },
    "last_updated": "1970-01-01T00:00:05Z"
@@ -846,6 +871,14 @@ TEST_P(AdminInstanceTest, ConfigDumpEcdsByResourceAndMask) {
    "ecds_filter": {
     "@type": "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig",
     "name": "foo"
+   }
+  },
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EcdsConfigDump.EcdsFilterConfig",
+   "version_info": "1",
+   "ecds_filter": {
+    "@type": "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig",
+    "name": "bar"
    }
   }
  ]

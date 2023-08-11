@@ -33,6 +33,7 @@ package network
 import "C"
 import (
 	"strings"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -66,8 +67,32 @@ func (c *cgoApiImpl) DownstreamInfo(f unsafe.Pointer, infoType int) string {
 	return strings.Clone(info)
 }
 
-func (c *cgoApiImpl) UpstreamConnect(libraryID string, addr string) unsafe.Pointer {
-	return unsafe.Pointer(C.envoyGoFilterUpstreamConnect(unsafe.Pointer(&libraryID), unsafe.Pointer(&addr)))
+func (c *cgoApiImpl) GetFilterState(f unsafe.Pointer, key string) string {
+	cb := (*connectionCallback)(f)
+	var value string
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+	cb.sema.Add(1)
+	res := C.envoyGoFilterGetFilterState(cb.wrapper, unsafe.Pointer(&key), unsafe.Pointer(&value))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&cb.waitingOnEnvoy, 1)
+		cb.sema.Wait()
+	} else {
+		cb.sema.Done()
+		// TODO: handle res
+	}
+
+	return strings.Clone(value)
+}
+
+func (c *cgoApiImpl) SetFilterState(f unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	cb := (*connectionCallback)(f)
+	_ = C.envoyGoFilterSetFilterState(cb.wrapper, unsafe.Pointer(&key), unsafe.Pointer(&value), C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
+	// TODO: handle res
+}
+
+func (c *cgoApiImpl) UpstreamConnect(libraryID string, addr string, connID uint64) unsafe.Pointer {
+	return unsafe.Pointer(C.envoyGoFilterUpstreamConnect(unsafe.Pointer(&libraryID), unsafe.Pointer(&addr), C.ulonglong(connID)))
 }
 
 func (c *cgoApiImpl) UpstreamWrite(f unsafe.Pointer, bufferPtr unsafe.Pointer, bufferLen int, endStream int) {

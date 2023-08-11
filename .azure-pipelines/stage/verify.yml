@@ -29,8 +29,7 @@ jobs:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_DOCKER_IN_DOCKER: 1
       ENVOY_RBE: 1
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
     displayName: "Verify packages"
 
@@ -38,7 +37,7 @@ jobs:
   displayName: Debs (arm64)
   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
   timeoutInMinutes: 120
-  pool: "envoy-arm-large"
+  pool: "envoy-arm-small"
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -53,10 +52,13 @@ jobs:
       AZP_BRANCH: $(Build.SourceBranch)
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_DOCKER_IN_DOCKER: 1
-      ENVOY_RBE: 1
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci"
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        CI_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
+      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+        CI_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
     displayName: "Verify packages"
 
 - job: verified
