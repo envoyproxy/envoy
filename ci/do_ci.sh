@@ -625,16 +625,7 @@ case $CI_TARGET in
 
     info)
         setup_clang_toolchain
-        n=0
-        until [ "$n" -ge 10 ]; do
-            bazel info "${BAZEL_GLOBAL_OPTIONS[@]}" \
-                && break
-            n=$((n+1))
-            if [[ "$n" -ne 10 ]]; then
-                sleep 15
-                echo "Retrying fetch ..."
-            fi
-        done
+        bazel info "${BAZEL_GLOBAL_OPTIONS[@]}"
         ;;
 
     msan)

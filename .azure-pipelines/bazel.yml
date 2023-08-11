@@ -9,9 +9,6 @@ parameters:
   default: ""
 
 # caching
-- name: cacheKeyBazelisk
-  type: string
-  default: .bazelversion
 - name: cacheKeyDocker
   type: string
   default: ".devcontainer/Dockerfile"
@@ -152,7 +149,6 @@ steps:
 - template: cached.yml
   parameters:
     keyBazel: "${{ parameters.cacheKeyBazel }}"
-    keyBazelisk: "${{ parameters.cacheKeyBazelisk }}"
     keyDocker: "${{ parameters.cacheKeyDocker }}"
     pathDockerBind: "${{ parameters.pathDockerBind }}"
     arch: "${{ parameters.artifactSuffix }}"
