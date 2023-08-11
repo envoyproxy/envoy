@@ -100,8 +100,6 @@ enum class PoolFailureReason {
   LocalConnectionFailure,
   // A remote connection failure took place while creating a new connection.
   RemoteConnectionFailure,
-  // A reset connection failure took place while creating a new connection.
-  CloseResetConnectionFailure,
   // A timeout occurred while creating a new connection.
   Timeout,
 };

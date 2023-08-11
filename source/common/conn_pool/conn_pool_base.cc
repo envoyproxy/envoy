@@ -503,12 +503,11 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       ConnectionPool::PoolFailureReason reason;
       if (client.timed_out_) {
         reason = ConnectionPool::PoolFailureReason::Timeout;
-      } else if (event == Network::ConnectionEvent::RemoteClose) {
+      } else if (event == Network::ConnectionEvent::RemoteClose ||
+                 event == Network::ConnectionEvent::RemoteReset) {
         reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
-      } else if (event == Network::ConnectionEvent::LocalClose) {
-        reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       } else {
-        reason = ConnectionPool::PoolFailureReason::CloseResetConnectionFailure;
+        reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
 
       // Raw connect failures should never happen under normal circumstances. If we have an
