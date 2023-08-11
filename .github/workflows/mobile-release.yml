@@ -18,7 +18,7 @@ jobs:
       statuses: write
 
   android_release_artifacts:
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.schedule

@@ -150,7 +150,6 @@ coverage --instrumentation_filter="//library/common[/:]"
 # instead use a platform-specific config
 #############################################################################
 build:mobile-remote-ci-common --config=rbe-engflow
-build:mobile-remote-ci-common --experimental_credential_helper=%workspace%/bazel/engflow-bazel-credential-helper.sh
 build:mobile-remote-ci-common --jobs=40
 build:mobile-remote-ci-common --verbose_failures
 build:mobile-remote-ci-common --spawn_strategy=remote,sandboxed,local

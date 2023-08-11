@@ -321,7 +321,10 @@ public:
   /**
    * @return const std::vector<HostVector>& list of hosts organized per
    *         locality. The local locality is the first entry if
-   *         hasLocalLocality() is true.
+   *         hasLocalLocality() is true. All hosts within the same entry have the same locality
+   *         and all hosts with a given locality are in the same entry. With the exception of
+   *         the local locality entry (if present), all entries are sorted by locality with
+   *         those considered less by the LocalityLess comparator ordered earlier in the list.
    */
   virtual const std::vector<HostVector>& get() const PURE;
 

@@ -56,7 +56,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -94,6 +94,12 @@ message QuicProtocolOptions {
   // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
   QuicKeepAliveSettings connection_keepalive = 5;
+
+  // An array of QUIC connection options represented in a serialized string, separated by commas.
+  string connection_options = 6;
+
+  // An array of QUIC client connection options represented in a serialized string, separated by commas.
+  string client_connection_options = 7;
 }
 
 message UpstreamHttpProtocolOptions {
