@@ -36,9 +36,6 @@ TEST_F(UtilsTest, HistogramMode) {
   query_["histogram_buckets"] = "detailed";
   EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());
   EXPECT_EQ(Utility::HistogramBucketsMode::Detailed, histogram_buckets_mode);
-  query_["histogram_buckets"] = "combined";
-  EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());
-  EXPECT_EQ(Utility::HistogramBucketsMode::Combined, histogram_buckets_mode);
   query_["histogram_buckets"] = "garbage";
   absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode);
   EXPECT_FALSE(status.ok());

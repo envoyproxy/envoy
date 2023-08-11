@@ -56,18 +56,6 @@ TEST_F(StatsHtmlRenderTest, HistogramDetailed) {
               HasSubstr(expected));
 }
 
-TEST_F(StatsHtmlRenderTest, HistogramCombined) {
-  // The goal of this test is to show that we have embedded the histogram as a json fragment.
-  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Combined;
-  StatsHtmlRender renderer{response_headers_, response_, params_};
-  constexpr absl::string_view expected =
-      "const json = \n{\"stats\":[{"
-      "\"supported_percentiles\":[0,25,50,75,90,95,99,99.5,99.9,100]},"
-      "{\"histograms\":[{\"name\":\"h1\",\"totals\":";
-  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
-              HasSubstr(expected));
-}
-
 TEST_F(StatsHtmlRenderTest, RenderActive) {
   params_.format_ = StatsFormat::ActiveHtml;
   StatsHtmlRender renderer(response_headers_, response_, params_);

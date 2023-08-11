@@ -343,25 +343,5 @@ TEST_F(StatsRenderTest, JsonHistogramDetailed) {
               JsonStringEq(expected));
 }
 
-TEST_F(StatsRenderTest, JsonHistogramCombined) {
-  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Combined;
-  StatsJsonRender renderer(response_headers_, response_, params_);
-  const std::string expected = R"EOF(
-{
-    "stats": [
-      {"supported_percentiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100]},
-      {"histograms": [
-        {
-          "name": "h1",
-          "totals": [[200, 10, 1], [300, 10, 2]],
-          "intervals": [[200, 10, 1], [300, 10, 2]],
-          "percentiles": [200, 207.5, 302.5, 306.25, 308.5, 309.25, 309.85, 309.925, 309.985, 310],
-        }
-      ]}]}
-  )EOF";
-  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
-              JsonStringEq(expected));
-}
-
 } // namespace Server
 } // namespace Envoy

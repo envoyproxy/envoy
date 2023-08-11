@@ -39,7 +39,6 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
     addDisjointBuckets(name, histogram, response);
     break;
   case Utility::HistogramBucketsMode::Detailed:
-  case Utility::HistogramBucketsMode::Combined:
     response.addFragments({name, ":\n  totals="});
     addDetail(histogram.detailedTotalBuckets(), response);
     response.add("\n  intervals=");
@@ -181,7 +180,6 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
     break;
   }
   case Utility::HistogramBucketsMode::Detailed:
-  case Utility::HistogramBucketsMode::Combined:
     generateHistogramDetail(name, histogram);
     break;
   }
@@ -227,11 +225,6 @@ void StatsJsonRender::renderHistogramStart() {
   histograms_initialized_ = true;
   json_stats_array_->newEntry();
 
-  if (histogram_buckets_mode_ != Utility::HistogramBucketsMode::Combined) {
-    json_histogram_map1_ = json_streamer_.newMap();
-    json_histogram_map1_->newKey("histograms");
-  }
-
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Detailed:
     json_histogram_map2_ = json_streamer_.newMap();
@@ -240,24 +233,6 @@ void StatsJsonRender::renderHistogramStart() {
     json_histogram_map2_->newKey("details");
     json_histogram_array_ = json_streamer_.newArray();
     break;
-  case Utility::HistogramBucketsMode::Combined: {
-    // 'Combined' histogram mode results in a stat of type
-    // 'supported_percentiles' being created once, covering all
-    // histograms. All other histograms are emitted at the same logical level
-    // as counter, gauges, or text readouts, simplifying the hierarchy, but
-    // making the 'combined' mode work somewhat different from the others.
-    //
-    // Both the single 'supported_percentiles'.
-    Json::Streamer::Map& map = json_streamer_.newMap();
-    map.newKey("supported_percentiles");
-    populateSupportedPercentiles();
-    json_streamer_.pop(map);
-    json_stats_array_->newEntry();
-    json_histogram_map1_ = json_streamer_.newMap();
-    json_streamer_.addNoCopy("\"histograms\":");
-    json_histogram_array_ = json_streamer_.newArray();
-    break;
-  }
   case Utility::HistogramBucketsMode::NoBuckets:
     json_histogram_map2_ = json_streamer_.newMap();
     json_histogram_map2_->newKey("supported_quantiles");
@@ -279,22 +254,13 @@ void StatsJsonRender::generateHistogramDetail(const std::string& name,
   Json::Streamer::Map& map = json_streamer_.newMap();
   map.newEntries({{"name", absl::StrCat("\"", Json::sanitize(name_buffer_, name), "\"")}});
 
-  if (histogram_buckets_mode_ == Utility::HistogramBucketsMode::Combined) {
-    map.newKey("totals");
-    populateBucketsTerse(histogram.detailedTotalBuckets());
-    map.newKey("intervals");
-    populateBucketsTerse(histogram.detailedIntervalBuckets());
-    std::vector<double> totals = histogram.cumulativeStatistics().computedQuantiles();
-    map.newEntries({{"percentiles", absl::StrCat("[", absl::StrJoin(totals, ","), "]")}});
-  } else {
-    map.newKey("totals");
-    populateBucketsVerbose(histogram.detailedTotalBuckets());
-    map.newKey("intervals");
-    populateBucketsVerbose(histogram.detailedIntervalBuckets());
+  map.newKey("totals");
+  populateBucketsVerbose(histogram.detailedTotalBuckets());
+  map.newKey("intervals");
+  populateBucketsVerbose(histogram.detailedIntervalBuckets());
 
-    map.newKey("percentiles");
-    populatePercentiles(histogram);
-  }
+  map.newKey("percentiles");
+  populatePercentiles(histogram);
 }
 
 void StatsJsonRender::populateBucketsTerse(
