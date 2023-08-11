@@ -1497,14 +1497,14 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareResidualsMismatched) {
 
   // The other 50% of the time, traffic will go to cross-zone upstreams with residual capacity
   // Zone B has no upstream hosts
-  // Zone C has a residual capacity of 20.83% (20.84% with rouding error): sampled value 0-2083
+  // Zone C has a residual capacity of 20.83% (20.84% with rounding error): sampled value 0-2083
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(2083));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
-  // Zone D has a residual capacity of 20.83% (20.84% with rouding error): sampled value 2084-4167
+  // Zone D has a residual capacity of 20.83% (20.84% with rounding error): sampled value 2084-4167
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2084));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
