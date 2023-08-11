@@ -64,6 +64,7 @@ protected:
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
+  void OnInvalidHeaders() override;
 
   // Http::MultiplexedStreamImplBase
   bool hasPendingData() override;

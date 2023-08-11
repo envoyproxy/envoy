@@ -346,11 +346,10 @@ public:
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority, time_source),
-        disable_active_health_check_(health_check_config.disable_active_health_check()),
-        health_status_(health_status) {
+        disable_active_health_check_(health_check_config.disable_active_health_check()) {
     // This EDS flags setting is still necessary for stats, configuration dump, canonical
     // coarseHealth() etc.
-    setEdsHealthFlag(health_status);
+    HostImpl::setEdsHealthStatus(health_status);
     HostImpl::weight(initial_weight);
   }
 
@@ -397,36 +396,52 @@ public:
     // Evaluate active health status first.
 
     // Active unhealthy.
-    if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
-        healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK)) {
+    if (healthFlagsGet(enumToInt(HealthFlag::FAILED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::FAILED_OUTLIER_CHECK))) {
       return HealthStatus::UNHEALTHY;
     }
+
+    // Eds unhealthy.
+    if (eds_health_status_ == envoy::config::core::v3::UNHEALTHY ||
+        eds_health_status_ == envoy::config::core::v3::DRAINING ||
+        eds_health_status_ == envoy::config::core::v3::TIMEOUT) {
+      return eds_health_status_;
+    }
+
     // Active degraded.
     if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC)) {
       return HealthStatus::DEGRADED;
     }
 
-    // Use EDS status if no any active status.
-    return health_status_;
+    // Eds degraded or healthy.
+    return eds_health_status_;
   }
 
   Host::Health coarseHealth() const override {
     // If any of the unhealthy flags are set, host is unhealthy.
-    if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
-        healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
-        healthFlagGet(HealthFlag::FAILED_EDS_HEALTH)) {
+    if (healthFlagsGet(enumToInt(HealthFlag::FAILED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::FAILED_OUTLIER_CHECK) |
+                       enumToInt(HealthFlag::FAILED_EDS_HEALTH))) {
       return Host::Health::Unhealthy;
     }
 
     // If any of the degraded flags are set, host is degraded.
-    if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC) ||
-        healthFlagGet(HealthFlag::DEGRADED_EDS_HEALTH)) {
+    if (healthFlagsGet(enumToInt(HealthFlag::DEGRADED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::DEGRADED_EDS_HEALTH))) {
       return Host::Health::Degraded;
     }
 
     // The host must have no flags or be pending removal.
     ASSERT(health_flags_ == 0 || healthFlagGet(HealthFlag::PENDING_DYNAMIC_REMOVAL));
     return Host::Health::Healthy;
+  }
+
+  void setEdsHealthStatus(envoy::config::core::v3::HealthStatus eds_health_status) override {
+    eds_health_status_ = eds_health_status;
+    setEdsHealthFlag(eds_health_status);
+  }
+  Host::HealthStatus edsHealthStatus() const override {
+    return Host::HealthStatus(eds_health_status_.load());
   }
 
   uint32_t weight() const override { return weight_; }
@@ -447,6 +462,9 @@ protected:
                    HostDescriptionConstSharedPtr host);
 
 private:
+  // Helper function to check multiple health flags at once.
+  bool healthFlagsGet(uint32_t flags) const { return health_flags_ & flags; }
+
   void setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status);
 
   std::atomic<uint32_t> health_flags_{};
@@ -455,7 +473,7 @@ private:
   // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
-  HealthStatus health_status_{};
+  std::atomic<Host::HealthStatus> eds_health_status_{};
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImpl>& parent) : parent_(parent) {
@@ -477,9 +495,23 @@ public:
   HostsPerLocalityImpl() : HostsPerLocalityImpl(std::vector<HostVector>(), false) {}
 
   // Single locality constructor
+  //
+  // Parameter requirements:
+  // 1. All entries in hosts must have the same locality.
+  // 2. If has_local_locality is true, then the locality of all entries in hosts
+  //    must be equal to the current envoy's locality.
   HostsPerLocalityImpl(const HostVector& hosts, bool has_local_locality = false)
       : HostsPerLocalityImpl(std::vector<HostVector>({hosts}), has_local_locality) {}
 
+  // Multiple localities constructor
+  //
+  // locality_hosts must adhere to the following ordering constraints:
+  // 1. All hosts within a single HostVector bucket must have the same locality
+  // 2. No hosts in different HostVector buckets can have the same locality
+  // 3. If has_local_locality is true, then the locality of all hosts in the first HostVector bucket
+  //    must be equal to the current envoy's locality.
+  // 4. All non-local HostVector buckets must be sorted in ascending order by the LocalityLess
+  // comparator
   HostsPerLocalityImpl(std::vector<HostVector>&& locality_hosts, bool has_local_locality)
       : local_(has_local_locality), hosts_per_locality_(std::move(locality_hosts)) {
     ASSERT(!has_local_locality || !hosts_per_locality_.empty());
@@ -1081,7 +1113,8 @@ private:
       common_lb_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
-  std::vector<Network::FilterFactoryCb> filter_factories_;
+  Filter::NetworkFilterFactoriesList filter_factories_;
+  Filter::UpstreamNetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;

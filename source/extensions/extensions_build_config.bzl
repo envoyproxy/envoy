@@ -141,6 +141,7 @@ EXTENSIONS = {
     "envoy.filters.http.file_system_buffer":            "//source/extensions/filters/http/file_system_buffer:config",
     "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
     "envoy.filters.http.geoip":                     "//source/extensions/filters/http/geoip:config",
+    "envoy.filters.http.grpc_field_extraction":         "//source/extensions/filters/http/grpc_field_extraction:config",
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
@@ -149,6 +150,7 @@ EXTENSIONS = {
     "envoy.filters.http.header_to_metadata":            "//source/extensions/filters/http/header_to_metadata:config",
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
+    "envoy.filters.http.json_to_metadata":            "//source/extensions/filters/http/json_to_metadata:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
     # Disabled by default

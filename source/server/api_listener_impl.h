@@ -209,8 +209,8 @@ public:
           http_connection_manager_(parent.http_connection_manager_factory_(read_callbacks_)) {}
     ~ApiListenerWrapper() override;
 
-    Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
-                                    bool is_internally_created = false) override;
+    Http::RequestDecoderHandlePtr newStreamHandle(Http::ResponseEncoder& response_encoder,
+                                                  bool is_internally_created = false) override;
 
     SyntheticReadCallbacks& readCallbacks() { return read_callbacks_; }
 

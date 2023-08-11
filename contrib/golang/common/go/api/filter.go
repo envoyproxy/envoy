@@ -109,12 +109,16 @@ type StreamInfo interface {
 	DownstreamLocalAddress() string
 	// DownstreamRemoteAddress return the downstream remote address.
 	DownstreamRemoteAddress() string
-	// UpstreamHostAddress return the upstream host address.
-	UpstreamHostAddress() (string, bool)
+	// UpstreamLocalAddress return the upstream local address.
+	UpstreamLocalAddress() (string, bool)
+	// UpstreamRemoteAddress return the upstream remote address.
+	UpstreamRemoteAddress() (string, bool)
 	// UpstreamClusterName return the upstream host cluster.
 	UpstreamClusterName() (string, bool)
 	// FilterState return the filter state interface.
 	FilterState() FilterState
+	// VirtualClusterName returns the name of the virtual cluster which got matched
+	VirtualClusterName() (string, bool)
 }
 
 type StreamFilterCallbacks interface {
@@ -165,10 +169,8 @@ type UpstreamFilter interface {
 }
 
 type ConnectionCallback interface {
-	// Return the local address of the connection.
-	LocalAddr() string
-	// Return the remote address of the connection.
-	RemoteAddr() string
+	// StreamInfo returns the stream info of the connection
+	StreamInfo() StreamInfo
 	// Write data to the connection.
 	Write(buffer []byte, endStream bool)
 	// Close the connection.

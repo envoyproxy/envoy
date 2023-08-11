@@ -1,5 +1,8 @@
 name: mobile_docs
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -13,12 +16,17 @@ concurrency:
 jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/env.yml
-    secrets: inherit
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
 
   docs:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 20
     container:

@@ -80,6 +80,8 @@ class EnvoyConfigurationTest {
     dnsCacheSaveIntervalSeconds: Int = 101,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
+    http3ConnectionOptions: String = "5RTO",
+    http3ClientConnectionOptions: String = "MPQC",
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -102,9 +104,12 @@ class EnvoyConfigurationTest {
     rtdsTimeoutSeconds: Int = 0,
     xdsAddress: String = "",
     xdsPort: Int = 0,
+    xdsAuthHeader: String = "",
+    xdsAuthToken: String = "",
     xdsJwtToken: String = "",
     xdsJwtTokenLifetimeSeconds: Int = 0,
     xdsSslRootCerts: String = "",
+    xdsSni: String = "",
     nodeId: String = "",
     nodeRegion: String = "",
     nodeZone: String = "",
@@ -127,6 +132,8 @@ class EnvoyConfigurationTest {
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      http3ConnectionOptions,
+      http3ClientConnectionOptions,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
@@ -151,9 +158,12 @@ class EnvoyConfigurationTest {
       rtdsTimeoutSeconds,
       xdsAddress,
       xdsPort,
+      xdsAuthHeader,
+      xdsAuthToken,
       xdsJwtToken,
       xdsJwtTokenLifetimeSeconds,
       xdsSslRootCerts,
+      xdsSni,
       nodeId,
       nodeRegion,
       nodeZone,
@@ -193,6 +203,8 @@ class EnvoyConfigurationTest {
     // H3
     assertThat(resolvedTemplate).contains("http3_protocol_options:");
     assertThat(resolvedTemplate).contains("name: alternate_protocols_cache");
+    assertThat(resolvedTemplate).contains("connection_options: 5RTO");
+    assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
 
     // Gzip
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");

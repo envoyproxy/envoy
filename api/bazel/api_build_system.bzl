@@ -10,11 +10,16 @@ load(
     "EXTERNAL_PROTO_GO_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
 )
+load(
+    "@envoy//bazel/cc_proto_descriptor_library:builddefs.bzl",
+    "cc_proto_descriptor_library",
+)
 
 EnvoyProtoDepsInfo = provider(fields = ["deps"])
 
 _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"
+_CC_PROTO_DESCRIPTOR_SUFFIX = "_cc_proto_descriptor"
 _CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
@@ -128,6 +133,17 @@ def api_cc_py_proto_library(
         deps = deps + _COMMON_PROTO_DEPS,
         visibility = visibility,
     )
+
+    # This is to support Envoy Mobile using Protobuf-Lite.
+    # Protobuf-Lite generated C++ code does not include reflection
+    # capabilities but analogous functionality can be provided by
+    # cc_proto_descriptor_library.
+    cc_proto_descriptor_library(
+        name = name + _CC_PROTO_DESCRIPTOR_SUFFIX,
+        visibility = visibility,
+        deps = [name],
+    )
+
     cc_proto_library_name = name + _CC_PROTO_SUFFIX
     pgv_cc_proto_library(
         name = cc_proto_library_name,

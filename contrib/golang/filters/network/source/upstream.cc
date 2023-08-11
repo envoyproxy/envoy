@@ -6,6 +6,8 @@
 #include "envoy/tcp/conn_pool.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/network/filter_state_dst_address.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,8 +46,8 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
 }
 
 UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_lib,
-                           Event::Dispatcher* dispatcher)
-    : dynamic_lib_(dynamic_lib), dispatcher_(dispatcher), addr_(addr) {
+                           unsigned long long int goConnID, Event::Dispatcher* dispatcher)
+    : dynamic_lib_(dynamic_lib), goConnID_(goConnID), dispatcher_(dispatcher), addr_(addr) {
   if (dispatcher_ == nullptr) {
     DispatcherStore& store = dispatcherStore();
     Thread::LockGuard guard(store.lock_);
@@ -53,8 +55,14 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
     ASSERT(!store.dispatchers_.empty());
     dispatcher_ = &store.dispatchers_[store.dispatcher_idx_++ % store.dispatchers_.size()].get();
   }
-  header_map_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
-      {{Http::Headers::get().EnvoyOriginalDstHost, addr}});
+  stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
+      dispatcher_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info_->filterState()->setData(
+      Network::DestinationAddress::key(),
+      std::make_shared<Network::DestinationAddress>(
+          Network::Utility::parseInternetAddressAndPort(addr, false)),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
+      StreamInfo::StreamSharingMayImpactPooling::None);
 }
 
 void UpstreamConn::connect() {
@@ -121,7 +129,7 @@ void UpstreamConn::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
   conn_->addUpstreamCallbacks(*this);
   remote_addr_ = conn_->connection().connectionInfoProvider().directRemoteAddress()->asString();
 
-  dynamic_lib_->envoyGoFilterOnUpstreamConnectionReady(wrapper_);
+  dynamic_lib_->envoyGoFilterOnUpstreamConnectionReady(wrapper_, goConnID_);
 }
 
 void UpstreamConn::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
@@ -133,7 +141,8 @@ void UpstreamConn::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
     handler_ = nullptr;
   }
 
-  dynamic_lib_->envoyGoFilterOnUpstreamConnectionFailure(wrapper_, static_cast<int>(reason));
+  dynamic_lib_->envoyGoFilterOnUpstreamConnectionFailure(wrapper_, static_cast<int>(reason),
+                                                         goConnID_);
 }
 
 void UpstreamConn::onEvent(Network::ConnectionEvent event) {

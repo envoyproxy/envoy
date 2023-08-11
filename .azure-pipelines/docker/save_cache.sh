@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+set -o pipefail
+
 DOCKER_CACHE_PATH="$1"
 NO_MOUNT_TMPFS="${2:-}"
 

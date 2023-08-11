@@ -104,6 +104,18 @@ public:
   virtual absl::Span<const std::string> dnsSansLocalCertificate() const PURE;
 
   /**
+   * @return absl::Span<const std::string> the IP entries in the SAN field of the peer certificate.
+   *         Returns {} if there is no peer certificate, or no SAN field, or no IPs.
+   **/
+  virtual absl::Span<const std::string> ipSansPeerCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the IP entries in the SAN field of the local
+   *certificate. Returns {} if there is no local certificate, or no SAN field, or no IPs.
+   **/
+  virtual absl::Span<const std::string> ipSansLocalCertificate() const PURE;
+
+  /**
    * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be
    *         considered valid from. Returns empty absl::optional if there is no peer certificate.
    **/

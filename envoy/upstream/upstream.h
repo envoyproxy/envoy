@@ -220,6 +220,16 @@ public:
   virtual HealthStatus healthStatus() const PURE;
 
   /**
+   * Set the EDS health status of the host. This is used when the host status is updated via EDS.
+   */
+  virtual void setEdsHealthStatus(HealthStatus health_status) PURE;
+
+  /**
+   * @return the EDS health status of the host.
+   */
+  virtual HealthStatus edsHealthStatus() const PURE;
+
+  /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
    * a new monitor must be installed before the host is used across threads. Thus,
    * this routine should only be called on the main thread before the host is used across threads.
@@ -311,7 +321,10 @@ public:
   /**
    * @return const std::vector<HostVector>& list of hosts organized per
    *         locality. The local locality is the first entry if
-   *         hasLocalLocality() is true.
+   *         hasLocalLocality() is true. All hosts within the same entry have the same locality
+   *         and all hosts with a given locality are in the same entry. With the exception of
+   *         the local locality entry (if present), all entries are sorted by locality with
+   *         those considered less by the LocalityLess comparator ordered earlier in the list.
    */
   virtual const std::vector<HostVector>& get() const PURE;
 

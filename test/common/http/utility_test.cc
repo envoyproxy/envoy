@@ -1937,6 +1937,52 @@ TEST(Utility, isValidRefererValue) {
       Utility::isValidRefererValue(absl::string_view("http://www.example.com/?foo=bar#fragment")));
   EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("foo=bar#fragment")));
 };
+TEST(HeaderIsValidTest, SchemeIsValid) {
+  EXPECT_TRUE(Utility::schemeIsValid("http"));
+  EXPECT_TRUE(Utility::schemeIsValid("https"));
+  EXPECT_TRUE(Utility::schemeIsValid("HtTP"));
+  EXPECT_TRUE(Utility::schemeIsValid("HtTPs"));
+
+  EXPECT_FALSE(Utility::schemeIsValid("htt"));
+  EXPECT_FALSE(Utility::schemeIsValid("httpss"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsHttp) {
+  EXPECT_TRUE(Utility::schemeIsHttp("http"));
+  EXPECT_TRUE(Utility::schemeIsHttp("htTp"));
+  EXPECT_FALSE(Utility::schemeIsHttp("https"));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+  EXPECT_TRUE(Utility::schemeIsHttp("http"));
+  EXPECT_FALSE(Utility::schemeIsHttp("htTp"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsHttps) {
+  EXPECT_TRUE(Utility::schemeIsHttps("https"));
+  EXPECT_TRUE(Utility::schemeIsHttps("htTps"));
+  EXPECT_FALSE(Utility::schemeIsHttps("http"));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+  EXPECT_TRUE(Utility::schemeIsHttps("https"));
+  EXPECT_FALSE(Utility::schemeIsHttps("htTps"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsValidLegacy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+
+  EXPECT_TRUE(Utility::schemeIsValid("http"));
+  EXPECT_TRUE(Utility::schemeIsValid("https"));
+
+  // These were not considered valid previously
+  EXPECT_FALSE(Utility::schemeIsValid("HtTP"));
+  EXPECT_FALSE(Utility::schemeIsValid("HtTPs"));
+
+  EXPECT_FALSE(Utility::schemeIsValid("htt"));
+  EXPECT_FALSE(Utility::schemeIsValid("httpss"));
+}
 
 } // namespace Http
 } // namespace Envoy
