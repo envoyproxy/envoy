@@ -1022,9 +1022,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()),
-      http_filter_config_provider_manager_(
-          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-              server_context)),
       observability_name_(!config.alt_stat_name().empty()
                               ? std::make_unique<std::string>(config.alt_stat_name())
                               : nullptr),
@@ -1092,6 +1089,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())
                         : nullptr),
+      http_filter_config_provider_manager_(
+          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+              server_context)),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),

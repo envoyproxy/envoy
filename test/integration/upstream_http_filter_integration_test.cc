@@ -71,7 +71,6 @@ public:
   }
 };
 
-/*
 class StaticUpstreamHttpFilterIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public UpstreamHttpFilterIntegrationTestBase {
@@ -146,7 +145,6 @@ TEST_P(StaticUpstreamHttpFilterIntegrationTest, RouterAndClusterFilters) {
   cleanupUpstreamAndDownstream();
   EXPECT_FALSE(upstream_headers->get(Http::LowerCaseString("x-header-to-add")).empty());
 }
-*/
 
 class UpstreamHttpExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                                       public UpstreamHttpFilterIntegrationTestBase {
@@ -449,7 +447,6 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   ASSERT_FALSE(header.empty());
   EXPECT_EQ(header_default_value_, header[0]->value().getStringView());
 
-  /*
   // Send 1st config update.
   sendXdsResponse(filter_name_, "1", header_key_, "test-val1");
   test_server_->waitForCounterGe(
@@ -467,10 +464,8 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
     auto headers = sentRequestAndGetHeaders();
     expectHeaderKeyAndValue(headers, "test-val2");
   }
-  */
 };
 
-/*
 TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, BasicWithoutWarmingWithConfigFail) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, true);
@@ -553,7 +548,6 @@ TEST_P(UpstreamHttpExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentN
     expectHeaderKeyAndValue(headers, "header-key2", "test-val2");
   }
 }
-*/
 
 } // namespace
 } // namespace Envoy

@@ -40,8 +40,10 @@ void ManagerImpl::add(const Target& target) {
 void ManagerImpl::initialize(const Watcher& watcher) {
   // If the manager is already initializing or initialized, consider this a programming error.
   ASSERT(state_ == State::Uninitialized, fmt::format("attempted to initialize {} twice", name_));
+
   // Create a handle to notify when initialization is complete.
   watcher_handle_ = watcher.createHandle(name_);
+
   if (count_ == 0) {
     // If we have no targets, initialization trivially completes. This can happen, and is fine.
     ENVOY_LOG(debug, "{} contains no targets", name_);
@@ -50,6 +52,7 @@ void ManagerImpl::initialize(const Watcher& watcher) {
     // If we have some targets, start initialization...
     ENVOY_LOG(debug, "{} initializing", name_);
     state_ = State::Initializing;
+
     // Attempt to initialize each target. If a target is unavailable, treat it as though it
     // completed immediately.
     for (const auto& target_handle : target_handles_) {
