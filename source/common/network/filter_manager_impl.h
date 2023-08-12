@@ -104,9 +104,12 @@ public:
   FilterManagerImpl(FilterManagerConnection& connection, const Socket& socket)
       : connection_(connection), socket_(socket) {}
 
-  void addWriteFilter(WriteFilterSharedPtr filter);
-  void addFilter(FilterSharedPtr filter);
-  void addReadFilter(ReadFilterSharedPtr filter);
+  void addWriteFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                      WriteFilterSharedPtr filter);
+  void addFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                 FilterSharedPtr filter);
+  void addReadFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                     ReadFilterSharedPtr filter);
   void removeReadFilter(ReadFilterSharedPtr filter);
   bool initializeReadFilters();
   void onRead();
@@ -115,8 +118,10 @@ public:
 
 private:
   struct ActiveReadFilter : public ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
-    ActiveReadFilter(FilterManagerImpl& parent, ReadFilterSharedPtr filter)
-        : parent_(parent), filter_(filter) {}
+    ActiveReadFilter(FilterManagerImpl& parent,
+                     const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                     ReadFilterSharedPtr filter)
+        : parent_(parent), network_filter_matcher_(network_filter_matcher), filter_(filter) {}
 
     Connection& connection() override { return parent_.connection_; }
     const Socket& socket() override { return parent_.socket_; }
@@ -134,6 +139,7 @@ private:
     bool startUpstreamSecureTransport() override { return parent_.startUpstreamSecureTransport(); }
 
     FilterManagerImpl& parent_;
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher_;
     ReadFilterSharedPtr filter_;
     bool initialized_{};
   };
@@ -141,8 +147,11 @@ private:
   using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
 
   struct ActiveWriteFilter : public WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
-    ActiveWriteFilter(FilterManagerImpl& parent, WriteFilterSharedPtr filter)
-        : parent_(parent), filter_(std::move(filter)) {}
+    ActiveWriteFilter(FilterManagerImpl& parent,
+                      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                      WriteFilterSharedPtr filter)
+        : parent_(parent), network_filter_matcher_(network_filter_matcher),
+          filter_(std::move(filter)) {}
 
     Connection& connection() override { return parent_.connection_; }
     const Socket& socket() override { return parent_.socket_; }
@@ -152,6 +161,7 @@ private:
     }
 
     FilterManagerImpl& parent_;
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher_;
     WriteFilterSharedPtr filter_;
   };
 

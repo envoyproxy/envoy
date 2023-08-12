@@ -32,6 +32,7 @@ inline void addUniqueClusters(
 
 Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
@@ -87,11 +88,14 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       std::make_shared<CommandSplitter::InstanceImpl>(
           std::move(router), context.scope(), filter_config->stat_prefix_, context.timeSource(),
           proto_config.latency_in_micros(), std::move(fault_manager));
-  return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
+  return [network_filter_matcher, splitter,
+          filter_config](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl factory;
-    filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
-        factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
-        filter_config));
+    filter_manager.addReadFilter(
+        network_filter_matcher,
+        std::make_shared<ProxyFilter>(factory,
+                                      Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()},
+                                      *splitter, filter_config));
   };
 }
 

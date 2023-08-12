@@ -39,7 +39,7 @@ bool AsyncTcpClientImpl::connect() {
   }
   connection_->enableHalfClose(enable_half_close_);
   connection_->addConnectionCallbacks(*this);
-  connection_->addReadFilter(std::make_shared<NetworkReadFilter>(*this));
+  connection_->addReadFilter(nullptr, std::make_shared<NetworkReadFilter>(*this));
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       cluster_info_->trafficStats()->upstream_cx_connect_ms_, dispatcher_.timeSource());
 

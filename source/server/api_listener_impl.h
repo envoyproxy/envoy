@@ -91,13 +91,16 @@ protected:
       void raiseConnectionEvent(Network::ConnectionEvent event);
 
       // Network::FilterManager
-      void addWriteFilter(Network::WriteFilterSharedPtr) override {
+      void addWriteFilter(const Network::NetworkFilterMatcherSharedPtr&,
+                          Network::WriteFilterSharedPtr) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
-      void addFilter(Network::FilterSharedPtr) override {
+      void addFilter(const Network::NetworkFilterMatcherSharedPtr&,
+                     Network::FilterSharedPtr) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
-      void addReadFilter(Network::ReadFilterSharedPtr) override {
+      void addReadFilter(const Network::NetworkFilterMatcherSharedPtr&,
+                         Network::ReadFilterSharedPtr) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
       void removeReadFilter(Network::ReadFilterSharedPtr) override {

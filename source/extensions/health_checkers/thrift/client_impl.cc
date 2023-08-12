@@ -66,7 +66,7 @@ void ClientImpl::start() {
   host_description_ = std::move(conn_data.host_description_);
   session_callbacks_ = std::make_unique<ThriftSessionCallbacks>(*this);
   connection_->addConnectionCallbacks(*session_callbacks_);
-  connection_->addReadFilter(session_callbacks_);
+  connection_->addReadFilter(nullptr, session_callbacks_);
 
   connection_->connect();
   connection_->noDelay(true);

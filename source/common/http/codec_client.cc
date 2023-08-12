@@ -32,7 +32,7 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
     connection_->detectEarlyCloseWhenReadDisabled(false);
   }
   connection_->addConnectionCallbacks(*this);
-  connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
+  connection_->addReadFilter(nullptr, Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });

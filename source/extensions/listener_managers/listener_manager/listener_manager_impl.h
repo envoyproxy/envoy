@@ -53,6 +53,9 @@ public:
       Configuration::FilterChainFactoryContext& filter_chain_factory_context,
       Filter::NetworkFilterConfigProviderManagerImpl& config_provider_manager);
 
+  static Network::NetworkFilterMatcherSharedPtr
+  createNetworkFilterMatcher(const envoy::config::listener::v3::Filter& filter);
+
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */

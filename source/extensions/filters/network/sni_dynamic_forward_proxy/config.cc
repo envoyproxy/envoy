@@ -16,15 +16,18 @@ SniDynamicForwardProxyNetworkFilterConfigFactory::SniDynamicForwardProxyNetworkF
 
 Network::FilterFactoryCb
 SniDynamicForwardProxyNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, Server::Configuration::FactoryContext& context) {
+    const FilterConfig& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    Server::Configuration::FactoryContext& context) {
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
       proto_config, cache_manager_factory, context.clusterManager()));
 
-  return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ProxyFilter>(filter_config));
+  return [network_filter_matcher, filter_config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(network_filter_matcher,
+                                 std::make_shared<ProxyFilter>(filter_config));
   };
 }
 

@@ -94,7 +94,8 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
       ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
           proto_config.config_discovery(), proto_config.name(),
           filter_chain_factory_context.getServerFactoryContext(), filter_chain_factory_context,
-          filter_chain_factory_context.clusterManager(), is_terminal, "network", nullptr));
+          filter_chain_factory_context.clusterManager(), is_terminal, "network", nullptr,
+          createNetworkFilterMatcher(proto_config)));
       continue;
     }
 
@@ -115,12 +116,22 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.getServerFactoryContext()),
         is_terminal);
-    Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
+    Network::FilterFactoryCb callback = factory.createFilterFactoryFromProto(
+        *message, createNetworkFilterMatcher(proto_config), filter_chain_factory_context);
     ret.push_back(
         config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name()));
   }
   return ret;
+}
+
+Network::NetworkFilterMatcherSharedPtr ProdListenerComponentFactory::createNetworkFilterMatcher(
+    const envoy::config::listener::v3::Filter& filter) {
+  if (!filter.has_filter_disabled()) {
+    return nullptr;
+  }
+
+  return std::shared_ptr<Network::NetworkFilterMatcher>(
+      Network::NetworkFilterMatcherBuilder::buildNetworkFilterMatcher(filter.filter_disabled()));
 }
 
 Filter::ListenerFilterFactoriesList
@@ -158,7 +169,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
           config_discovery, name, context.getServerFactoryContext(), context,
-          context.clusterManager(), false, "listener", createListenerFilterMatcher(proto_config));
+          context.clusterManager(), false, "listener", createListenerFilterMatcher(proto_config),
+          nullptr);
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",

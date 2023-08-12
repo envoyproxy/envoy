@@ -10,21 +10,28 @@
 namespace Envoy {
 namespace Network {
 
-void FilterManagerImpl::addWriteFilter(WriteFilterSharedPtr filter) {
+void FilterManagerImpl::addWriteFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    WriteFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
-  ActiveWriteFilterPtr new_filter = std::make_unique<ActiveWriteFilter>(*this, filter);
+  ActiveWriteFilterPtr new_filter =
+      std::make_unique<ActiveWriteFilter>(*this, network_filter_matcher, filter);
   filter->initializeWriteFilterCallbacks(*new_filter);
   LinkedList::moveIntoList(std::move(new_filter), downstream_filters_);
 }
 
-void FilterManagerImpl::addFilter(FilterSharedPtr filter) {
-  addReadFilter(filter);
-  addWriteFilter(filter);
+void FilterManagerImpl::addFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher, FilterSharedPtr filter) {
+  addReadFilter(network_filter_matcher, filter);
+  addWriteFilter(network_filter_matcher, filter);
 }
 
-void FilterManagerImpl::addReadFilter(ReadFilterSharedPtr filter) {
+void FilterManagerImpl::addReadFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    ReadFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
-  ActiveReadFilterPtr new_filter = std::make_unique<ActiveReadFilter>(*this, filter);
+  ActiveReadFilterPtr new_filter =
+      std::make_unique<ActiveReadFilter>(*this, network_filter_matcher, filter);
   filter->initializeReadFilterCallbacks(*new_filter);
   LinkedList::moveIntoListBack(std::move(new_filter), upstream_filters_);
 }

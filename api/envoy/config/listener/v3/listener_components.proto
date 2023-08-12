@@ -26,6 +26,38 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Listener :ref:`configuration overview <config_listeners>`
 
 // [#next-free-field: 6]
+// [#not-implemented-hide:]
+message NetworkFilterChainMatchPredicate {
+  // A set of match configurations used for logical operations.
+  message MatchSet {
+    // The list of rules that make up the set.
+    repeated NetworkFilterChainMatchPredicate rules = 1
+        [(validate.rules).repeated = {min_items: 2}];
+  }
+
+  oneof rule {
+    option (validate.required) = true;
+
+    // A set that describes a logical OR. If any member of the set matches, the match configuration
+    // matches.
+    MatchSet or_match = 1;
+
+    // A set that describes a logical AND. If all members of the set match, the match configuration
+    // matches.
+    MatchSet and_match = 2;
+
+    // A negation match. The match configuration will match if the negated match condition matches.
+    NetworkFilterChainMatchPredicate not_match = 3;
+
+    // The match configuration will always match.
+    bool any_match = 4 [(validate.rules).bool = {const: true}];
+
+    // Match destination port.
+    type.v3.Int32Range destination_port_range = 5;
+  }
+}
+
+// [#next-free-field: 7]
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.Filter";
 
@@ -47,6 +79,12 @@ message Filter {
     // listener closes the connections.
     core.v3.ExtensionConfigSource config_discovery = 5;
   }
+
+  // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.
+  // See :ref:`NetworkFilterChainMatchPredicate <envoy_v3_api_msg_config.listener.v3.NetworkFilterChainMatchPredicate>`
+  // for further examples.
+  // [#not-implemented-hide:]
+  NetworkFilterChainMatchPredicate filter_disabled = 6;
 }
 
 // Specifies the match criteria for selecting a specific filter chain for a

@@ -19,6 +19,7 @@ namespace RateLimitFilter {
 
 Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::ratelimit::v3::RateLimit& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
@@ -29,11 +30,14 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
   Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service());
-  return [proto_config, &context, timeout,
+  return [network_filter_matcher, proto_config, &context, timeout,
           filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<Filter>(
-        filter_config, Filters::Common::RateLimit::rateLimitClient(
-                           context, proto_config.rate_limit_service().grpc_service(), timeout)));
+    filter_manager.addReadFilter(
+        network_filter_matcher,
+        std::make_shared<Filter>(
+            filter_config,
+            Filters::Common::RateLimit::rateLimitClient(
+                context, proto_config.rate_limit_service().grpc_service(), timeout)));
   };
 }
 

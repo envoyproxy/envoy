@@ -56,9 +56,12 @@ public:
   ~ConnectionImpl() override;
 
   // Network::FilterManager
-  void addWriteFilter(WriteFilterSharedPtr filter) override;
-  void addFilter(FilterSharedPtr filter) override;
-  void addReadFilter(ReadFilterSharedPtr filter) override;
+  void addWriteFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                      WriteFilterSharedPtr filter) override;
+  void addFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                 FilterSharedPtr filter) override;
+  void addReadFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                     ReadFilterSharedPtr filter) override;
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 

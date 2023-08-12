@@ -20,10 +20,11 @@ class FactoryBase : public Server::Configuration::NamedNetworkFilterConfigFactor
 public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
                                Server::Configuration::FactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
-                                             context);
+                                             network_filter_matcher, context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -60,9 +61,10 @@ private:
                                             Server::Configuration::ServerFactoryContext&) {
     return is_terminal_filter_;
   }
-  virtual Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    Server::Configuration::FactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const ConfigProto& proto_config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Server::Configuration::FactoryContext& context) PURE;
 
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsTyped(const ProtocolOptionsProto&,

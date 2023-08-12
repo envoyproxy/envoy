@@ -48,5 +48,44 @@ bool ListenerFilterAndMatcher::matches(ListenerFilterCallbacks& cb) const {
                      [&cb](const auto& matcher) { return matcher->matches(cb); });
 }
 
+NetworkFilterMatcherPtr NetworkFilterMatcherBuilder::buildNetworkFilterMatcher(
+    const envoy::config::listener::v3::NetworkFilterChainMatchPredicate& match_config) {
+  switch (match_config.rule_case()) {
+  case envoy::config::listener::v3::NetworkFilterChainMatchPredicate::RuleCase::kAnyMatch:
+    return std::make_unique<NetworkFilterAnyMatcher>();
+  case envoy::config::listener::v3::NetworkFilterChainMatchPredicate::RuleCase::kNotMatch:
+    return std::make_unique<NetworkFilterNotMatcher>(match_config.not_match());
+  case envoy::config::listener::v3::NetworkFilterChainMatchPredicate::RuleCase::kAndMatch:
+    return std::make_unique<NetworkFilterAndMatcher>(match_config.and_match().rules());
+  case envoy::config::listener::v3::NetworkFilterChainMatchPredicate::RuleCase::kOrMatch:
+    return std::make_unique<NetworkFilterOrMatcher>(match_config.or_match().rules());
+  case envoy::config::listener::v3::NetworkFilterChainMatchPredicate::RuleCase::
+      kDestinationPortRange:
+    return std::make_unique<NetworkFilterDstPortMatcher>(match_config.destination_port_range());
+  case envoy::config::listener::v3::NetworkFilterChainMatchPredicate::RuleCase::RULE_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+NetworkFilterSetLogicMatcher::NetworkFilterSetLogicMatcher(
+    absl::Span<const ::envoy::config::listener::v3::NetworkFilterChainMatchPredicate* const>
+        predicates)
+    : sub_matchers_(predicates.length()) {
+  std::transform(predicates.begin(), predicates.end(), sub_matchers_.begin(), [](const auto* pred) {
+    return NetworkFilterMatcherBuilder::buildNetworkFilterMatcher(*pred);
+  });
+}
+
+bool NetworkFilterOrMatcher::matches(NetworkFilterCallbacks& cb) const {
+  return std::any_of(sub_matchers_.begin(), sub_matchers_.end(),
+                     [&cb](const auto& matcher) { return matcher->matches(cb); });
+}
+
+bool NetworkFilterAndMatcher::matches(NetworkFilterCallbacks& cb) const {
+  return std::all_of(sub_matchers_.begin(), sub_matchers_.end(),
+                     [&cb](const auto& matcher) { return matcher->matches(cb); });
+}
+
 } // namespace Network
 } // namespace Envoy

@@ -24,11 +24,14 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::direct_response::v3::Config& config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
       Server::Configuration::FactoryContext& context) override {
-    return [config, &context](Network::FilterManager& filter_manager) -> void {
-      auto content = Config::DataSource::read(config.response(), true, context.api());
-      filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(content));
-    };
+    return
+        [network_filter_matcher, config, &context](Network::FilterManager& filter_manager) -> void {
+          auto content = Config::DataSource::read(config.response(), true, context.api());
+          filter_manager.addReadFilter(network_filter_matcher,
+                                       std::make_shared<DirectResponseFilter>(content));
+        };
   }
 
   bool isTerminalFilterByProtoTyped(

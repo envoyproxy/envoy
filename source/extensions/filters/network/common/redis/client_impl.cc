@@ -69,7 +69,8 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                                    redis_command_stats, scope, is_transaction_client);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
-  client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
+  client->connection_->addReadFilter(nullptr,
+                                     Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
   client->connection_->noDelay(true);
   return client;

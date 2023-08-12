@@ -113,14 +113,21 @@ ConnectionImpl::~ConnectionImpl() {
   close(ConnectionCloseType::NoFlush);
 }
 
-void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
-  filter_manager_.addWriteFilter(filter);
+void ConnectionImpl::addWriteFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    WriteFilterSharedPtr filter) {
+  filter_manager_.addWriteFilter(network_filter_matcher, filter);
 }
 
-void ConnectionImpl::addFilter(FilterSharedPtr filter) { filter_manager_.addFilter(filter); }
+void ConnectionImpl::addFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                               FilterSharedPtr filter) {
+  filter_manager_.addFilter(network_filter_matcher, filter);
+}
 
-void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
-  filter_manager_.addReadFilter(filter);
+void ConnectionImpl::addReadFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    ReadFilterSharedPtr filter) {
+  filter_manager_.addReadFilter(network_filter_matcher, filter);
 }
 
 void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {

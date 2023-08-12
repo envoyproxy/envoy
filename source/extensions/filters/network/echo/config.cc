@@ -21,11 +21,12 @@ public:
   EchoConfigFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
 
 private:
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::network::echo::v3::Echo&,
-                                    Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<EchoFilter>());
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::network::echo::v3::Echo&,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Server::Configuration::FactoryContext&) override {
+    return [network_filter_matcher](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(network_filter_matcher, std::make_shared<EchoFilter>());
     };
   }
 

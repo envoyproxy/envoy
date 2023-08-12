@@ -23,9 +23,10 @@ public:
   SniDynamicForwardProxyNetworkFilterConfigFactory();
 
 private:
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const FilterConfig& proto_config,
-                                    Server::Configuration::FactoryContext& context) override;
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const FilterConfig& proto_config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace SniDynamicForwardProxy

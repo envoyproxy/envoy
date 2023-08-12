@@ -53,7 +53,8 @@ public:
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
       Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) PURE;
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher) PURE;
 
   /**
    * Get an FilterConfigProviderPtr for a statically inlined filter config.

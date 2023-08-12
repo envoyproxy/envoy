@@ -40,10 +40,16 @@ public:
    * Applies the default configuration if one is set, otherwise does nothing.
    */
   virtual void applyDefaultConfiguration() PURE;
+
   /**
    * Return Network::ListenerFilterMatcherSharedPtr& the listener filter matcher.
    */
   virtual const Network::ListenerFilterMatcherSharedPtr& getListenerFilterMatcher() PURE;
+
+  /**
+   * Return Network::NetworkFilterMatcherSharedPtr& the network filter matcher.
+   */
+  virtual const Network::NetworkFilterMatcherSharedPtr& getNetworkFilterMatcher() PURE;
 };
 
 template <class FactoryCallback>

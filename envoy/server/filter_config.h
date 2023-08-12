@@ -125,6 +125,7 @@ public:
    */
   virtual Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
+                               const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
                                FactoryContext& filter_chain_factory_context) PURE;
 
   std::string category() const override { return "envoy.filters.network"; }

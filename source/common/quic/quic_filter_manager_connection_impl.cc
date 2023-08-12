@@ -29,16 +29,22 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
       Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_));
 }
 
-void QuicFilterManagerConnectionImpl::addWriteFilter(Network::WriteFilterSharedPtr filter) {
-  filter_manager_->addWriteFilter(filter);
+void QuicFilterManagerConnectionImpl::addWriteFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    Network::WriteFilterSharedPtr filter) {
+  filter_manager_->addWriteFilter(network_filter_matcher, filter);
 }
 
-void QuicFilterManagerConnectionImpl::addFilter(Network::FilterSharedPtr filter) {
-  filter_manager_->addFilter(filter);
+void QuicFilterManagerConnectionImpl::addFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    Network::FilterSharedPtr filter) {
+  filter_manager_->addFilter(network_filter_matcher, filter);
 }
 
-void QuicFilterManagerConnectionImpl::addReadFilter(Network::ReadFilterSharedPtr filter) {
-  filter_manager_->addReadFilter(filter);
+void QuicFilterManagerConnectionImpl::addReadFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    Network::ReadFilterSharedPtr filter) {
+  filter_manager_->addReadFilter(network_filter_matcher, filter);
 }
 
 void QuicFilterManagerConnectionImpl::removeReadFilter(Network::ReadFilterSharedPtr filter) {

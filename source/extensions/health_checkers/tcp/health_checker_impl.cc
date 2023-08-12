@@ -134,7 +134,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
             .connection_;
     session_callbacks_ = std::make_shared<TcpSessionCallbacks>(*this);
     client_->addConnectionCallbacks(*session_callbacks_);
-    client_->addReadFilter(session_callbacks_);
+    client_->addReadFilter(nullptr, session_callbacks_);
 
     expect_close_ = false;
     client_->connect();

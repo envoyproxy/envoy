@@ -45,6 +45,7 @@ SINGLETON_MANAGER_REGISTRATION(thrift_route_config_provider_manager);
 
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
@@ -57,11 +58,13 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
 
   // We capture route_config_provider_manager here only to copy the shared_ptr and keep the
   // reference passed to ConfigImpl valid even after the local variable goes out of scope.
-  return [route_config_provider_manager, filter_config,
+  return [network_filter_matcher, route_config_provider_manager, filter_config,
           &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-        *filter_config, context.api().randomGenerator(),
-        context.mainThreadDispatcher().timeSource(), context.drainDecision()));
+    filter_manager.addReadFilter(
+        network_filter_matcher,
+        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
+                                            context.mainThreadDispatcher().timeSource(),
+                                            context.drainDecision()));
   };
 }
 

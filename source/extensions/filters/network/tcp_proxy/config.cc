@@ -13,13 +13,16 @@ namespace TcpProxy {
 
 Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());
 
   Envoy::TcpProxy::ConfigSharedPtr filter_config(
       std::make_shared<Envoy::TcpProxy::Config>(proto_config, context));
-  return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
+  return [network_filter_matcher, filter_config,
+          &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
+        network_filter_matcher,
         std::make_shared<Envoy::TcpProxy::Filter>(filter_config, context.clusterManager()));
   };
 }

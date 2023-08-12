@@ -23,9 +23,11 @@ void MultiConnectionBaseImpl::connect() {
   maybeScheduleNextAttempt();
 }
 
-void MultiConnectionBaseImpl::addWriteFilter(WriteFilterSharedPtr filter) {
+void MultiConnectionBaseImpl::addWriteFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    WriteFilterSharedPtr filter) {
   if (connect_finished_) {
-    connections_[0]->addWriteFilter(filter);
+    connections_[0]->addWriteFilter(network_filter_matcher, filter);
     return;
   }
   // Filters should only be notified of events on the final connection, so defer adding
@@ -33,9 +35,10 @@ void MultiConnectionBaseImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   post_connect_state_.write_filters_.push_back(filter);
 }
 
-void MultiConnectionBaseImpl::addFilter(FilterSharedPtr filter) {
+void MultiConnectionBaseImpl::addFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher, FilterSharedPtr filter) {
   if (connect_finished_) {
-    connections_[0]->addFilter(filter);
+    connections_[0]->addFilter(network_filter_matcher, filter);
     return;
   }
   // Filters should only be notified of events on the final connection, so defer adding
@@ -43,9 +46,11 @@ void MultiConnectionBaseImpl::addFilter(FilterSharedPtr filter) {
   post_connect_state_.filters_.push_back(filter);
 }
 
-void MultiConnectionBaseImpl::addReadFilter(ReadFilterSharedPtr filter) {
+void MultiConnectionBaseImpl::addReadFilter(
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    ReadFilterSharedPtr filter) {
   if (connect_finished_) {
-    connections_[0]->addReadFilter(filter);
+    connections_[0]->addReadFilter(network_filter_matcher, filter);
     return;
   }
   // Filters should only be notified of events on the final connection, so defer adding
@@ -523,13 +528,13 @@ void MultiConnectionBaseImpl::setUpFinalConnection(ConnectionEvent event,
   if (event == ConnectionEvent::Connected) {
     // Apply post-connect state which is only connections which have succeeded.
     for (auto& filter : post_connect_state_.filters_) {
-      connections_[0]->addFilter(filter);
+      connections_[0]->addFilter(nullptr, filter);
     }
     for (auto& filter : post_connect_state_.write_filters_) {
-      connections_[0]->addWriteFilter(filter);
+      connections_[0]->addWriteFilter(nullptr, filter);
     }
     for (auto& filter : post_connect_state_.read_filters_) {
-      connections_[0]->addReadFilter(filter);
+      connections_[0]->addReadFilter(nullptr, filter);
     }
     if (post_connect_state_.initialize_read_filters_.has_value() &&
         post_connect_state_.initialize_read_filters_.value()) {

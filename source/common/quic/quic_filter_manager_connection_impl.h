@@ -38,9 +38,12 @@ public:
                                   std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
-  void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
-  void addFilter(Network::FilterSharedPtr filter) override;
-  void addReadFilter(Network::ReadFilterSharedPtr filter) override;
+  void addWriteFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                      Network::WriteFilterSharedPtr filter) override;
+  void addFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                 Network::FilterSharedPtr filter) override;
+  void addReadFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                     Network::ReadFilterSharedPtr filter) override;
   void removeReadFilter(Network::ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 

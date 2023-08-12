@@ -55,6 +55,18 @@ public:
 };
 
 /**
+ *  Interface for a network filter matching with incoming traffic.
+ */
+class NetworkFilterMatcher {
+public:
+  virtual ~NetworkFilterMatcher() = default;
+  virtual bool matches(Network::NetworkFilterCallbacks& cb) const PURE;
+};
+
+using NetworkFilterMatcherPtr = std::unique_ptr<NetworkFilterMatcher>;
+using NetworkFilterMatcherSharedPtr = std::shared_ptr<NetworkFilterMatcher>;
+
+/**
  * Callbacks used by individual write filter instances to communicate with the filter manager.
  */
 class WriteFilterCallbacks : public virtual NetworkFilterCallbacks {
@@ -237,19 +249,22 @@ public:
    * Add a write filter to the connection. Filters are invoked in LIFO order (the last added
    * filter is called first).
    */
-  virtual void addWriteFilter(WriteFilterSharedPtr filter) PURE;
+  virtual void addWriteFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                              WriteFilterSharedPtr filter) PURE;
 
   /**
    * Add a combination filter to the connection. Equivalent to calling both addWriteFilter()
    * and addReadFilter() with the same filter instance.
    */
-  virtual void addFilter(FilterSharedPtr filter) PURE;
+  virtual void addFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                         FilterSharedPtr filter) PURE;
 
   /**
    * Add a read filter to the connection. Filters are invoked in FIFO order (the filter added
    * first is called first).
    */
-  virtual void addReadFilter(ReadFilterSharedPtr filter) PURE;
+  virtual void addReadFilter(const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+                             ReadFilterSharedPtr filter) PURE;
 
   /**
    * Remove a read filter from the connection.

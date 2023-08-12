@@ -13,9 +13,10 @@ namespace NetworkFilters {
 namespace SniCluster {
 
 Network::FilterFactoryCb SniClusterNetworkFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message&, Server::Configuration::FactoryContext&) {
-  return [](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<SniClusterFilter>());
+    const Protobuf::Message&, const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    Server::Configuration::FactoryContext&) {
+  return [network_filter_matcher](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(network_filter_matcher, std::make_shared<SniClusterFilter>());
   };
 }
 

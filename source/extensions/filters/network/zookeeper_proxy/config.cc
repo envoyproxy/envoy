@@ -20,6 +20,7 @@ namespace ZooKeeperProxy {
  */
 Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
@@ -48,8 +49,10 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
       latency_threshold_overrides, context.scope()));
   auto& time_source = context.mainThreadDispatcher().timeSource();
 
-  return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<ZooKeeperFilter>(filter_config, time_source));
+  return [network_filter_matcher, filter_config,
+          &time_source](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(network_filter_matcher,
+                             std::make_shared<ZooKeeperFilter>(filter_config, time_source));
   };
 }
 

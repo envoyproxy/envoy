@@ -77,6 +77,7 @@ static void validateRbacRules(const envoy::config::rbac::v3::RBAC& rules) {
 Network::FilterFactoryCb
 RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
   if (proto_config.has_rules()) {
     validateRbacRules(proto_config.rules());
@@ -88,8 +89,9 @@ RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
       std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope(),
                                                            context.getServerFactoryContext(),
                                                            context.messageValidationVisitor()));
-  return [config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
+  return [network_filter_matcher, config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(network_filter_matcher,
+                                 std::make_shared<RoleBasedAccessControlFilter>(config));
   };
 }
 

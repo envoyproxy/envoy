@@ -17,6 +17,7 @@ namespace MongoProxy {
 
 Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
@@ -41,12 +42,14 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
 
   auto stats = std::make_shared<MongoStats>(context.scope(), stat_prefix, commands);
   const bool emit_dynamic_metadata = proto_config.emit_dynamic_metadata();
-  return [stat_prefix, &context, access_log, fault_config, emit_dynamic_metadata,
-          stats](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
-        stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
-        context.drainDecision(), context.mainThreadDispatcher().timeSource(), emit_dynamic_metadata,
-        stats));
+  return [network_filter_matcher, stat_prefix, &context, access_log, fault_config,
+          emit_dynamic_metadata, stats](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(
+        network_filter_matcher,
+        std::make_shared<ProdProxyFilter>(stat_prefix, context.scope(), context.runtime(),
+                                          access_log, fault_config, context.drainDecision(),
+                                          context.mainThreadDispatcher().timeSource(),
+                                          emit_dynamic_metadata, stats));
   };
 }
 

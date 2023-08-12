@@ -150,7 +150,7 @@ private:
 
     auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
         config_discovery, name, server_context_, factory_context_, cluster_manager_,
-        last_filter_in_current_config, filter_chain_type, nullptr);
+        last_filter_in_current_config, filter_chain_type, nullptr, nullptr);
     filter_factories.push_back(std::move(filter_config_provider));
   }
 
