@@ -248,4 +248,3 @@ message BucketId {
     values {string {min_len: 1}}
   }];
 }
-
