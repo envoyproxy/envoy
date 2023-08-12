@@ -33,18 +33,16 @@ class RateLimitClientImpl : public RateLimitClient,
                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
-                      Server::Configuration::FactoryContext& context,
-                      RateLimitQuotaCallbacks* callbacks, BucketsContainer& quota_buckets,
-                      RateLimitQuotaUsageReports& usage_reports)
+                      Server::Configuration::FactoryContext& context, absl::string_view domain_name,
+                      RateLimitQuotaCallbacks* callbacks, BucketsContainer& quota_buckets)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)),
         rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
-        quota_usage_reports_(usage_reports),
-        time_source_(context.mainThreadDispatcher().timeSource()) {}
+        time_source_(context.mainThreadDispatcher().timeSource()), domain_name_(domain_name) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
   // Build the usage report (i.e., the request sent to RLQS server).
-  RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain, const BucketId& bucket_id);
+  RateLimitQuotaUsageReports buildUsageReport(const BucketId& bucket_id);
 
   // RawAsyncStreamCallbacks methods;
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -56,14 +54,15 @@ public:
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
   void closeStream() override;
   // Send the usage report to RLQS server
-  void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id) override;
+  void sendUsageReport(absl::optional<BucketId> bucket_id) override;
   void setCallback(RateLimitQuotaCallbacks* callbacks) override { rlqs_callback_ = callbacks; }
   // Notify the rate limit client that the filter itself has been destroyed. i.e., the filter
   // callback can not be used anymore.
   void resetCallback() override { rlqs_callback_ = nullptr; }
 
 private:
-  BucketQuotaUsage addNewBucketUsage(const BucketId& bucket_id);
+  void addNewBucket(const BucketId& bucket_id);
+  RateLimitQuotaUsageReports getReport(bool new_bucket);
   // Store the client as the bare object since there is no ownership transfer involved.
   GrpcAsyncClient aync_client_;
   Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
@@ -79,8 +78,9 @@ private:
   RateLimitQuotaCallbacks* rlqs_callback_ = nullptr;
   // Reference to objects that are stored in TLS cache. They outlive the filter.
   BucketsContainer& quota_buckets_;
-  RateLimitQuotaUsageReports& quota_usage_reports_;
+  // RateLimitQuotaUsageReports& quota_usage_reports_;
   TimeSource& time_source_;
+  std::string domain_name_;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
@@ -91,9 +91,9 @@ inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service,
                       RateLimitQuotaCallbacks* callbacks, BucketsContainer& quota_buckets,
-                      RateLimitQuotaUsageReports& quota_usage_reports) {
-  return std::make_unique<RateLimitClientImpl>(grpc_service, context, callbacks, quota_buckets,
-                                               quota_usage_reports);
+                      absl::string_view domain_name) {
+  return std::make_unique<RateLimitClientImpl>(grpc_service, context, domain_name, callbacks,
+                                               quota_buckets);
 }
 
 } // namespace RateLimitQuota

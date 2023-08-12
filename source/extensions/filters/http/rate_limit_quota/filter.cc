@@ -30,12 +30,12 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
   //   return Envoy::Http::FilterHeadersStatus::Continue;
   // }
   // Allocate new bucket.
-  std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
+  // std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
 
   // Create the gRPC client if it has not been created.
   if (client_.rate_limit_client == nullptr) {
     client_.rate_limit_client = createRateLimitClient(factory_context_, config_->rlqs_server(),
-                                                      this, quota_buckets_, quota_usage_reports_);
+                                                      this, quota_buckets_, config_->domain());
   } else {
     // Callback has been reset to nullptr when filter was destroyed last time.
     // Reset it here when new filter has been created.
@@ -56,10 +56,10 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
 
   // Send the usage report to RLQS server immediately on the first time when the request is
   // matched.l
-  client_.rate_limit_client->sendUsageReport(config_->domain(), bucket_id);
+  client_.rate_limit_client->sendUsageReport(bucket_id);
 
   // Store the bucket into the quota bucket container.
-  quota_buckets_[bucket_id] = std::move(new_bucket);
+  // quota_buckets_[bucket_id] = std::move(new_bucket);
 
   ASSERT(client_.send_reports_timer != nullptr);
   // Set the reporting interval and enable the timer.

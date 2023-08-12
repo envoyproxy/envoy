@@ -45,12 +45,22 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public RateLimitQuotaCallbacks,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
+  // RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
+  //                      Server::Configuration::FactoryContext& factory_context,
+  //                      BucketsContainer& quota_buckets,
+  //                      RateLimitQuotaUsageReports& quota_usage_reports, ThreadLocalClient&
+  //                      client)
+  //     : config_(std::move(config)), factory_context_(factory_context),
+  //       quota_buckets_(quota_buckets), quota_usage_reports_(quota_usage_reports), client_(client)
+  //       {
+  //   createMatcher();
+  // }
+
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
-                       BucketsContainer& quota_buckets,
-                       RateLimitQuotaUsageReports& quota_usage_reports, ThreadLocalClient& client)
+                       BucketsContainer& quota_buckets, ThreadLocalClient& client)
       : config_(std::move(config)), factory_context_(factory_context),
-        quota_buckets_(quota_buckets), quota_usage_reports_(quota_usage_reports), client_(client) {
+        quota_buckets_(quota_buckets), client_(client) {
     createMatcher();
   }
 
@@ -98,7 +108,7 @@ private:
 
   // Don't take ownership here and these objects are stored in TLS.
   BucketsContainer& quota_buckets_;
-  RateLimitQuotaUsageReports& quota_usage_reports_;
+  // RateLimitQuotaUsageReports& quota_usage_reports_;
   ThreadLocalClient& client_;
 
   bool initiating_call_{};

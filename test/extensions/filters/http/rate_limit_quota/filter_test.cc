@@ -40,7 +40,7 @@ enum class MatcherConfigType {
 
 class FilterTest : public testing::Test {
 public:
-  FilterTest() : thread_local_client_(dispatcher_, filter_config_) {
+  FilterTest() : thread_local_client_(dispatcher_) {
     // Add the grpc service config.
     TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
@@ -86,7 +86,7 @@ public:
   void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
     filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, bucket_cache_,
-                                                     quota_usage_reports_, thread_local_client_);
+                                                     thread_local_client_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -147,7 +147,6 @@ public:
 
   // TODO(tyxia) No need for TLS storage
   BucketsContainer bucket_cache_;
-  RateLimitQuotaUsageReports quota_usage_reports_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   ThreadLocalClient thread_local_client_;
 };

@@ -11,6 +11,8 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 
+#include "absl/time/time.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -37,6 +39,14 @@ struct BucketIdEqual {
   }
 };
 
+struct QuotaUsage {
+  // Requests the data plane has allowed through.
+  uint64_t num_requests_allowed;
+  // Requests throttled.
+  uint64_t num_requests_denied;
+  std::chrono::nanoseconds last_report;
+};
+
 // Single bucket entry
 struct Bucket {
   // Default constructor
@@ -57,10 +67,12 @@ struct Bucket {
   // BucketAction bucket_action;
   // TODO(tyxia) Thread local storage should take the ownership of all the objects so that
   // it is also responsible for destruction.
-  std::unique_ptr<BucketAction> bucket_action;
+  // std::unique_ptr<BucketAction> bucket_action;
+  BucketAction bucket_action;
   // TODO(tyxia) No need to store bucket ID  as it is already the key of BucketsContainer.
   // TODO(tyxia) Seems unused
-  BucketQuotaUsage quota_usage;
+  QuotaUsage quota_usage;
+  // BucketQuotaUsage quota_usage;
 };
 
 // using BucketsContainer = absl::node_hash_map<BucketId, Bucket, BucketIdHash, BucketIdEqual>;
@@ -68,13 +80,11 @@ using BucketsContainer =
     absl::node_hash_map<BucketId, std::unique_ptr<Bucket>, BucketIdHash, BucketIdEqual>;
 
 struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota> {
-  ThreadLocalClient(Envoy::Event::Dispatcher& event_dispatcher,
-                    FilterConfigConstSharedPtr filter_config)
-      : dispatcher(event_dispatcher), config(std::move(filter_config)) {
+  ThreadLocalClient(Envoy::Event::Dispatcher& event_dispatcher) : dispatcher(event_dispatcher) {
     // Create the quota usage report method that sends the reports the RLS server periodically.
     send_reports_timer = dispatcher.createTimer([this] {
       if (rate_limit_client != nullptr) {
-        rate_limit_client->sendUsageReport(config->domain(), absl::nullopt);
+        rate_limit_client->sendUsageReport(absl::nullopt);
       } else {
         ENVOY_LOG(error, "Rate limit client has been destroyed; no periodical report send");
       }
@@ -104,7 +114,6 @@ struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota>
 
   // TODO(tyxia) Maybe no need to store dispatcher.
   Envoy::Event::Dispatcher& dispatcher;
-  FilterConfigConstSharedPtr config;
 };
 
 class ThreadLocalBucket : public Envoy::ThreadLocal::ThreadLocalObject {
@@ -112,8 +121,7 @@ public:
   // TODO(tyxia) Here is similar to defer initialization methodology.
   // We have the empty hash map in thread local storage at the beginning and build the map later
   // in the `rate_limit_quota_filter` when the request comes.
-  ThreadLocalBucket(Envoy::Event::Dispatcher& dispatcher, FilterConfigConstSharedPtr config)
-      : client_(dispatcher, std::move(config)) {}
+  ThreadLocalBucket(Envoy::Event::Dispatcher& dispatcher) : client_(dispatcher) {}
 
   // Return the buckets. Buckets are returned by reference so that caller site can modify its
   // content.
@@ -131,11 +139,10 @@ private:
 };
 
 struct QuotaBucketCache {
-  QuotaBucketCache(Envoy::Server::Configuration::FactoryContext& context,
-                   FilterConfigConstSharedPtr config)
+  QuotaBucketCache(Envoy::Server::Configuration::FactoryContext& context)
       : tls(context.threadLocal()) {
-    tls.set([config = std::move(config)](Envoy::Event::Dispatcher& dispatcher) {
-      return std::make_shared<ThreadLocalBucket>(dispatcher, std::move(config));
+    tls.set([](Envoy::Event::Dispatcher& dispatcher) {
+      return std::make_shared<ThreadLocalBucket>(dispatcher);
     });
   }
   Envoy::ThreadLocal::TypedSlot<ThreadLocalBucket> tls;

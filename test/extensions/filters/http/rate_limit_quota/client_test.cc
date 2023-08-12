@@ -41,7 +41,7 @@ TEST_F(RateLimitClientTest, SendUsageReport) {
   bool end_stream = false;
   // Send quota usage report and ensure that we get it.
   EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, end_stream));
-  test_client.client_->sendUsageReport("cloud_12345_67890_td_rlqs", bucket_id);
+  test_client.client_->sendUsageReport(bucket_id);
   EXPECT_CALL(test_client.stream_, closeStream());
   EXPECT_CALL(test_client.stream_, resetStream());
   test_client.client_->closeStream();
@@ -58,7 +58,7 @@ TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
 
   // Send empty report and ensure that we get it.
   EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, false));
-  test_client.client_->sendUsageReport("cloud_12345_67890_td_rlqs", absl::nullopt);
+  test_client.client_->sendUsageReport(absl::nullopt);
 
   // `onQuotaResponse` callback is expected to be called.
   EXPECT_CALL(test_client.callbacks_, onQuotaResponse);
@@ -79,52 +79,55 @@ TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
 TEST_F(RateLimitClientTest, BuildUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  std::string domain = "cloud_12345_67890_rlqs";
 
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
-  RateLimitQuotaUsageReports report = test_client.client_->buildUsageReport(domain, bucket_id);
-  const uint64_t bucket_identifier = MessageUtil::hash(bucket_id);
-  EXPECT_EQ(report.domain(), domain);
+  RateLimitQuotaUsageReports report = test_client.client_->buildUsageReport(bucket_id);
+  EXPECT_EQ(report.domain(), test_client.domain_);
   EXPECT_EQ(report.bucket_quota_usages().size(), 1);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_identifier).num_requests_allowed(), 1);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_identifier).num_requests_denied(), 0);
+  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 1);
+  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
 }
 
 TEST_F(RateLimitClientTest, BuildMultipleReports) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  std::string domain = "cloud_12345_67890_rlqs";
 
   EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
   // Build the usage report with 2 entries with same domain and bucket id.
   RateLimitQuotaUsageReports report;
   for (int i = 0; i < 2; ++i) {
-    report = test_client.client_->buildUsageReport(domain, bucket_id);
+    report = test_client.client_->buildUsageReport(bucket_id);
   }
-  const uint64_t bucket_id_0 = MessageUtil::hash(bucket_id);
-  std::cout << "test:" << bucket_id_0 << "\n";
-  EXPECT_EQ(report.domain(), domain);
+
+  EXPECT_EQ(report.domain(), test_client.domain_);
   EXPECT_EQ(report.bucket_quota_usages().size(), 1);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_allowed(), 2);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_denied(), 0);
+  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 2);
+  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
 
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id2;
   TestUtility::loadFromYaml(MultipleBukcetId, bucket_id2);
   // Build the usage report with the entry with different bucket id which will create a new entry in
   // report.
-  const uint64_t bucket_id_1 = MessageUtil::hash(bucket_id2);
-  std::cout << "test:" << bucket_id_1 << "\n";
-  report = test_client.client_->buildUsageReport(domain, bucket_id2);
+  report = test_client.client_->buildUsageReport(bucket_id2);
   EXPECT_EQ(report.bucket_quota_usages().size(), 2);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_allowed(), 2);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_1).num_requests_allowed(), 1);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_denied(), 0);
+  for (auto usage : report.bucket_quota_usages()) {
+    if (Protobuf::util::MessageDifferencer::Equals(usage.bucket_id(), bucket_id)) {
+      EXPECT_EQ(usage.num_requests_allowed(), 2);
+    } else {
+      EXPECT_EQ(usage.num_requests_allowed(), 1);
+    }
+    EXPECT_EQ(usage.num_requests_denied(), 0);
+  }
 
   // Update the usage report with old bucket id.
-  report = test_client.client_->buildUsageReport(domain, bucket_id);
+  report = test_client.client_->buildUsageReport(bucket_id);
   EXPECT_EQ(report.bucket_quota_usages().size(), 2);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_allowed(), 3);
-  EXPECT_EQ(report.bucket_quota_usages().at(bucket_id_0).num_requests_denied(), 0);
+  for (auto usage : report.bucket_quota_usages()) {
+    if (Protobuf::util::MessageDifferencer::Equals(usage.bucket_id(), bucket_id)) {
+      EXPECT_EQ(usage.num_requests_allowed(), 3);
+    }
+    EXPECT_EQ(usage.num_requests_denied(), 0);
+  }
 }
 
 } // namespace

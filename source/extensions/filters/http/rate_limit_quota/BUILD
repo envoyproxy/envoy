@@ -96,6 +96,7 @@ envoy_cc_library(
     hdrs = ["quota_bucket_cache.h"],
     deps = [
         ":client_interface",
+        "//envoy/common:time_interface",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",

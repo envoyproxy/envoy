@@ -60,8 +60,7 @@ public:
           .WillOnce(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
     }
 
-    client_ = createRateLimitClient(context, grpc_service, &callbacks_, bucket_cache_,
-                                    quota_usage_reports_);
+    client_ = createRateLimitClient(context, grpc_service, &callbacks_, bucket_cache_, domain_);
   }
 
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
@@ -96,8 +95,8 @@ public:
   MockRateLimitQuotaCallbacks callbacks_;
   bool external_inited_ = false;
   bool start_failed_ = false;
-  RateLimitQuotaUsageReports quota_usage_reports_;
   BucketsContainer bucket_cache_;
+  std::string domain_ = "cloud_12345_67890_rlqs";
 };
 
 } // namespace

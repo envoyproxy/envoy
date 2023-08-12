@@ -24,14 +24,13 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
       filter_config);
 
   // Bucket cache TLS object is created on the main thread and shared between worker threads.
-  std::shared_ptr<QuotaBucketCache> bucket_cache =
-      std::make_shared<QuotaBucketCache>(context, config);
+  std::shared_ptr<QuotaBucketCache> bucket_cache = std::make_shared<QuotaBucketCache>(context);
 
   return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache)](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
         config, context, bucket_cache->tls.get()->quotaBuckets(),
-        bucket_cache->tls.get()->quotaUsageReports(), bucket_cache->tls.get()->rateLimitClient()));
+        bucket_cache->tls.get()->rateLimitClient()));
   };
 }
 
