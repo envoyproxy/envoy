@@ -57,7 +57,7 @@ message RateLimitRequest {
   // when the request is over limit.
   // This may be useful for scenarios where the client wants to provide an update the rate limit counter without being
   // concerned about whether the request is over limit.
-  bool is_reporting = 3;
+  bool is_reporting = 4;
 }
 
 // A response from a ShouldRateLimit call.
