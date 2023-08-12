@@ -51,18 +51,18 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(const BucketId&
   // `quota_usage_reports_`. (i.e., no need for container/map).
 
   RateLimitQuotaUsageReports report;
-  // bool new_report = false;
   bool new_bucket = false;
-  // Not first bucket in the report.
+
   if (quota_buckets_.find(bucket_id) != quota_buckets_.end()) {
-    // Update the num_requests_allowed, other elements stay same.
+    // Update the num_requests_allowed if bucket is found from the cache.
     quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
   } else {
+    // Add new bucket to the cache.
     addNewBucket(bucket_id);
     new_bucket = true;
   }
 
-  // Get the report from quota bucket.
+  // Get the report from quota bucket cache.
   report = getReport(new_bucket);
   return report;
 }
@@ -99,9 +99,8 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
                 "cache entry: ",
                 response->ShortDebugString());
     } else {
-      // quota_buckets_[bucket_id]->bucket_action =
-      //     std::make_unique<BucketAction>(std::move(action));
       // quota_buckets_[bucket_id]->bucket_action = std::make_unique<BucketAction>(action);
+      // TODO(tyxia) Reference lifetime extension.
       quota_buckets_[bucket_id]->bucket_action = action;
     }
   }
@@ -147,41 +146,3 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-
-// RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_view domain,
-//                                                                  const BucketId& bucket_id) {
-//   const uint64_t id = MessageUtil::hash(bucket_id);
-//   // TODO(tyxia) Domain is provided by filter configuration whose lifetime is tied with HCM. This
-//   // means that domain name has same lifetime as TLS because TLS is created by factory context.
-//   In
-//   // other words, there is only one domain name throughout the whole lifetime of
-//   // `quota_usage_reports_`. (i.e., no need for container/map).
-
-//   // First report.
-//   if (quota_usage_reports_.domain().empty()) {
-//     // Set the domain name in the first report.
-//     quota_usage_reports_.set_domain(std::string(domain));
-//     // Add the usage report.
-//     (*quota_usage_reports_.mutable_bucket_quota_usages())[id] = addNewBucketUsage(bucket_id);
-//   } else {
-//     auto quota_usage = quota_usage_reports_.bucket_quota_usages();
-//     if (quota_usage.find(id) != quota_usage.end()) {
-//       auto mutable_quota_usage = quota_usage_reports_.mutable_bucket_quota_usages();
-//       (*mutable_quota_usage)[id].set_num_requests_allowed(quota_usage[id].num_requests_allowed()
-//       +
-//                                                           1);
-//       // TODO(tyxia) Closer look
-//       auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-//                      time_source_.monotonicTime().time_since_epoch())
-//                      .count();
-//       auto time_elapsed =
-//           now - Protobuf::util::TimeUtil::TimestampToNanoseconds(quota_usage[id].last_report());
-//       *(*mutable_quota_usage)[id].mutable_time_elapsed() =
-//           Protobuf::util::TimeUtil::NanosecondsToDuration(time_elapsed);
-//     } else {
-//       // New bucket in this report(i.e., No updates has been performed.)
-//       (*quota_usage_reports_.mutable_bucket_quota_usages())[id] = addNewBucketUsage(bucket_id);
-//     }
-//   }
-//   return quota_usage_reports_;
-// }
