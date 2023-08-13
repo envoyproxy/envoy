@@ -51,9 +51,10 @@ forwarding_rules:
   ON_CALL(context.api_, threadFactory()).WillByDefault(ReturnRef(thread_factory));
   KafkaMeshConfigFactory factory;
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  EXPECT_CALL(connection, addReadFilter(_, _));
 
   // when
   cb(connection);

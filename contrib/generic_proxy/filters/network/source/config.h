@@ -19,9 +19,10 @@ class Factory : public Envoy::Extensions::NetworkFilters::Common::FactoryBase<Pr
 public:
   Factory() : FactoryBase(Filter::name(), true) {}
 
-  Envoy::Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
-                                    Envoy::Server::Configuration::FactoryContext& context) override;
+  Envoy::Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const ProxyConfig& proto_config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Envoy::Server::Configuration::FactoryContext& context) override;
 
   static std::pair<CodecFactoryPtr, ProxyFactoryPtr>
   factoriesFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,

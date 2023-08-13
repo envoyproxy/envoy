@@ -21,9 +21,10 @@ public:
   KafkaMeshConfigFactory() : FactoryBase("envoy.filters.network.kafka_mesh", true) {}
 
 private:
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const KafkaMeshProtoConfig& config,
-                                    Server::Configuration::FactoryContext& context) override;
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const KafkaMeshProtoConfig& config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Mesh

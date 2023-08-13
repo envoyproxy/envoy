@@ -23,7 +23,9 @@ namespace Mesh {
 // The mesh filter doesn't do anything special, it just sets up the shared entities.
 // Any extra configuration validation is done in UpstreamKafkaConfiguration constructor.
 Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyped(
-    const KafkaMeshProtoConfig& config, Server::Configuration::FactoryContext& context) {
+    const KafkaMeshProtoConfig& config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    Server::Configuration::FactoryContext& context) {
 
 #ifdef WIN32
   throw EnvoyException("Kafka mesh filter is not supported on Windows");
@@ -42,11 +44,11 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
   const RecordCallbackProcessorSharedPtr shared_consumer_manager =
       std::make_shared<SharedConsumerManagerImpl>(*configuration, context.api().threadFactory());
 
-  return [configuration, upstream_kafka_facade,
+  return [network_filter_matcher, configuration, upstream_kafka_facade,
           shared_consumer_manager](Network::FilterManager& filter_manager) -> void {
     Network::ReadFilterSharedPtr filter = std::make_shared<KafkaMeshFilter>(
         *configuration, *upstream_kafka_facade, *shared_consumer_manager);
-    filter_manager.addReadFilter(filter);
+    filter_manager.addReadFilter(network_filter_matcher, filter);
   };
 #endif
 }

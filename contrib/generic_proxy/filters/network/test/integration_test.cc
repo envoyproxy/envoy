@@ -182,7 +182,7 @@ public:
 
     client_connection_ = integration_->makeClientConnection(integration_->lookupPort("listener_0"));
     client_connection_->addConnectionCallbacks(*connection_callbacks_);
-    client_connection_->addReadFilter(test_read_filter_);
+    client_connection_->addReadFilter(nullptr, test_read_filter_);
     client_connection_->connect();
     integration_->dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
     return connection_callbacks_->connection_connected_;

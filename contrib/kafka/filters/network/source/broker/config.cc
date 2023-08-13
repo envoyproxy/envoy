@@ -13,16 +13,19 @@ namespace Kafka {
 namespace Broker {
 
 Network::FilterFactoryCb KafkaConfigFactory::createFilterFactoryFromProtoTyped(
-    const KafkaBrokerProtoConfig& proto_config, Server::Configuration::FactoryContext& context) {
+    const KafkaBrokerProtoConfig& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
 
   const std::string& stat_prefix = proto_config.stat_prefix();
 
-  return [&context, stat_prefix](Network::FilterManager& filter_manager) -> void {
+  return [network_filter_matcher, &context,
+          stat_prefix](Network::FilterManager& filter_manager) -> void {
     Network::FilterSharedPtr filter =
         std::make_shared<KafkaBrokerFilter>(context.scope(), context.timeSource(), stat_prefix);
-    filter_manager.addFilter(filter);
+    filter_manager.addFilter(network_filter_matcher, filter);
   };
 }
 

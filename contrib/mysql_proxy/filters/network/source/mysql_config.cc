@@ -22,6 +22,7 @@ namespace MySQLProxy {
 Network::FilterFactoryCb
 NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
@@ -30,8 +31,8 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
 
   MySQLFilterConfigSharedPtr filter_config(
       std::make_shared<MySQLFilterConfig>(stat_prefix, context.scope()));
-  return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<MySQLFilter>(filter_config));
+  return [network_filter_matcher, filter_config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(network_filter_matcher, std::make_shared<MySQLFilter>(filter_config));
   };
 }
 

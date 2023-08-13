@@ -23,9 +23,10 @@ public:
 
 private:
   // Common::FactoryBase<KafkaBrokerProtoConfig>
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const KafkaBrokerProtoConfig& proto_config,
-                                    Server::Configuration::FactoryContext& context) override;
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const KafkaBrokerProtoConfig& proto_config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Broker

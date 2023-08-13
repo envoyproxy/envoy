@@ -23,6 +23,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& proto_config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
       Server::Configuration::FactoryContext& context) override;
 };
 

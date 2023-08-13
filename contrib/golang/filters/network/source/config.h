@@ -37,6 +37,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::golang::v3alpha::Config& proto_config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
       Server::Configuration::FactoryContext& context) override;
 
   bool is_terminal_filter_{true};

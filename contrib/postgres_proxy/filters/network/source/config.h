@@ -25,6 +25,7 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy&
           proto_config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
       Server::Configuration::FactoryContext& context) override;
 };
 

@@ -82,9 +82,10 @@ std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
   return factories;
 }
 
-Envoy::Network::FilterFactoryCb
-Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
-                                           Envoy::Server::Configuration::FactoryContext& context) {
+Envoy::Network::FilterFactoryCb Factory::createFilterFactoryFromProtoTyped(
+    const ProxyConfig& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+    Envoy::Server::Configuration::FactoryContext& context) {
 
   std::shared_ptr<RouteConfigProviderManager> route_config_provider_manager =
       context.singletonManager().getTyped<RouteConfigProviderManager>(
@@ -112,7 +113,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context),
       std::move(tracer), std::move(tracing_config), context);
 
-  return [route_config_provider_manager, tracer_manager, config, &context,
+  return [network_filter_matcher, route_config_provider_manager, tracer_manager, config, &context,
           custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {
     // Create filter by the custom filter factory if the custom filter factory is not null.
     if (custom_proxy_factory != nullptr) {
@@ -120,8 +121,10 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       return;
     }
 
-    filter_manager.addReadFilter(std::make_shared<Filter>(
-        config, context.mainThreadDispatcher().timeSource(), context.runtime()));
+    filter_manager.addReadFilter(
+        network_filter_matcher,
+        std::make_shared<Filter>(config, context.mainThreadDispatcher().timeSource(),
+                                 context.runtime()));
   };
 }
 

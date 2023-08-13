@@ -35,9 +35,9 @@ public:
     ON_CALL(context_.api_, threadFactory()).WillByDefault(ReturnRef(thread_factory_));
 
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
+    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, nullptr, context_); });
     Network::MockConnection connection;
-    EXPECT_CALL(connection, addFilter(_));
+    EXPECT_CALL(connection, addFilter(_, _));
     cb(connection);
   }
 
@@ -56,7 +56,7 @@ TEST(GolangConfigFactoryTest, InvalidateEmptyConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
       GolangConfigFactory().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::golang::v3alpha::Config(), context),
+          envoy::extensions::filters::network::golang::v3alpha::Config(), nullptr, context),
       Envoy::ProtoValidationException,
       "ConfigValidationError.LibraryId: value length must be at least 1 characters");
 }

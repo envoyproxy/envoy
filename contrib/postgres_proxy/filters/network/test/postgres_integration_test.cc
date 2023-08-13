@@ -270,11 +270,13 @@ public:
                                           Network::ConnectionCallbacks& /* upstream_callbacks*/)
         : FactoryBase(name) {}
 
-    Network::FilterFactoryCb
-    createFilterFactoryFromProtoTyped(const test::integration::postgres::SyncWriteFilterConfig&,
-                                      Server::Configuration::FactoryContext&) override {
+    Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+        const test::integration::postgres::SyncWriteFilterConfig&,
+        const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+        Server::Configuration::FactoryContext&) override {
       return [&](Network::FilterManager& filter_manager) -> void {
-        filter_manager.addWriteFilter(std::make_shared<SyncWriteFilter>(proceed_sync_, recv_sync_));
+        filter_manager.addWriteFilter(network_filter_matcher,
+                                      std::make_shared<SyncWriteFilter>(proceed_sync_, recv_sync_));
       };
     }
 

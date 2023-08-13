@@ -33,11 +33,11 @@ class SipFilterConfigTestBase {
 public:
   void testConfig(envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& config) {
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
+    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, nullptr, context_); });
     EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.getServerFactoryContext()));
 
     Network::MockConnection connection;
-    EXPECT_CALL(connection, addReadFilter(_));
+    EXPECT_CALL(connection, addReadFilter(_, _));
     cb(connection);
   }
 
@@ -48,9 +48,10 @@ public:
 class SipFilterConfigTest : public testing::Test, public SipFilterConfigTestBase {};
 
 TEST_F(SipFilterConfigTest, ValidateFail) {
-  EXPECT_THROW(factory_.createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy(), context_),
-               ProtoValidationException);
+  EXPECT_THROW(
+      factory_.createFilterFactoryFromProto(
+          envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy(), nullptr, context_),
+      ProtoValidationException);
 }
 
 TEST_F(SipFilterConfigTest, ValidProtoConfiguration) {
@@ -90,7 +91,7 @@ sip_filters:
       parseSipProxyFromYaml(yaml);
   std::string cluster = "A";
   config.mutable_route_config()->mutable_routes()->at(0).mutable_route()->set_cluster(cluster);
-  EXPECT_NO_THROW({ factory_.createFilterFactoryFromProto(config, context_); });
+  EXPECT_NO_THROW({ factory_.createFilterFactoryFromProto(config, nullptr, context_); });
 }
 
 // Test config with an explicitly defined router filter.
@@ -126,8 +127,8 @@ sip_filters:
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy config =
       parseSipProxyFromYaml(yaml);
 
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
-                          "no_such_filter");
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, nullptr, context_),
+                          EnvoyException, "no_such_filter");
 }
 
 // Test config with multiple filters.

@@ -11,6 +11,7 @@ namespace PostgresProxy {
 Network::FilterFactoryCb
 NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());
 
@@ -23,8 +24,9 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
 
   PostgresFilterConfigSharedPtr filter_config(
       std::make_shared<PostgresFilterConfig>(config_options, context.scope()));
-  return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<PostgresFilter>(filter_config));
+  return [network_filter_matcher, filter_config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(network_filter_matcher,
+                             std::make_shared<PostgresFilter>(filter_config));
   };
 }
 

@@ -14,6 +14,7 @@ namespace ClientSslAuth {
 
 Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.auth_api_cluster().empty());
   ASSERT(!proto_config.stat_prefix().empty());
@@ -21,8 +22,9 @@ Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProt
   ClientSslAuthConfigSharedPtr filter_config(ClientSslAuthConfig::create(
       proto_config, context.threadLocal(), context.clusterManager(), context.mainThreadDispatcher(),
       context.scope(), context.api().randomGenerator()));
-  return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ClientSslAuthFilter>(filter_config));
+  return [network_filter_matcher, filter_config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(network_filter_matcher,
+                                 std::make_shared<ClientSslAuthFilter>(filter_config));
   };
 }
 

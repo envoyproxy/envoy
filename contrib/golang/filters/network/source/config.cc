@@ -13,6 +13,7 @@ REGISTER_FACTORY(GolangConfigFactory,
 
 Network::FilterFactoryCb GolangConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::golang::v3alpha::Config& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
   is_terminal_filter_ = proto_config.is_terminal_filter();
 
@@ -36,8 +37,10 @@ Network::FilterFactoryCb GolangConfigFactory::createFilterFactoryFromProtoTyped(
     ASSERT(config_id, "config id should not be zero");
   }
 
-  return [config, config_id, &context, dlib](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<Filter>(context, config, config_id, dlib));
+  return [network_filter_matcher, config, config_id, &context,
+          dlib](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(network_filter_matcher,
+                             std::make_shared<Filter>(context, config, config_id, dlib));
   };
 }
 

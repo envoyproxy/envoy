@@ -37,6 +37,7 @@ ProtocolOptionsConfigImpl::customizedAffinity() const {
 
 Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& proto_config,
+    const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
@@ -61,12 +62,14 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     transaction_infos->emplace(cluster, transaction_info_ptr);
   }
 
-  return
-      [filter_config, &context, transaction_infos](Network::FilterManager& filter_manager) -> void {
-        filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-            *filter_config, context.api().randomGenerator(),
-            context.mainThreadDispatcher().timeSource(), context, transaction_infos));
-      };
+  return [network_filter_matcher, filter_config, &context,
+          transaction_infos](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(
+        network_filter_matcher,
+        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
+                                            context.mainThreadDispatcher().timeSource(), context,
+                                            transaction_infos));
+  };
 }
 
 /**
