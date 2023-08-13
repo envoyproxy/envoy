@@ -73,7 +73,7 @@ private:
   Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
   // The callback that is used to communicate with filter.
   RateLimitQuotaCallbacks* rlqs_callback_ = nullptr;
-  // Reference to quota cache that is stored in TLS cache. It outlives the filter.
+  // Reference to quota bucket cache that is stored in TLS cache. It outlives the filter.
   BucketsCache& quota_buckets_;
   TimeSource& time_source_;
 };

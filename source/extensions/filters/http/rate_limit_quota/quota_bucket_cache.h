@@ -37,7 +37,7 @@ struct BucketIdEqual {
 };
 
 struct QuotaUsage {
-  // Requests the data plane has allowed through.
+  // Requests allowed.
   uint64_t num_requests_allowed;
   // Requests throttled.
   uint64_t num_requests_denied;
@@ -47,17 +47,6 @@ struct QuotaUsage {
 
 // This object stores the data for single bucket entry.
 struct Bucket {
-  // Default constructor
-  Bucket() = default;
-  // Disable copy constructor and assignment.
-  Bucket(const Bucket& bucket) = delete;
-  Bucket& operator=(const Bucket& bucket) = delete;
-  // Default move constructor and assignment.
-  Bucket(Bucket&& bucket) = default;
-  Bucket& operator=(Bucket&& bucket) = default;
-
-  ~Bucket() = default;
-
   // Cached action from the response that was received from the RLQS server.
   BucketAction bucket_action;
   // Cache quota usage.
@@ -103,10 +92,10 @@ class ThreadLocalBucket : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
   ThreadLocalBucket(Envoy::Event::Dispatcher& dispatcher) : client_(dispatcher) {}
 
-  // Return the buckets; returned by reference it can be modified.
+  // Return the buckets; returned by reference so it can be modified.
   BucketsCache& quotaBuckets() { return quota_buckets_; }
 
-  // Return the rate limit client; no ownership transferred.
+  // Return the rate limit client; returned by reference so no ownership transferred.
   ThreadLocalClient& rateLimitClient() { return client_; }
 
 private:
@@ -115,9 +104,8 @@ private:
   ThreadLocalClient client_;
 };
 
-struct QuotaBucketCache {
-  QuotaBucketCache(Envoy::Server::Configuration::FactoryContext& context)
-      : tls(context.threadLocal()) {
+struct QuotaBucket {
+  QuotaBucket(Envoy::Server::Configuration::FactoryContext& context) : tls(context.threadLocal()) {
     tls.set([](Envoy::Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalBucket>(dispatcher);
     });

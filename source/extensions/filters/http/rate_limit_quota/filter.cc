@@ -15,7 +15,7 @@ Http::FilterHeadersStatus
 RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
                                                    const RateLimitOnMatchAction& match_action) {
   const auto& bucket_settings = match_action.bucketSettings();
-  // The first matched request that doesn't have quota assignment from the RLQS server yet, so the
+  // The first matched request doesn't have quota assignment from the RLQS server yet, so the
   // action is performed based on pre-configured strategy from no assignment behavior config.
   // TODO(tyxia) Check no assignment logic with the allow/deny interface. Default is allow all.
 
@@ -42,11 +42,8 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
   initiating_call_ = true;
 
   // Send the usage report to RLQS server immediately on the first time when the request is
-  // matched.l
+  // matched.
   client_.rate_limit_client->sendUsageReport(bucket_id);
-
-  // Store the bucket into the quota bucket container.
-  // quota_buckets_[bucket_id] = std::move(new_bucket);
 
   ASSERT(client_.send_reports_timer != nullptr);
   // Set the reporting interval and enable the timer.
@@ -87,7 +84,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 
   BucketId bucket_id = ret.value();
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
-    // The request has been matched to the quota bucket for the first time.
+    // The first request, create a new bucket in the cache and sent the report to RLQS server.
     return createNewBucketAndSendReport(bucket_id, match_action);
   } else {
     // Found the cached bucket entry.

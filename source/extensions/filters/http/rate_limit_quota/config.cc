@@ -4,7 +4,6 @@
 
 #include "envoy/registry/registry.h"
 
-// #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
@@ -23,8 +22,8 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>(
       filter_config);
 
-  // Bucket cache TLS object is created on the main thread and shared between worker threads.
-  std::shared_ptr<QuotaBucketCache> bucket_cache = std::make_shared<QuotaBucketCache>(context);
+  // Quota bucket TLS object is created on the main thread and shared between worker threads.
+  std::shared_ptr<QuotaBucket> bucket_cache = std::make_shared<QuotaBucket>(context);
 
   return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache)](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {

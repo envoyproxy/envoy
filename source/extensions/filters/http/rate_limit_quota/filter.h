@@ -72,8 +72,8 @@ public:
   }
 
   ~RateLimitQuotaFilter() override {
-    // Notify the client that has been destroyed and its callback which is pointer to this pointer
-    // can not be used anymore.
+    // Notify the client that the filter has been destroyed and the callback can not be used
+    // anymore.
     if (client_.rate_limit_client != nullptr) {
       client_.rate_limit_client->resetCallback();
     }
@@ -82,7 +82,7 @@ public:
 private:
   // Create the matcher factory and matcher.
   void createMatcher();
-  // Create new bucket element.
+  // Create new bucket and send the report to RLQS server.
   Http::FilterHeadersStatus
   createNewBucketAndSendReport(const BucketId& bucket_id,
                                const RateLimitOnMatchAction& match_action);
