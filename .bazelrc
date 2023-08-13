@@ -193,6 +193,7 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 # Coverage options
 coverage --config=coverage
 coverage --build_tests_only
+
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
@@ -201,15 +202,15 @@ build:coverage --test_timeout=390,750,1500,5700
 build:coverage --define=dynamic_link_tests=true
 build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
-build:coverage --coverage_support=@envoy//bazel/coverage:coverage_support
-build:coverage --test_env=CC_CODE_COVERAGE_SCRIPT=bazel/coverage/collect_cc_coverage.sh
 build:coverage --test_env=HEAPCHECK=
 build:coverage --combined_report=lcov
 build:coverage --strategy=TestRunner=sandboxed,local
 build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
+build:coverage --experimental_generate_llvm_lcov
 build:coverage --collect_code_coverage
-build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//envoy[/:],//contrib(?!/.*/test)[/:]"
+build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],^//envoy[/:],^//contrib(?!/.*/test)[/:]"
+build:coverage --remote_download_toplevel
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
