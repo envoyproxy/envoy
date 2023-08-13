@@ -171,11 +171,13 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filter_manager::Throttler& proto_config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
       Server::Configuration::FactoryContext&) override {
-    return [proto_config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<ThrottlerFilter>(
-          std::chrono::milliseconds(proto_config.tick_interval_ms()),
-          proto_config.max_chunk_length()));
+    return [network_filter_matcher, proto_config](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addFilter(network_filter_matcher,
+                               std::make_shared<ThrottlerFilter>(
+                                   std::chrono::milliseconds(proto_config.tick_interval_ms()),
+                                   proto_config.max_chunk_length()));
     };
   }
 };
@@ -256,9 +258,10 @@ public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
+                               const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
                                Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<DispenserFilter>());
+    return [network_filter_matcher](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addFilter(network_filter_matcher, std::make_shared<DispenserFilter>());
     };
   }
 

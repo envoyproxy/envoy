@@ -133,11 +133,14 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::TestNetworkAsyncTcpFilterConfig& config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
       Server::Configuration::FactoryContext& context) override {
-    return [config, &context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestNetworkAsyncTcpFilter>(
-          config, context.scope(), context.clusterManager()));
-    };
+    return
+        [network_filter_matcher, config, &context](Network::FilterManager& filter_manager) -> void {
+          filter_manager.addReadFilter(network_filter_matcher,
+                                       std::make_shared<TestNetworkAsyncTcpFilter>(
+                                           config, context.scope(), context.clusterManager()));
+        };
   }
 };
 

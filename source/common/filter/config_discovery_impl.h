@@ -129,9 +129,11 @@ public:
       onConfigUpdate(*default_configuration_, "", nullptr);
     }
   }
+
   const Network::ListenerFilterMatcherSharedPtr& getListenerFilterMatcher() override {
     return listener_filter_matcher_;
   }
+
   const Network::NetworkFilterMatcherSharedPtr& getNetworkFilterMatcher() override {
     return network_filter_matcher_;
   }

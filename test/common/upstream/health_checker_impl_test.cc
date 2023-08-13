@@ -4187,7 +4187,7 @@ public:
   void expectClientCreate() {
     connection_ = new NiceMock<Network::MockClientConnection>();
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
-    EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
+    EXPECT_CALL(*connection_, addReadFilter(_, _)).WillOnce(SaveArg<1>(&read_filter_));
   }
 
   std::shared_ptr<TcpHealthCheckerImpl> health_checker_;

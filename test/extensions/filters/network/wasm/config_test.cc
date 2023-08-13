@@ -86,14 +86,17 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
   std::shared_ptr<Envoy::Extensions::Common::Wasm::Context> context = nullptr;
   {
     WasmFilterConfig factory;
-    Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
+    Network::FilterFactoryCb cb =
+        factory.createFilterFactoryFromProto(proto_config, nullptr, context_);
     EXPECT_CALL(init_watcher_, ready());
     context_.initManager().initialize(init_watcher_);
     EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
     Network::MockConnection connection;
-    EXPECT_CALL(connection, addFilter(_)).WillOnce([&context](Network::FilterSharedPtr filter) {
-      context = std::static_pointer_cast<Envoy::Extensions::Common::Wasm::Context>(filter);
-    });
+    EXPECT_CALL(connection, addFilter(_, _))
+        .WillOnce([&context](const Network::NetworkFilterMatcherSharedPtr&,
+                             Network::FilterSharedPtr filter) {
+          context = std::static_pointer_cast<Envoy::Extensions::Common::Wasm::Context>(filter);
+        });
     cb(connection);
   }
   // Check if the context still holds a valid Wasm even after the factory is destroyed.
@@ -123,12 +126,13 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   WasmFilterConfig factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, nullptr, context_);
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addFilter(_, _));
   cb(connection);
 }
 
@@ -146,7 +150,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCode) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   WasmFilterConfig factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, context_),
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, nullptr, context_),
                             Extensions::Common::Wasm::WasmException,
                             "Unable to create Wasm network filter test");
 }
@@ -166,7 +170,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   WasmFilterConfig factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, context_),
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, nullptr, context_),
                             Extensions::Common::Wasm::WasmException,
                             "Unable to create Wasm network filter test");
 }
@@ -294,12 +298,13 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   WasmFilterConfig factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, nullptr, context_);
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addFilter(_, _));
   cb(connection);
 }
 
@@ -327,7 +332,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
   WasmFilterConfig factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, context_),
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, nullptr, context_),
                             Envoy::Extensions::Common::Wasm::WasmException,
                             "Unable to create Wasm network filter ");
   const std::string valid_yaml =
@@ -347,12 +352,13 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
       value: "valid"
   )EOF"));
   TestUtility::loadFromYaml(valid_yaml, proto_config);
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, nullptr, context_);
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addFilter(_, _));
   cb(connection);
 }
 

@@ -74,7 +74,7 @@ public:
       : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
         cnames_(cnames), record_ttl_(record_ttl), refused_(refused), error_on_a_(error_on_a),
         error_on_aaaa_(error_on_aaaa) {
-    connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+    connection_->addReadFilter(nullptr, Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
   ~TestDnsServerQuery() { connection_->close(ConnectionCloseType::NoFlush); }

@@ -215,7 +215,7 @@ protected:
       factories.push_back(
           std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
               [read_filter, this](Network::FilterManager& filter_manager) {
-                filter_manager.addReadFilter(read_filter);
+                filter_manager.addReadFilter(nullptr, read_filter);
                 read_filter->callbacks_->connection().addConnectionCallbacks(
                     network_connection_callbacks_);
               }));

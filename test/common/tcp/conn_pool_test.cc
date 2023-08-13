@@ -149,9 +149,10 @@ public:
 
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, options_))
         .WillOnce(Return(test_conn.connection_));
-    EXPECT_CALL(*test_conn.connection_, addReadFilter(_))
+    EXPECT_CALL(*test_conn.connection_, addReadFilter(_, _))
         .WillOnce(Invoke(
-            [&](Network::ReadFilterSharedPtr filter) -> void { test_conn.filter_ = filter; }));
+            [&](const Network::NetworkFilterMatcherSharedPtr&,
+                Network::ReadFilterSharedPtr filter) -> void { test_conn.filter_ = filter; }));
     EXPECT_CALL(*test_conn.connection_, connect());
     EXPECT_CALL(*test_conn.connect_timer_, enableTimer(_, _));
 
@@ -282,7 +283,7 @@ public:
     EXPECT_CALL(*connection_, setBufferLimits(0));
     EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
     EXPECT_CALL(*connection_, addConnectionCallbacks(_));
-    EXPECT_CALL(*connection_, addReadFilter(_));
+    EXPECT_CALL(*connection_, addReadFilter(_, _));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, noDelay(true));

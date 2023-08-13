@@ -51,11 +51,13 @@ private:
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
     RoleBasedAccessControlNetworkFilterConfigFactory factory;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), Envoy::EnvoyException);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(config, nullptr, context),
+                 Envoy::EnvoyException);
 
     config.clear_rules();
     (*config.mutable_shadow_rules()->mutable_policies())["foo"] = policy_proto;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), Envoy::EnvoyException);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(config, nullptr, context),
+                 Envoy::EnvoyException);
   }
 
   void checkMatcher(const std::string& matcher_yaml) {
@@ -92,9 +94,9 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  EXPECT_CALL(connection, addReadFilter(_, _));
   cb(connection);
 }
 
@@ -113,9 +115,9 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidMatcherProto) 
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  EXPECT_CALL(connection, addReadFilter(_, _));
   cb(connection);
 }
 

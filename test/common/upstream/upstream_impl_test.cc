@@ -4143,6 +4143,7 @@ public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
+                               const Network::NetworkFilterMatcherSharedPtr&,
                                Server::Configuration::FactoryContext&) override {
     PANIC("not implemented");
   }

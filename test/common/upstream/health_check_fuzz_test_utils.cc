@@ -85,7 +85,7 @@ void TcpHealthCheckerImplTestBase::expectClientCreate() {
   connection_ = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(testing::Return(connection_));
-  EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(testing::SaveArg<0>(&read_filter_));
+  EXPECT_CALL(*connection_, addReadFilter(_, _)).WillOnce(testing::SaveArg<1>(&read_filter_));
 }
 
 GrpcHealthCheckerImplTestBaseUtils::GrpcHealthCheckerImplTestBaseUtils() {

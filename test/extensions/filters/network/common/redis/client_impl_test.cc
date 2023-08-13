@@ -71,8 +71,8 @@ public:
 
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(*host_, createConnection_(_, _)).WillOnce(Return(conn_info));
-    EXPECT_CALL(*upstream_connection_, addReadFilter(_))
-        .WillOnce(SaveArg<0>(&upstream_read_filter_));
+    EXPECT_CALL(*upstream_connection_, addReadFilter(_, _))
+        .WillOnce(SaveArg<1>(&upstream_read_filter_));
     EXPECT_CALL(*upstream_connection_, connect());
     EXPECT_CALL(*upstream_connection_, noDelay(true));
 

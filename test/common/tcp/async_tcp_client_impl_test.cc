@@ -38,7 +38,7 @@ public:
 
     EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, connect());
-    EXPECT_CALL(*connection_, addReadFilter(_));
+    EXPECT_CALL(*connection_, addReadFilter(_, _));
     if (trigger_connected) {
       EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::Connected));
     }

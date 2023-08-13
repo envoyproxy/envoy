@@ -31,13 +31,15 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
   // Get the pointer of write_filter when the write_filter is being added to connection_.
   write_filter_callbacks_ = std::make_shared<NiceMock<Network::MockWriteFilterCallbacks>>();
   read_filter_callbacks_ = std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
-  ON_CALL(write_filter_callbacks_->connection_, addWriteFilter(_))
-      .WillByDefault(Invoke([&](Network::WriteFilterSharedPtr write_filter) -> void {
+  ON_CALL(write_filter_callbacks_->connection_, addWriteFilter(_, _))
+      .WillByDefault(Invoke([&](const Network::NetworkFilterMatcherSharedPtr&,
+                                Network::WriteFilterSharedPtr write_filter) -> void {
         write_filter->initializeWriteFilterCallbacks(*write_filter_callbacks_);
         write_filter_ = write_filter;
       }));
-  ON_CALL(write_filter_callbacks_->connection_, addFilter(_))
-      .WillByDefault(Invoke([&](Network::FilterSharedPtr filter) -> void {
+  ON_CALL(write_filter_callbacks_->connection_, addFilter(_, _))
+      .WillByDefault(Invoke([&](const Network::NetworkFilterMatcherSharedPtr&,
+                                Network::FilterSharedPtr filter) -> void {
         filter->initializeReadFilterCallbacks(*read_filter_callbacks_);
         filter->initializeWriteFilterCallbacks(*write_filter_callbacks_);
         write_filter_ = filter;
@@ -83,7 +85,7 @@ void UberWriteFilterFuzzer::fuzz(
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
     ENVOY_LOG_MISC(debug, "Config content after decoded: {}", message->DebugString());
-    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
+    cb_ = factory.createFilterFactoryFromProto(*message, nullptr, factory_context_);
     // Add filter to connection_.
     cb_(write_filter_callbacks_->connection_);
   } catch (const EnvoyException& e) {

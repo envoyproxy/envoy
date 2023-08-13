@@ -410,7 +410,7 @@ FakeHttpConnection::FakeHttpConnection(
 #endif
   }
   shared_connection_.connection().addReadFilter(
-      Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+      nullptr, Network::ReadFilterSharedPtr{new ReadFilter(*this)});
 }
 
 AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
@@ -978,7 +978,7 @@ void FakeRawConnection::initialize() {
     return;
   }
   ASSERT(shared_connection_.dispatcher().isThreadSafe());
-  shared_connection_.connection().addReadFilter(read_filter_);
+  shared_connection_.connection().addReadFilter(nullptr, read_filter_);
 }
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,

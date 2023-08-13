@@ -1310,12 +1310,15 @@ public:
   InjectDynamicMetadataFactory() : FactoryBase("test.inject_dynamic_metadata") {}
 
 private:
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::tcp_proxy::InjectDynamicMetadata& cfg,
-                                    Server::Configuration::FactoryContext&) override {
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::integration::tcp_proxy::InjectDynamicMetadata& cfg,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Server::Configuration::FactoryContext&) override {
     std::string key = cfg.key();
-    return [key = std::move(key)](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<InjectDynamicMetadata>(key));
+    return [network_filter_matcher,
+            key = std::move(key)](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(network_filter_matcher,
+                                   std::make_shared<InjectDynamicMetadata>(key));
     };
   }
 };
@@ -1424,7 +1427,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // filter so there will be no pause waiting on auth data.
   ssl_client_->addConnectionCallbacks(connect_callbacks_);
   ssl_client_->enableHalfClose(true);
-  ssl_client_->addReadFilter(payload_reader_);
+  ssl_client_->addReadFilter(nullptr, payload_reader_);
   ssl_client_->connect();
   while (!connect_callbacks_.connected()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

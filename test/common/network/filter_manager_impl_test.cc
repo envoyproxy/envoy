@@ -71,9 +71,9 @@ TEST_F(NetworkFilterManagerTest, All) {
   MockFilter* filter(new LocalMockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(nullptr, WriteFilterSharedPtr{write_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
@@ -119,8 +119,8 @@ TEST_F(NetworkFilterManagerTest, ConnectionClosedBeforeRunningFilter) {
   MockFilter* filter(new LocalMockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
@@ -146,9 +146,9 @@ TEST_F(NetworkFilterManagerTest, FilterReturnStopAndNoCallback) {
   MockFilter* filter(new LocalMockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(nullptr, WriteFilterSharedPtr{write_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
@@ -174,8 +174,8 @@ TEST_F(NetworkFilterManagerTest, ReadFilterCloseConnectionAndReturnContinue) {
   MockFilter* filter(new LocalMockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
@@ -206,9 +206,9 @@ TEST_F(NetworkFilterManagerTest, WriteFilterCloseConnectionAndReturnContinue) {
   MockFilter* filter(new LocalMockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(nullptr, WriteFilterSharedPtr{write_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
@@ -245,9 +245,9 @@ TEST_F(NetworkFilterManagerTest, ReadCloseConnectionReturnStopAndCallback) {
   MockFilter* filter(new LocalMockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(nullptr, WriteFilterSharedPtr{write_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
@@ -279,9 +279,9 @@ TEST_F(NetworkFilterManagerTest, WriteCloseConnectionReturnStopAndCallback) {
   MockFilter* filter(new LocalMockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(nullptr, WriteFilterSharedPtr{write_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
@@ -320,9 +320,9 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
   MockFilter* filter(new LocalMockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(nullptr, WriteFilterSharedPtr{write_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
@@ -364,9 +364,9 @@ TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
   MockFilter* filter(new MockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(nullptr, WriteFilterSharedPtr{write_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
   EXPECT_EQ(manager.initializeReadFilters(), true);
@@ -396,9 +396,9 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
   MockFilter* filter(new MockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(nullptr, WriteFilterSharedPtr{write_filter});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   Buffer::OwnedImpl injected_buffer("greetings");
   EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("greetings"), false))
@@ -421,9 +421,9 @@ TEST_F(NetworkFilterManagerTest, StartUpstreamSecureTransport) {
   MockFilter* filter(new MockFilter());
 
   FilterManagerImpl manager(connection_, socket_);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter_1});
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter_2});
-  manager.addFilter(FilterSharedPtr{filter});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter_1});
+  manager.addReadFilter(nullptr, ReadFilterSharedPtr{read_filter_2});
+  manager.addFilter(nullptr, FilterSharedPtr{filter});
 
   // Verify that filter manager calls each filter's 'startUpstreamsecureTransport' method.
   // when one filter calls startUpstreamSecureTransport.

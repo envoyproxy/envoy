@@ -82,7 +82,7 @@ public:
                                Server::Configuration::CommonFactoryContext&) override {
     auto config = dynamic_cast<const ProtobufWkt::StringValue&>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));
+      filter_manager.addFilter(nullptr, std::make_shared<PoliteFilter>(test_parent_, config));
     };
   }
 

@@ -55,7 +55,7 @@ TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
   EXPECT_THROW(
       HttpConnectionManagerFilterConfigFactory().createFilterFactoryFromProto(
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager(),
-          context_),
+          nullptr, context_),
       ProtoValidationException);
 }
 
@@ -1564,8 +1564,10 @@ http_filters:
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
   EXPECT_CALL(context_.thread_local_, allocateSlot());
-  Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
-  Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
+  Network::FilterFactoryCb cb1 =
+      factory.createFilterFactoryFromProto(proto_config, nullptr, context_);
+  Network::FilterFactoryCb cb2 =
+      factory.createFilterFactoryFromProto(proto_config, nullptr, context_);
   EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_.getServerFactoryContext()));
 }
 
@@ -3197,14 +3199,16 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
   TestUtility::loadFromYamlAndValidate(yaml_string, config);
 
   MobileHttpConnectionManagerFilterConfigFactory factory;
-  Network::FilterFactoryCb create_hcm_cb = factory.createFilterFactoryFromProto(config, context_);
+  Network::FilterFactoryCb create_hcm_cb =
+      factory.createFilterFactoryFromProto(config, nullptr, context_);
 
   NiceMock<Network::MockFilterManager> fm;
   NiceMock<Network::MockReadFilterCallbacks> cb;
   Network::ReadFilterSharedPtr hcm_filter;
   Http::ConnectionManagerImpl* hcm = nullptr;
-  EXPECT_CALL(fm, addReadFilter(_))
-      .WillOnce(Invoke([&](Network::ReadFilterSharedPtr manager) -> void {
+  EXPECT_CALL(fm, addReadFilter(_, _))
+      .WillOnce(Invoke([&](const Network::NetworkFilterMatcherSharedPtr&,
+                           Network::ReadFilterSharedPtr manager) -> void {
         hcm_filter = manager;
         hcm = dynamic_cast<Http::ConnectionManagerImpl*>(manager.get());
       }));

@@ -180,7 +180,7 @@ protected:
           server_connection_ = dispatcher_->createServerConnection(
               std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
           server_connection_->addConnectionCallbacks(server_callbacks_);
-          server_connection_->addReadFilter(read_filter_);
+          server_connection_->addReadFilter(nullptr, read_filter_);
 
           expected_callbacks--;
           if (expected_callbacks == 0) {
@@ -381,8 +381,8 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
         server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->addReadFilter(read_filter_);
-        server_connection_->addReadFilter(add_and_remove_filter);
+        server_connection_->addReadFilter(nullptr, read_filter_);
+        server_connection_->addReadFilter(nullptr, add_and_remove_filter);
         server_connection_->removeReadFilter(add_and_remove_filter);
       }));
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
@@ -409,7 +409,7 @@ TEST_P(ConnectionImplTest, UnregisterRegisterDuringConnectCallback) {
         server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->addReadFilter(read_filter_);
+        server_connection_->addReadFilter(nullptr, read_filter_);
 
         expected_callbacks--;
         if (expected_callbacks == 0) {
@@ -569,7 +569,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
         server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->addReadFilter(read_filter_);
+        server_connection_->addReadFilter(nullptr, read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -619,7 +619,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
         server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->addReadFilter(read_filter_);
+        server_connection_->addReadFilter(nullptr, read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -694,12 +694,12 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
   std::shared_ptr<MockFilter> filter(new MockFilter());
-  client_connection_->addFilter(filter);
-  client_connection_->addWriteFilter(write_filter);
+  client_connection_->addFilter(nullptr, filter);
+  client_connection_->addWriteFilter(nullptr, write_filter);
 
   // Make sure removed filters don't get callbacks.
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
-  client_connection_->addReadFilter(read_filter);
+  client_connection_->addReadFilter(nullptr, read_filter);
   client_connection_->removeReadFilter(read_filter);
 
   Sequence s1;
@@ -719,7 +719,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->setConnectionStats(server_connection_stats.toBufferStats());
-        server_connection_->addReadFilter(read_filter_);
+        server_connection_->addReadFilter(nullptr, read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
       }));
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
@@ -800,7 +800,7 @@ TEST_P(ConnectionImplTest, ReadEnableDispatches) {
   connect();
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
 
   {
     Buffer::OwnedImpl buffer("data");
@@ -837,7 +837,7 @@ TEST_P(ConnectionImplTest, KickUndone) {
   connect();
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
   Buffer::Instance* connection_buffer = nullptr;
 
   {
@@ -971,7 +971,7 @@ TEST_P(ConnectionImplTest, HalfClose) {
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   server_connection_->enableHalfClose(true);
   client_connection_->enableHalfClose(true);
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
 
   EXPECT_CALL(*read_filter_, onData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
     dispatcher_->exit();
@@ -1090,7 +1090,7 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   setUpBasicConnection();
   client_connection_->setBufferLimits(2);
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
   connect();
 
   auto on_filter_data_exit = [&](Buffer::Instance&, bool) -> FilterStatus {
@@ -1545,7 +1545,7 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
 
   NiceMockConnectionStats stats;
   server_connection_->setConnectionStats(stats.toBufferStats());
@@ -1590,7 +1590,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
 
   NiceMockConnectionStats stats;
   server_connection_->setConnectionStats(stats.toBufferStats());
@@ -1630,7 +1630,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
 
   NiceMockConnectionStats stats;
   server_connection_->setConnectionStats(stats.toBufferStats());
@@ -1669,7 +1669,7 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithPendingWrite) {
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
   NiceMockConnectionStats stats;
   server_connection_->setConnectionStats(stats.toBufferStats());
 
@@ -1713,7 +1713,7 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithoutPendingWrite)
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-  client_connection_->addReadFilter(client_read_filter);
+  client_connection_->addReadFilter(nullptr, client_read_filter);
   NiceMockConnectionStats stats;
   server_connection_->setConnectionStats(stats.toBufferStats());
 
@@ -2160,7 +2160,7 @@ public:
 //
 // Ref: https://github.com/envoyproxy/envoy/issues/5313
 TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
-  connection_->addReadFilter(std::make_shared<Network::FakeReadFilter>());
+  connection_->addReadFilter(nullptr, std::make_shared<Network::FakeReadFilter>());
   connection_->enableHalfClose(true);
   EXPECT_CALL(*transport_socket_, doRead(_))
       .Times(2)
@@ -2176,7 +2176,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
 
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter);
+  connection_->addReadFilter(nullptr, read_filter);
 
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
   connection_->readDisable(true);
@@ -2240,7 +2240,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
   connection_->setBufferLimits(5);
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter);
+  connection_->addReadFilter(nullptr, read_filter);
 
   EXPECT_CALL(*transport_socket_, doRead(_))
       .WillOnce(Invoke([](Buffer::Instance& buffer) -> IoResult {
@@ -2335,7 +2335,7 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
   connection_->setBufferLimits(5);
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter);
+  connection_->addReadFilter(nullptr, read_filter);
 
   // Add some data to the read buffer and also call setTransportSocketIsReadable to mimic what
   // transport sockets are expected to do when the read buffer high watermark is hit.
@@ -2575,7 +2575,7 @@ TEST_F(MockTransportConnectionImplTest, HalfCloseWrite) {
 TEST_F(MockTransportConnectionImplTest, ReadMultipleEndStream) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter);
+  connection_->addReadFilter(nullptr, read_filter);
   EXPECT_CALL(*transport_socket_, doRead(_))
       .Times(2)
       .WillRepeatedly(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
@@ -2589,7 +2589,7 @@ TEST_F(MockTransportConnectionImplTest, ReadMultipleEndStream) {
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseReadFirst) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter);
+  connection_->addReadFilter(nullptr, read_filter);
 
   EXPECT_CALL(*transport_socket_, doRead(_))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
@@ -2608,7 +2608,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseReadFirst) {
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWriteFirst) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter);
+  connection_->addReadFilter(nullptr, read_filter);
 
   Buffer::OwnedImpl buffer;
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
@@ -2628,7 +2628,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWriteFirst) {
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter);
+  connection_->addReadFilter(nullptr, read_filter);
 
   Buffer::OwnedImpl buffer("data");
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
@@ -2651,7 +2651,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst)
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter);
+  connection_->addReadFilter(nullptr, read_filter);
 
   EXPECT_CALL(*transport_socket_, doRead(_))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
@@ -2680,8 +2680,8 @@ TEST_F(MockTransportConnectionImplTest, ReadEndStreamStopIteration) {
   std::shared_ptr<MockReadFilter> read_filter1(new StrictMock<MockReadFilter>());
   std::shared_ptr<MockReadFilter> read_filter2(new StrictMock<MockReadFilter>());
   connection_->enableHalfClose(true);
-  connection_->addReadFilter(read_filter1);
-  connection_->addReadFilter(read_filter2);
+  connection_->addReadFilter(nullptr, read_filter1);
+  connection_->addReadFilter(nullptr, read_filter2);
 
   EXPECT_CALL(*read_filter1, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*read_filter2, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
@@ -2707,8 +2707,8 @@ TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
   std::shared_ptr<MockWriteFilter> write_filter1(new StrictMock<MockWriteFilter>());
   std::shared_ptr<MockWriteFilter> write_filter2(new StrictMock<MockWriteFilter>());
   connection_->enableHalfClose(true);
-  connection_->addWriteFilter(write_filter2);
-  connection_->addWriteFilter(write_filter1);
+  connection_->addWriteFilter(nullptr, write_filter2);
+  connection_->addWriteFilter(nullptr, write_filter1);
 
   EXPECT_CALL(*write_filter1, onWrite(BufferStringEqual(val), true))
       .WillOnce(Return(FilterStatus::StopIteration));
@@ -2782,7 +2782,7 @@ class PostCloseConnectionImplTest : public MockTransportConnectionImplTest {
 protected:
   // Setup connection, single read event.
   void initialize() {
-    connection_->addReadFilter(read_filter_);
+    connection_->addReadFilter(nullptr, read_filter_);
     connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
     EXPECT_CALL(*transport_socket_, doRead(_))
@@ -2982,7 +2982,7 @@ public:
           server_connection_ = dispatcher_->createServerConnection(
               std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
           server_connection_->setBufferLimits(read_buffer_limit);
-          server_connection_->addReadFilter(read_filter_);
+          server_connection_->addReadFilter(nullptr, read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));

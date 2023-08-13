@@ -4446,7 +4446,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::CommonFactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addWriteFilter(std::make_shared<TestUpstreamNetworkFilter>());
+      filter_manager.addWriteFilter(nullptr, std::make_shared<TestUpstreamNetworkFilter>());
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -4486,9 +4486,9 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
 
   create(parseBootstrapFromV3Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
-  EXPECT_CALL(*connection, addWriteFilter(_));
-  EXPECT_CALL(*connection, addFilter(_)).Times(0);
+  EXPECT_CALL(*connection, addReadFilter(_, _)).Times(0);
+  EXPECT_CALL(*connection, addWriteFilter(_, _));
+  EXPECT_CALL(*connection, addFilter(_, _)).Times(0);
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection));
   auto conn_data = cluster_manager_->getThreadLocalCluster("cluster_1")->tcpConn(nullptr);

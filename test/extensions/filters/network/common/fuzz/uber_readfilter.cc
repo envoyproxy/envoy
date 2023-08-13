@@ -37,13 +37,15 @@ void UberFilterFuzzer::fuzzerSetup() {
 
   // Get the pointer of read_filter when the read_filter is being added to connection_.
   read_filter_callbacks_ = std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
-  ON_CALL(read_filter_callbacks_->connection_, addReadFilter(_))
-      .WillByDefault(Invoke([&](Network::ReadFilterSharedPtr read_filter) -> void {
+  ON_CALL(read_filter_callbacks_->connection_, addReadFilter(_, _))
+      .WillByDefault(Invoke([&](const Network::NetworkFilterMatcherSharedPtr&,
+                                Network::ReadFilterSharedPtr read_filter) -> void {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
       }));
-  ON_CALL(read_filter_callbacks_->connection_, addFilter(_))
-      .WillByDefault(Invoke([&](Network::FilterSharedPtr read_filter) -> void {
+  ON_CALL(read_filter_callbacks_->connection_, addFilter(_, _))
+      .WillByDefault(Invoke([&](const Network::NetworkFilterMatcherSharedPtr&,
+                                Network::FilterSharedPtr read_filter) -> void {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
       }));
@@ -108,7 +110,7 @@ void UberFilterFuzzer::fuzz(
     // Make sure no invalid system calls are executed in fuzzer.
     checkInvalidInputForFuzzer(filter_name, message.get());
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
-    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
+    cb_ = factory.createFilterFactoryFromProto(*message, nullptr, factory_context_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup {}", e.what());
     return;

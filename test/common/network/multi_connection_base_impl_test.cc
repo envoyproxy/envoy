@@ -417,21 +417,21 @@ TEST_F(MultiConnectionBaseImplTest, AddReadFilter) {
   ReadFilterSharedPtr filter = std::make_shared<MockReadFilter>();
   filter->initializeReadFilterCallbacks(callbacks);
   // The filter will be captured by the impl and not passed to the connection until it completes.
-  impl_->addReadFilter(filter);
+  impl_->addReadFilter(nullptr, filter);
 
   startConnect();
 
   timeOutAndStartNextAttempt();
 
   // addReadFilter() should be applied to the now final connection.
-  EXPECT_CALL(*createdConnections()[1], addReadFilter(filter));
+  EXPECT_CALL(*createdConnections()[1], addReadFilter(_, filter));
   connectSecondAttempt();
 
   ReadFilterSharedPtr filter2 = std::make_shared<MockReadFilter>();
   filter2->initializeReadFilterCallbacks(callbacks);
   // Verify that addReadFilter() calls are delegated to the remaining connection.
-  EXPECT_CALL(*createdConnections()[1], addReadFilter(filter2));
-  impl_->addReadFilter(filter2);
+  EXPECT_CALL(*createdConnections()[1], addReadFilter(_, filter2));
+  impl_->addReadFilter(nullptr, filter2);
 }
 
 TEST_F(MultiConnectionBaseImplTest, RemoveReadFilter) {
@@ -460,8 +460,8 @@ TEST_F(MultiConnectionBaseImplTest, RemoveReadFilterBeforeConnectFinished) {
   ReadFilterSharedPtr filter2 = std::make_shared<MockReadFilter>();
   filter2->initializeReadFilterCallbacks(callbacks);
   // The filters will be captured by the impl and not passed to the connection until it completes.
-  impl_->addReadFilter(filter);
-  impl_->addReadFilter(filter2);
+  impl_->addReadFilter(nullptr, filter);
+  impl_->addReadFilter(nullptr, filter2);
 
   // The removal will be captured by the impl and not passed to the connection until it completes.
   impl_->removeReadFilter(filter);
@@ -469,7 +469,7 @@ TEST_F(MultiConnectionBaseImplTest, RemoveReadFilterBeforeConnectFinished) {
   timeOutAndStartNextAttempt();
 
   // Verify that addReadFilter() calls are delegated to the remaining connection.
-  EXPECT_CALL(*createdConnections()[1], addReadFilter(filter2));
+  EXPECT_CALL(*createdConnections()[1], addReadFilter(_, filter2));
   connectSecondAttempt();
 }
 
@@ -484,7 +484,7 @@ TEST_F(MultiConnectionBaseImplTest, InitializeReadFilters) {
   MockReadFilterCallbacks callbacks;
   ReadFilterSharedPtr filter = std::make_shared<MockReadFilter>();
   filter->initializeReadFilterCallbacks(callbacks);
-  impl_->addReadFilter(filter);
+  impl_->addReadFilter(nullptr, filter);
 
   // initializeReadFilters() will be captured by the impl and not passed to the connection until it
   // completes.
@@ -493,15 +493,15 @@ TEST_F(MultiConnectionBaseImplTest, InitializeReadFilters) {
   timeOutAndStartNextAttempt();
 
   // initializeReadFilters() should be applied to the now final connection.
-  EXPECT_CALL(*createdConnections()[1], addReadFilter(_));
+  EXPECT_CALL(*createdConnections()[1], addReadFilter(_, _));
   EXPECT_CALL(*createdConnections()[1], initializeReadFilters()).WillOnce(Return(true));
   connectSecondAttempt();
 
   ReadFilterSharedPtr filter2 = std::make_shared<MockReadFilter>();
   filter2->initializeReadFilterCallbacks(callbacks);
   // Verify that addReadFilter() calls are delegated to the remaining connection.
-  EXPECT_CALL(*createdConnections()[1], addReadFilter(filter2));
-  impl_->addReadFilter(filter2);
+  EXPECT_CALL(*createdConnections()[1], addReadFilter(_, filter2));
+  impl_->addReadFilter(nullptr, filter2);
 }
 
 TEST_F(MultiConnectionBaseImplTest, InitializeReadFiltersAfterConnect) {
@@ -812,21 +812,21 @@ TEST_F(MultiConnectionBaseImplTest, AddWriteFilter) {
   WriteFilterSharedPtr filter = std::make_shared<MockWriteFilter>();
   filter->initializeWriteFilterCallbacks(callbacks);
   // The filter will be captured by the impl and not passed to the connection until it completes.
-  impl_->addWriteFilter(filter);
+  impl_->addWriteFilter(nullptr, filter);
 
   startConnect();
 
   timeOutAndStartNextAttempt();
 
   // addWriteFilter() should be applied to the now final connection.
-  EXPECT_CALL(*createdConnections()[1], addWriteFilter(filter));
+  EXPECT_CALL(*createdConnections()[1], addWriteFilter(_, filter));
   connectSecondAttempt();
 
   WriteFilterSharedPtr filter2 = std::make_shared<MockWriteFilter>();
   filter2->initializeWriteFilterCallbacks(callbacks);
   // Verify that addWriteFilter() calls are delegated to the remaining connection.
-  EXPECT_CALL(*createdConnections()[1], addWriteFilter(filter2));
-  impl_->addWriteFilter(filter2);
+  EXPECT_CALL(*createdConnections()[1], addWriteFilter(_, filter2));
+  impl_->addWriteFilter(nullptr, filter2);
 }
 
 TEST_F(MultiConnectionBaseImplTest, AddWriteFilterAfterConnect) {
@@ -837,8 +837,8 @@ TEST_F(MultiConnectionBaseImplTest, AddWriteFilterAfterConnect) {
   MockWriteFilterCallbacks callbacks;
   WriteFilterSharedPtr filter = std::make_shared<MockWriteFilter>();
   filter->initializeWriteFilterCallbacks(callbacks);
-  EXPECT_CALL(*createdConnections()[0], addWriteFilter(filter));
-  impl_->addWriteFilter(filter);
+  EXPECT_CALL(*createdConnections()[0], addWriteFilter(_, filter));
+  impl_->addWriteFilter(nullptr, filter);
 }
 
 TEST_F(MultiConnectionBaseImplTest, AddFilter) {
@@ -850,22 +850,22 @@ TEST_F(MultiConnectionBaseImplTest, AddFilter) {
   filter->initializeReadFilterCallbacks(read_callbacks);
   filter->initializeWriteFilterCallbacks(write_callbacks);
   // The filter will be captured by the impl and not passed to the connection until it completes.
-  impl_->addFilter(filter);
+  impl_->addFilter(nullptr, filter);
 
   startConnect();
 
   timeOutAndStartNextAttempt();
 
   // addFilter() should be applied to the now final connection.
-  EXPECT_CALL(*createdConnections()[1], addFilter(filter));
+  EXPECT_CALL(*createdConnections()[1], addFilter(_, filter));
   connectSecondAttempt();
 
   FilterSharedPtr filter2 = std::make_shared<MockFilter>();
   filter2->initializeReadFilterCallbacks(read_callbacks);
   filter2->initializeWriteFilterCallbacks(write_callbacks);
   // Verify that addFilter() calls are delegated to the remaining connection.
-  EXPECT_CALL(*createdConnections()[1], addFilter(filter2));
-  impl_->addFilter(filter2);
+  EXPECT_CALL(*createdConnections()[1], addFilter(_, filter2));
+  impl_->addFilter(nullptr, filter2);
 }
 
 TEST_F(MultiConnectionBaseImplTest, AddFilterAfterConnect) {
@@ -878,8 +878,8 @@ TEST_F(MultiConnectionBaseImplTest, AddFilterAfterConnect) {
   FilterSharedPtr filter = std::make_shared<MockFilter>();
   filter->initializeReadFilterCallbacks(read_callbacks);
   filter->initializeWriteFilterCallbacks(write_callbacks);
-  EXPECT_CALL(*createdConnections()[0], addFilter(filter));
-  impl_->addFilter(filter);
+  EXPECT_CALL(*createdConnections()[0], addFilter(_, filter));
+  impl_->addFilter(nullptr, filter);
 }
 
 TEST_F(MultiConnectionBaseImplTest, AddBytesSentCallback) {

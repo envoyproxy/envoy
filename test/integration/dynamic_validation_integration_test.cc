@@ -34,6 +34,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& /*proto_config*/,
+      const Network::NetworkFilterMatcherSharedPtr&,
       Server::Configuration::FactoryContext& /*context*/) override {
     return {};
   }

@@ -59,10 +59,13 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::TestNetworkFilterConfig& config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
       Server::Configuration::FactoryContext& context) override {
-    return [config, &context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestNetworkFilter>(context.scope()));
-    };
+    return
+        [network_filter_matcher, config, &context](Network::FilterManager& filter_manager) -> void {
+          filter_manager.addReadFilter(network_filter_matcher,
+                                       std::make_shared<TestNetworkFilter>(context.scope()));
+        };
   }
 };
 
@@ -103,9 +106,11 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::TestDrainerNetworkFilterConfig& config,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
       Server::Configuration::FactoryContext&) override {
-    return [config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestDrainerNetworkFilter>(config));
+    return [network_filter_matcher, config](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(network_filter_matcher,
+                                   std::make_shared<TestDrainerNetworkFilter>(config));
     };
   }
 

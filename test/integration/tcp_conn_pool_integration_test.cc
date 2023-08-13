@@ -88,9 +88,11 @@ public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
+                               const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
                                Server::Configuration::FactoryContext& context) override {
-    return [&context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestFilter>(context.clusterManager()));
+    return [network_filter_matcher, &context](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(network_filter_matcher,
+                                   std::make_shared<TestFilter>(context.clusterManager()));
     };
   }
 

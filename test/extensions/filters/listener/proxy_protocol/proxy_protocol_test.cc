@@ -157,7 +157,7 @@ public:
                                const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
-            connection.addReadFilter(read_filter_);
+            connection.addReadFilter(nullptr, read_filter_);
             return true;
           }));
     }
@@ -2024,7 +2024,7 @@ public:
                              const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);
-          connection.addReadFilter(read_filter_);
+          connection.addReadFilter(nullptr, read_filter_);
           return true;
         }));
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))

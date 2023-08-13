@@ -135,7 +135,7 @@ public:
                                const Filter::NetworkFilterFactoriesList&) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
-            connection.addReadFilter(read_filter_);
+            connection.addReadFilter(nullptr, read_filter_);
             return true;
           }));
     }

@@ -79,6 +79,7 @@ class TestNetworkFilterFactory
 public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
+                               const Network::NetworkFilterMatcherSharedPtr&,
                                Server::Configuration::FactoryContext&) override {
     created_ = true;
     return [](Network::FilterManager&) -> void {};
@@ -193,7 +194,7 @@ public:
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
         config_source, name, server_factory_context_, factory_context_,
         server_factory_context_.cluster_manager_, last_filter_config, getFilterType(),
-        getMatcher());
+        getListenerMatcher(), getNetworkMatcher());
   }
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
@@ -242,7 +243,10 @@ public:
   const std::string getTypeUrl() const { return "google.protobuf.StringValue"; }
 
   virtual const std::string getFilterType() const PURE;
-  virtual const Network::ListenerFilterMatcherSharedPtr getMatcher() const { return nullptr; }
+  virtual const Network::ListenerFilterMatcherSharedPtr getListenerMatcher() const {
+    return nullptr;
+  }
+  virtual const Network::NetworkFilterMatcherSharedPtr getNetworkMatcher() const { return nullptr; }
   virtual const std::string getConfigReloadCounter() const PURE;
   virtual const std::string getConfigFailCounter() const PURE;
 
@@ -579,7 +583,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
           config_source, "foo", config_discovery_test.server_factory_context_,
           config_discovery_test.factory_context_,
           config_discovery_test.server_factory_context_.cluster_manager_, true,
-          config_discovery_test.getFilterType(), config_discovery_test.getMatcher()),
+          config_discovery_test.getFilterType(), config_discovery_test.getListenerMatcher(),
+          config_discovery_test.getNetworkMatcher()),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "
       "configuration with type URL "
@@ -632,15 +637,17 @@ class TcpListenerFilterConfigMatcherTest : public testing::Test,
                                            public TcpListenerFilterConfigDiscoveryImplTest {
 public:
   TcpListenerFilterConfigMatcherTest() : matcher_(nullptr) {}
-  const Network::ListenerFilterMatcherSharedPtr getMatcher() const override { return matcher_; }
-  void setMatcher(Network::ListenerFilterMatcherSharedPtr matcher) { matcher_ = matcher; }
+  const Network::ListenerFilterMatcherSharedPtr getListenerMatcher() const override {
+    return matcher_;
+  }
+  void setListenerMatcher(Network::ListenerFilterMatcherSharedPtr matcher) { matcher_ = matcher; }
 
   Network::ListenerFilterMatcherSharedPtr matcher_;
 };
 
 // Setup matcher as nullptr
 TEST_F(TcpListenerFilterConfigMatcherTest, TcpListenerFilterNullMatcher) {
-  // By default, getMatcher() returns nullptr.
+  // By default, getListenerMatcher() returns nullptr.
   setup();
   // Verify the listener_filter_matcher_ stored in provider_ matches with the configuration.
   EXPECT_EQ(provider_->getListenerFilterMatcher(), nullptr);
@@ -653,7 +660,7 @@ TEST_F(TcpListenerFilterConfigMatcherTest, TcpListenerFilterAnyMatcher) {
   pred.set_any_match(true);
   Network::ListenerFilterMatcherSharedPtr matcher =
       Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(pred);
-  setMatcher(matcher);
+  setListenerMatcher(matcher);
   setup();
   EXPECT_EQ(provider_->getListenerFilterMatcher(), matcher);
   EXPECT_CALL(init_watcher_, ready());

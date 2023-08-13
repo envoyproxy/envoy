@@ -52,9 +52,10 @@ public:
     EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
     EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
     EXPECT_CALL(*connection_, connect());
-    EXPECT_CALL(*connection_, addReadFilter(_))
+    EXPECT_CALL(*connection_, addReadFilter(_, _))
         .WillOnce(
-            Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
+            Invoke([this](const Network::NetworkFilterMatcherSharedPtr&,
+                          Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
 
     codec_ = new Http::MockClientConnection();
     EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
@@ -105,7 +106,7 @@ TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
   EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
   EXPECT_CALL(*connection, connect());
-  EXPECT_CALL(*connection, addReadFilter(_));
+  EXPECT_CALL(*connection, addReadFilter(_, _));
   auto codec = new Http::MockClientConnection();
 
   EXPECT_CALL(dispatcher_, createTimer_(_));

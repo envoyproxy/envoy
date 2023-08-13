@@ -37,12 +37,13 @@ DubboProxyProto parseDubboProxyFromV3Yaml(const std::string& yaml) {
 class DubboFilterConfigTestBase {
 public:
   void testConfig(DubboProxyProto& config) {
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
+    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, nullptr, context_); });
 
     Network::MockConnection connection;
-    EXPECT_CALL(connection, addReadFilter(_))
+    EXPECT_CALL(connection, addReadFilter(_, _))
         .WillOnce(testing::Invoke(
-            [this](Network::ReadFilterSharedPtr filter) { filter_ = std::move(filter); }));
+            [this](const Network::NetworkFilterMatcherSharedPtr&,
+                   Network::ReadFilterSharedPtr filter) { filter_ = std::move(filter); }));
 
     cb(connection);
 
@@ -63,9 +64,10 @@ class DubboFilterConfigTest : public DubboFilterConfigTestBase, public testing::
 
 TEST_F(DubboFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(DubboProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy(), context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      DubboProxyFilterConfigFactory().createFilterFactoryFromProto(
+          envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy(), nullptr, context),
+      ProtoValidationException);
 }
 
 TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
@@ -75,10 +77,10 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, nullptr, context);
   EXPECT_TRUE(factory.isTerminalFilterByProto(config, context.getServerFactoryContext()));
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  EXPECT_CALL(connection, addReadFilter(_, _));
   cb(connection);
 }
 
@@ -90,9 +92,9 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithEmptyProto) {
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("my_stat_prefix");
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  EXPECT_CALL(connection, addReadFilter(_, _));
   cb(connection);
 }
 
@@ -123,8 +125,8 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithUnknownFilter) {
 
   DubboProxyProto config = parseDubboProxyFromV3Yaml(yaml);
 
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
-                          "no_such_filter");
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, nullptr, context_),
+                          EnvoyException, "no_such_filter");
 }
 
 // Test config with multiple filters.
@@ -198,7 +200,7 @@ resources:
   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
       parseDubboProxyFromV3Yaml(config_yaml);
   Matchers::UniversalStringMatcher universal_name_matcher;
-  Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config, context_);
+  Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config, nullptr, context_);
   auto response =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
@@ -226,8 +228,8 @@ drds:
 
   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
       parseDubboProxyFromV3Yaml(yaml);
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
-                          "both drds and route_config is present in DubboProxy");
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, nullptr, context_),
+                          EnvoyException, "both drds and route_config is present in DubboProxy");
 }
 
 TEST_F(DubboFilterConfigTest, DubboProxyBothMultipleRouteConfigAndRouteConfig) {
@@ -243,7 +245,8 @@ multiple_route_config:
 
   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
       parseDubboProxyFromV3Yaml(yaml);
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, nullptr, context_),
+                          EnvoyException,
                           "both mutiple_route_config and route_config is present in DubboProxy");
 }
 #endif
@@ -260,7 +263,8 @@ drds:
 
   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
       parseDubboProxyFromV3Yaml(yaml);
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, nullptr, context_),
+                          EnvoyException,
                           "drds supports only aggregated api_type in api_config_source");
 }
 

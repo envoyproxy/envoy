@@ -183,7 +183,7 @@ public:
     filter_factory.push_back(
         std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
             [&](Network::FilterManager& filter_manager) {
-              filter_manager.addReadFilter(read_filter);
+              filter_manager.addReadFilter(nullptr, read_filter);
               read_filter->callbacks_->connection().addConnectionCallbacks(
                   network_connection_callbacks);
               read_filter->callbacks_->connection().setConnectionStats(
@@ -264,7 +264,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
   filter_factory.push_back(
       std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
           [&](Network::FilterManager& filter_manager) {
-            filter_manager.addReadFilter(read_filter);
+            filter_manager.addReadFilter(nullptr, read_filter);
             read_filter->callbacks_->connection().addConnectionCallbacks(
                 network_connection_callbacks);
             read_filter->callbacks_->connection().setConnectionStats(
@@ -322,7 +322,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
   filter_factory.push_back(
       std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
           [&](Network::FilterManager& filter_manager) {
-            filter_manager.addReadFilter(read_filter);
+            filter_manager.addReadFilter(nullptr, read_filter);
             read_filter->callbacks_->connection().addConnectionCallbacks(
                 network_connection_callbacks);
             read_filter->callbacks_->connection().setConnectionStats(

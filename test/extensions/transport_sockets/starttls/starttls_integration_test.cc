@@ -112,11 +112,12 @@ class StartTlsSwitchFilterConfigFactory : public Extensions::NetworkFilters::Com
 public:
   explicit StartTlsSwitchFilterConfigFactory(const std::string& name) : FactoryBase(name) {}
 
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
-                                    Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<StartTlsSwitchFilter>());
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::integration::starttls::StartTlsFilterConfig&,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Server::Configuration::FactoryContext&) override {
+    return [network_filter_matcher](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addFilter(network_filter_matcher, std::make_shared<StartTlsSwitchFilter>());
     };
   }
 
@@ -227,7 +228,7 @@ void StartTlsIntegrationTest::initialize() {
 
   conn_->enableHalfClose(true);
   conn_->addConnectionCallbacks(connect_callbacks_);
-  conn_->addReadFilter(payload_reader_);
+  conn_->addReadFilter(nullptr, payload_reader_);
 }
 
 // Method adds StartTlsSwitchFilter into the filter chain.

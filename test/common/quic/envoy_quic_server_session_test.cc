@@ -201,7 +201,7 @@ public:
   bool installReadFilter() {
     // Setup read filter.
     read_filter_ = std::make_shared<Network::MockReadFilter>(),
-    envoy_quic_session_.addReadFilter(read_filter_);
+    envoy_quic_session_.addReadFilter(nullptr, read_filter_);
     EXPECT_EQ(Http::Protocol::Http3,
               read_filter_->callbacks_->connection().streamInfo().protocol().value());
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());

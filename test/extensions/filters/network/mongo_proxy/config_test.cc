@@ -21,9 +21,10 @@ namespace MongoProxy {
 
 TEST(MongoFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(MongoProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy(), context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      MongoProxyFilterConfigFactory().createFilterFactoryFromProto(
+          envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy(), nullptr, context),
+      ProtoValidationException);
 }
 
 TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
@@ -39,9 +40,10 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addFilter(_, _));
   cb(connection);
 }
 
@@ -55,9 +57,9 @@ TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addFilter(_, _));
   cb(connection);
 }
 
@@ -72,9 +74,9 @@ TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
   config.add_commands("foo");
   config.add_commands("bar");
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addFilter(_, _));
   cb(connection);
 }
 
@@ -204,9 +206,10 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addFilter(_, _));
   cb(connection);
 }
 
@@ -220,9 +223,9 @@ TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, nullptr, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addFilter(_, _));
   cb(connection);
 }
 

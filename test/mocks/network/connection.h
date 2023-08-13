@@ -50,9 +50,15 @@ public:
   MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));                           \
   MOCK_METHOD(void, removeConnectionCallbacks, (ConnectionCallbacks & cb));                        \
   MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));                                       \
-  MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));                                \
-  MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));                                          \
-  MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));                                  \
+  MOCK_METHOD(                                                                                     \
+      void, addWriteFilter,                                                                        \
+      (const NetworkFilterMatcherSharedPtr& network_filter_matcher, WriteFilterSharedPtr filter)); \
+  MOCK_METHOD(                                                                                     \
+      void, addFilter,                                                                             \
+      (const NetworkFilterMatcherSharedPtr& network_filter_matcher, FilterSharedPtr filter));      \
+  MOCK_METHOD(                                                                                     \
+      void, addReadFilter,                                                                         \
+      (const NetworkFilterMatcherSharedPtr& network_filter_matcher, ReadFilterSharedPtr filter));  \
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));                               \
   MOCK_METHOD(void, enableHalfClose, (bool enabled));                                              \
   MOCK_METHOD(bool, isHalfCloseEnabled, (), (const));                                              \

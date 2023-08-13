@@ -3129,7 +3129,7 @@ TEST_P(SslSocketTest, HalfClose) {
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
   client_connection->enableHalfClose(true);
-  client_connection->addReadFilter(client_read_filter);
+  client_connection->addReadFilter(nullptr, client_read_filter);
   client_connection->connect();
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -3142,7 +3142,7 @@ TEST_P(SslSocketTest, HalfClose) {
             std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
             stream_info_);
         server_connection->enableHalfClose(true);
-        server_connection->addReadFilter(server_read_filter);
+        server_connection->addReadFilter(nullptr, server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, true);
@@ -3214,7 +3214,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
       client_ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->enableHalfClose(true);
-  client_connection->addReadFilter(client_read_filter);
+  client_connection->addReadFilter(nullptr, client_read_filter);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
@@ -3226,7 +3226,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
             std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
             stream_info_);
         server_connection->enableHalfClose(true);
-        server_connection->addReadFilter(server_read_filter);
+        server_connection->addReadFilter(nullptr, server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
@@ -3304,7 +3304,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
       client_ssl_socket_factory.createTransportSocket(nullptr, nullptr), nullptr, nullptr);
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->enableHalfClose(true);
-  client_connection->addReadFilter(client_read_filter);
+  client_connection->addReadFilter(nullptr, client_read_filter);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
@@ -3316,7 +3316,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
             std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
             stream_info_);
         server_connection->enableHalfClose(true);
-        server_connection->addReadFilter(server_read_filter);
+        server_connection->addReadFilter(nullptr, server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
@@ -5893,7 +5893,7 @@ protected:
               stream_info_);
           server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addConnectionCallbacks(server_callbacks_);
-          server_connection_->addReadFilter(read_filter_);
+          server_connection_->addReadFilter(nullptr, read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
@@ -5970,7 +5970,7 @@ protected:
               stream_info_);
           server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addConnectionCallbacks(server_callbacks_);
-          server_connection_->addReadFilter(read_filter_);
+          server_connection_->addReadFilter(nullptr, read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
@@ -6092,7 +6092,7 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
             std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
             stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->addReadFilter(read_filter_);
+        server_connection_->addReadFilter(nullptr, read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
       }));
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
@@ -6125,7 +6125,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
             stream_info_);
         server_connection_->setBufferLimits(read_buffer_limit);
         server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->addReadFilter(read_filter_);
+        server_connection_->addReadFilter(nullptr, read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
         EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
       }));

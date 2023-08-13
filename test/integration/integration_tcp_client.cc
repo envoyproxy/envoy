@@ -68,7 +68,7 @@ IntegrationTcpClient::IntegrationTcpClient(
 
   connection_->enableHalfClose(enable_half_close);
   connection_->addConnectionCallbacks(*callbacks_);
-  connection_->addReadFilter(payload_reader_);
+  connection_->addReadFilter(nullptr, payload_reader_);
   connection_->connect();
 }
 

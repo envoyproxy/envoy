@@ -132,7 +132,7 @@ Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
   upstream_connection_ =
       h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
   upstream_connection_->addConnectionCallbacks(*upstream_connection_cb_);
-  upstream_connection_->addReadFilter(std::make_shared<UpstreamReadFilter>(self_));
+  upstream_connection_->addReadFilter(nullptr, std::make_shared<UpstreamReadFilter>(self_));
   upstream_connection_->connect();
   return Network::FilterStatus::Continue;
 }
@@ -173,14 +173,17 @@ public:
     return true;
   }
 
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
-                                    Server::Configuration::FactoryContext& context) override {
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::integration::starttls::StartTlsFilterConfig&,
+      const Network::NetworkFilterMatcherSharedPtr& network_filter_matcher,
+      Server::Configuration::FactoryContext& context) override {
     return [&](Network::FilterManager& filter_manager) -> void {
       // Inject two filters into downstream connection: first is helper read filter and then
       // terminal filter.
-      filter_manager.addReadFilter(std::make_shared<StartTlsSwitchFilter::DownstreamReadFilter>());
+      filter_manager.addReadFilter(network_filter_matcher,
+                                   std::make_shared<StartTlsSwitchFilter::DownstreamReadFilter>());
       filter_manager.addReadFilter(
+          network_filter_matcher,
           StartTlsSwitchFilter::newInstance(context.clusterManager(), upstream_callbacks_));
     };
   }

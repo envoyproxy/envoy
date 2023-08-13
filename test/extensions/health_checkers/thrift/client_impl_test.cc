@@ -35,7 +35,7 @@ public:
     conn_info.connection_ = connection_;
 
     EXPECT_CALL(client_callback_, createConnection_).WillOnce(Return(conn_info));
-    EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
+    EXPECT_CALL(*connection_, addReadFilter(_, _)).WillOnce(SaveArg<1>(&read_filter_));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, noDelay(true));
 
