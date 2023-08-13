@@ -10,8 +10,8 @@ namespace Envoy {
 namespace benchmark {
 
 bool skipExpensiveBenchmarks();
-//void setStartupHook(std::function<void()>);
+// void setStartupHook(std::function<void()>);
 void setCleanupHook(std::function<void()>);
 
-}
+} // namespace benchmark
 } // namespace Envoy
