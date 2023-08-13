@@ -47,7 +47,7 @@ class CertValidator {
 public:
   // Wraps cert validation parameters added from time to time.
   struct ExtraValidationContext {
-    // Transport socket callbacks.
+    // The pointer to transport socket callbacks.
     Network::TransportSocketCallbacks* callbacks;
   };
 
