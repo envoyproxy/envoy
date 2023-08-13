@@ -25,9 +25,6 @@ using BucketAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaRespo
 using BucketQuotaUsage =
     ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
 
-// Forward declaration
-// class RateLimitClientImpl;
-
 // Customized hash and equal struct for `BucketId` hash key.
 struct BucketIdHash {
   size_t operator()(const BucketId& bucket_id) const { return MessageUtil::hash(bucket_id); }
@@ -44,10 +41,11 @@ struct QuotaUsage {
   uint64_t num_requests_allowed;
   // Requests throttled.
   uint64_t num_requests_denied;
+  // Last report time.
   std::chrono::nanoseconds last_report;
 };
 
-// Single bucket entry
+// This object stores the data for single bucket entry.
 struct Bucket {
   // Default constructor
   Bucket() = default;
@@ -58,29 +56,19 @@ struct Bucket {
   Bucket(Bucket&& bucket) = default;
   Bucket& operator=(Bucket&& bucket) = default;
 
-  ~Bucket() {}
+  ~Bucket() = default;
 
-  // std::unique_ptr<RateLimitClient> rate_limit_client;
-  // // The timer for sending the reports periodically.
-  // Event::TimerPtr send_reports_timer;
-  // Cached bucket action from the response that was received from the RLQS server.
-  // BucketAction bucket_action;
-  // TODO(tyxia) Thread local storage should take the ownership of all the objects so that
-  // it is also responsible for destruction.
-  // std::unique_ptr<BucketAction> bucket_action;
+  // Cached action from the response that was received from the RLQS server.
   BucketAction bucket_action;
-  // TODO(tyxia) No need to store bucket ID  as it is already the key of BucketsContainer.
-  // TODO(tyxia) Seems unused
+  // Cache quota usage.
   QuotaUsage quota_usage;
-  // BucketQuotaUsage quota_usage;
 };
 
-// using BucketsContainer = absl::node_hash_map<BucketId, Bucket, BucketIdHash, BucketIdEqual>;
-using BucketsContainer =
+using BucketsCache =
     absl::node_hash_map<BucketId, std::unique_ptr<Bucket>, BucketIdHash, BucketIdEqual>;
 
 struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota> {
-  ThreadLocalClient(Envoy::Event::Dispatcher& event_dispatcher) : dispatcher(event_dispatcher) {
+  ThreadLocalClient(Envoy::Event::Dispatcher& dispatcher) {
     // Create the quota usage report method that sends the reports the RLS server periodically.
     send_reports_timer = dispatcher.createTimer([this] {
       if (rate_limit_client != nullptr) {
@@ -90,51 +78,40 @@ struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota>
       }
     });
   }
-  // TODO(tyxia) Different from Google3, look
-  // // Disable copy constructor and assignment.
-  // ThreadLocalClient(const ThreadLocalClient& client) = delete;
-  // ThreadLocalClient& operator=(const ThreadLocalClient& client) = delete;
-  // // Default move constructor and assignment.
-  // ThreadLocalClient(ThreadLocalClient&& client) = default;
-  // ThreadLocalClient& operator=(ThreadLocalClient&& client) = default;
+
+  // Disable copy constructor and assignment.
+  ThreadLocalClient(const ThreadLocalClient& client) = delete;
+  ThreadLocalClient& operator=(const ThreadLocalClient& client) = delete;
+  // Default move constructor and assignment.
+  ThreadLocalClient(ThreadLocalClient&& client) = default;
+  ThreadLocalClient& operator=(ThreadLocalClient&& client) = default;
+
   ~ThreadLocalClient() {
     if (rate_limit_client != nullptr) {
+      // Close the stream.
       rate_limit_client->closeStream();
     }
   }
 
-  // TODO(tyxia) Each bucket owns the unique grpc client for sending the quota usage report
-  // periodically.
-  // std::unique_ptr<RateLimitClientImpl> rate_limit_client;
-  // TODO(tyxia) Store the abstract interface to avoid cyclic dependency between quota bucket and
-  // client.
+  // Rate limit client. It is owned here (in TLS) and is used by all the buckets.
   std::unique_ptr<RateLimitClient> rate_limit_client;
   // The timer for sending the reports periodically.
   Event::TimerPtr send_reports_timer;
-
-  // TODO(tyxia) Maybe no need to store dispatcher.
-  Envoy::Event::Dispatcher& dispatcher;
 };
 
 class ThreadLocalBucket : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
-  // TODO(tyxia) Here is similar to defer initialization methodology.
-  // We have the empty hash map in thread local storage at the beginning and build the map later
-  // in the `rate_limit_quota_filter` when the request comes.
   ThreadLocalBucket(Envoy::Event::Dispatcher& dispatcher) : client_(dispatcher) {}
 
-  // Return the buckets. Buckets are returned by reference so that caller site can modify its
-  // content.
-  BucketsContainer& quotaBuckets() { return quota_buckets_; }
-  // Return the quota usage reports.
-  RateLimitQuotaUsageReports& quotaUsageReports() { return quota_usage_reports_; }
+  // Return the buckets; returned by reference it can be modified.
+  BucketsCache& quotaBuckets() { return quota_buckets_; }
 
+  // Return the rate limit client; no ownership transferred.
   ThreadLocalClient& rateLimitClient() { return client_; }
 
 private:
-  // Thread local storage for bucket container and quota usage report.
-  BucketsContainer quota_buckets_;
-  RateLimitQuotaUsageReports quota_usage_reports_;
+  // Thread local storage for bucket container and client.
+  BucketsCache quota_buckets_;
   ThreadLocalClient client_;
 };
 

@@ -75,7 +75,6 @@ TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
   test_client.client_->onRemoteClose(0, "");
 }
 
-// TODO(tyxia) Update allowed/denied check
 TEST_F(RateLimitClientTest, BuildUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);

@@ -34,11 +34,12 @@ class RateLimitClientImpl : public RateLimitClient,
 public:
   RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
                       Server::Configuration::FactoryContext& context, absl::string_view domain_name,
-                      RateLimitQuotaCallbacks* callbacks, BucketsContainer& quota_buckets)
-      : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+                      RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets)
+      : domain_name_(domain_name),
+        aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)),
         rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
-        time_source_(context.mainThreadDispatcher().timeSource()), domain_name_(domain_name) {}
+        time_source_(context.mainThreadDispatcher().timeSource()) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
   // Build the usage report (i.e., the request sent to RLQS server).
@@ -63,24 +64,18 @@ public:
 private:
   void addNewBucket(const BucketId& bucket_id);
   RateLimitQuotaUsageReports getReport(bool new_bucket);
-  // Store the client as the bare object since there is no ownership transfer involved.
+
+  bool stream_closed_ = false;
+  // Domain from filter configuration. The same domain name throughout the whole lifetime of client.
+  std::string domain_name_;
+  // Client is stored as the bare object since there is no ownership transfer involved.
   GrpcAsyncClient aync_client_;
   Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
-
-  // TODO(tyxia) Further look at the use of this flag later.
-  bool stream_closed_ = false;
-
-  // TODO(tyxia) if the response is from periodical report, then the filter object is possible that
-  // it is not the old filter anymore, how we do onQuotaResponse and update the treadLocal storage.
-  // The TLS should be same but filter is different now how about storage it in the TLS then??? How
-  // about the client and filter class have the pointer points to the same TLS object Then we don't
-  // even need the callback to update it then!!!
+  // The callback that is used to communicate with filter.
   RateLimitQuotaCallbacks* rlqs_callback_ = nullptr;
-  // Reference to objects that are stored in TLS cache. They outlive the filter.
-  BucketsContainer& quota_buckets_;
-  // RateLimitQuotaUsageReports& quota_usage_reports_;
+  // Reference to quota cache that is stored in TLS cache. It outlives the filter.
+  BucketsCache& quota_buckets_;
   TimeSource& time_source_;
-  std::string domain_name_;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
@@ -90,7 +85,7 @@ using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
 inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service,
-                      RateLimitQuotaCallbacks* callbacks, BucketsContainer& quota_buckets,
+                      RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets,
                       absl::string_view domain_name) {
   return std::make_unique<RateLimitClientImpl>(grpc_service, context, domain_name, callbacks,
                                                quota_buckets);

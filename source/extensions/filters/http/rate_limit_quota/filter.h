@@ -45,26 +45,14 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public RateLimitQuotaCallbacks,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
-  // RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
-  //                      Server::Configuration::FactoryContext& factory_context,
-  //                      BucketsContainer& quota_buckets,
-  //                      RateLimitQuotaUsageReports& quota_usage_reports, ThreadLocalClient&
-  //                      client)
-  //     : config_(std::move(config)), factory_context_(factory_context),
-  //       quota_buckets_(quota_buckets), quota_usage_reports_(quota_usage_reports), client_(client)
-  //       {
-  //   createMatcher();
-  // }
-
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
-                       BucketsContainer& quota_buckets, ThreadLocalClient& client)
+                       BucketsCache& quota_buckets, ThreadLocalClient& client)
       : config_(std::move(config)), factory_context_(factory_context),
         quota_buckets_(quota_buckets), client_(client) {
     createMatcher();
   }
 
-  // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
@@ -106,9 +94,8 @@ private:
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 
-  // Don't take ownership here and these objects are stored in TLS.
-  BucketsContainer& quota_buckets_;
-  // RateLimitQuotaUsageReports& quota_usage_reports_;
+  // Reference to the objects that are stored in TLS.
+  BucketsCache& quota_buckets_;
   ThreadLocalClient& client_;
 
   bool initiating_call_{};

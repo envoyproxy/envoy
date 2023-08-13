@@ -17,20 +17,7 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
   const auto& bucket_settings = match_action.bucketSettings();
   // The first matched request that doesn't have quota assignment from the RLQS server yet, so the
   // action is performed based on pre-configured strategy from no assignment behavior config.
-  // TODO(tyxia) Implement no assignment logic with the allow/deny interface
-  // if (bucket_settings.has_no_assignment_behavior()) {
-  //   // Retrieve the `blanket_rule` value from the config to decide if we want to fail-open or
-  //   // fail-close.
-  //   auto strategy = bucket_settings.no_assignment_behavior().fallback_rate_limit();
-  //   if (strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
-  //   }
-  // } else {
-  //   ENVOY_LOG(error, "No assignment behavior is not configured.");
-  //   // We just use fail-open (i.e. ALLOW_ALL) here.
-  //   return Envoy::Http::FilterHeadersStatus::Continue;
-  // }
-  // Allocate new bucket.
-  // std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
+  // TODO(tyxia) Check no assignment logic with the allow/deny interface. Default is allow all.
 
   // Create the gRPC client if it has not been created.
   if (client_.rate_limit_client == nullptr) {
@@ -67,7 +54,7 @@ RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
   client_.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
 
   initiating_call_ = false;
-  // TODO(tyxia) Do we need to stop here???
+  // TODO(tyxia) Revisit later.
   // Stop the iteration for headers as well as data and trailers for the current filter and the
   // filters following.
   return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
@@ -102,37 +89,20 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // The request has been matched to the quota bucket for the first time.
     return createNewBucketAndSendReport(bucket_id, match_action);
+  } else {
+    // Found the cached bucket entry.
+    // First, get the quota assignment (if exists) from the cached bucket action.
+    // TODO(tyxia) Implement other assignment type besides ALLOW ALL.
+    if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
+      auto rate_limit_strategy =
+          quota_buckets_[bucket_id]->bucket_action.quota_assignment_action().rate_limit_strategy();
+
+      if (rate_limit_strategy.has_blanket_rule() &&
+          rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
+        quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+      }
+    }
   }
-  // TODO(tyxia) Uncomment this section to finish the implementation and test.
-  // else {
-  // // Found the cached bucket entry.
-  // // First, get the quota assignment (if exists) from the cached bucket action.
-  // if (quota_buckets_[bucket_id].bucket_action.has_quota_assignment_action()) {
-  //   auto rate_limit_strategy =
-  //       quota_buckets_[bucket_id].bucket_action.quota_assignment_action().rate_limit_strategy();
-  //   // Set up the action based on strategy.
-  //   switch (rate_limit_strategy.strategy_case()) {
-  //   case RateLimitStrategy::StrategyCase::kBlanketRule: {
-  //   }
-  //   case RateLimitStrategy::StrategyCase::kRequestsPerTimeUnit: {
-  //     if (quota_buckets_[bucket_id].quota_usage.num_requests_allowed() <
-  //         rate_limit_strategy.requests_per_time_unit().requests_per_time_unit()) {
-  //     }
-  //   }
-
-  //   case RateLimitStrategy::StrategyCase::kTokenBucket: {
-  //   }
-  //   case RateLimitStrategy::StrategyCase::STRATEGY_NOT_SET: {
-  //     PANIC_DUE_TO_PROTO_UNSET;
-  //   }
-  //     PANIC_DUE_TO_CORRUPT_ENUM;
-  //   }
-  // } else {
-  // }
-  // }
-
-  // Get the quota usage info.
-  // quota_buckets_[bucket_id].quota_usage;
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
@@ -187,7 +157,7 @@ void RateLimitQuotaFilter::onQuotaResponse(RateLimitQuotaResponse&) {
 }
 
 void RateLimitQuotaFilter::onDestroy() {
-  // TODO(tyxia) Clean up resource. rate limit clients should be closed at TLS.
+  // TODO(tyxia) TLS resource are not cleaned here.
 }
 
 } // namespace RateLimitQuota

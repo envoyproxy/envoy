@@ -22,7 +22,7 @@ void RateLimitClientImpl::addNewBucket(const BucketId& bucket_id) {
 
 RateLimitQuotaUsageReports RateLimitClientImpl::getReport(bool new_bucket) {
   RateLimitQuotaUsageReports report;
-  // Build the whole new report from quota_buckets_
+  // Build the report from quota bucket cache.
   for (const auto& [id, bucket] : quota_buckets_) {
     auto* usage = report.add_bucket_quota_usages();
     *usage->mutable_bucket_id() = id;
@@ -38,23 +38,18 @@ RateLimitQuotaUsageReports RateLimitClientImpl::getReport(bool new_bucket) {
     }
   }
 
-  // Set the domain.
+  // Set the domain name.
   report.set_domain(domain_name_);
   return report;
 }
 
 RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(const BucketId& bucket_id) {
-  // ASSERT(quota_usage_reports_ != nullptr);
-  // TODO(tyxia) Domain is provided by filter configuration whose lifetime is tied with HCM. This
-  // means that domain name has same lifetime as TLS because TLS is created by factory context. In
-  // other words, there is only one domain name throughout the whole lifetime of
-  // `quota_usage_reports_`. (i.e., no need for container/map).
-
-  RateLimitQuotaUsageReports report;
   bool new_bucket = false;
 
   if (quota_buckets_.find(bucket_id) != quota_buckets_.end()) {
-    // Update the num_requests_allowed if bucket is found from the cache.
+    // Update the found entry in the quota cache.
+    // TODO(tyxia) Allow all requests for now, update it based on no assignment policy in next
+    // PRs.
     quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
   } else {
     // Add new bucket to the cache.
@@ -62,17 +57,15 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(const BucketId&
     new_bucket = true;
   }
 
-  // Get the report from quota bucket cache.
-  report = getReport(new_bucket);
-  return report;
+  // Get the report from quota bucket cache and return.
+  return getReport(new_bucket);
 }
 
 void RateLimitClientImpl::sendUsageReport(absl::optional<BucketId> bucket_id) {
   ASSERT(stream_ != nullptr);
-  // In periodical report case, there is no bucked id provided because client just reports
-  // based on the cached report which is also updated every time we build the report (i.e.,
-  // buildUsageReport is called).
-  // TODO(tyxia) end_stream means send and close.
+  // In periodical report case, there is no bucked id provided and client just reports
+  // the quota usage from cached report.
+  // TODO(tyxia) Revisit end_stream, means send and close.
   stream_->sendMessage(bucket_id.has_value() ? buildUsageReport(bucket_id.value())
                                              : getReport(false),
                        /*end_stream=*/false);
@@ -87,34 +80,27 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
     }
     BucketId bucket_id = action.bucket_id();
     if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
-      // TODO(tyxia) Allocate and extend lifetime to store in the bucket. We probably should not
-      // create new bucket when response is not matched. The new bucket here doesn't have essential
-      // elements like rate limiting client.
-
-      // std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
-      // new_bucket->action = std::make_unique<BucketAction>(std::move(action));
-      // quota_buckets_[bucket_id] = std::move(new_bucket);
+      // The response should be matched to the report we sent.
       ENVOY_LOG(error,
                 "Received a response, but but it is not matched any quota "
                 "cache entry: ",
                 response->ShortDebugString());
     } else {
-      // quota_buckets_[bucket_id]->bucket_action = std::make_unique<BucketAction>(action);
-      // TODO(tyxia) Reference lifetime extension.
       quota_buckets_[bucket_id]->bucket_action = action;
     }
   }
-  // TODO(tyxia) Keep this async callback interface here to do other post-processing.
-  // This doesn't work for periodical response as filter has been destroyed.
+
+  // `rlqs_callback_` has been reset to nullptr for periodical report case.
+  // No need to invoke onQuotaResponse to continue the filter chain for this case as filter chain
+  // has not been paused.
   if (rlqs_callback_ != nullptr) {
     rlqs_callback_->onQuotaResponse(*response);
   }
 }
+
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
   if (stream_ != nullptr && !stream_closed_) {
-    // TODO(tyxia) Google_grpc from onRemoteClose will call here because stream_ not null.
-    // but stream_closed_ is true which prevent it.
     stream_->closeStream();
     stream_closed_ = true;
     stream_->resetStream();
@@ -122,7 +108,7 @@ void RateLimitClientImpl::closeStream() {
 }
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
-  // TODO(tyxia) Add implementation later.
+  // TODO(tyxia) Revisit later, maybe add some logging.
   stream_closed_ = true;
   closeStream();
 }

@@ -95,7 +95,7 @@ public:
   MockRateLimitQuotaCallbacks callbacks_;
   bool external_inited_ = false;
   bool start_failed_ = false;
-  BucketsContainer bucket_cache_;
+  BucketsCache bucket_cache_;
   std::string domain_ = "cloud_12345_67890_rlqs";
 };
 

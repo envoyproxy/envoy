@@ -254,7 +254,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiSameRequest) {
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
                                                                   {"group", "envoy"}};
-  for (int i = 0; i < 2; ++i) {
+  for (int i = 0; i < 3; ++i) {
     // Send downstream client request to upstream.
     sendClientRequest(&custom_headers);
 
@@ -276,10 +276,13 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiSameRequest) {
       absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
       custom_headers_cpy.insert({"name", "prod"});
       auto* bucket_action = rlqs_response.add_bucket_action();
-      // (*bucket_action->mutable_bucket_id()->mutable_bucket()) =
-      // GenerateBucketId(custom_headers);
+
       for (const auto& [key, value] : custom_headers_cpy) {
         (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+        auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
+        quota_assignment->mutable_assignment_time_to_live()->set_seconds(120);
+        auto* strategy = quota_assignment->mutable_rate_limit_strategy();
+        strategy->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
       }
 
       // Send the response from RLQS server.
@@ -306,32 +309,34 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiSameRequest) {
 TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
   initializeConfig();
   HttpIntegrationTest::initialize();
-  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
-                                                                  {"group", "envoy"}};
 
-  absl::flat_hash_map<std::string, std::string> custom_headers_2 = {{"environment", "staging"},
-                                                                    {"group", "envoy_test"}};
-  for (int i = 0; i < 2; ++i) {
+  std::vector<absl::flat_hash_map<std::string, std::string>> custom_headers = {
+      {{"environment", "staging"}, {"group", "envoy"}},
+      {{"environment", "staging"}, {"group", "envoy_1"}},
+      {{"environment", "staging"}, {"group", "envoy_2"}}};
+  int header_size = custom_headers.size();
+  for (int i = 0; i < header_size; ++i) {
     // Send downstream client request to upstream.
     if (i == 0) {
-      sendClientRequest(&custom_headers);
-      // Start the gRPC stream to RLQS server.
+      sendClientRequest(&custom_headers[i]);
+      // Start the gRPC stream to RLQS server on the first request.
       ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
       ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
       envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
       ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
       rlqs_stream_->startGrpcStream();
     } else {
-      sendClientRequest(&custom_headers_2);
+      sendClientRequest(&custom_headers[i]);
 
-      // No need to start gRPC stream since it is kept open.
+      // No need to start gRPC stream again since it is kept open.
       envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
       ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
     }
 
     // Build the response.
     envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
-    absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
+    absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers[i];
     custom_headers_cpy.insert({"name", "prod"});
     auto* bucket_action = rlqs_response.add_bucket_action();
     // (*bucket_action->mutable_bucket_id()->mutable_bucket()) =

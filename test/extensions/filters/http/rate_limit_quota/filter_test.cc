@@ -145,8 +145,7 @@ public:
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
-  // TODO(tyxia) No need for TLS storage
-  BucketsContainer bucket_cache_;
+  BucketsCache bucket_cache_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   ThreadLocalClient thread_local_client_;
 };
