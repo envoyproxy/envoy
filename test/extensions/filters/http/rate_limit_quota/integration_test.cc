@@ -140,7 +140,7 @@ TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
                                                          std::chrono::milliseconds(25000)));
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResponseEmpty) {
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlowEmptyResponse) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
@@ -174,7 +174,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResponseEmpty) {
   EXPECT_EQ(response_->headers().getStatusValue(), "200");
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResposneNotMatched) {
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResponseNotMatched) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
@@ -189,10 +189,11 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResposneNotMatched) {
   ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
   rlqs_stream_->startGrpcStream();
 
-  // Build the response.
+  // Build the response whose bucket ID doesn't match the sent report.
   envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
   auto* bucket_action = rlqs_response.add_bucket_action();
-  (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({"test_key", "test_value"});
+  (*bucket_action->mutable_bucket_id()->mutable_bucket())
+      .insert({"not_matched_key", "not_matched_value"});
   // Send the response from RLQS server.
   rlqs_stream_->sendGrpcMessage(rlqs_response);
 
@@ -209,7 +210,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResposneNotMatched) {
   EXPECT_EQ(response_->headers().getStatusValue(), "200");
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResposneMatched) {
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResponseMatched) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
@@ -224,10 +225,8 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowResposneMatched) {
   ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
   rlqs_stream_->startGrpcStream();
 
-  // Build the response.
+  // Build the response whose bucket ID matches the sent report.
   envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
-  // std::vector<std::pair<std::string, std::string>> bucket_pairs = {std::make_pair("test_key",
-  // "test_value")};
   custom_headers.insert({"name", "prod"});
   auto* bucket_action = rlqs_response.add_bucket_action();
   for (const auto& [key, value] : custom_headers) {
@@ -258,21 +257,19 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiSameRequest) {
     // Send downstream client request to upstream.
     sendClientRequest(&custom_headers);
 
-    // Second downstream client request will not trigger the reports to RLQS
-    // server since it is the same as first request that it will find the entry in the cache.
+    // Second downstream client request will not trigger the reports to RLQS server since it is
+    // same as first request, which will find the entry in the cache.
     if (i == 0) {
       // Start the gRPC stream to RLQS server.
       ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
       ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
-      // reports should be built in filter.cc
+
       envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
       ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
       rlqs_stream_->startGrpcStream();
 
       // Build the response.
       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
-      // std::vector<std::pair<std::string, std::string>> bucket_pairs =
-      // {std::make_pair("test_key", "test_value")};
       absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
       custom_headers_cpy.insert({"name", "prod"});
       auto* bucket_action = rlqs_response.add_bucket_action();
@@ -300,8 +297,6 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiSameRequest) {
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(response_->headers().getStatusValue(), "200");
 
-    // For loop need this cleanUp, otherwise it fail as
-    // http://sponge2/693f7fa1-7cab-412e-b3e3-4591efe6231d
     cleanUp();
   }
 }
@@ -339,8 +334,6 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
     absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers[i];
     custom_headers_cpy.insert({"name", "prod"});
     auto* bucket_action = rlqs_response.add_bucket_action();
-    // (*bucket_action->mutable_bucket_id()->mutable_bucket()) =
-    // GenerateBucketId(custom_headers);
     for (const auto& [key, value] : custom_headers_cpy) {
       (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
     }
@@ -366,8 +359,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
   }
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, AdvancedFlow) {
-  // SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
@@ -384,13 +376,10 @@ TEST_P(RateLimitQuotaIntegrationTest, AdvancedFlow) {
 
   // Build the response.
   envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
-  // std::vector<std::pair<std::string, std::string>> bucket_pairs =
-  // {std::make_pair("test_key", "test_value")};
   absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
   custom_headers_cpy.insert({"name", "prod"});
   auto* bucket_action = rlqs_response.add_bucket_action();
-  // (*bucket_action->mutable_bucket_id()->mutable_bucket()) =
-  // GenerateBucketId(custom_headers);
+
   for (const auto& [key, value] : custom_headers_cpy) {
     (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
   }
@@ -411,14 +400,12 @@ TEST_P(RateLimitQuotaIntegrationTest, AdvancedFlow) {
   // Trigger the periodical report.
   // TODO(tyxia) Make interval configurable. It is 60s in ValidMatcherConfig.
   simTime().advanceTimeWait(std::chrono::milliseconds(60000));
-  // dispatcher_->run(Event::Dispatcher::RunType::Block);;
   ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
 
   // Build the response.
   envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response2;
   auto* bucket_action2 = rlqs_response2.add_bucket_action();
-  // (*bucket_action->mutable_bucket_id()->mutable_bucket()) =
-  // GenerateBucketId(custom_headers);
+
   for (const auto& [key, value] : custom_headers_cpy) {
     (*bucket_action2->mutable_bucket_id()->mutable_bucket()).insert({key, value});
   }
