@@ -103,7 +103,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Newwork::ConnectionEvent::RemoteReset ||
+      event == Network::ConnectionEvent::RemoteReset ||
       event == Network::ConnectionEvent::LocalReset ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "disconnect. resetting {} pending requests", *connection_,

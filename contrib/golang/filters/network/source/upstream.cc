@@ -150,7 +150,7 @@ void UpstreamConn::onEvent(Network::ConnectionEvent event) {
                  static_cast<int>(event));
 
   if (event != Network::ConnectionEvent::Connected ||
-      event != Newwork::ConnectionEvent::ConnectedZeroRtt) {
+      event != Network::ConnectionEvent::ConnectedZeroRtt) {
     closed_ = true;
     conn_ = nullptr;
   }
