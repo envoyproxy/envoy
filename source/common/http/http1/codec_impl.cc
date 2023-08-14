@@ -637,8 +637,15 @@ Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   if (status.ok() && data.length() > 0) {
     // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
     // after a response is complete indicates an error.
+    stats_.protocol_error_.inc();
     return codecProtocolError("http/1.1 protocol error: extraneous data after response complete");
   }
+
+  if (!status.ok()) {
+    ASSERT(isCodecProtocolError(status.status()));
+    stats_.protocol_error_.inc();
+  }
+
   return status;
 }
 

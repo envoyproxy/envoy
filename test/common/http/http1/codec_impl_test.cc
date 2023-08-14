@@ -4820,6 +4820,7 @@ TEST_P(Http1ServerConnectionImplTest, Char22InHeaderValue) {
   auto status = codec_->dispatch(buffer);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+  EXPECT_EQ(1, store_.counter("http1.protocol_error").value());
 }
 
 TEST_P(Http1ClientConnectionImplTest, MultipleContentLength) {

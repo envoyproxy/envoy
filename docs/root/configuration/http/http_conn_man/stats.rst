@@ -148,6 +148,7 @@ On the upstream side all http1 statistics are rooted at ``cluster.<name>.http1.`
    ``metadata_not_supported_error``, Counter, Total number of metadata dropped during HTTP/1 encoding
    ``response_flood``, Counter, Total number of connections closed due to response flooding
    ``requests_rejected_with_underscores_in_headers``, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
+   ``protocol_error``, Counter, Total number of requests that resulted in an error in the http_parser internals.
 
 HTTP/2 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~~

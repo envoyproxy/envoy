@@ -17,7 +17,8 @@ namespace Http1 {
   COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(metadata_not_supported_error)                                                            \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
-  COUNTER(response_flood)
+  COUNTER(response_flood)                                                                          \
+  COUNTER(protocol_error)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
