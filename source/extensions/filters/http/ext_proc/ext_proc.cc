@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <cstdio>
+
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
 #include "source/common/http/utility.h"
@@ -113,6 +115,21 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
+absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>
+FilterConfig::initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) const {
+  absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr> expressions;
+  for (const auto& matcher : matchers) {
+    auto parse_status = google::api::expr::parser::Parse(matcher);
+    if (!parse_status.ok()) {
+      throw EnvoyException("Unable to parse descriptor expression: " +
+                           parse_status.status().ToString());
+    }
+    expressions.emplace(matcher, Extensions::Filters::Common::Expr::createExpression(
+                                     builder_->builder(), parse_status.value().expr()));
+  }
+  return expressions;
+}
+
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()) {
   if (config.has_overrides()) {
@@ -201,7 +218,8 @@ void Filter::onDestroy() {
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                                      absl::optional<ProtobufWkt::Struct> proto) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -215,10 +233,14 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
+  addDynamicMetadata(req);
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
+  if (proto.has_value()) {
+    (*headers_req->mutable_attributes())[FilterName] = proto.value();
+  }
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -226,6 +248,45 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   stats_.stream_msgs_sent_.inc();
   state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
+}
+
+const absl::optional<ProtobufWkt::Struct> Filter::evaluateAttributes(
+    Filters::Common::Expr::ActivationPtr activation,
+    const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>&
+        expr) {
+  absl::optional<ProtobufWkt::Struct> proto;
+  if (expr.size() > 0) {
+    proto.emplace(ProtobufWkt::Struct{});
+    for (const auto& hash_entry : expr) {
+      ProtobufWkt::Arena arena;
+      const auto result = hash_entry.second.get()->Evaluate(*activation, &arena);
+      if (!result.ok()) {
+        // TODO: Stats?
+        continue;
+      }
+
+      if (result.value().IsError()) {
+        ENVOY_LOG(trace, "error parsing cel expression {}", hash_entry.first);
+        continue;
+      }
+
+      ProtobufWkt::Value value;
+      switch (result.value().type()) {
+      case google::api::expr::runtime::CelValue::Type::kBool:
+        value.set_bool_value(result.value().BoolOrDie());
+      case google::api::expr::runtime::CelValue::Type::kNullType:
+        value.set_null_value(ProtobufWkt::NullValue{});
+      case google::api::expr::runtime::CelValue::Type::kDouble:
+        value.set_number_value(result.value().DoubleOrDie());
+      default:
+        value.set_string_value(Filters::Common::Expr::print(result.value()));
+      }
+
+      (*(proto.value()).mutable_fields())[hash_entry.first] = value;
+    }
+  }
+
+  return proto;
 }
 
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
@@ -240,7 +301,11 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     return FilterHeadersStatus::Continue;
   }
 
-  const auto status = onHeaders(decoding_state_, headers, end_stream);
+  auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
+                                                                &headers, nullptr, nullptr);
+  auto proto = evaluateAttributes(std::move(activation_ptr), config_->request_expr());
+
+  const auto status = onHeaders(decoding_state_, headers, end_stream, proto);
   ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
   return status;
 }
@@ -526,7 +591,11 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     return FilterHeadersStatus::Continue;
   }
 
-  const auto status = onHeaders(encoding_state_, headers, end_stream);
+  auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
+                                                                nullptr, &headers, nullptr);
+  auto proto = evaluateAttributes(std::move(activation_ptr), config_->response_expr());
+
+  const auto status = onHeaders(encoding_state_, headers, end_stream, proto);
   ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
   return status;
 }
@@ -551,6 +620,7 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
   ProcessingRequest req;
+  addDynamicMetadata(req);
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
@@ -560,6 +630,7 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
+  addDynamicMetadata(req);
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
@@ -613,6 +684,85 @@ void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout)
   stats_.override_message_timeout_received_.inc();
 }
 
+void Filter::addDynamicMetadata(ProcessingRequest& req) {
+  envoy::config::core::v3::Metadata metadata_context;
+
+  // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_proc
+  // service. If metadata key is set in both the connection and request metadata then the value
+  // will be the request metadata value. If metadata key is set in both the encoder and decoder
+  // streams, then the value will be the encoder value
+  const auto& connection_decoder_metadata =
+      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
+  const auto& request_decoder_metadata =
+      decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  const auto& connection_encoder_metadata =
+      encoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
+  const auto& request_encoder_metadata =
+      encoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  for (const auto& context_key : config_->metadataContextNamespaces()) {
+    if (const auto metadata_it = request_decoder_metadata.find(context_key);
+        metadata_it != request_decoder_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = request_encoder_metadata.find(context_key);
+               metadata_it != request_encoder_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_decoder_metadata.find(context_key);
+               metadata_it != connection_decoder_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_encoder_metadata.find(context_key);
+               metadata_it != connection_encoder_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+
+  // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
+  // ext_proc service. If metadata key is set in both the connection and request metadata then
+  // the value will be the request metadata value. If metadata key is set in both the encoder and
+  // decoder streams, then the value will be the encoder value
+  const auto& connection_decoder_typed_metadata =
+      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
+  const auto& request_decoder_typed_metadata =
+      decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  const auto& connection_encoder_typed_metadata =
+      encoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
+  const auto& request_encoder_typed_metadata =
+      encoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
+    if (const auto metadata_it = request_decoder_typed_metadata.find(context_key);
+        metadata_it != request_decoder_typed_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = request_encoder_typed_metadata.find(context_key);
+               metadata_it != request_encoder_typed_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_decoder_typed_metadata.find(context_key);
+               metadata_it != connection_decoder_typed_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_encoder_typed_metadata.find(context_key);
+               metadata_it != connection_encoder_typed_metadata.end()) {
+      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+
+  *req.mutable_metadata_context() = metadata_context;
+}
+
+void setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
+                        std::unique_ptr<ProcessingResponse>& response) {
+  if (response->has_dynamic_metadata()) {
+    auto ss = std::stringstream();
+    ss << "envoy.filters.http.ext_proc." << ns;
+    auto md_ns = ss.str();
+    cb->streamInfo().setDynamicMetadata(md_ns, response->dynamic_metadata());
+  }
+}
+
+void Filter::setEncoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
+  setDynamicMetadata("encoder", encoder_callbacks_, response);
+}
+void Filter::setDecoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
+  setDynamicMetadata("decoder", decoder_callbacks_, response);
+}
+
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   if (processing_complete_) {
     ENVOY_LOG(debug, "Ignoring stream message received after processing complete");
@@ -642,21 +792,27 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
+    setDecoderDynamicMetadata(response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
+    setEncoderDynamicMetadata(response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
+    setDecoderDynamicMetadata(response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
+    setEncoderDynamicMetadata(response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
+    setDecoderDynamicMetadata(response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
+    setEncoderDynamicMetadata(response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
@@ -666,6 +822,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
     } else {
+      setDecoderDynamicMetadata(response);
       // We won't be sending anything more to the stream after we
       // receive this message.
       ENVOY_LOG(debug, "Sending immediate response");

@@ -97,6 +97,11 @@ protected:
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+    EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+    EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(dynamic_metadata_));
+    EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
+        .Times(AnyNumber())
+        .WillOnce(Invoke(this, &HttpFilterTest::doSetDynamicMetadata));
 
     // Pointing dispatcher_.time_system_ to a SimulatedTimeSystem object.
     test_time_ = new Envoy::Event::SimulatedTimeSystem();
@@ -121,7 +126,10 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, 200ms, 10000, *stats_store_.rootScope(), ""));
+    config_.reset(new FilterConfig(
+        proto_config, 200ms, 10000, *stats_store_.rootScope(), "",
+        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr))));
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -184,6 +192,10 @@ protected:
     EXPECT_CALL(*stream, close()).WillOnce(Invoke(this, &HttpFilterTest::doSendClose));
     return stream;
   }
+
+  void doSetDynamicMetadata(const std::string& ns, const ProtobufWkt::Struct& val) {
+    (*dynamic_metadata_.mutable_filter_metadata())[ns] = val;
+  };
 
   void doSend(ProcessingRequest&& request, Unused) { last_request_ = std::move(request); }
 
@@ -487,6 +499,7 @@ protected:
   std::vector<Event::MockTimer*> timers_;
   TestScopedRuntime scoped_runtime_;
   Envoy::Event::SimulatedTimeSystem* test_time_;
+  envoy::config::core::v3::Metadata dynamic_metadata_;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -2991,6 +3004,53 @@ TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
   EXPECT_EQ(1, config_->stats().rejected_header_mutations_.value());
 }
 
+// Verify that when returning an response with dynamic_metadata field set, the filter emits
+// dynamic metadata.
+TEST_F(HttpFilterTest, EmitDynamicMetadata) {
+  // Configure the filter to only pass response headers to ext server.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
+    (*metadata_mut)["foo"].set_string_value("bar");
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  envoy::config::core::v3::Metadata expected_metadata;
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    envoy.filters.http.ext_proc.encoder:
+      foo: bar
+  )EOF";
+
+  TestUtility::loadFromYaml(yaml, expected_metadata);
+  EXPECT_EQ(dynamic_metadata_.DebugString(), expected_metadata.DebugString());
+
+  filter_->onDestroy();
+}
+
 class HttpFilter2Test : public HttpFilterTest,
                         public ::Envoy::Http::HttpConnectionManagerImplMixin {};
 
@@ -3190,7 +3250,6 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
   Buffer::OwnedImpl fake_input("hello");
   conn_manager_->onData(fake_input, false);
 }
-
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

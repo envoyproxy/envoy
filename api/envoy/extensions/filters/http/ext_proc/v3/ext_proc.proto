@@ -98,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 16]
+// [#next-free-field: 18]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -125,7 +125,6 @@ message ExternalProcessor {
   // for a reply.
   bool async_mode = 4;
 
-  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the request_headers message.
@@ -133,7 +132,6 @@ message ExternalProcessor {
   // for the list of supported attributes and their types.
   repeated string request_attributes = 5;
 
-  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the response_headers message.
@@ -206,6 +204,17 @@ message ExternalProcessor {
   // Instead, the stream to the external processor will be closed. There will be no
   // more external processing for this stream from now on.
   bool disable_immediate_response = 15;
+
+  // Specifies a list of metadata namespaces whose values, if present, will be passed to the
+  // ext_proc service as an opaque *protobuf::Struct*.
+  repeated string metadata_context_namespaces = 16;
+
+  // Specifies a list of metadata namespaces whose values, if present, will be passed to the
+  // ext_proc service. :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` is passed as an ``protobuf::Any``.
+  //
+  // It works in a way similar to ``metadata_context_namespaces`` but allows envoy and external processing server to share the protobuf message definition
+  // in order to do a safe parsing.
+  repeated string typed_metadata_context_namespaces = 17;
 }
 
 // The HeaderForwardingRules structure specifies what headers are
