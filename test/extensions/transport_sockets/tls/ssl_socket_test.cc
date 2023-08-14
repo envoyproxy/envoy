@@ -6767,7 +6767,10 @@ TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setPrivateKeyMethodExpected(true));
+  testUtil(test_options.setPrivateKeyMethodExpected(true)
+               .setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, TestStaplesOcspResponseSuccess) {
