@@ -277,7 +277,7 @@ typed_config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 
-  stream_info_.response_code_ = 200;
+  stream_info_.setResponseCode(200);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 }
@@ -317,11 +317,11 @@ typed_config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 
-  stream_info_.response_code_ = 500;
+  stream_info_.setResponseCode(500);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 
-  stream_info_.response_code_ = 200;
+  stream_info_.setResponseCode(200);
   stream_info_.end_time_ =
       stream_info_.startTimeMonotonic() + std::chrono::microseconds(1001000000000000);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
@@ -599,7 +599,7 @@ typed_config:
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
-  stream_info_.response_code_ = 500;
+  stream_info_.setResponseCode(500);
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -682,7 +682,7 @@ typed_config:
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
-  stream_info_.response_code_ = 500;
+  stream_info_.setResponseCode(500);
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -801,7 +801,7 @@ status_code_filter:
   Http::TestResponseTrailerMapImpl response_trailers;
   TestStreamInfo info(time_source);
 
-  info.response_code_ = 400;
+  info.setResponseCode(400);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
   EXPECT_TRUE(filter.evaluate(info, request_headers, response_headers, response_trailers,
                               AccessLog::AccessLogType::NotSet));
@@ -828,13 +828,13 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  stream_info_.response_code_ = 499;
+  stream_info_.setResponseCode(499);
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
            AccessLog::AccessLogType::NotSet);
 
-  stream_info_.response_code_ = 500;
+  stream_info_.setResponseCode(500);
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
@@ -1338,7 +1338,7 @@ typed_config:
       {"UNAVAILABLE", 502},       {"UNAVAILABLE", 503}, {"UNAVAILABLE", 504}};
 
   for (const auto& [response_string, response_code] : statusMapping) {
-    stream_info_.response_code_ = response_code;
+    stream_info_.setResponseCode(response_code);
 
     const InstanceSharedPtr log = AccessLogFactory::fromProto(
         parseAccessLogFromV3Yaml(fmt::format(yaml_template, response_string)), context_);
@@ -1844,7 +1844,7 @@ typed_config:
   InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   request_headers_.addCopy("log", "true");
-  stream_info_.response_code_ = 404;
+  stream_info_.setResponseCode(404);
   EXPECT_CALL(*file_, write(_));
   logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
               AccessLog::AccessLogType::NotSet);
