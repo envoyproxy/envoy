@@ -192,11 +192,12 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::LocalClose &&
-      event != Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::Connected ||
+      event == Network::ConnectionEvent::ConnectedZeroRtt) {
     return;
   }
-  resetAllRpcs(event == Network::ConnectionEvent::LocalClose);
+  resetAllRpcs(event == Network::ConnectionEvent::LocalClose ||
+               event == Network::ConnectionEvent::LocalReset);
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {

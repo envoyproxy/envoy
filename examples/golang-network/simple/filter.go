@@ -119,7 +119,8 @@ func (f *upFilter) OnData(buffer []byte, endOfStream bool) {
 func (f *upFilter) OnEvent(event api.ConnectionEvent) {
 	remoteAddr, _ := f.cb.StreamInfo().UpstreamRemoteAddress()
 	fmt.Printf("OnEvent, addr: %v, event: %v\n", remoteAddr, event)
-	if event == api.LocalClose || event == api.RemoteClose {
+	if event == api.LocalClose || event == api.RemoteClose ||
+	   event == api.LocalReset || event == api.RemoteReset {
 		close(f.ch)
 	}
 }

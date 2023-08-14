@@ -100,7 +100,9 @@ ThriftHealthChecker::ThriftActiveHealthCheckSession::createConnection() {
 
 void ThriftHealthChecker::ThriftActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+      event == Network::ConnectionEvent::RemoteReset ||
+      event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalReset) {
     ENVOY_LOG(trace, "on event close, is_local_close={} expect_close={}",
               event == Network::ConnectionEvent::LocalClose, expect_close_);
     if (!expect_close_) {

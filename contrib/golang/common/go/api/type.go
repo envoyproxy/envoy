@@ -317,8 +317,10 @@ type ConnectionEvent int
 const (
 	RemoteClose      ConnectionEvent = 0
 	LocalClose       ConnectionEvent = 1
-	Connected        ConnectionEvent = 2
-	ConnectedZeroRtt ConnectionEvent = 3
+	RemoteReset      ConnectionEvent = 2
+  LocalReset       ConnectionEvent = 3
+	Connected        ConnectionEvent = 4
+	ConnectedZeroRtt ConnectionEvent = 5
 )
 
 func (e ConnectionEvent) String() string {
@@ -327,6 +329,10 @@ func (e ConnectionEvent) String() string {
 		return "RemoteClose"
 	case LocalClose:
 		return "LocalClose"
+	case RemoteReset:
+		return "RemoteReset"
+	case LocalReset:
+		return "LocalReset"
 	case Connected:
 		return "Connected"
 	case ConnectedZeroRtt:
@@ -349,6 +355,9 @@ const (
 	FlushWriteAndDelay ConnectionCloseType = 2
 	// Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
 	Abort ConnectionCloseType = 3
+	// Do not write/flush any pending data and immediately raise
+  // ConnectionEvent::LocalReset Envoy will try close the connection with RST flag.
+	AbortReset ConnectionCloseType = 4
 )
 
 func (t ConnectionCloseType) String() string {
@@ -361,6 +370,8 @@ func (t ConnectionCloseType) String() string {
 		return "FlushWriteAndDelay"
 	case Abort:
 		return "Abort"
+	case AbortReset:
+		return "AbortReset"
 	}
 	return "unknown"
 }

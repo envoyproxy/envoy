@@ -684,9 +684,11 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
   ENVOY_LOG(info, "received upstream event {}", static_cast<int>(event));
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
+  case Network::ConnectionEvent::RemoteReset:
     ENVOY_LOG(debug, "upstream remote close");
     break;
   case Network::ConnectionEvent::LocalClose:
+  case Network::ConnectionEvent::LocalReset:
     ENVOY_LOG(debug, "upstream local close");
     break;
   default:

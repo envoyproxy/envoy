@@ -90,7 +90,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     return;
   }
 
-  if (event == Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::RemoteReset) {
     remote_closed_ = true;
   }
 
@@ -102,12 +103,15 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 
   if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Newwork::ConnectionEvent::RemoteReset ||
+      event == Network::ConnectionEvent::LocalReset ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "disconnect. resetting {} pending requests", *connection_,
                    active_requests_.size());
     disableIdleTimer();
     idle_timer_.reset();
-    StreamResetReason reason = event == Network::ConnectionEvent::RemoteClose
+    StreamResetReason reason = (event == Network::ConnectionEvent::RemoteClose ||
+                                event == Network::ConnectionEvent::RemoteReset)
                                    ? StreamResetReason::RemoteConnectionFailure
                                    : StreamResetReason::LocalConnectionFailure;
     if (connected_) {

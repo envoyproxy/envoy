@@ -231,7 +231,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Ins
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+      event == Network::ConnectionEvent::RemoteReset ||
+      event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalReset) {
     // For the raw disconnect event, we are either between intervals in which case we already have
     // a timer setup, or we did the close or got a reset, in which case we already setup a new
     // timer. There is nothing to do here other than blow away the client.

@@ -779,7 +779,8 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     disableIdleTimer();
 
     if (connecting) {
-      if (event == Network::ConnectionEvent::RemoteClose) {
+      if (event == Network::ConnectionEvent::RemoteClose ||
+          event == Network::ConnectionEvent::RemoteReset) {
         getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
             Upstream::Outlier::Result::LocalOriginConnectFailed);

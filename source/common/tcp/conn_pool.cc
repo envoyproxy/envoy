@@ -80,7 +80,9 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event);
 
   if (event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteClose) {
+      event == Network::ConnectionEvent::LocalReset ||
+      event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::RemoteReset) {
     disableIdleTimer();
 
     // Do not pass the Connected event to any session which registered during onEvent above.

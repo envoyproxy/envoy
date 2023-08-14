@@ -63,7 +63,9 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onDeferredDelete() {
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+      event == Network::ConnectionEvent::RemoteReset ||
+      event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalReset) {
     // This should only happen after any active requests have been failed/cancelled.
     ASSERT(!current_request_);
     parent_.dispatcher_.deferredDelete(std::move(client_));

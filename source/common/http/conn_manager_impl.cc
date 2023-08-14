@@ -543,15 +543,19 @@ void ConnectionManagerImpl::resetAllStreams(absl::optional<StreamInfo::ResponseF
 }
 
 void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::LocalClose) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalReset) {
     stats_.named_.downstream_cx_destroy_local_.inc();
   }
 
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+      event == Network::ConnectionEvent::RemoteReset ||
+      evnet == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalReset) {
 
     std::string details;
-    if (event == Network::ConnectionEvent::RemoteClose) {
+    if (event == Network::ConnectionEvent::RemoteClose ||
+        event == Network::ConnectionEvent::RemoteReset) {
       remote_close_ = true;
       stats_.named_.downstream_cx_destroy_remote_.inc();
       details = StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect;

@@ -352,7 +352,9 @@ void ProxyFilter::logMessage(Message& message, bool full) {
 
 void ProxyFilter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+      event == Network::ConnectionEvent::RemoteReset ||
+      event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalReset) {
     if (delay_timer_) {
       delay_timer_->disableTimer();
       delay_timer_.reset();
@@ -364,11 +366,15 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
     }
   }
 
-  if (event == Network::ConnectionEvent::RemoteClose && !active_query_list_.empty()) {
+  if ((event == Network::ConnectionEvent::RemoteClose ||
+       event == Network::ConnectionEvent::RemoteReset) &&
+      !active_query_list_.empty()) {
     stats_.cx_destroy_remote_with_active_rq_.inc();
   }
 
-  if (event == Network::ConnectionEvent::LocalClose && !active_query_list_.empty()) {
+  if ((event == Network::ConnectionEvent::LocalClose ||
+       event == Network::ConnectionEvent::LocalReset) &&
+      !active_query_list_.empty()) {
     stats_.cx_destroy_local_with_active_rq_.inc();
   }
 }

@@ -247,8 +247,8 @@ RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
 }
 
 void RedisCluster::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+  if (event != Network::ConnectionEvent::Connected ||
+      event != Newwork::ConnectionEvent::ConnectedZeroRtt) {
     auto client_to_delete = parent_.client_map_.find(host_);
     ASSERT(client_to_delete != parent_.client_map_.end());
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->client_));
