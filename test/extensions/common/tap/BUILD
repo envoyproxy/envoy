@@ -33,7 +33,6 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],
 )
 
