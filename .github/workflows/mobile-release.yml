@@ -1,5 +1,8 @@
 name: mobile_release
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   schedule:
@@ -10,16 +13,21 @@ jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     uses: ./.github/workflows/_env.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      statuses: write
 
   android_release_artifacts:
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.schedule
               || !contains(github.actor, '[bot]'))
       }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: android_release_artifacts
     runs-on: ubuntu-22.04
     timeout-minutes: 120
@@ -41,7 +49,7 @@ jobs:
       run: |
         version="0.5.0.$(date '+%Y%m%d')"
         ./bazelw build \
-          $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
+          --config=mobile-remote-release-clang \
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a \
           --define=pom_version="$version" \
@@ -60,9 +68,13 @@ jobs:
       with:
         name: envoy_android_aar_sources
         path: mobile/envoy_android_aar_sources.tar.gz
+
   android_release_deploy:
     name: android_release_deploy
     needs: android_release_artifacts
+    permissions:
+      contents: read
+      packages: read
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:

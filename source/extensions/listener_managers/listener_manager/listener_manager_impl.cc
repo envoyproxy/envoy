@@ -94,7 +94,7 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
       ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
           proto_config.config_discovery(), proto_config.name(),
           filter_chain_factory_context.getServerFactoryContext(), filter_chain_factory_context,
-          is_terminal, "network", nullptr));
+          filter_chain_factory_context.clusterManager(), is_terminal, "network", nullptr));
       continue;
     }
 
@@ -157,8 +157,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         }
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.getServerFactoryContext(), context, false, "listener",
-          createListenerFilterMatcher(proto_config));
+          config_discovery, name, context.getServerFactoryContext(), context,
+          context.clusterManager(), false, "listener", createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",

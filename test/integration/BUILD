@@ -463,7 +463,7 @@ envoy_cc_test(
     srcs = [
         "http2_flood_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 6,
     tags = [
         "cpu:3",
     ],
@@ -768,7 +768,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "protocol_integration_test",
-    size = "large",
+    size = "enormous",
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],
@@ -2246,7 +2246,7 @@ envoy_cc_test(
 # selects.
 envoy_cc_test(
     name = "quic_protocol_integration_test",
-    size = "large",
+    size = "enormous",
     srcs = select({
         "//bazel:disable_http3": [],
         "//bazel:disable_admin_functionality": [],
@@ -2467,7 +2467,7 @@ envoy_cc_test(
     srcs = [
         "default_header_validator_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],

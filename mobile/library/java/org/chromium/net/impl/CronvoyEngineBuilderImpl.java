@@ -71,6 +71,8 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   private String mUserAgent;
   private String mStoragePath;
   private boolean mQuicEnabled;
+  private String mQuicConnectionOptions = "";
+  private String mQuicClientConnectionOptions = "";
   private boolean mHttp2Enabled;
   private boolean mBrotiEnabled;
   private boolean mDisableCache;
@@ -141,6 +143,20 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   }
 
   boolean quicEnabled() { return mQuicEnabled; }
+
+  public CronvoyEngineBuilderImpl setQuicConnectionOptions(String options) {
+    mQuicConnectionOptions = options;
+    return this;
+  }
+
+  String quicConnectionOptions() { return mQuicConnectionOptions; }
+
+  public CronvoyEngineBuilderImpl setQuicClientConnectionOptions(String options) {
+    mQuicClientConnectionOptions = options;
+    return this;
+  }
+
+  String quicClientConnectionOptions() { return mQuicClientConnectionOptions; }
 
   /**
    * Constructs default QUIC User Agent Id string including application name and Cronet version.
