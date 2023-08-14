@@ -550,7 +550,7 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::RemoteReset ||
-      evnet == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::LocalReset) {
 
     std::string details;
