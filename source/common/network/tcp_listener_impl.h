@@ -42,7 +42,6 @@ private:
   // Returns true if global connection limit has been reached and the accepted socket should be
   // rejected/closed. If the accepted socket is to be admitted, false is returned.
   bool rejectCxOverGlobalLimit() const;
-  bool trackGlobalActiveCxLimitInOverloadManager() const;
 
   Random::RandomGenerator& random_;
   Runtime::Loader& runtime_;

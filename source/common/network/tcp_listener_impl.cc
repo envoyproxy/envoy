@@ -26,7 +26,7 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     return false;
   }
 
-  if (trackGlobalActiveCxLimitInOverloadManager()) {
+  if (track_global_cx_limit_in_overload_manager_) {
     // Check if deprecated runtime flag `overload.global_downstream_max_connections` is configured
     // simultaneously with downstream connections monitor in overload manager.
     if (runtime_.threadsafeSnapshot()->get(GlobalMaxCxRuntimeKey)) {
@@ -52,12 +52,6 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
         GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
     return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
   }
-}
-
-bool TcpListenerImpl::trackGlobalActiveCxLimitInOverloadManager() const {
-  return overload_state_ &&
-         overload_state_->isResourceMonitorEnabled(
-             Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections);
 }
 
 void TcpListenerImpl::onSocketEvent(short flags) {
