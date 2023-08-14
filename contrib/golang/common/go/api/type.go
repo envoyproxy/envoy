@@ -318,7 +318,7 @@ const (
 	RemoteClose      ConnectionEvent = 0
 	LocalClose       ConnectionEvent = 1
 	RemoteReset      ConnectionEvent = 2
-  LocalReset       ConnectionEvent = 3
+	LocalReset       ConnectionEvent = 3
 	Connected        ConnectionEvent = 4
 	ConnectedZeroRtt ConnectionEvent = 5
 )
@@ -356,7 +356,7 @@ const (
 	// Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
 	Abort ConnectionCloseType = 3
 	// Do not write/flush any pending data and immediately raise
-  // ConnectionEvent::LocalReset Envoy will try close the connection with RST flag.
+	// ConnectionEvent::LocalReset Envoy will try close the connection with RST flag.
 	AbortReset ConnectionCloseType = 4
 )
 
