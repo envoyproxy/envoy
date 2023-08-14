@@ -2,6 +2,14 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: eds
+  change: |
+    Introduced caching of EDS assignments when used with ADS. Prior to this change, Envoy required that EDS assignments were sent
+    after an EDS cluster was updated. If no EDS assignment was received for the cluster, it ended up with an empty assignment.
+    Following this change, after a cluster update, Envoy waits for an EDS assignment until
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
+    the cached assignment and finish updating the warmed cluster. This change is disabled by default, and can be enabled by setting
+    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to true.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
