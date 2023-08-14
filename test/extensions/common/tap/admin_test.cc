@@ -2,17 +2,17 @@
 #include <memory>
 
 #include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
 #include "source/extensions/common/tap/admin.h"
-#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "source/extensions/common/tap/tap.h"
 #include "source/extensions/common/tap/tap_config_base.h"
 
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -155,11 +155,10 @@ using Extensions::Common::Tap::TapSinkFactory;
 class MockTapSinkFactory : public TapSinkFactory {
 public:
   MockTapSinkFactory() {}
-  ~MockTapSinkFactory() override {};
+  ~MockTapSinkFactory() override{};
 
-  MOCK_METHOD(SinkPtr, createSinkPtr,
-      (const Protobuf::Message& config, Upstream::ClusterManager&),
-      (override));
+  MOCK_METHOD(SinkPtr, createSinkPtr, (const Protobuf::Message& config, Upstream::ClusterManager&),
+              (override));
 
   MOCK_METHOD(std::string, name, (), (const, override));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
@@ -190,12 +189,10 @@ public:
 class TestConfigImpl : public TapConfigBaseImpl {
 public:
   TestConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-      Extensions::Common::Tap::Sink* admin_streamer,
-      Server::Configuration::FactoryContext& context) : TapConfigBaseImpl(
-        std::move(proto_config), admin_streamer,
-        context.clusterManager(),
-        context.messageValidationContext().staticValidationVisitor()
-      ) {}
+                 Extensions::Common::Tap::Sink* admin_streamer,
+                 Server::Configuration::FactoryContext& context)
+      : TapConfigBaseImpl(std::move(proto_config), admin_streamer, context.clusterManager(),
+                          context.messageValidationContext().staticValidationVisitor()) {}
 };
 
 // TODO move this test to a new file?
@@ -222,10 +219,11 @@ TEST_F(TypedExtensionConfigTest, AddTestConfig) {
   // TapSinkFactoryImpl factory_impl;
   MockTapSinkFactory factory_impl;
   EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
-  EXPECT_CALL(factory_impl, createEmptyConfigProto).WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
         return std::make_unique<ProtobufWkt::StringValue>();
-        }));
-  EXPECT_CALL(factory_impl, createSinkPtr).Times(1);
+      }));
+  EXPECT_CALL(factory_impl, createSinkPtr);
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;

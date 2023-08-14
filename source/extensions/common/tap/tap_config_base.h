@@ -103,8 +103,7 @@ public:
 
 protected:
   TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                    Common::Tap::Sink* admin_streamer,
-                    Upstream::ClusterManager& cluster_manager,
+                    Common::Tap::Sink* admin_streamer, Upstream::ClusterManager& cluster_manager,
                     ProtobufMessage::ValidationVisitor& validation_visitor);
 
 private:

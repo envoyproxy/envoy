@@ -94,8 +94,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     TapSinkFactory& tap_sink_factory =
         Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
     ProtobufTypes::MessagePtr config = Config::Utility::translateAnyToFactoryConfig(
-        sinks[0].custom_sink().typed_config(),
-        validation_visitor, tap_sink_factory);
+        sinks[0].custom_sink().typed_config(), validation_visitor, tap_sink_factory);
     sink_ = tap_sink_factory.createSinkPtr(*config, cluster_manager);
     sink_to_use_ = sink_.get();
     break;
