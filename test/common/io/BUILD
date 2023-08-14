@@ -17,6 +17,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/io:io_uring_impl_lib",
+        "//source/common/network:address_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",

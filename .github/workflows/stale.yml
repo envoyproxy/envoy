@@ -1,3 +1,8 @@
+name: Prune stale
+
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   schedule:
@@ -5,17 +10,17 @@ on:
 
 jobs:
   prune_stale:
-    permissions:
-      issues: write  # for actions/stale to close stale issues
-      pull-requests: write  # for actions/stale to close stale PRs
-    name: Prune Stale
-    runs-on: ubuntu-22.04
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.schedule
               || !contains(github.actor, '[bot]'))
       }}
+    permissions:
+      issues: write  # for actions/stale to close stale issues
+      pull-requests: write  # for actions/stale to close stale PRs
+    name: Prune stale
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Prune Stale

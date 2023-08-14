@@ -321,7 +321,10 @@ public:
   /**
    * @return const std::vector<HostVector>& list of hosts organized per
    *         locality. The local locality is the first entry if
-   *         hasLocalLocality() is true.
+   *         hasLocalLocality() is true. All hosts within the same entry have the same locality
+   *         and all hosts with a given locality are in the same entry. With the exception of
+   *         the local locality entry (if present), all entries are sorted by locality with
+   *         those considered less by the LocalityLess comparator ordered earlier in the list.
    */
   virtual const std::vector<HostVector>& get() const PURE;
 
@@ -622,6 +625,7 @@ public:
 #define ALL_CLUSTER_CONFIG_UPDATE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)         \
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
+  COUNTER(assignment_use_cached)                                                                   \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_empty)                                                                            \
   COUNTER(update_failure)                                                                          \

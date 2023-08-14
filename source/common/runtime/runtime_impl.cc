@@ -720,7 +720,7 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
       std::string path =
           layer.disk_layer().symlink_root() + "/" + layer.disk_layer().subdirectory();
       if (layer.disk_layer().append_service_cluster()) {
-        path += "/" + service_cluster_;
+        absl::StrAppend(&path, "/", service_cluster_);
       }
       if (api_.fileSystem().directoryExists(path)) {
         TRY_ASSERT_MAIN_THREAD {

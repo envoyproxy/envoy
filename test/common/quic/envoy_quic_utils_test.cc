@@ -189,15 +189,31 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   EXPECT_EQ(100, quic_config.GetMaxUnidirectionalStreamsToSend());
   EXPECT_EQ(16777216, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
   EXPECT_EQ(25165824, quic_config.GetInitialSessionFlowControlWindowToSend());
+  EXPECT_TRUE(quic_config.SendConnectionOptions().empty());
+  EXPECT_TRUE(quic_config.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT).empty());
 
   // Test converting values.
   config.mutable_max_concurrent_streams()->set_value(2);
   config.mutable_initial_stream_window_size()->set_value(3);
   config.mutable_initial_connection_window_size()->set_value(50);
+  config.set_connection_options("5RTO,ACKD");
+  config.set_client_connection_options("6RTO,AKD4");
   convertQuicConfig(config, quic_config);
   EXPECT_EQ(2, quic_config.GetMaxBidirectionalStreamsToSend());
   EXPECT_EQ(2, quic_config.GetMaxUnidirectionalStreamsToSend());
   EXPECT_EQ(3, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  EXPECT_EQ(2, quic_config.SendConnectionOptions().size());
+  EXPECT_EQ(2, quic_config.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT).size());
+  std::string quic_copts = "";
+  for (auto& copt : quic_config.SendConnectionOptions()) {
+    quic_copts.append(quic::QuicTagToString(copt));
+  }
+  EXPECT_EQ(quic_copts, "5RTOACKD");
+  std::string quic_ccopts = "";
+  for (auto& ccopt : quic_config.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT)) {
+    quic_ccopts.append(quic::QuicTagToString(ccopt));
+  }
+  EXPECT_EQ(quic_ccopts, "6RTOAKD4");
 }
 
 TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
