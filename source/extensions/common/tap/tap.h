@@ -86,7 +86,9 @@ public:
   std::string category() const override { return "envoy.tap.sinks"; }
 
   /**
-   * @return a new tap SinkPtr
+   * Create a Sink that can be used for writing out data produced by the tap filter.
+   * @param config supplies the protobuf configuration for the sink factory
+   * @param cluster_manager is a ClusterManager from the HTTP/transport socket context
    */
   virtual SinkPtr createSinkPtr(const Protobuf::Message& config,
                                 Upstream::ClusterManager& cluster_manager) PURE;
