@@ -226,6 +226,7 @@ envoy_cc_library(
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
     external_deps = [
+        "abseil_strings",
         "spdlog",
     ],
 )

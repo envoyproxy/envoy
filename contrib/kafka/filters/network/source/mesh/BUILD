@@ -252,6 +252,8 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/common:base_includes",
+        "@com_google_absl//absl/strings",
         envoy_external_dep_path("librdkafka"),
     ],
 )

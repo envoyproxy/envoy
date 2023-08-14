@@ -98,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -199,6 +199,14 @@ message ExternalProcessor {
   // :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
   // If not set, ``mode_override`` API in the response message will be ignored.
   bool allow_mode_override = 14;
+
+  // If set to true, ignore the
+  // :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
+  // message in an external processor response. In such case, no local reply will be sent.
+  // Instead, the stream to the external processor will be closed. There will be no
+  // more external processing for this stream from now on.
+  // [#not-implemented-hide:]
+  bool disable_immediate_response = 15;
 }
 
 // The HeaderForwardingRules structure specifies what headers are

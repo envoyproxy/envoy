@@ -269,6 +269,40 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 }
 
+// Test Rtds update with Resource wrapper.
+TEST_P(RtdsIntegrationTest, RtdsUpdate) {
+  initialize();
+  acceptXdsConnection();
+
+  EXPECT_EQ("whatevs", getRuntimeKey("foo"));
+  EXPECT_EQ("yar", getRuntimeKey("bar"));
+  EXPECT_EQ("", getRuntimeKey("baz"));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+                                      {"some_rtds_layer"}, {}, true));
+  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_rtds_layer
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+
+  // Use the Resource wrapper no matter if it is Sotw or Delta.
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1",
+      {{"test", ProtobufWkt::Any()}});
+  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+
+  EXPECT_EQ("bar", getRuntimeKey("foo"));
+  EXPECT_EQ("yar", getRuntimeKey("bar"));
+  EXPECT_EQ("meh", getRuntimeKey("baz"));
+
+  EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  EXPECT_EQ(initial_load_success_ + 1, test_server_->counter("runtime.load_success")->value());
+  EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
+  EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
+}
+
 // Verify that RTDS initialization starts only after initialization of all primary clusters has
 // completed. Primary cluster initialization completes asynchronously when some of the clusters use
 // DNS for endpoint discovery or when health check is configured.

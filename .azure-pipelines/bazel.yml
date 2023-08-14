@@ -9,9 +9,6 @@ parameters:
   default: ""
 
 # caching
-- name: cacheKeyBazelisk
-  type: string
-  default: .bazelversion
 - name: cacheKeyDocker
   type: string
   default: ".devcontainer/Dockerfile"
@@ -23,6 +20,9 @@ parameters:
   default: $(pathCacheTemp)
 
 - name: tmpfsCacheDisabled
+  type: string
+  default: ''
+- name: tmpfsDockerDisabled
   type: string
   default: ''
 
@@ -130,7 +130,7 @@ steps:
     done
     sudo chown -R azure-pipelines:azure-pipelines $(Build.StagingDirectory)/bazel_root/
   displayName: "Mount/tmpfs bazel directories"
-  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false))
+  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false), ne('${{ parameters.tmpfsDockerDisabled }}', true))
 
 - bash: |
     set -e
@@ -143,18 +143,18 @@ steps:
     sudo chown -R vsts:vsts "${CACHE_DIRS[@]}" $(Build.StagingDirectory)/bazel_root/
     echo "Created bazel cache directories: "${CACHE_DIRS[*]}""
   displayName: "Create bazel directories"
-  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', true))
+  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', true), eq('${{ parameters.tmpfsDockerDisabled }}', true))
 
 # Caching
 - template: cached.yml
   parameters:
     keyBazel: "${{ parameters.cacheKeyBazel }}"
-    keyBazelisk: "${{ parameters.cacheKeyBazelisk }}"
     keyDocker: "${{ parameters.cacheKeyDocker }}"
     pathDockerBind: "${{ parameters.pathDockerBind }}"
     arch: "${{ parameters.artifactSuffix }}"
     pathTemp: "${{ parameters.pathCacheTemp }}"
     tmpfsDisabled: "${{ parameters.tmpfsCacheDisabled }}"
+    tmpfsDockerDisabled: "${{ parameters.tmpfsDockerDisabled }}"
 
 - ${{ each step in parameters.stepsPre }}:
   - ${{ each pair in step }}:
