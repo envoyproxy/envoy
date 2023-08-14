@@ -18,8 +18,6 @@ DynamicOpenTracingTracerFactory::DynamicOpenTracingTracerFactory()
 Tracing::DriverSharedPtr DynamicOpenTracingTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::DynamicOtConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
-  ENVOY_LOG_MISC(warn, "OpenTracing is deprecated and will be removed soon.");
-
   const std::string& library = proto_config.library();
   const ProtobufWkt::Struct& config_struct = proto_config.config();
   absl::StatusOr<std::string> json_or_error = MessageUtil::getJsonStringFromMessage(config_struct);
