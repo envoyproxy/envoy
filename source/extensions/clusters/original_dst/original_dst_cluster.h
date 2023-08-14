@@ -190,5 +190,7 @@ private:
                     ClusterFactoryContext& context) override;
 };
 
+DECLARE_FACTORY(OriginalDstClusterFactory);
+
 } // namespace Upstream
 } // namespace Envoy

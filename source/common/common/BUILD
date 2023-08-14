@@ -210,6 +210,7 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":base_logger_lib",
+        ":fmt_lib",
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
@@ -225,6 +226,7 @@ envoy_cc_library(
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
     external_deps = [
+        "abseil_strings",
         "spdlog",
     ],
 )

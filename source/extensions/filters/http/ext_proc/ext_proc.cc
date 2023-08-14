@@ -171,7 +171,7 @@ Filter::StreamOpenState Filter::openStream() {
     stats_.streams_started_.inc();
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
-    if (grpc_service_.has_envoy_grpc()) {
+    if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
       logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
     }
   }
@@ -180,11 +180,6 @@ Filter::StreamOpenState Filter::openStream() {
 
 void Filter::closeStream() {
   if (stream_) {
-    if (grpc_service_.has_envoy_grpc()) {
-      logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
-      logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-    }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -463,7 +458,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
-  if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
+  if (!body_delivered && state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) {
     // If no gRPC stream yet, opens it before sending data.
     switch (openStream()) {
     case StreamOpenState::Error:
@@ -477,7 +472,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
-    sendBufferedData(state, ProcessorState::CallbackState::BufferedBodyCallback, true);
+    sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback,
+                  false);
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
@@ -544,7 +540,7 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                            ProcessorState::CallbackState new_state, bool end_stream) {
-  ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
+  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
   ProcessingRequest req;
@@ -553,17 +549,6 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
   body_req->set_body(data.toString());
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
-}
-
-void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
-                              bool end_stream) {
-  if (state.hasBufferedData()) {
-    sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
-  } else {
-    // If there is no buffered data, sends an empty body.
-    Buffer::OwnedImpl data("");
-    sendBodyChunk(state, data, new_state, end_stream);
-  }
 }
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
@@ -576,6 +561,20 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   ENVOY_LOG(debug, "Sending trailers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
+}
+
+void Filter::logGrpcStreamInfo() {
+  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
+    const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
+    if (upstream_meter != nullptr) {
+      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+    }
+    // Only set upstream host in logging info once.
+    if (logging_info_->upstreamHost() == nullptr) {
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    }
+  }
 }
 
 void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout) {
@@ -657,6 +656,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // We won't be sending anything more to the stream after we
     // receive this message.
     ENVOY_LOG(debug, "Sending immediate response");
+    // TODO(tyxia) For immediate response case here and below, logging is needed because
+    // `onFinishProcessorCalls` is called after `closeStream` below.
+    // Investigate to see if we can switch the order of those two so that the logging here can be
+    // avoided.
+    logGrpcStreamInfo();
     processing_complete_ = true;
     closeStream();
     onFinishProcessorCalls(Grpc::Status::Ok);
@@ -691,6 +695,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
+    logGrpcStreamInfo();
     closeStream();
     onFinishProcessorCalls(processing_status.raw_code());
     ImmediateResponse invalid_mutation_response;
@@ -728,6 +733,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
 void Filter::onGrpcClose() {
   ENVOY_LOG(debug, "Received gRPC stream close");
+
   processing_complete_ = true;
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
@@ -738,6 +744,7 @@ void Filter::onGrpcClose() {
 
 void Filter::onMessageTimeout() {
   ENVOY_LOG(debug, "message timeout reached");
+  logGrpcStreamInfo();
   stats_.message_timeouts_.inc();
   if (config_->failureModeAllow()) {
     // The user would like a timeout to not cause message processing to fail.

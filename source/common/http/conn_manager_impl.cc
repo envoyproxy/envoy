@@ -111,7 +111,12 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                      /*server_name=*/config_.serverName(),
                                      /*proxy_status_config=*/config_.proxyStatusConfig())),
       refresh_rtt_after_request_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {}
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {
+  ENVOY_LOG_ONCE_IF(
+      trace, accept_new_http_stream_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
+      "found. Is it configured?");
+}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -973,6 +978,17 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   return ip->port();
 }
 
+namespace {
+bool streamErrorOnlyErrors(absl::string_view error_details) {
+  // Pre UHV HCM did not respect stream_error_on_invalid_http_message
+  // and only sent 400 for specific errors.
+  // TODO(#28555): make these errors respect the stream_error_on_invalid_http_message
+  return error_details == UhvResponseCodeDetail::get().FragmentInUrlPath ||
+         error_details == UhvResponseCodeDetail::get().EscapedSlashesInPath ||
+         error_details == UhvResponseCodeDetail::get().Percent00InPath;
+}
+} // namespace
+
 bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   if (header_validator_) {
     auto validation_result = header_validator_->validateRequestHeaders(*request_headers_);
@@ -1017,12 +1033,8 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         resetStream();
       } else {
         sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
-        // Pre UHV HCM did not respect stream_error_on_invalid_http_message
-        // and only sent 400 when :path contained fragment or encoded slashes
-        // TODO(#28555): make these errors respect the stream_error_on_invalid_http_message
         if (!response_encoder_->streamErrorOnInvalidHttpMessage() &&
-            failure_details != UhvResponseCodeDetail::get().FragmentInUrlPath &&
-            failure_details != UhvResponseCodeDetail::get().EscapedSlashesInPath) {
+            !streamErrorOnlyErrors(failure_details)) {
           connection_manager_.handleCodecError(failure_details);
         }
       }
