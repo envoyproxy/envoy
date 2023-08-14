@@ -654,8 +654,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
     if (config_->disableImmediateResponse()) {
-      ENVOY_LOG(debug,
-                "Filter has diable immediate response configured. Treat it as spurious response");
+      ENVOY_LOG(debug, "Filter has disable_immediate_response configured. "
+                       "Treat the immediate response message as spurious response.");
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
     } else {

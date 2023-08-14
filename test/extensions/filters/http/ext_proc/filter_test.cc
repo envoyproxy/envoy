@@ -709,7 +709,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyWithDisabledConfig) {
   disable_immediate_response: true
   )EOF");
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
@@ -723,16 +723,16 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyWithDisabledConfig) {
   stream_callbacks_->onReceiveMessage(std::move(resp1));
 
   Buffer::OwnedImpl req_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  EXPECT_EQ(filter_->decodeData(req_data, true), FilterDataStatus::Continue);
+  EXPECT_EQ(filter_->decodeTrailers(request_trailers_), FilterTrailersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true), FilterHeadersStatus::Continue);
   filter_->onDestroy();
 
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(1, config_->stats().spurious_msgs_received_.value());
-  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 0);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
 // Using the default configuration, test the filter with a processor that
