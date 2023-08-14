@@ -152,7 +152,14 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   }
   auto value = key.StringOrDie().value();
   if (value == Code) {
-    auto code = info_.responseCode();
+    absl::optional<uint32_t> code;
+    uint32_t maybecode;
+    if (info_.responseCode().has_value()) {
+      code.emplace(info_.responseCode().value());
+    } else if (headers_.value_ != nullptr &&
+               absl::SimpleAtoi(headers_.value_->getStatusValue(), &maybecode)) {
+      code.emplace(maybecode);
+    }
     if (code.has_value()) {
       return CelValue::CreateInt64(code.value());
     }
