@@ -11,8 +11,6 @@ WARNINGS=()
 FLAKY_SANDBOXES=(
     # https://github.com/envoyproxy/envoy/issues/28542
     double-proxy
-    # https://github.com/envoyproxy/envoy/issues/28543
-    golang-network
     # https://github.com/envoyproxy/envoy/issues/28541
     wasm-cc
     # https://github.com/envoyproxy/envoy/issues/28546

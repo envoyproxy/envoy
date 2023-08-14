@@ -922,11 +922,11 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
 }
 
-bool EdfLoadBalancerBase::isSlowStartEnabled() {
+bool EdfLoadBalancerBase::isSlowStartEnabled() const {
   return slow_start_window_ > std::chrono::milliseconds(0);
 }
 
-bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
+bool EdfLoadBalancerBase::noHostsAreInSlowStart() const {
   if (!isSlowStartEnabled()) {
     return true;
   }
@@ -996,35 +996,37 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   }
 }
 
-double EdfLoadBalancerBase::applyAggressionFactor(double time_factor) {
-  if (aggression_ == 1.0 || time_factor == 1.0) {
+namespace {
+double applyAggressionFactor(double time_factor, double aggression) {
+  if (aggression == 1.0 || time_factor == 1.0) {
     return time_factor;
   } else {
-    return std::pow(time_factor, 1.0 / aggression_);
+    return std::pow(time_factor, 1.0 / aggression);
   }
 }
+} // namespace
 
-double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) {
+double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) const {
   // We can reliably apply slow start weight only if `last_hc_pass_time` in host has been populated
   // either by active HC or by `member_update_cb_` in `EdfLoadBalancerBase`.
   if (host.lastHcPassTime() && host.coarseHealth() == Upstream::Host::Health::Healthy) {
     auto in_healthy_state_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         time_source_.monotonicTime() - host.lastHcPassTime().value());
     if (in_healthy_state_duration < slow_start_window_) {
-      aggression_ =
+      double aggression =
           aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
-      if (aggression_ <= 0.0 || std::isnan(aggression_)) {
+      if (aggression <= 0.0 || std::isnan(aggression)) {
         ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
                                      "aggression cannot be less than 0.0");
-        aggression_ = 1.0;
+        aggression = 1.0;
       }
 
-      ASSERT(aggression_ > 0.0);
+      ASSERT(aggression > 0.0);
       auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
                                                       in_healthy_state_duration.count())) /
                          slow_start_window_.count();
-      return host_weight *
-             std::max(applyAggressionFactor(time_factor), slow_start_min_weight_percent_);
+      return host_weight * std::max(applyAggressionFactor(time_factor, aggression),
+                                    slow_start_min_weight_percent_);
     } else {
       return host_weight;
     }
@@ -1033,7 +1035,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
   }
 }
 
-double LeastRequestLoadBalancer::hostWeight(const Host& host) {
+double LeastRequestLoadBalancer::hostWeight(const Host& host) const {
   // This method is called to calculate the dynamic weight as following when all load balancing
   // weights are not equal:
   //

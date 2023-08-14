@@ -28,6 +28,17 @@ upstreams and control plane xDS clusters.
   active_clusters, Gauge, Number of currently active (warmed) clusters
   warming_clusters, Gauge, Number of currently warming (not active) clusters
 
+
+In addition to the cluster manager stats, there are per worker thread local
+cluster manager statistics tree rooted at
+*thread_local_cluster_manager.<worker_id>.* with the following statistics.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  clusters_inflated, Gauge, Number of clusters the worker has initialized. If using cluster deferral this number should be <= (cluster_added - clusters_removed).
+
 .. _config_cluster_stats:
 
 Every cluster has a statistics tree rooted at *cluster.<name>.* with the following statistics:

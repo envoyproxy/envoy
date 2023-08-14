@@ -33,6 +33,7 @@ RUNTIME_GUARD(envoy_reloadable_features_allow_absolute_url_with_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_allow_compact_maglev);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_append_xfh_idempotent);
+RUNTIME_GUARD(envoy_reloadable_features_check_mep_on_first_eject);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
@@ -44,6 +45,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_update_listener_socket_options);
 RUNTIME_GUARD(envoy_reloadable_features_expand_agnostic_stream_lifetime);
 RUNTIME_GUARD(envoy_reloadable_features_finish_reading_on_decode_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_format_ports_as_numbers);
+RUNTIME_GUARD(envoy_reloadable_features_handle_uppercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_http1_allow_codec_error_response_after_1xx_headers);
 RUNTIME_GUARD(envoy_reloadable_features_http2_decode_metadata_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http2_validate_authority_with_quiche);
@@ -56,6 +58,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ignore_optional_option_from_hcm_for_rout
 RUNTIME_GUARD(envoy_reloadable_features_immediate_response_use_filter_mutation_rule);
 RUNTIME_GUARD(envoy_reloadable_features_initialize_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_keep_endpoint_active_hc_status_on_locality_update);
+RUNTIME_GUARD(envoy_reloadable_features_lowercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_header_passthrough_fix);
@@ -78,8 +81,6 @@ RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
-RUNTIME_GUARD(envoy_reloadable_features_uhv_preserve_url_encoded_case);
-RUNTIME_GUARD(envoy_reloadable_features_uhv_translate_backslash_to_slash);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_allow_connect_with_2xx);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wait_for_response_headers_before_disabling_read);
 RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
@@ -116,6 +117,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 // TODO(wbpcode) complete remove this feature is no one use it.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
+// TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
+// TODO(adisuissa): enable by default once this is tested in prod.
+FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

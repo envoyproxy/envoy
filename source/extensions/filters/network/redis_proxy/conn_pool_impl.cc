@@ -99,7 +99,10 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
-    onClusterAddOrUpdateNonVirtual(*cluster);
+    Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+      return *cluster;
+    };
+    onClusterAddOrUpdateNonVirtual(cluster->info()->name(), command);
   }
 }
 
@@ -116,8 +119,8 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
-    Upstream::ThreadLocalCluster& cluster) {
-  if (cluster.info()->name() != cluster_name_) {
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+  if (cluster_name != cluster_name_) {
     return;
   }
   // Ensure the filter is not deleted in the main thread during this method.
@@ -132,6 +135,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   }
 
   ASSERT(cluster_ == nullptr);
+  auto& cluster = get_cluster();
   cluster_ = &cluster;
   // Update username and password when cluster updates.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);

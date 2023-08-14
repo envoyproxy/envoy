@@ -71,5 +71,54 @@ static Registry::RegisterFactory<TestNetworkFilterConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     register_;
 
+class TestDrainerNetworkFilter : public Network::ReadFilter {
+public:
+  TestDrainerNetworkFilter(const test::integration::filters::TestDrainerNetworkFilterConfig& config)
+      : bytes_to_drain_(config.bytes_to_drain()) {}
+
+  Network::FilterStatus onData(Buffer::Instance& buffer, bool) override {
+    buffer.drain(bytes_to_drain_);
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+  }
+
+private:
+  Envoy::Network::ReadFilterCallbacks* read_callbacks_{};
+  int bytes_to_drain_;
+};
+
+class TestDrainerNetworkFilterConfigFactory
+    : public Extensions::NetworkFilters::Common::FactoryBase<
+          test::integration::filters::TestDrainerNetworkFilterConfig> {
+public:
+  TestDrainerNetworkFilterConfigFactory()
+      : Extensions::NetworkFilters::Common::FactoryBase<
+            test::integration::filters::TestDrainerNetworkFilterConfig>(
+            "envoy.test.test_drainer_network_filter") {}
+
+private:
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::integration::filters::TestDrainerNetworkFilterConfig& config,
+      Server::Configuration::FactoryContext&) override {
+    return [config](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<TestDrainerNetworkFilter>(config));
+    };
+  }
+
+  bool isTerminalFilterByProtoTyped(
+      const test::integration::filters::TestDrainerNetworkFilterConfig& config,
+      Server::Configuration::ServerFactoryContext&) override {
+    return config.is_terminal_filter();
+  }
+};
+
+static Registry::RegisterFactory<TestDrainerNetworkFilterConfigFactory,
+                                 Server::Configuration::NamedNetworkFilterConfigFactory>
+    drainer_register_;
+
 } // namespace
 } // namespace Envoy
