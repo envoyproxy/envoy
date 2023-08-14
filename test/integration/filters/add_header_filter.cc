@@ -44,7 +44,7 @@ static Registry::RegisterFactory<AddHeaderFilterConfig,
 
 class AddConfigurableHeaderFilter : public Http::PassThroughFilter {
 public:
-  AddConfigurableHeaderFilter(std::string header_key, std::string header_value)
+  AddConfigurableHeaderFilter(const std::string& header_key, const std::string& header_value)
       : header_key_(header_key), header_value_(header_value) {}
 
   AddConfigurableHeaderFilter() = default;
@@ -55,8 +55,8 @@ public:
   }
 
 private:
-  std::string header_key_;
-  std::string header_value_;
+  const std::string header_key_;
+  const std::string header_value_;
 };
 
 class AddConfigurableHeaderFilterFactory

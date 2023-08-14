@@ -42,66 +42,64 @@ public:
     autonomous_upstream_ = true;
   }
 
-  void addStaticClusterFilter(const std::string& name, const std::string& key = "",
-                              const std::string& value = "") {
-    config_helper_.addConfigModifier(
-        [name, key, value](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          ConfigHelper::HttpProtocolOptions protocol_options =
-              MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-                  (*cluster->mutable_typed_extension_protocol_options())
-                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-          auto* filter = protocol_options.add_http_filters();
-          filter->set_name(name);
-
-          if (key != "" && value != "") {
-            auto configuration = test::integration::filters::AddHeaderFilterConfig();
-            configuration.set_header_key(key);
-            configuration.set_header_value(value);
-            filter->mutable_typed_config()->PackFrom(configuration);
-          }
-
-          (*cluster->mutable_typed_extension_protocol_options())
-              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-                  .PackFrom(protocol_options);
-        });
+  void addStaticClusterFilter(const HttpFilterProto& config) {
+    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      ConfigHelper::HttpProtocolOptions protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+              (*cluster->mutable_typed_extension_protocol_options())
+                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      *protocol_options.add_http_filters() = config;
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(protocol_options);
+    });
   }
 
-  void addStaticRouterFilter(const std::string& name, const std::string& key = "",
-                             const std::string& value = "") {
+  void addStaticRouterFilter(const HttpFilterProto& config) {
     config_helper_.addConfigModifier(
-        [name, key, value](
+        [config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
           HttpFilterProto& router_filter = *hcm.mutable_http_filters(0);
           ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
           envoy::extensions::filters::http::router::v3::Router router;
           router_filter.typed_config().UnpackTo(&router);
-          auto* filter = router.add_upstream_http_filters();
-          filter->set_name(name);
-
-          if (key != "" && value != "") {
-            auto configuration = test::integration::filters::AddHeaderFilterConfig();
-            configuration.set_header_key(key);
-            configuration.set_header_value(value);
-            filter->mutable_typed_config()->PackFrom(configuration);
-          }
-
+          *router.add_upstream_http_filters() = config;
           router_filter.mutable_typed_config()->PackFrom(router);
         });
   }
 
-  void addStaticFilter(const std::string& name, const std::string& key = "",
-                       const std::string& value = "") {
+  const HttpFilterProto getAddHeaderFilterConfig(const std::string& name, const std::string& key,
+                                                 const std::string& value) {
+    HttpFilterProto filter_config;
+    filter_config.set_name(name);
+    auto configuration = test::integration::filters::AddHeaderFilterConfig();
+    configuration.set_header_key(key);
+    configuration.set_header_value(value);
+    filter_config.mutable_typed_config()->PackFrom(configuration);
+    return filter_config;
+  }
+
+  const HttpFilterProto getCodecFilterConfig() {
+    HttpFilterProto filter_config;
+    filter_config.set_name("envoy.filters.http.upstream_codec");
+    auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
+    filter_config.mutable_typed_config()->PackFrom(configuration);
+    return filter_config;
+  }
+
+  void addStaticFilter(const std::string& name, const std::string& key, const std::string& value) {
     if (useRouterFilters()) {
-      addStaticRouterFilter(name, key, value);
+      addStaticRouterFilter(getAddHeaderFilterConfig(name, key, value));
     } else {
-      addStaticClusterFilter(name, key, value);
+      addStaticClusterFilter(getAddHeaderFilterConfig(name, key, value));
     }
   }
 
-  void addCodecClusterFilter() { addStaticClusterFilter("envoy.filters.http.upstream_codec"); }
-  void addCodecRouterFilter() { addStaticRouterFilter("envoy.filters.http.upstream_codec"); }
+  void addCodecRouterFilter() { addStaticRouterFilter(getCodecFilterConfig()); }
+
+  void addCodecClusterFilter() { addStaticClusterFilter(getCodecFilterConfig()); }
 
   void addCodecFilter() {
     if (useRouterFilters()) {
@@ -152,7 +150,7 @@ public:
 };
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, BasicSuccess) {
-  addStaticFilter("foo", default_header_key_, default_header_value_);
+  addStaticFilter("envoy.test.add_header_upstream", default_header_key_, default_header_value_);
   addCodecFilter();
   initialize();
 
@@ -184,8 +182,9 @@ public:
 
 // Only cluster-specified filters should be applied.
 TEST_P(StaticRouterAndClusterFiltersIntegrationTest, StaticRouterAndClusterFilters) {
-  addStaticClusterFilter("foo", default_header_key_, "value-from-cluster");
-  addStaticRouterFilter("bar", default_header_key_, "value-from-router");
+  addStaticClusterFilter(
+      getAddHeaderFilterConfig("foo", default_header_key_, "value-from-cluster"));
+  addStaticRouterFilter(getAddHeaderFilterConfig("bar", default_header_key_, "value-from-router"));
   addCodecClusterFilter();
   addCodecRouterFilter();
   initialize();
