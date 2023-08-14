@@ -598,15 +598,15 @@ Utility::QueryParamsMulti Utility::QueryParamsMulti::parseParameters(absl::strin
 
 void Utility::QueryParamsMulti::remove(absl::string_view key) { this->data.erase(key); }
 
-void Utility::QueryParamsMulti::add(absl::string_view key, const std::string& value) {
-  auto result = this->data.emplace(key, std::vector<std::string>{value});
+void Utility::QueryParamsMulti::add(absl::string_view key, absl::string_view value) {
+  auto result = this->data.emplace(std::string(key), std::vector<std::string>{std::string(value)});
   if (!result.second) {
-    result.first->second.push_back(value);
+    result.first->second.push_back(std::string(value));
   }
 }
 
-void Utility::QueryParamsMulti::overwrite(absl::string_view key, const std::string& value) {
-  this->data[key] = std::vector<std::string>{value};
+void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_view value) {
+  this->data[key] = std::vector<std::string>{std::string(value)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
