@@ -158,8 +158,7 @@ public:
   ~MockTapSinkFactory() override {};
 
   MOCK_METHOD(SinkPtr, createSinkPtr,
-      (const Protobuf::Message& config,
-       Server::Configuration::CommonFactoryContext& context),
+      (const Protobuf::Message& config, Upstream::ClusterManager&),
       (override));
 
   MOCK_METHOD(std::string, name, (), (const, override));
@@ -177,7 +176,7 @@ public:
       return std::make_unique<ProtobufWkt::StringValue>();
     }
     Extensions::Common::Tap::SinkPtr createSinkPtr(const Protobuf::Message&,
-                                                   Server::Configuration::CommonFactoryContext&) override {
+                                                   Upstream::ClusterManager&) override {
       std::cout << "WE ARE IN CREATE_SINK_PTR" << std::endl;
       return NULL; // FIXME
     }
@@ -193,8 +192,10 @@ public:
   TestConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
       Extensions::Common::Tap::Sink* admin_streamer,
       Server::Configuration::FactoryContext& context) : TapConfigBaseImpl(
-        std::move(proto_config), admin_streamer, context
-        ) {}
+        std::move(proto_config), admin_streamer,
+        context.clusterManager(),
+        context.messageValidationContext().staticValidationVisitor()
+      ) {}
 };
 
 // TODO move this test to a new file?

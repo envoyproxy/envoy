@@ -31,7 +31,9 @@ fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*
 HttpTapConfigImpl::HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer,
                                      Server::Configuration::FactoryContext& context)
-    : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
+    : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer,
+                                   context.clusterManager(),
+                                   context.messageValidationContext().staticValidationVisitor()) {}
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t stream_id) {
   return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), stream_id);

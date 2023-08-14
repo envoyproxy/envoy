@@ -26,7 +26,8 @@ public:
   createConfigFromProto(const envoy::config::tap::v3::TapConfig& proto_config,
                         Extensions::Common::Tap::Sink* admin_streamer) override {
     return std::make_shared<SocketTapConfigImpl>(std::move(proto_config), admin_streamer,
-                                                 time_source_, factory_context_);
+                                                 time_source_, factory_context_.clusterManager(),
+                                                 factory_context_.messageValidationVisitor());
   }
 
 private:
@@ -75,7 +76,7 @@ DownstreamTapSocketConfigFactory::createTransportSocketFactory(
   return std::make_unique<DownstreamTapSocketFactory>(
       outer_config,
       std::make_unique<SocketTapConfigFactoryImpl>(
-          server_context.mainThreadDispatcher().timeSource()),
+          server_context.mainThreadDispatcher().timeSource(), context),
       server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
       server_context.mainThreadDispatcher(), std::move(inner_transport_factory));
 }

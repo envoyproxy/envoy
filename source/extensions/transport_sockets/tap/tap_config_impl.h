@@ -52,9 +52,10 @@ class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
 public:
   SocketTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                       Extensions::Common::Tap::Sink* admin_streamer, TimeSource& time_system,
-                      Server::Configuration::CommonFactoryContext& context)
+                      Upstream::ClusterManager& cluster_manager,
+                      ProtobufMessage::ValidationVisitor& validation_visitor)
       : Extensions::Common::Tap::TapConfigBaseImpl(std::move(proto_config), admin_streamer,
-                                                   context),
+                                                   cluster_manager, validation_visitor),
         time_source_(time_system) {}
 
   // SocketTapConfig

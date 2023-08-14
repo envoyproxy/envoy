@@ -47,12 +47,14 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
 
 TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer,
-                                     Server::Configuration::CommonFactoryContext& context)
+                                     Upstream::ClusterManager& cluster_manager,
+                                     ProtobufMessage::ValidationVisitor& validation_visitor)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()) {
+
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
   ASSERT(sinks.size() == 1);
@@ -93,8 +95,8 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
         Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
     ProtobufTypes::MessagePtr config = Config::Utility::translateAnyToFactoryConfig(
         sinks[0].custom_sink().typed_config(),
-        context.messageValidationContext().staticValidationVisitor(), tap_sink_factory);
-    sink_ = tap_sink_factory.createSinkPtr(*config, context);
+        validation_visitor, tap_sink_factory);
+    sink_ = tap_sink_factory.createSinkPtr(*config, cluster_manager);
     sink_to_use_ = sink_.get();
     break;
   }

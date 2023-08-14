@@ -104,7 +104,8 @@ public:
 protected:
   TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                     Common::Tap::Sink* admin_streamer,
-                    Server::Configuration::CommonFactoryContext& context);
+                    Upstream::ClusterManager& cluster_manager,
+                    ProtobufMessage::ValidationVisitor& validation_visitor);
 
 private:
   // This is the default setting for both RX/TX max buffered bytes. (This means that per tap, the

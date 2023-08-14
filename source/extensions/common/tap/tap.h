@@ -89,7 +89,7 @@ public:
    * @return a new tap SinkPtr
    */
   virtual SinkPtr createSinkPtr(const Protobuf::Message& config,
-                                Server::Configuration::CommonFactoryContext& context) PURE;
+                                Upstream::ClusterManager& cluster_manager) PURE;
 };
 
 using TapSinkFactoryPtr = std::unique_ptr<TapSinkFactory>;
