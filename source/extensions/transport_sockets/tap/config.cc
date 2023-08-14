@@ -26,8 +26,7 @@ public:
   createConfigFromProto(const envoy::config::tap::v3::TapConfig& proto_config,
                         Extensions::Common::Tap::Sink* admin_streamer) override {
     return std::make_shared<SocketTapConfigImpl>(std::move(proto_config), admin_streamer,
-                                                 time_source_, factory_context_.clusterManager(),
-                                                 factory_context_.messageValidationVisitor());
+                                                 time_source_, factory_context_);
   }
 
 private:
