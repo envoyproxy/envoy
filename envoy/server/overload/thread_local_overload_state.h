@@ -91,11 +91,13 @@ public:
    * @param name of resource monitor to check.
    */
   virtual bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) PURE;
+
   /**
-   * Returns current resource usage (most recent read) tracked by monitor.
-   * @param name of resource monitor to check.
+   * Returns proactive resource owned by overload manager.
+   * @param name of the proactive resource to retrieve.
    */
-  virtual int64_t currentResourceUsage(OverloadProactiveResourceName resource_name) PURE;
+  virtual ProactiveResourceMonitorOptRef
+  getProactiveResourceMonitorForTest(OverloadProactiveResourceName resource_name) PURE;
 };
 
 using ThreadLocalOverloadStateOptRef = OptRef<ThreadLocalOverloadState>;

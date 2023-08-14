@@ -25,6 +25,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":downstream_connections_monitor",
         "//envoy/registry",

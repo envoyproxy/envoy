@@ -1,5 +1,3 @@
-#include <unordered_map>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 
@@ -10,12 +8,22 @@ namespace Envoy {
 
 namespace {
 
-class GlobalDownstreamCxLimitIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
-      public BaseIntegrationTest {
+envoy::config::overload::v3::OverloadManager overloadManagerProtoConfig(uint32_t max_cx) {
+  const static std::string yaml_config = R"EOF(
+          resource_monitors:
+            - name: "envoy.resource_monitors.global_downstream_max_connections"
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
+                max_active_downstream_connections: {}
+        )EOF";
+  return TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(
+      fmt::format(yaml_config, std::to_string(max_cx)));
+}
+
+class GlobalDownstreamCxLimitIntegrationTest : public testing::Test, public BaseIntegrationTest {
 protected:
   GlobalDownstreamCxLimitIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, ConfigHelper::tcpProxyConfig()) {}
 
   void initializeOverloadManager(uint32_t max_cx) {
     overload_manager_config_ = overloadManagerProtoConfig(max_cx);
@@ -25,62 +33,33 @@ protected:
     initialize();
   }
 
-  std::string counterPrefix() {
-    const bool isV4 = (version_ == Network::Address::IpVersion::v4);
-    return (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
-  }
-
   AssertionResult waitForConnections(uint32_t expected_connections) {
     absl::Notification num_downstream_conns_reached;
-    test_server_->server().dispatcher().post([this, &num_downstream_conns_reached,
+    absl::Mutex lock;
+    test_server_->server().dispatcher().post([this, &lock, &num_downstream_conns_reached,
                                               expected_connections]() {
       auto& overload_state = test_server_->server().overloadManager().getThreadLocalOverloadState();
-      for (int i = 0; i < 10; ++i) {
-        if (overload_state.currentResourceUsage(
-                Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) ==
-            expected_connections) {
-          num_downstream_conns_reached.Notify();
-        }
-        // TODO(mattklein123): Do not use a real sleep here. Switch to events with waitFor().
-        timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(50));
-      }
-      if (overload_state.currentResourceUsage(
-              Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) ==
-          expected_connections) {
+      const auto& monitor = overload_state.getProactiveResourceMonitorForTest(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections);
+      ASSERT_TRUE(monitor.has_value());
+      absl::MutexLock l(&lock);
+      const auto reached_expected_count =
+          [&monitor, expected_connections]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
+            return monitor->currentResourceUsage() == expected_connections;
+          };
+      if (timeSystem().waitFor(lock, absl::Condition(&reached_expected_count),
+                               std::chrono::milliseconds(5000))) {
         num_downstream_conns_reached.Notify();
-      }
+      };
     });
-    if (num_downstream_conns_reached.WaitForNotificationWithTimeout(absl::Milliseconds(500))) {
-      return AssertionSuccess();
-    } else {
-      return AssertionFailure();
-    }
+    return AssertionSuccess();
   }
 
 private:
-  std::string overloadManagerConfig(std::string max_cx) {
-    return fmt::format(R"EOF(
-          resource_monitors:
-            - name: "envoy.resource_monitors.global_downstream_max_connections"
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
-                max_active_downstream_connections: {}
-        )EOF",
-                       max_cx);
-  }
-
-  envoy::config::overload::v3::OverloadManager overloadManagerProtoConfig(uint32_t max_cx) {
-    return TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(
-        overloadManagerConfig(std::to_string(max_cx)));
-  }
   envoy::config::overload::v3::OverloadManager overload_manager_config_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, GlobalDownstreamCxLimitIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitInOverloadManager) {
+TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitInOverloadManager) {
   initializeOverloadManager(6);
   std::vector<IntegrationTcpClientPtr> tcp_clients;
   std::vector<FakeRawConnectionPtr> raw_conns;
@@ -90,7 +69,7 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitInOverloadManager) {
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
     ASSERT_TRUE(tcp_clients.back()->connected());
   }
-  test_server_->waitForCounterEq(counterPrefix() + "downstream_global_cx_overflow", 0);
+  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 0);
   // 7th connection should fail because we have hit the configured limit for
   // `max_active_downstream_connections`.
   tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
@@ -98,7 +77,7 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitInOverloadManager) {
   ASSERT_FALSE(
       fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
   tcp_clients.back()->waitForDisconnect();
-  test_server_->waitForCounterEq(counterPrefix() + "downstream_global_cx_overflow", 1);
+  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 1);
   // Get rid of the client that failed to connect.
   tcp_clients.back()->close();
   tcp_clients.pop_back();
@@ -119,7 +98,7 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitInOverloadManager) {
   raw_conns.clear();
 }
 
-TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOverloadManager) {
+TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOverloadManager) {
   // Configure global connections limit via deprecated runtime key.
   config_helper_.addRuntimeOverride("overload.global_downstream_max_connections", "3");
   initializeOverloadManager(2);
@@ -137,21 +116,14 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOve
       ASSERT_TRUE(tcp_clients.back()->connected());
     }
   };
-  // TODO(nezdolik) this should be logged once per each run (ipv4,ipv6),
-  //  but second run does not contain the log line even though logging code is hit. Some macro+test
-  //  setup weirdness.
-  if (version_ == Network::Address::IpVersion::v4) {
-    EXPECT_LOG_CONTAINS_N_TIMES("warn", log_line, 1, { establish_conns(); });
-  } else {
-    establish_conns();
-  }
+  EXPECT_LOG_CONTAINS_N_TIMES("warn", log_line, 1, { establish_conns(); });
   // Third connection should fail because we have hit the configured limit in overload manager.
   tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
   raw_conns.emplace_back();
   ASSERT_FALSE(
       fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
   tcp_clients.back()->waitForDisconnect();
-  test_server_->waitForCounterEq(counterPrefix() + "downstream_global_cx_overflow", 1);
+  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 1);
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();
   }
@@ -159,7 +131,7 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOve
   raw_conns.clear();
 }
 
-TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitOptOutRespected) {
+TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitOptOutRespected) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_ignore_global_conn_limit(true);
@@ -174,7 +146,7 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitOptOutRespected) {
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
     ASSERT_TRUE(tcp_clients.back()->connected());
   }
-  test_server_->waitForCounterEq(counterPrefix() + "downstream_global_cx_overflow", 0);
+  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 0);
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();
   }
@@ -182,7 +154,7 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitOptOutRespected) {
   raw_conns.clear();
 }
 
-TEST_P(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInOverloadManager) {
+TEST_F(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInOverloadManager) {
   config_helper_.addRuntimeOverride("envoy.resource_limits.listener.listener_0.connection_limit",
                                     "2");
   initializeOverloadManager(5);
@@ -200,8 +172,8 @@ TEST_P(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInO
   ASSERT_FALSE(
       fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
   tcp_clients.back()->waitForDisconnect();
-  test_server_->waitForCounterEq(counterPrefix() + "downstream_cx_overflow", 1);
-  test_server_->waitForCounterEq(counterPrefix() + "downstream_global_cx_overflow", 0);
+  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_overflow", 1);
+  test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 0);
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();
   }

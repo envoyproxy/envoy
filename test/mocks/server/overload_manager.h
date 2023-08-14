@@ -17,7 +17,8 @@ public:
   MOCK_METHOD(bool, tryAllocateResource, (OverloadProactiveResourceName, int64_t));
   MOCK_METHOD(bool, tryDeallocateResource, (OverloadProactiveResourceName, int64_t));
   MOCK_METHOD(bool, isResourceMonitorEnabled, (OverloadProactiveResourceName));
-  MOCK_METHOD(int64_t, currentResourceUsage, (OverloadProactiveResourceName));
+  MOCK_METHOD(ProactiveResourceMonitorOptRef, getProactiveResourceMonitorForTest,
+              (OverloadProactiveResourceName));
 
 private:
   const OverloadActionState disabled_state_;

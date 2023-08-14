@@ -131,7 +131,12 @@ TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::Rand
       bind_to_port_(bind_to_port), reject_fraction_(0.0),
       ignore_global_conn_limit_(ignore_global_conn_limit),
       max_connections_to_accept_per_socket_event_(max_connections_to_accept_per_socket_event),
-      overload_state_(overload_state) {
+      overload_state_(overload_state),
+      track_global_cx_limit_in_overload_manager_(
+          overload_state_
+              ? overload_state_->isResourceMonitorEnabled(
+                    Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)
+              : false) {
   if (bind_to_port) {
     // Use level triggered mode to avoid potential loss of the trigger due to
     // transient accept errors or early termination due to accepting
