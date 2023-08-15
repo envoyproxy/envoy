@@ -156,8 +156,7 @@ public:
   MockTapSinkFactory() {}
   ~MockTapSinkFactory() override{};
 
-  MOCK_METHOD(SinkPtr, createSinkPtr, (const Protobuf::Message& config, Upstream::ClusterManager&),
-              (override));
+  MOCK_METHOD(SinkPtr, createSinkPtr, (const Protobuf::Message& config, SinkContext), (override));
 
   MOCK_METHOD(std::string, name, (), (const, override));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
@@ -168,8 +167,8 @@ public:
   TestConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                  Extensions::Common::Tap::Sink* admin_streamer,
                  Server::Configuration::FactoryContext& context)
-      : TapConfigBaseImpl(std::move(proto_config), admin_streamer, context.clusterManager(),
-                          context.messageValidationContext().staticValidationVisitor()) {}
+      : TapConfigBaseImpl(std::move(proto_config), admin_streamer,
+                          context.messageValidationContext().staticValidationVisitor(), context) {}
 };
 
 TEST(TypedExtensionConfigTest, AddTestConfig) {

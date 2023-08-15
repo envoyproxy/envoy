@@ -47,8 +47,8 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
 
 TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer,
-                                     Upstream::ClusterManager& cluster_manager,
-                                     ProtobufMessage::ValidationVisitor& validation_visitor)
+                                     ProtobufMessage::ValidationVisitor& validation_visitor,
+                                     SinkContext context)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -93,9 +93,40 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   case ProtoOutputSink::OutputSinkTypeCase::kCustomSink: {
     TapSinkFactory& tap_sink_factory =
         Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
+#if 0
+    ProtobufTypes::MessagePtr config;
+    if
+    (absl::holds_alternative<std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(context))
+    {
+      std::cout << "transport socket context" << std::endl; // TODO delete me
+      auto tsf_context_ref =
+      absl::get<std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(context);
+      auto tsf_context = tsf_context_ref.get();
+      config = Config::Utility::translateAnyToFactoryConfig(
+          sinks[0].custom_sink().typed_config(),
+          tsf_context.messageValidationVisitor(),
+          tap_sink_factory);
+    } else if
+    (absl::holds_alternative<std::reference_wrapper<Server::Configuration::FactoryContext>>(context))
+    {
+      std::cout << "http filter context" << std::endl; // TODO delete me
+      auto http_context_ref =
+      absl::get<std::reference_wrapper<Server::Configuration::FactoryContext>>(context); auto
+      http_context = http_context_ref.get(); config =
+      Config::Utility::translateAnyToFactoryConfig(
+          sinks[0].custom_sink().typed_config(),
+          http_context.messageValidationContext().staticValidationVisitor(),
+          tap_sink_factory);
+    } else {
+      std::cout << "unknown context" << std::endl;
+    }
+    config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
+                                                          validation_visitor, tap_sink_factory);
+#else
     ProtobufTypes::MessagePtr config = Config::Utility::translateAnyToFactoryConfig(
         sinks[0].custom_sink().typed_config(), validation_visitor, tap_sink_factory);
-    sink_ = tap_sink_factory.createSinkPtr(*config, cluster_manager);
+#endif
+    sink_ = tap_sink_factory.createSinkPtr(*config, context);
     sink_to_use_ = sink_.get();
     break;
   }
