@@ -12,7 +12,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
   try {
     TestUtility::validate(input);
     std::vector<Formatter::FormatterProviderPtr> formatters =
-        Formatter::SubstitutionFormatParser::parse(input.format());
+        Formatter::SubstitutionFormatParser::parse<Formatter::HttpFormatterContext>(input.format());
     const auto& request_headers =
         Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.request_headers());
     const auto& response_headers =
@@ -22,9 +22,13 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
     MockTimeSystem time_system;
     const std::unique_ptr<TestStreamInfo> stream_info =
         Fuzz::fromStreamInfo(input.stream_info(), time_system);
+
+    Formatter::HttpFormatterContext formatter_context(request_headers, response_headers,
+                                                      response_trailers, absl::string_view(),
+                                                      AccessLog::AccessLogType::NotSet);
+
     for (const auto& it : formatters) {
-      it->format(request_headers, response_headers, response_trailers, *stream_info,
-                 absl::string_view(), AccessLog::AccessLogType::NotSet);
+      it->format(formatter_context, *stream_info);
     }
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {

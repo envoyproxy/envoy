@@ -11,7 +11,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
-#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/formatter/substitution_format_utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -201,17 +201,20 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
  * FormatterProvider for string literals. It ignores headers and stream info and returns string by
  * which it was initialized.
  */
-class PlainStringFormatter : public FormatterProvider {
+template <class FormatterContext>
+class PlainStringFormatter : public FormatterProviderBase<FormatterContext> {
 public:
-  PlainStringFormatter(const std::string& str);
+  PlainStringFormatter(absl::string_view str) { str_.set_string_value(str); }
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string> format(const FormatterContext&,
+                                     const StreamInfo::StreamInfo&) const override {
+    return str_.string_value();
+  }
+  ProtobufWkt::Value formatValue(const FormatterContext&,
+                                 const StreamInfo::StreamInfo&) const override {
+    return str_;
+  }
 
 private:
   ProtobufWkt::Value str_;
@@ -220,17 +223,21 @@ private:
 /**
  * FormatterProvider for numbers.
  */
-class PlainNumberFormatter : public FormatterProvider {
+template <class FormatterContext>
+class PlainNumberFormatter : public FormatterProviderBase<FormatterContext> {
 public:
-  PlainNumberFormatter(double num);
+  PlainNumberFormatter(double num) { num_.set_number_value(num); }
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string> format(const FormatterContext&,
+                                     const StreamInfo::StreamInfo&) const override {
+    std::string str = absl::StrFormat("%g", num_.number_value());
+    return str;
+  }
+  ProtobufWkt::Value formatValue(const FormatterContext&,
+                                 const StreamInfo::StreamInfo&) const override {
+    return num_;
+  }
 
 private:
   ProtobufWkt::Value num_;
@@ -239,21 +246,39 @@ private:
 /**
  * FormatterProvider based on StreamInfo fields.
  */
-class StreamInfoFormatter : public FormatterProvider {
+template <class FormatterContext>
+class StreamInfoFormatter : public FormatterProviderBase<FormatterContext> {
 public:
-  StreamInfoFormatter(const std::string&, const std::string& = "",
-                      absl::optional<size_t> = absl::nullopt);
+  StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
+                      absl::optional<size_t> max_length = absl::nullopt) {
+    const auto& formatters = getKnownStreamInfoFormatterProviders();
+
+    auto it = formatters.find(command);
+
+    if (it == formatters.end()) {
+      throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", command));
+    }
+
+    // Check flags for the command.
+    CommandSyntaxChecker::verifySyntax((*it).second.first, command, sub_command, max_length);
+
+    // Create a pointer to the formatter by calling a function
+    // associated with formatter's name.
+    formatter_ = (*it).second.second(sub_command, max_length);
+  }
 
   StreamInfoFormatter(StreamInfoFormatterProviderPtr formatter)
       : formatter_(std::move(formatter)) {}
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string> format(const FormatterContext&,
+                                     const StreamInfo::StreamInfo& info) const override {
+    return formatter_->format(info);
+  }
+  ProtobufWkt::Value formatValue(const FormatterContext&,
+                                 const StreamInfo::StreamInfo& info) const override {
+    return formatter_->formatValue(info);
+  }
 
 private:
   StreamInfoFormatterProviderPtr formatter_;
