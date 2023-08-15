@@ -51,7 +51,10 @@ envoy_cc_library(
     external_deps = [
         "protobuf",
     ],
-    deps = [":cc_wkt_protos"],
+    deps = [
+        ":cc_wkt_protos",
+        "//envoy/common:base_includes",
+    ],
 )
 
 envoy_cc_library(

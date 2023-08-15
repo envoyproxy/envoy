@@ -56,6 +56,10 @@ class TestActiveQuicListener : public ActiveQuicListener {
   }
 };
 
+uint32_t testWorkerSelector(const Buffer::Instance&, uint32_t default_value) {
+  return default_value;
+}
+
 class TestActiveQuicListenerFactory : public ActiveQuicListenerFactory {
 public:
   using ActiveQuicListenerFactory::ActiveQuicListenerFactory;
@@ -75,7 +79,7 @@ protected:
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
         packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
-        proof_source_factory, std::move(cid_generator));
+        proof_source_factory, std::move(cid_generator), testWorkerSelector);
   }
 };
 

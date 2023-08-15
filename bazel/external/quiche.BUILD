@@ -198,6 +198,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:variant",
     ],
 )
