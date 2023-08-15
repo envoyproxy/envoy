@@ -267,8 +267,7 @@ typed_config:
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "test-x-set-header-0"));
 
     // check header exists which removed in golang side: x-test-header-1
-    EXPECT_EQ(true,
-              upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+    EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
     // check header value which set in golang: req-downstream-local-address
     EXPECT_TRUE(
@@ -307,8 +306,7 @@ typed_config:
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
     EXPECT_EQ("bar", entries[0]->value().getStringView());
 
-    EXPECT_EQ(
-        true,
+    EXPECT_TRUE(
         upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
 
     // check trailer value which add in golang: x-test-trailer-2
@@ -337,7 +335,7 @@ typed_config:
     EXPECT_EQ("foo", getHeader(response->headers(), "test-x-set-header-0"));
 
     // check resp header exists which removed in golang side: x-test-header-1
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
     // check header value which is appended in golang: existed-header
     entries = response->headers().get(Http::LowerCaseString("existed-header"));
@@ -361,11 +359,10 @@ typed_config:
     EXPECT_EQ("HTTP/1.1", getHeader(response->headers(), "rsp-protocol"));
 
     // check filter chain name in encode phase, exists.
-    EXPECT_EQ(false,
-              response->headers().get(Http::LowerCaseString("rsp-filter-chain-name")).empty());
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("rsp-filter-chain-name")).empty());
 
     // check response code in encode phase, not exists.
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("rsp-response-code")).empty());
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("rsp-response-code")).empty());
 
     // check response code details in encode phase
     EXPECT_EQ("via_upstream", getHeader(response->headers(), "rsp-response-code-details"));
@@ -388,7 +385,7 @@ typed_config:
     EXPECT_EQ("200", getHeader(response->headers(), "rsp-status"));
 
     // verify protocol
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("test-protocol")).empty());
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("test-protocol")).empty());
 
     // verify scheme
     EXPECT_EQ("http", getHeader(response->headers(), "test-scheme"));
