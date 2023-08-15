@@ -192,7 +192,11 @@ TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
       .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
         return std::make_unique<ProtobufWkt::StringValue>();
       }));
-  EXPECT_CALL(factory_impl, createSinkPtr);
+  EXPECT_CALL(
+      factory_impl,
+      createSinkPtr(
+          _,
+          testing::VariantWith<std::reference_wrapper<Server::Configuration::FactoryContext>>(_)));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -222,7 +226,11 @@ TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
       .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
         return std::make_unique<ProtobufWkt::StringValue>();
       }));
-  EXPECT_CALL(factory_impl, createSinkPtr);
+  EXPECT_CALL(
+      factory_impl,
+      createSinkPtr(
+          _, testing::VariantWith<
+                 std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(_)));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
