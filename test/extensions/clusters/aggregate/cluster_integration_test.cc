@@ -122,10 +122,13 @@ static_resources:
                                                   Platform::null_device_path));
 }
 
-class AggregateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                 public HttpIntegrationTest {
+class AggregateIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
-  AggregateIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam(), config()) {
+  AggregateIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam()), config()),
+        deferred_cluster_creation_(std::get<1>(GetParam())) {
     use_lds_ = false;
   }
 
@@ -137,16 +140,20 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
 
     defer_listener_finalization_ = true;
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(
+          deferred_cluster_creation_);
+    });
     HttpIntegrationTest::initialize();
 
     addFakeUpstream(Http::CodecType::HTTP2);
     addFakeUpstream(Http::CodecType::HTTP2);
     cluster1_ = ConfigHelper::buildStaticCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(GetParam()));
+        Network::Test::getLoopbackAddressString(version_));
     cluster2_ = ConfigHelper::buildStaticCluster(
         SecondClusterName, fake_upstreams_[SecondUpstreamIndex]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(GetParam()));
+        Network::Test::getLoopbackAddressString(version_));
 
     // Let Envoy establish its connection to the CDS server.
     acceptXdsConnection();
@@ -173,12 +180,14 @@ public:
     xds_stream_->startGrpcStream();
   }
 
+  const bool deferred_cluster_creation_;
   envoy::config::cluster::v3::Cluster cluster1_;
   envoy::config::cluster::v3::Cluster cluster2_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, AggregateIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, AggregateIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
 
 TEST_P(AggregateIntegrationTest, ClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.

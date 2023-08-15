@@ -26,6 +26,8 @@ func (f *filter) sendLocalReplyInternal() api.StatusType {
 // Callbacks which are called in request path
 func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
 	f.path, _ = header.Get(":path")
+	api.LogDebugf("get path %s", f.path)
+
 	if f.path == "/localreply_by_config" {
 		return f.sendLocalReplyInternal()
 	}

@@ -12,6 +12,8 @@ inputs:
     type: string
     required: true
 
+  repo_ref:
+    type: string
   repo_ref_sha:
     type: string
   repo_ref_name:
@@ -58,8 +60,12 @@ outputs:
     value: ${{ steps.should_run.outputs.mobile_release_validation }}
   mobile_tsan:
     value: ${{ steps.should_run.outputs.mobile_tsan }}
+  repo_ref:
+    value: ${{ steps.context.outputs.repo_ref }}
   repo_ref_name:
     value: ${{ steps.context.outputs.repo_ref_name }}
+  repo_ref_pr_number:
+    value: ${{ steps.context.outputs.repo_ref_pr_number }}
   repo_ref_sha:
     value: ${{ steps.context.outputs.repo_ref_sha }}
   repo_ref_sha_short:
@@ -117,14 +123,23 @@ runs:
   - id: context
     name: 'CI context'
     run: |
-      VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+      if grep dev VERSION.txt; then
+          VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+      else
+          VERSION_DEV=""
+      fi
       VERSION_PATCH="$(cat VERSION.txt | cut -d- -f1 | rev | cut -d. -f1 | rev)"
       # TODO: strip merge from pr names
       REF_NAME=${{ inputs.repo_ref_name || github.ref_name }}
       if [[ "$REF_NAME" =~ ^refs/pull/ ]]; then
           REF_NAME="${REF_NAME:10}"
+          REF_PR_NUMBER="$(echo "${REF_NAME}" | cut -d/ -f1)"
+      elif [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+          REF_PR_NUMBER="$(echo "${REF_NAME}" | cut -d/ -f1)"
       fi
+      echo "SET PR NUMBER: ${REF_PR_NUMBER}"
 
+      REF="${{ steps.trusted.outputs.trusted != 'true' && inputs.repo_ref || '' }}"
       REF_SHA=${{ inputs.repo_ref_sha || github.event.pull_request.head.sha || github.sha }}
       REF_SHA_SHORT="${REF_SHA:0:7}"
       REF_TITLE=(
@@ -133,7 +148,9 @@ runs:
           "@${REF_SHA_SHORT}")
       REF_TITLE="$(printf %s "${REF_TITLE[@]}" $'\n')"
       {
+          echo "repo_ref=$REF"
           echo "repo_ref_name=$REF_NAME"
+          echo "repo_ref_pr_number=$REF_PR_NUMBER"
           echo "repo_ref_sha=$REF_SHA"
           echo "repo_ref_title=$REF_TITLE"
           echo "repo_ref_sha_short=$REF_SHA_SHORT"

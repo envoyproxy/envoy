@@ -151,7 +151,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   quiche::HttpValidationPolicy http_validation_policy;
   http_validation_policy.disallow_header_continuation_lines = true;
   http_validation_policy.require_header_colon = true;
-  http_validation_policy.disallow_multiple_content_length = false;
+  http_validation_policy.disallow_multiple_content_length = true;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
   http_validation_policy.validate_transfer_encoding = false;
   http_validation_policy.require_content_length_if_body_required = false;
@@ -377,6 +377,9 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
     break;
   case BalsaFrameEnums::INVALID_HEADER_CHARACTER:
     error_message_ = "header value contains invalid chars";
+    break;
+  case BalsaFrameEnums::MULTIPLE_CONTENT_LENGTH_KEYS:
+    error_message_ = "HPE_UNEXPECTED_CONTENT_LENGTH";
     break;
   default:
     error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);

@@ -16,7 +16,7 @@ The OAuth filter's flow involves:
   are sent as query string parameters in this first redirect.
 * After a successful login, the authn server should be configured to redirect the user back to the
   :ref:`redirect_uri <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.redirect_uri>`
-  provided in the query string in the first step. In the below code example, we choose /callback as the configured match path.
+  provided in the query string in the first step. In the below code example, we choose ``/callback`` as the configured match path.
   An "authorization grant" is included in the query string for this second redirect.
 * Using this new grant and the :ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.token_secret>`,
   the filter then attempts to retrieve an access token from
@@ -46,11 +46,11 @@ However the encoded character sequences that represent ASCII control characters 
 decoded. The characters without defined meaning in URL according to `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_
 are also left undecoded. Specifically the following characters are left in the encoded form:
 
-* Control characters with values less than or equal 0x1F
-* Space (0x20)
-* DEL character (0x7F)
-* Extended ASCII characters with values grteater than or equal 0x80
-* Characters without defined meaning in URL: `"<>\^{}|`
+* Control characters with values less than or equal ``0x1F``
+* Space (``0x20``)
+* DEL character (``0x7F``)
+* Extended ASCII characters with values greater than or equal ``0x80``
+* Characters without defined meaning in URL: ``"<>\^{}|``
 
 .. note::
   By default, OAuth2 filter sets some cookies with the following names:
@@ -251,7 +251,7 @@ Generally, allowlisting is inadvisable from a security standpoint.
 Statistics
 ----------
 
-The OAuth2 filter outputs statistics in the *<stat_prefix>.* namespace.
+The OAuth2 filter outputs statistics in the ``<stat_prefix>.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description

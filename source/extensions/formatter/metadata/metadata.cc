@@ -74,7 +74,8 @@ MetadataFormatterCommandParser::parse(const std::string& command, const std::str
     }
 
     // Return a pointer to formatter provider.
-    return provider->second(filter_namespace, path, max_length);
+    return std::make_unique<Envoy::Formatter::StreamInfoFormatter>(
+        provider->second(filter_namespace, path, max_length));
   }
   return nullptr;
 }
