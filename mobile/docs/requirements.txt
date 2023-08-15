@@ -825,6 +825,7 @@ sphinx==7.1.2 \
     #   -r requirements.in
     #   envoy-docs-sphinx-runner
     #   sphinx-copybutton
+    #   sphinxcontrib-devhelp
     #   sphinxcontrib-googleanalytics
     #   sphinxcontrib-httpdomain
     #   sphinxcontrib-jquery
@@ -841,9 +842,9 @@ sphinxcontrib-applehelp==1.0.4 \
     # via
     #   -r requirements.in
     #   sphinx
-sphinxcontrib-devhelp==1.0.2 \
-    --hash=sha256:8165223f9a335cc1af7ffe1ed31d2871f325254c0423bc0c4c7cd1c1e4734a2e \
-    --hash=sha256:ff7f1afa7b9642e7060379360a67e9c41e8f3121f2ce9164266f61b9f4b338e4
+sphinxcontrib-devhelp==1.0.5 \
+    --hash=sha256:63b41e0d38207ca40ebbeabcf4d8e51f76c03e78cd61abe118cf4435c73d4212 \
+    --hash=sha256:fe8009aed765188f08fcaadbb3ea0d90ce8ae2d76710b7e29ea7d047177dae2f
     # via
     #   -r requirements.in
     #   sphinx
