@@ -165,8 +165,7 @@ public:
 class TestConfigImpl : public TapConfigBaseImpl {
 public:
   TestConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                 Extensions::Common::Tap::Sink* admin_streamer,
-                 SinkContext context)
+                 Extensions::Common::Tap::Sink* admin_streamer, SinkContext context)
       : TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
 };
 

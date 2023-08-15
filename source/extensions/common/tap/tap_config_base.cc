@@ -47,8 +47,7 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                                     Common::Tap::Sink* admin_streamer,
-                                     SinkContext context)
+                                     Common::Tap::Sink* admin_streamer, SinkContext context)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -96,25 +95,23 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
 
     // extract message validation visitor from the context and use it to define config
     ProtobufTypes::MessagePtr config;
-    if
-    (absl::holds_alternative<std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(context))
-    {
-      std::cout << "transport socket context" << std::endl; // TODO delete me
+    if (absl::holds_alternative<
+            std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(
+            context)) {
       Server::Configuration::TransportSocketFactoryContext& tsf_context =
-      absl::get<std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(context).get();
+          absl::get<std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(
+              context)
+              .get();
+      config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
+                                                            tsf_context.messageValidationVisitor(),
+                                                            tap_sink_factory);
+    } else if (absl::holds_alternative<
+                   std::reference_wrapper<Server::Configuration::FactoryContext>>(context)) {
+      Server::Configuration::FactoryContext& http_context =
+          absl::get<std::reference_wrapper<Server::Configuration::FactoryContext>>(context).get();
       config = Config::Utility::translateAnyToFactoryConfig(
           sinks[0].custom_sink().typed_config(),
-          tsf_context.messageValidationVisitor(),
-          tap_sink_factory);
-    } else if
-    (absl::holds_alternative<std::reference_wrapper<Server::Configuration::FactoryContext>>(context))
-    {
-      std::cout << "http filter context" << std::endl; // TODO delete me
-      Server::Configuration::FactoryContext& http_context = absl::get<std::reference_wrapper<Server::Configuration::FactoryContext>>(context).get();
-      config = Config::Utility::translateAnyToFactoryConfig(
-          sinks[0].custom_sink().typed_config(),
-          http_context.messageValidationContext().staticValidationVisitor(),
-          tap_sink_factory);
+          http_context.messageValidationContext().staticValidationVisitor(), tap_sink_factory);
     } else {
       PANIC("unknown context type");
     }
