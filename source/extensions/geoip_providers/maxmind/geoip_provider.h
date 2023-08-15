@@ -2,7 +2,7 @@
 
 #include "envoy/geoip/geoip_provider_driver.h"
 
-// todo (nezdolik) do we need this?
+// TODO(nezdolik) do we need this?
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.validate.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
@@ -14,7 +14,6 @@ namespace Extensions {
 namespace GeoipProviders {
 namespace Maxmind {
 
-// todo(nezdolik) add validation of config values
 class GeoipProviderConfig {
 public:
   GeoipProviderConfig(const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
@@ -77,7 +76,7 @@ private:
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 
-// todo (nezdolik) should this be std::atomic<ConstSingleton<std::unique_ptr<MMDB_s>>> instead?
+// TODO(nezdolik) should this be std::atomic<ConstSingleton<std::unique_ptr<MMDB_s>>> instead?
 using MaxmindDbPtr = std::unique_ptr<MMDB_s>;
 class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {

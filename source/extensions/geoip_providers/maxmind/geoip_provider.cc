@@ -87,7 +87,7 @@ void GeoipProviderConfig::incCounter(Stats::StatName name) {
 
 GeoipProvider::~GeoipProvider() {
   ENVOY_LOG(debug, "Shutting down Maxmind geolocation provider");
-  // todo(nezdolik) consider switching to atomic singleton for db objects
+  // TODO(nezdolik) consider switching to atomic singleton for db objects
   if (city_db_) {
     MMDB_close(city_db_.get());
   }
@@ -184,8 +184,6 @@ void GeoipProvider::lookupInAsnDb(
       if (status == MMDB_SUCCESS && entry_data_list) {
         populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
                                 MMDB_ASN_LOOKUP_ARGS[0]);
-        // todo remove this in final version, this is only for testing
-        MMDB_dump_entry_data_list(stdout, entry_data_list, 2);
         MMDB_free_entry_data_list(entry_data_list);
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit("isp_db");
@@ -233,8 +231,6 @@ void GeoipProvider::lookupInAnonDb(
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->anonProxyHeader().value(), MMDB_ANON_LOOKUP_ARGS[4]);
         }
-        // todo remove this in final version, this is only for testing
-        MMDB_dump_entry_data_list(stdout, entry_data_list, 2);
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit("anon_db");
         }
