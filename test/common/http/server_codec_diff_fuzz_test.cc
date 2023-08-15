@@ -556,8 +556,7 @@ public:
 
     if (input_.has_response_trailers()) {
       ResponseTrailerMapPtr response_trailers_1 = makeResponseTrailers();
-      ResponseTrailerMapPtr response_trailers_2 =
-          Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*response_trailers_1);
+      ResponseTrailerMapPtr response_trailers_2 = makeResponseTrailers();
       hcm_under_test_1_.decoder_filter_->callbacks_->encodeTrailers(std::move(response_trailers_1));
       hcm_under_test_2_.decoder_filter_->callbacks_->encodeTrailers(std::move(response_trailers_2));
     }
@@ -587,7 +586,11 @@ public:
     ASSERT(input_.has_response_trailers());
     ResponseTrailerMapPtr trailers = Http::ResponseTrailerMapImpl::create();
     for (const auto& trailer : input_.response_trailers().trailers()) {
-      trailers->addCopy(LowerCaseString(trailer.key()), trailer.value());
+      Http::HeaderString key_string;
+      key_string.setCopyUnvalidatedForTestOnly(trailer.key());
+      Http::HeaderString value_string;
+      value_string.setCopyUnvalidatedForTestOnly(trailer.value());
+      trailers->addViaMove(std::move(key_string), std::move(value_string));
     }
     return trailers;
   }
@@ -649,6 +652,7 @@ private:
       absl::StrAppend(&wire_bytes, "Host: ", request.authority().value(), "\r\n");
     }
     bool chunked_encoding = false;
+    bool has_content_length = false;
     for (const auto& header : request.headers()) {
       if (absl::EqualsIgnoreCase(header.key(), "transfer-encoding") &&
           absl::StrContainsIgnoreCase(header.value(), "chunked")) {
@@ -657,8 +661,14 @@ private:
       std::string value = header.value();
       if (input_.send_request_body() && absl::EqualsIgnoreCase(header.key(), "content-length")) {
         value = std::to_string(request_body.size());
+        has_content_length = true;
       }
       absl::StrAppend(&wire_bytes, header.key(), ": ", value, "\r\n");
+    }
+
+    if (input_.send_request_body() && !chunked_encoding && !has_content_length) {
+      // If the body is sent without either transfer-encoding: chunked or content-length then
+      // it is just interpreted as next request.
     }
 
     absl::StrAppend(&wire_bytes, "\r\n");

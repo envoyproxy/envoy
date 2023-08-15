@@ -1,0 +1,48 @@
+configuration {
+  normalize_path: true
+}
+request {
+  scheme {
+    value: "https"
+  }
+  method {
+    value: "GET"
+  }
+  path {
+    value: "/websocket/endpoint"
+  }
+  headers {
+    key: "connection"
+    value: "upgrade, keep-alive"
+  }
+  headers {
+    key: "GET"
+    value: "websocket"
+  }
+  headers {
+    key: "baz"
+    value: "GET"
+  }
+}
+send_request_body: true
+response {
+  status {
+    value: "101"
+  }
+  headers {
+    key: "upgrade"
+    value: "websocket"
+  }
+  headers {
+    key: "connection"
+    value: "upgrade"
+  }
+  headers {
+    key: "connection"
+    value: "moo"
+  }
+  headers {
+    key: "cat"
+    value: "meow"
+  }
+}
