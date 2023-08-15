@@ -51,7 +51,7 @@ public:
 
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     stats_.on_data_.inc();
-    ENVOY_LOG_MISC(debug, "Downstream onData: {}, length: {} back to down", data.toString(),
+    ENVOY_LOG_MISC(debug, "Downstream onData: {}, length: {} sending to upstream", data.toString(),
                    data.length());
     client_->write(data, end_stream);
 
@@ -86,6 +86,8 @@ private:
                      static_cast<int>(event));
       if (event == Network::ConnectionEvent::RemoteReset) {
         parent_.client_->close(Network::ConnectionCloseType::AbortReset);
+      } else if (event == Network::ConnectionEvent::RemoteClose) {
+        parent_.client_->close(Network::ConnectionCloseType::NoFlush);
       }
     };
 
@@ -114,6 +116,8 @@ private:
                      static_cast<int>(event));
       if (event == Network::ConnectionEvent::RemoteReset) {
         parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
+      } else if (event == Network::ConnectionEvent::RemoteClose) {
+        parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       }
     };
 
