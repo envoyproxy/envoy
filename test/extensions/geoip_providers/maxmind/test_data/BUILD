@@ -9,5 +9,5 @@ envoy_package()
 
 filegroup(
     name = "geolocation_databases",
-    srcs = glob(["*"]),
-
+    srcs = glob(["*.mmdb"]),
+)

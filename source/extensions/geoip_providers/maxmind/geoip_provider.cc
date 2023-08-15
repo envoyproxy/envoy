@@ -117,14 +117,13 @@ void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
                            Geolocation::LookupGeoHeadersCallback&& cb) const {
   auto& remote_address = request.remoteAddress();
   auto lookup_result = absl::flat_hash_map<std::string, std::string>{};
-  std::cerr << "***Lookup for ip: " << remote_address->ip()->addressAsString() << std::endl;
   lookupInCityDb(remote_address, lookup_result);
   lookupInAsnDb(remote_address, lookup_result);
   lookupInAnonDb(remote_address, lookup_result);
   cb(std::move(lookup_result));
 }
 
-// todo: document En as default and only language used for lookups. Document that region is selcted
+// todo: document En as default and only language used for lookups. Document that region is selected
 // as least specific subdivision
 void GeoipProvider::lookupInCityDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
@@ -157,8 +156,6 @@ void GeoipProvider::lookupInCityDb(
                                   config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
                                   MMDB_COUNTRY_LOOKUP_ARGS[1], MMDB_COUNTRY_LOOKUP_ARGS[2]);
         }
-        // todo remove this in final version, this is only for testing
-        MMDB_dump_entry_data_list(stdout, entry_data_list, 2);
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit("city_db");
         }
@@ -176,7 +173,7 @@ void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
-    ASSERT(isp_db_, "Maxmind asn database is not initialised for performing lookups");
+    RELEASE_ASSERT(isp_db_, "Maxmind asn database is not initialised for performing lookups");
     int mmdb_error;
     const uint32_t n_prev_hits = lookup_result.size();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(

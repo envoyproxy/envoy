@@ -14,7 +14,6 @@ envoy_package()
 
 envoy_extension_package()
 
-#todo(nezdolik) may need to split into interface and impl
 envoy_cc_extension(
     name = "geoip_provider_driver_interface",
     hdrs = [

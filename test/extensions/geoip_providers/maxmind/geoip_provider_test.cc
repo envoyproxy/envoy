@@ -193,26 +193,6 @@ TEST_F(GeoipProviderTest, ValidConfigEmptyLookupResult) {
   EXPECT_EQ(0, captured_lookup_response_.size());
 }
 
-TEST_F(GeoipProviderTest, GeoDbNotSetForConfiguredHeader) {
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        city: "x-geo-city"
-        asn: "x-geo-asn"
-    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
-  )EOF";
-  initializeProvider(config_yaml);
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("78.26.243.166");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  EXPECT_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
-               "assert failure: isp_db_. Details: Maxmind asn database is not initialised for "
-               "performing lookups");
-}
-
 TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
@@ -241,6 +221,28 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
   EXPECT_EQ(3, captured_lookup_response_.size());
+}
+
+using GeoipProviderDeathTest = GeoipProviderTest;
+
+TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        city: "x-geo-city"
+        asn: "x-geo-asn"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  EXPECT_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
+               "assert failure: isp_db_. Details: Maxmind asn database is not initialised for "
+               "performing lookups");
 }
 
 } // namespace Maxmind

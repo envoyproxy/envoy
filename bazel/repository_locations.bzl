@@ -1459,7 +1459,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.geoip_providers.maxmind"],
         release_date = "2022-09-30",
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:maxmind:libmaxminddb:*",
         license = "Apache-2.0",
         license_url = "https://github.com/maxmind/libmaxminddb/blob/{version}/LICENSE",
     ),

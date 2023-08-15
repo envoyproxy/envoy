@@ -11,14 +11,12 @@ namespace Envoy {
 namespace Geolocation {
 
 // Actual result of the lookup. Each entry in the map represents the geolocation header (entry key)
-// for which the lookup was invoked mapped to a lookup result from the database. Entry value will be
-// set to absl::nullopt when database lookup yields an empty result.
+// for which the lookup was invoked mapped to a lookup result from the database.
 using LookupResult = const absl::flat_hash_map<std::string, std::string>;
 
 // Async callbacks used for geolocation provider lookups.
 using LookupGeoHeadersCallback = std::function<void(LookupResult&&)>;
 
-// todo remove headers
 class LookupRequest {
 public:
   LookupRequest() = default;
