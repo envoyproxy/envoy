@@ -149,7 +149,7 @@ void UpstreamConn::onEvent(Network::ConnectionEvent event) {
   ENVOY_CONN_LOG(debug, "onEvent addr: {}, event: {}", conn_->connection(), addr_,
                  static_cast<int>(event));
 
-  if (event != Network::ConnectionEvent::Connected ||
+  if (event != Network::ConnectionEvent::Connected &&
       event != Network::ConnectionEvent::ConnectedZeroRtt) {
     closed_ = true;
     conn_ = nullptr;

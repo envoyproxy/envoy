@@ -48,7 +48,7 @@ Network::FilterStatus KafkaMeshFilter::onData(Buffer::Instance& data, bool) {
 }
 
 void KafkaMeshFilter::onEvent(Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::Connected ||
+  if (event != Network::ConnectionEvent::Connected &&
       event != Network::ConnectionEvent::ConnectedZeroRtt) {
     // Connection is being closed but there might be some requests in flight, abandon them.
     abandonAllInFlightRequests();

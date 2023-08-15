@@ -434,7 +434,7 @@ void Filter::bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data) {
 }
 
 void Filter::onBoundUpstreamConnectionEvent(Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::Connected ||
+  if (event != Network::ConnectionEvent::Connected &&
       event != Network::ConnectionEvent::ConnectedZeroRtt) {
     ENVOY_LOG(debug, "generic proxy: bound upstream connection closed.");
     // All pending streams should be reset by the upstream connection manager.

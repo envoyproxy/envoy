@@ -93,7 +93,7 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onEvent(Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::Connected ||
+  if (event != Network::ConnectionEvent::Connected &&
       event != Network::ConnectionEvent::ConnectedZeroRtt) {
     resetTimerState();
     config_->decrementConnection();
