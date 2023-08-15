@@ -34,6 +34,9 @@ bug_fixes:
     :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
     :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
     values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
+- area: extension_discovery_service
+  change: |
+    Fixed a bug causing crash if ECDS is used with upstream HTTP filters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
