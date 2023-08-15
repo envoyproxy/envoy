@@ -9,7 +9,7 @@
 
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/admin_stream.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
@@ -166,12 +166,11 @@ class TestConfigImpl : public TapConfigBaseImpl {
 public:
   TestConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                  Extensions::Common::Tap::Sink* admin_streamer,
-                 Server::Configuration::FactoryContext& context)
-      : TapConfigBaseImpl(std::move(proto_config), admin_streamer,
-                          context.messageValidationContext().staticValidationVisitor(), context) {}
+                 SinkContext context)
+      : TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
 };
 
-TEST(TypedExtensionConfigTest, AddTestConfig) {
+TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
 
   const std::string tap_config_yaml =
       R"EOF(
@@ -198,6 +197,36 @@ TEST(TypedExtensionConfigTest, AddTestConfig) {
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl(tap_config, NULL, factory_context);
+}
+
+TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
+
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY
+        custom_sink:
+          name: custom_sink
+          typed_config:
+            "@type": type.googleapis.cm/google.protobuf.StringValue
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  MockTapSinkFactory factory_impl;
+  EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+        return std::make_unique<ProtobufWkt::StringValue>();
+      }));
+  EXPECT_CALL(factory_impl, createSinkPtr);
+  Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   TestConfigImpl(tap_config, NULL, factory_context);
 }
 

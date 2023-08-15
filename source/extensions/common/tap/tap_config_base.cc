@@ -3,6 +3,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
@@ -47,7 +48,6 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
 
 TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer,
-                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                      SinkContext context)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
@@ -93,15 +93,15 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   case ProtoOutputSink::OutputSinkTypeCase::kCustomSink: {
     TapSinkFactory& tap_sink_factory =
         Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
-#if 0
+
+    // extract message validation visitor from the context and use it to define config
     ProtobufTypes::MessagePtr config;
     if
     (absl::holds_alternative<std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(context))
     {
       std::cout << "transport socket context" << std::endl; // TODO delete me
-      auto tsf_context_ref =
-      absl::get<std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(context);
-      auto tsf_context = tsf_context_ref.get();
+      Server::Configuration::TransportSocketFactoryContext& tsf_context =
+      absl::get<std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(context).get();
       config = Config::Utility::translateAnyToFactoryConfig(
           sinks[0].custom_sink().typed_config(),
           tsf_context.messageValidationVisitor(),
@@ -110,22 +110,15 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     (absl::holds_alternative<std::reference_wrapper<Server::Configuration::FactoryContext>>(context))
     {
       std::cout << "http filter context" << std::endl; // TODO delete me
-      auto http_context_ref =
-      absl::get<std::reference_wrapper<Server::Configuration::FactoryContext>>(context); auto
-      http_context = http_context_ref.get(); config =
-      Config::Utility::translateAnyToFactoryConfig(
+      Server::Configuration::FactoryContext& http_context = absl::get<std::reference_wrapper<Server::Configuration::FactoryContext>>(context).get();
+      config = Config::Utility::translateAnyToFactoryConfig(
           sinks[0].custom_sink().typed_config(),
           http_context.messageValidationContext().staticValidationVisitor(),
           tap_sink_factory);
     } else {
-      std::cout << "unknown context" << std::endl;
+      PANIC("unknown context type");
     }
-    config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
-                                                          validation_visitor, tap_sink_factory);
-#else
-    ProtobufTypes::MessagePtr config = Config::Utility::translateAnyToFactoryConfig(
-        sinks[0].custom_sink().typed_config(), validation_visitor, tap_sink_factory);
-#endif
+
     sink_ = tap_sink_factory.createSinkPtr(*config, context);
     sink_to_use_ = sink_.get();
     break;

@@ -29,7 +29,7 @@ envoy_cc_test(
         "//source/extensions/common/tap:tap_config_base",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:admin_stream_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
