@@ -18,8 +18,6 @@ namespace HttpFilters {
 namespace Fault {
 namespace {
 
-using HTTPFaultProtoConfig = envoy::extensions::filters::http::fault::v3::HTTPFault;
-
 TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
