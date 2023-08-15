@@ -19,6 +19,14 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "mocks",
+    hdrs = ["mocks.h"],
+    deps = [
+        "//source/extensions/filters/http/cache:http_cache_lib",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "cache_headers_utils_test",
     srcs = ["cache_headers_utils_test.cc"],
@@ -82,6 +90,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         ":common",
+        ":mocks",
         "//source/extensions/filters/http/cache:cache_filter_lib",
         "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
         "//source/extensions/http/cache/simple_http_cache:config",

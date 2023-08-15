@@ -247,7 +247,7 @@ public:
   const FilterConfig& config() const { return *config_; }
 
   ExtProcFilterStats& stats() { return stats_; }
-  ExtProcLoggingInfo& loggingInfo() { return *logging_info_; }
+  ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -264,13 +264,11 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
   // ExternalProcessorCallbacks
-
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
-
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
-
   void onGrpcClose() override;
+  void logGrpcStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
