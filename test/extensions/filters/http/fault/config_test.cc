@@ -18,6 +18,8 @@ namespace HttpFilters {
 namespace Fault {
 namespace {
 
+using HTTPFaultProtoConfig = envoy::extensions::filters::http::fault::v3::HTTPFault;
+
 TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
@@ -44,6 +46,29 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+TEST(FaultFilterConfigTest, SimpleConfigServerContext) {
+  const std::string yaml_string = R"EOF(
+  filter_metadata:
+    hello: "world"
+  delay:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  )EOF";
+
+  envoy::extensions::filters::http::fault::v3::HTTPFault config;
+  TestUtility::loadFromYamlAndValidate(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  FaultFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
 }
 
 TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {

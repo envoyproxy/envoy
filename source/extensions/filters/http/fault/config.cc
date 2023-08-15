@@ -21,6 +21,17 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+  FaultFilterConfigSharedPtr filter_config(
+      new FaultFilterConfig(config, server_context.runtime(), stats_prefix, server_context.scope(),
+                            server_context.timeSource()));
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
+  };
+}
+
 Router::RouteSpecificFilterConfigConstSharedPtr
 FaultFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
