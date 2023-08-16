@@ -9,6 +9,7 @@
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
 #include "test/mocks/config/custom_config_validators.h"
+#include "test/mocks/config/eds_resources_cache.h"
 #include "test/mocks/config/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -127,7 +128,7 @@ TEST(WatchMapTest, Basic) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
 
   {
@@ -201,7 +202,7 @@ TEST(WatchMapTest, Overlap) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
@@ -259,12 +260,99 @@ TEST(WatchMapTest, Overlap) {
   }
 }
 
+// Checks that a resource is added to the cache the first time it is received,
+// and removed when there's no more interest.
+TEST(WatchMapTest, CacheResourceAddResource) {
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  NiceMock<MockCustomConfigValidators> config_validators;
+  NiceMock<MockEdsResourcesCache> eds_resources_cache;
+  const std::string eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  WatchMap watch_map(false, eds_type_url, config_validators,
+                     makeOptRef<EdsResourcesCache>(eds_resources_cache));
+  // The test uses 2 watchers to ensure that interest is kept regardless of
+  // which watcher was the first to add a watch for the assignment.
+  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
+  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
+  envoy::config::endpoint::v3::ClusterLoadAssignment alice;
+  alice.set_cluster_name("alice");
+  updated_resources.Add()->PackFrom(alice);
+
+  // First watch becomes interested.
+  {
+    absl::flat_hash_set<std::string> update_to({"alice", "dummy"});
+    // "alice" isn't known - no need to remove from the cache.
+    EXPECT_CALL(eds_resources_cache, removeResource("alice")).Times(0);
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1, update_to);
+    EXPECT_EQ(update_to, added_removed.added_); // add to subscription
+    EXPECT_TRUE(added_removed.removed_.empty());
+    watch_map.updateWatchInterest(watch2, {"dummy"});
+
+    // *Only* first watch receives update.
+    expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
+    expectNoUpdate(callbacks2, "version1");
+    // A call for SotW and a call for Delta to the cache's setResource method.
+    EXPECT_CALL(eds_resources_cache, setResource("alice", ProtoEq(alice))).Times(2);
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
+  }
+  // Second watch becomes interested.
+  {
+    absl::flat_hash_set<std::string> update_to({"alice", "dummy"});
+    // "alice" is known, and there's still interest - no removal.
+    EXPECT_CALL(eds_resources_cache, removeResource("alice")).Times(0);
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch2, update_to);
+    EXPECT_TRUE(added_removed.added_.empty()); // nothing happens
+    EXPECT_TRUE(added_removed.removed_.empty());
+
+    // Both watches receive update.
+    expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version2");
+    expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version2");
+    // A call for SotW and a call for Delta to the cache's setResource method.
+    EXPECT_CALL(eds_resources_cache, setResource("alice", ProtoEq(alice))).Times(2);
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version2");
+  }
+  // First watch loses interest.
+  {
+    // "alice" is known, and there's still interest - no removal.
+    EXPECT_CALL(eds_resources_cache, removeResource("alice")).Times(0);
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch1, {"dummy"});
+    EXPECT_TRUE(added_removed.added_.empty()); // nothing happens
+    EXPECT_TRUE(added_removed.removed_.empty());
+
+    // Both watches receive the update. For watch2, this is obviously desired.
+    expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version3");
+    // For watch1, it's more subtle: the WatchMap sees that this update has no
+    // resources watch1 cares about, but also knows that watch1 previously had
+    // some resources. So, it must inform watch1 that it now has no resources.
+    // (SotW only: delta's explicit removals avoid the need for this guessing.)
+    expectEmptySotwNoDeltaUpdate(callbacks1, "version3");
+    // A call for SotW and a call for Delta to the cache's setResource method.
+    EXPECT_CALL(eds_resources_cache, setResource("alice", ProtoEq(alice))).Times(2);
+    doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version3");
+  }
+  // Second watch loses interest.
+  {
+    // A call for the cache's removeResource method as there's no more
+    // interest in "alice".
+    EXPECT_CALL(eds_resources_cache, removeResource("alice"));
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch2, {"dummy"});
+    EXPECT_TRUE(added_removed.added_.empty());
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"alice"}),
+              added_removed.removed_); // remove from subscription
+  }
+}
+
 // These are regression tests for #11877, validate that when two watches point at the same
 // watched resource, and an update to one of the watches removes one or both of them, that
 // WatchMap defers deletes and doesn't crash.
 class SameWatchRemoval : public testing::Test {
 public:
-  SameWatchRemoval() : watch_map_(false, "ClusterLoadAssignmentType", config_validators) {}
+  SameWatchRemoval() : watch_map_(false, "ClusterLoadAssignmentType", config_validators, {}) {}
 
   void SetUp() override {
     envoy::config::endpoint::v3::ClusterLoadAssignment alice;
@@ -343,7 +431,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
@@ -400,7 +488,7 @@ TEST(WatchMapTest, UninterestingUpdate) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"alice"});
 
@@ -445,7 +533,7 @@ TEST(WatchMapTest, WatchingEverything) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   /*Watch* watch1 = */ watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   // watch1 never specifies any names, and so is treated as interested in everything.
@@ -482,7 +570,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
@@ -516,7 +604,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
 
 TEST(WatchMapTest, OnConfigUpdateFailed) {
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   // calling on empty map doesn't break
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 
@@ -538,7 +626,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz/*?some=thing&thing=some"});
 
@@ -583,7 +671,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators, {});
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz?some=thing&thing=some"});
 
@@ -624,7 +712,7 @@ TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(true, "ClusterLoadAssignmentType", config_validators);
+  WatchMap watch_map(true, "ClusterLoadAssignmentType", config_validators, {});
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
@@ -676,6 +764,10 @@ TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
     watch_map.onConfigUpdate(empty_resources, removed_names_proto, "version2");
   }
 }
+
+// TODO(adip): Add tests that use the eds cache.
+// Needs to test the following function onConfigUpdate (sotw&delta) and
+// updateWatchInterest
 
 } // namespace
 } // namespace Config

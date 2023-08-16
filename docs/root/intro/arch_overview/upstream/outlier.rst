@@ -64,8 +64,7 @@ consecutive 5xx) or at a specified interval (for example in the case of periodic
 ejection algorithm works as follows:
 
 #. A host is determined to be an outlier.
-#. If no hosts have been ejected, Envoy will eject the host immediately. Otherwise, it checks to make
-   sure the number of ejected hosts is below the allowed threshold (specified via the
+#. It checks to make sure the number of ejected hosts is below the allowed threshold (specified via the
    :ref:`outlier_detection.max_ejection_percent<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>`
    setting). If the number of ejected hosts is above the threshold, the host is not ejected.
 #. The host is ejected for some number of milliseconds. Ejection means that the host is marked

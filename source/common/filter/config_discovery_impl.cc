@@ -59,7 +59,8 @@ const std::string& DynamicFilterConfigProviderImplBase::name() { return subscrip
 FilterConfigSubscription::FilterConfigSubscription(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
     FilterConfigProviderManagerImplBase& filter_config_provider_manager,
     const std::string& subscription_id)
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
@@ -74,10 +75,8 @@ FilterConfigSubscription::FilterConfigSubscription(
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
   const auto resource_name = getResourceName();
-  subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_,
-          {});
+  subscription_ = cluster_manager.subscriptionFactory().subscriptionFromConfigSource(
+      config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
 }
 
 void FilterConfigSubscription::start() {
@@ -181,7 +180,8 @@ void FilterConfigSubscription::incrementConflictCounter() { stats_.config_confli
 
 std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::getSubscription(
     const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
-    Server::Configuration::ServerFactoryContext& server_context, const std::string& stat_prefix) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix) {
   // There are ECDS filters configured. Setup ECDS config dump call backs.
   setupEcdsConfigDumpCallbacks(server_context.admin());
 
@@ -193,7 +193,7 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::g
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {
     auto subscription = std::make_shared<FilterConfigSubscription>(
-        config_source, name, server_context, stat_prefix, *this, subscription_id);
+        config_source, name, server_context, cluster_manager, stat_prefix, *this, subscription_id);
     subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
     return subscription;
   } else {

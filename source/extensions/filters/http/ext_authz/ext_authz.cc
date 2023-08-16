@@ -142,14 +142,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (buffer_data_ && !skip_check_) {
-    const bool buffer_is_full = isBufferFull();
+    const bool buffer_is_full = isBufferFull(data.length());
     if (end_stream || buffer_is_full) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
                        *decoder_callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
-      if (!buffer_is_full) {
-        // Make sure data is available in initiateCall.
-        decoder_callbacks_->addDecodedData(data, true);
-      }
+      // Make sure data is available in initiateCall.
+      decoder_callbacks_->addDecodedData(data, true);
       initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
@@ -444,12 +442,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 }
 
-bool Filter::isBufferFull() const {
-  const auto* buffer = decoder_callbacks_->decodingBuffer();
-  if (config_->allowPartialMessage() && buffer != nullptr) {
-    return buffer->length() >= config_->maxRequestBytes();
+bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
+  if (!config_->allowPartialMessage()) {
+    return false;
   }
-  return false;
+
+  uint64_t num_bytes_buffered = num_bytes_processing;
+  const auto* buffer = decoder_callbacks_->decodingBuffer();
+  if (buffer != nullptr) {
+    num_bytes_buffered += buffer->length();
+  }
+
+  return num_bytes_buffered >= config_->maxRequestBytes();
 }
 
 void Filter::continueDecoding() {

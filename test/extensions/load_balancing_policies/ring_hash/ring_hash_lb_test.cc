@@ -639,8 +639,13 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
 
 // Given locality weights all 0, expect the same behavior as if no hosts were provided at all.
 TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime())};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ =
       makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}});
@@ -655,10 +660,19 @@ TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
 // Given localities with weights 1, 2, 3 and 0, and a ring size of exactly 6, expect the correct
 // number of hashes for each host.
 TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime())};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+  envoy::config::core::v3::Locality zone_d;
+  zone_d.set_zone("D");
+
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_c),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_d)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
@@ -690,10 +704,19 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
 // Given localities with weights 1, 2, 3 and 0, and a sufficiently large ring, expect that requests
 // will distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime())};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+  envoy::config::core::v3::Locality zone_d;
+  zone_d.set_zone("D");
+
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_c),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_d)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
@@ -725,12 +748,17 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
 
 // Given both host weights and locality weights, expect the correct number of hashes for each host.
 TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), 2)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_a, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_b, 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
@@ -763,12 +791,17 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
 // Given both host weights and locality weights, and a sufficiently large ring, expect that requests
 // will distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), 2)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_a, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_b, 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
@@ -872,10 +905,16 @@ TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
 // Given extremely lopsided locality weights, and a ring that isn't large enough to fit all hosts,
 // expect that the correct proportion of hosts will be present in the ring.
 TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
   hostSet().hosts_.clear();
   HostVector heavy_but_sparse, light_but_dense;
   for (uint32_t i = 0; i < 1024; ++i) {
-    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime()));
+    auto host_locality = i == 0 ? zone_a : zone_b;
+    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime(), host_locality));
     hostSet().hosts_.push_back(host);
     (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }
