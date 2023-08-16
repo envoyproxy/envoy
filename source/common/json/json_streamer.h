@@ -64,17 +64,20 @@ public:
   void pop(Level& level);
   void clear();
 
+  static std::string number(double d);
+  static std::string quote(absl::string_view str);
+
+private:
+  friend Map;
+  friend Array;
+
   void addSanitized(absl::string_view token);
   void addCopy(absl::string_view token);
   void addDouble(double number);
-  static std::string quote(absl::string_view str);
   void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
   void addFragments(const Array::Strings& src);
   void flush();
 
-  static std::string number(double d);
-
-private:
   Buffer::Instance& response_;
   std::vector<absl::string_view> fragments_;
   std::string buffer_;
