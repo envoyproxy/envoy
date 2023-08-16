@@ -43,6 +43,9 @@ Usage
     --disable-deprecation-check
       Disables the deprecation check for RouteConfiguration proto.
 
+    --detailed-coverage
+      Enables displaying of not covered routes for non-comprehensive code coverage mode.
+
     -h,  --help
       Displays usage information and exits.
 

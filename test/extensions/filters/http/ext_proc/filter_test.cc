@@ -98,16 +98,6 @@ protected:
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
-    EXPECT_CALL(async_client_stream_info_, bytesSent()).WillRepeatedly(Return(100));
-    EXPECT_CALL(async_client_stream_info_, bytesReceived()).WillRepeatedly(Return(200));
-    EXPECT_CALL(async_client_stream_info_, upstreamClusterInfo());
-    EXPECT_CALL(testing::Const(async_client_stream_info_), upstreamInfo());
-    // Get pointer to MockUpstreamInfo.
-    std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
-        std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(
-            async_client_stream_info_.upstreamInfo());
-    EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost());
-
     // Pointing dispatcher_.time_system_ to a SimulatedTimeSystem object.
     test_time_ = new Envoy::Event::SimulatedTimeSystem();
     dispatcher_.time_system_.reset(test_time_);
@@ -470,8 +460,6 @@ protected:
                 filter_config_name);
     const Envoy::ProtobufWkt::Struct& loggedMetadata = filterState->filterMetadata();
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
-    EXPECT_EQ(filterState->bytesSent(), 100);
-    EXPECT_EQ(filterState->bytesReceived(), 200);
   }
 
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;

@@ -1,5 +1,8 @@
 name: android_build
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -14,11 +17,16 @@ jobs:
   env:
     if: ${{ github.repository == 'envoyproxy/envoy' }}
     uses: ./.github/workflows/_env.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      statuses: write
 
   androidbuild:
     if: ${{ needs.env.outputs.mobile_android_build == 'true' }}
     needs: env
+    permissions:
+      contents: read
+      packages: read
     name: android_build
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 90
@@ -35,8 +43,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
-          $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
+        cd mobile
+        ./bazelw build \
+          --config=mobile-remote-ci \
           --fat_apk_cpu=x86_64 \
           --linkopt=-fuse-ld=lld \
           //:android_dist
@@ -46,6 +55,9 @@ jobs:
     needs:
     - env
     - androidbuild
+    permissions:
+      contents: read
+      packages: read
     name: java_helloworld
     runs-on: macos-12
     timeout-minutes: 50
@@ -57,7 +69,9 @@ jobs:
         java-package: jdk
         architecture: x64
         distribution: zulu
-    - run: cd mobile && ./ci/mac_ci_setup.sh --android
+    - run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh --android
       name: 'Install dependencies'
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
@@ -72,12 +86,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-ci-macos \
             --fat_apk_cpu=x86_64 \
             //examples/java/hello_world:hello_envoy
-          adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
-          adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
+        adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
+        adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
     - name: 'Check connectivity'
       run: |
         timeout 30 adb logcat -e "received headers with status 301" -m 1 || {
@@ -87,11 +102,15 @@ jobs:
             }
             exit 1
         }
+
   kotlinhelloworld:
     if: ${{ needs.env.outputs.mobile_android_build == 'true' }}
     needs:
     - env
     - androidbuild
+    permissions:
+      contents: read
+      packages: read
     name: kotlin_helloworld
     runs-on: macos-12
     timeout-minutes: 50
@@ -104,7 +123,9 @@ jobs:
         architecture: x64
         distribution: zulu
     - name: 'Install dependencies'
-      run: cd mobile && ./ci/mac_ci_setup.sh --android
+      run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh --android
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -118,12 +139,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-ci-macos \
             --fat_apk_cpu=x86_64 \
             //examples/kotlin/hello_world:hello_envoy_kt
-          adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
-          adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
+        adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
+        adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
     - name: 'Check connectivity'
       run: |
         timeout 30 adb logcat -e "received headers with status 200" -m 1 || {
@@ -139,6 +161,9 @@ jobs:
     needs:
     - env
     - androidbuild
+    permissions:
+      contents: read
+      packages: read
     name: kotlin_baseline_app
     runs-on: macos-12
     timeout-minutes: 50
@@ -151,7 +176,9 @@ jobs:
         architecture: x64
         distribution: zulu
     - name: 'Install dependencies'
-      run: cd mobile && ./ci/mac_ci_setup.sh --android
+      run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh --android
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -165,12 +192,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-ci-macos \
             --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/baseline:hello_envoy_kt
-          adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
-          adb shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
+        adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
+        adb shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
     - name: 'Check connectivity'
       run: |
         timeout 30 adb logcat -e "received headers with status 301" -m 1 || {
@@ -180,11 +208,15 @@ jobs:
             }
             exit 1
         }
+
   kotlinexperimentalapp:
     if: ${{ needs.env.outputs.mobile_android_build_all == 'true' }}
     needs:
     - env
     - androidbuild
+    permissions:
+      contents: read
+      packages: read
     name: kotlin_experimental_app
     runs-on: macos-12
     timeout-minutes: 50
@@ -197,7 +229,9 @@ jobs:
         architecture: x64
         distribution: zulu
     - name: 'Install dependencies'
-      run: cd mobile && ./ci/mac_ci_setup.sh --android
+      run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh --android
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       name: 'Start emulator'
       with:
@@ -211,13 +245,14 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cd mobile && ./bazelw build \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-ci-macos \
             --fat_apk_cpu=x86_64 \
             --define envoy_mobile_listener=enabled \
             //test/kotlin/apps/experimental:hello_envoy_kt
-          adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
-          adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
+        adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
+        adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
     - name: 'Check connectivity'
       run: |
         timeout 30 adb logcat -e "received headers with status 200" -m 1 || {
