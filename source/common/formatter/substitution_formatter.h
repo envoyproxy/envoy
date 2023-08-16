@@ -236,8 +236,10 @@ public:
                     bool omit_empty_values)
       : struct_formatter_(format_mapping, preserve_types, omit_empty_values) {}
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                    bool omit_empty_values, const std::vector<CommandParserPtr>& commands)
-      : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands) {}
+                    bool omit_empty_values, bool sort_properties,
+                    const std::vector<CommandParserPtr>& commands)
+      : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands),
+        sort_properties_(sort_properties) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -248,6 +250,7 @@ public:
 
 private:
   const StructFormatter struct_formatter_;
+  bool sort_properties_{false};
 };
 
 } // namespace Formatter

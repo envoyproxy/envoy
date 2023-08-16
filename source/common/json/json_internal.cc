@@ -729,6 +729,44 @@ ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   return result.value();
 }
 
+FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value);
+FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct);
+
+FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value) {
+  if (protobuf_value.has_string_value()) {
+    return Field::createValue(protobuf_value.string_value());
+  } else if (protobuf_value.has_number_value()) {
+    return Field::createValue(protobuf_value.number_value());
+  } else if (protobuf_value.has_bool_value()) {
+    return Field::createValue(protobuf_value.bool_value());
+  } else if (protobuf_value.has_null_value()) {
+    return Field::createNull();
+  } else if (protobuf_value.has_list_value()) {
+    FieldSharedPtr array = Field::createArray();
+    for (const auto& list_value : protobuf_value.list_value().values()) {
+      array->append(loadFromProtobufValueInternal(list_value));
+    }
+    return array;
+  } else if (protobuf_value.has_struct_value()) {
+    return loadFromProtobufStructInternal(protobuf_value.struct_value());
+  }
+
+  PANIC("not implemented");
+}
+
+FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct) {
+  auto root = Field::createObject();
+  for (const auto& field : protobuf_struct.fields()) {
+    root->insert(field.first, loadFromProtobufValueInternal(field.second));
+  }
+
+  return root;
+}
+
+ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct) {
+  return loadFromProtobufStructInternal(protobuf_struct);
+}
+
 std::string Factory::serialize(absl::string_view str) {
   nlohmann::json j(str);
   return j.dump();

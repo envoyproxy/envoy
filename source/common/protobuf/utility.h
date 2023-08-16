@@ -588,6 +588,12 @@ public:
    * the input string is valid UTF-8, it will be returned unmodified.
    */
   static std::string sanitizeUtf8String(absl::string_view str);
+
+  /**
+   * Creates a new struct object with the same values where fields are sorted.
+   * @param src original struct.
+   */
+  static ProtobufWkt::Struct sortProperties(const ProtobufWkt::Struct& src);
 };
 
 class ValueUtil {

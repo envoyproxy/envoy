@@ -33,6 +33,7 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:utility_lib",

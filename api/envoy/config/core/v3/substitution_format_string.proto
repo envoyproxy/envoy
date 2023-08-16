@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
 // to generate a new string in either plain text or JSON format.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message SubstitutionFormatString {
   oneof format {
     option (validate.required) = true;
@@ -113,4 +113,7 @@ message SubstitutionFormatString {
   // See the formatters extensions documentation for details.
   // [#extension-category: envoy.formatter]
   repeated TypedExtensionConfig formatters = 6;
+
+  // The output JSON string properties will be sorted if json_format is used and sort_properties is set to true.
+  bool sort_properties = 7;
 }

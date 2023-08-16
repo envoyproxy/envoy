@@ -609,6 +609,21 @@ void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst)
   }
 }
 
+ProtobufWkt::Struct MessageUtil::sortProperties(const ProtobufWkt::Struct& src) {
+  std::map<std::string, const ProtobufWkt::Value*> sorted_fields;
+
+  for (const auto& field : src.fields()) {
+    sorted_fields[field.first] = &field.second;
+  }
+
+  ProtobufWkt::Struct sorted_struct;
+  for (const auto& sorted_field : sorted_fields) {
+    (*sorted_struct.mutable_fields())[sorted_field.first] = *(sorted_field.second);
+  }
+
+  return sorted_struct;
+}
+
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
   ProtobufWkt::Value::KindCase kind = v1.kind_case();
   if (kind != v2.kind_case()) {
