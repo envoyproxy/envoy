@@ -8,7 +8,8 @@
 # leave room for compiler/linker.
 # The number 3G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
-startup --host_jvm_args="-Xmx3g -XX:MaxDirectMemorySize=512m"
+startup --host_jvm_args=-Xmx3g
+startup --host_jvm_args=-XX:MaxDirectMemorySize=512m"
 
 fetch --color=yes
 run --color=yes
