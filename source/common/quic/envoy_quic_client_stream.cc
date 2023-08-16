@@ -257,15 +257,33 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                   quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
-  const uint64_t status = optional_status.value();
-  if (Http::CodeUtility::is1xx(status)) {
-    // These are Informational 1xx headers, not the actual response headers.
-    set_headers_decompressed(false);
-  }
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       !upgrade_protocol_.empty()) {
     Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
+  }
+#else
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
+  // In Envoy, both upgrade requests and extended CONNECT requests are
+  // represented as their HTTP/1 forms, regardless of the HTTP version used.
+  // Therefore, these need to be transformed into their HTTP/1 form.
+
+  // In UHV mode the :status header at this point can be malformed, as it is validated
+  // later on in the response_decoder_.decodeHeaders() call.
+  // Account for this here.
+  if (!optional_status.has_value()) {
+    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
+    // request
+    response_decoder_->decodeHeaders(std::move(headers), fin);
+    ConsumeHeaderList();
+    return;
+  }
+#endif
+
+  const uint64_t status = optional_status.value();
+  if (Http::CodeUtility::is1xx(status)) {
+    // These are Informational 1xx headers, not the actual response headers.
+    set_headers_decompressed(false);
   }
 
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
@@ -280,40 +298,6 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
       got_304_response_ = true;
     }
   }
-#else
-  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  // In Envoy, both upgrade requests and extended CONNECT requests are
-  // represented as their HTTP/1 forms, regardless of the HTTP version used.
-  // Therefore, these need to be transformed into their HTTP/1 form.
-
-  // in UHV mode the :status header at this point can be malformed, as it is validated
-  // later on in the response_decoder_.decodeHeaders() call.
-  // Account for this here.
-  if (optional_status.has_value()) {
-    const uint64_t status = optional_status.value();
-    if (Http::CodeUtility::is1xx(status)) {
-      // These are Informational 1xx headers, not the actual response headers.
-      set_headers_decompressed(false);
-    }
-
-    const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
-    if (is_special_1xx && !decoded_1xx_) {
-      // This is 100 Continue, only decode it once to support Expect:100-Continue header.
-      decoded_1xx_ = true;
-      response_decoder_->decode1xxHeaders(std::move(headers));
-    } else if (!is_special_1xx) {
-      response_decoder_->decodeHeaders(std::move(headers),
-                                       /*end_stream=*/fin);
-      if (status == enumToInt(Http::Code::NotModified)) {
-        got_304_response_ = true;
-      }
-    }
-  } else {
-    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
-    // request
-    response_decoder_->decodeHeaders(std::move(headers), fin);
-  }
-#endif
 
   ConsumeHeaderList();
 }

@@ -534,7 +534,19 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
-
+#else
+  // In UHV mode the :status header at this point can be malformed, as it is validated
+  // later on in the response_decoder_.decodeHeaders() call.
+  // Account for this here.
+  absl::optional<uint64_t> status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
+  if (!status_opt.has_value()) {
+    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
+    // request
+    response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
+    return;
+  }
+  const uint64_t status = status_opt.value();
+#endif
   // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that further
   // proxying is on an upgrade path.
   received_noninformational_headers_ =
@@ -546,31 +558,6 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   } else {
     response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
   }
-#else
-  // in UHV mode the :status header at this point can be malformed, as it is validated
-  // later on in the response_decoder_.decodeHeaders() call.
-  // Account for this here.
-  absl::optional<uint64_t> status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
-  if (status_opt.has_value()) {
-    const uint64_t status = status_opt.value();
-    // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that
-    // further proxying is on an upgrade path.
-    received_noninformational_headers_ =
-        !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
-
-    if (HeaderUtility::isSpecial1xx(*headers)) {
-      ASSERT(!remote_end_stream_);
-      response_decoder_.decode1xxHeaders(std::move(headers));
-    } else {
-      response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
-    }
-  } else {
-    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
-    // request
-    response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
-  }
-
-#endif
 }
 
 bool ConnectionImpl::StreamImpl::maybeDeferDecodeTrailers() {
