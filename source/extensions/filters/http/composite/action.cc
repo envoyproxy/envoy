@@ -1,3 +1,4 @@
+#include "source/common/http/filter_chain_helper.h"
 #include "source/extensions/filters/http/composite/action.h"
 
 namespace Envoy {
@@ -16,11 +17,21 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
       config, validation_visitor);
       if (composite_action.has_config_discovery()){
         auto config_discovery = composite_action.config_discovery();
-            if context.server_factory_context_.has_value(){
-  std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =  Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-            context.getServerFactoryContext());
+            if (context.server_factory_context_.has_value()){
+              Server::Configuration::ServerFactoryContext& server_factory_context = context.server_factory_context_.value();
+              Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
+
+  std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =  Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
+            server_factory_context);
+            Envoy::Http::FilterFactoryCb callback = nullptr;
+            std::unique_ptr<Envoy::Filter::DynamicFilterConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>> provider = filter_config_provider_manager->createDynamicFilterConfigProvider(
+        config_discovery, "name", server_factory_context, factory_context, server_factory_context.clusterManager(),
+        false, "http", nullptr);
+               return [cb = provider->config().value()]() -> Matcher::ActionPtr {
+    return std::make_unique<ExecuteFilterAction>(cb);
+  };
             }
-     
+
       } else {
 
   auto& factory =
@@ -52,7 +63,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     return std::make_unique<ExecuteFilterAction>(cb);
   };
       }
-|}
+}
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,
                  Matcher::ActionFactory<Http::Matching::HttpFilterActionContext>);
