@@ -79,7 +79,7 @@ new_features:
   change: |
     added support for lmove command.
 
-deprecated
+deprecated:
 - area: tracing
   change: |
     OpenTracing will be deprecated at version 2.10, since the upstream project has been abandoned.
