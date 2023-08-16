@@ -23,8 +23,11 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
     EXPECT_EQ(expected_host_name_.value(), host_name);
   }
   if (expected_local_address_.has_value()) {
-    ASSERT(validation_context.local_address != nullptr);
-    EXPECT_EQ(expected_local_address_.value(), validation_context.local_address->asString());
+    ASSERT(validation_context.callbacks != nullptr);
+    EXPECT_EQ(expected_local_address_.value(), validation_context.callbacks->connection()
+                                                   .connectionInfoProvider()
+                                                   .localAddress()
+                                                   ->asString());
   }
   // Store cert chain for the delayed validation.
   for (size_t i = 0; i < sk_X509_num(&cert_chain); i++) {

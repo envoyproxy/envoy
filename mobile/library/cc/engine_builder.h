@@ -170,6 +170,8 @@ public:
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
 #ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
+  EngineBuilder& setHttp3ConnectionOptions(std::string options);
+  EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
 #endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
@@ -250,6 +252,8 @@ private:
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
   bool enable_http3_ = true;
+  std::string http3_connection_options_ = "";
+  std::string http3_client_connection_options_ = "";
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;

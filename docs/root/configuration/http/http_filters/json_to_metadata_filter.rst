@@ -46,7 +46,7 @@ comes from the owning HTTP connection manager.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  rq_success, Counter, Total requests that succeed to parse the json body
+  rq_success, Counter, Total requests that succeed to parse the json body. Note that a pure string or number body is treated as a successful json body which increases this counter.
   rq_mismatched_content_type, Counter, Total requests that mismatch the content type
   rq_no_body, Counter, Total requests without content body
   rq_invalid_json_body, Counter, Total requests with invalid json body
