@@ -1,6 +1,5 @@
 services:
 
-  # front-proxy
   front-envoy:
     build:
       context: .
@@ -18,13 +17,17 @@ services:
   service1:
     build:
       context: ../shared/python
-      target: aiohttp-tracing-service2
+      target: aiohttp-tracing-service3
+    volumes:
+    - ./service-envoy.yaml:/etc/service-envoy.yaml
     environment:
     - SERVICE_NAME=1
 
   service2:
     build:
       context: ../shared/python
-      target: aiohttp-tracing-service2
+      target: aiohttp-tracing-service3
+    volumes:
+    - ./service-envoy.yaml:/etc/service-envoy.yaml
     environment:
     - SERVICE_NAME=2
