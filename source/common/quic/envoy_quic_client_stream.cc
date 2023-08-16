@@ -281,6 +281,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #endif
 
   const uint64_t status = optional_status.value();
+  // TODO(#29071) determine how to handle 101, since it is not supported by HTTP/2
   if (Http::CodeUtility::is1xx(status)) {
     // These are Informational 1xx headers, not the actual response headers.
     set_headers_decompressed(false);
