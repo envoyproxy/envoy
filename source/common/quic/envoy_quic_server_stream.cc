@@ -272,6 +272,11 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
       (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
        Http::HeaderUtility::isConnectUdp(*headers))) {
     useCapsuleProtocol();
+    // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so makes it bypass
+    // the default Datagram queue.
+    if (Http::HeaderUtility::isConnectUdp(*headers)) {
+      session()->SetForceFlushForDefaultQueue(true);
+    }
   }
 #endif
 
@@ -558,9 +563,6 @@ bool EnvoyQuicServerStream::hasPendingData() {
 }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-// TODO(https://github.com/envoyproxy/envoy/issues/23564): Make the stream use Capsule Protocol
-// for CONNECT-UDP support when the headers contain "Capsule-Protocol: ?1" or "Upgrade:
-// connect-udp".
 void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   ASSERT(request_decoder_ != nullptr);
