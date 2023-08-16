@@ -30,6 +30,12 @@ public:
   std::string toString();
   std::string replaceQueryString(const HeaderString& path);
 
+  // This function is only here to allow for sane unit testing, and should not be called outside of
+  // unit tests
+  absl::btree_map<std::string, std::vector<std::string>> copy_map_for_testing() {
+    return absl::btree_map<std::string, std::vector<std::string>>(data);
+  }
+
   static QueryParamsMulti parseParameters(absl::string_view data, size_t start, bool decode_params);
   static QueryParamsMulti parseQueryString(absl::string_view url);
   static QueryParamsMulti parseAndDecodeQueryString(absl::string_view url);
