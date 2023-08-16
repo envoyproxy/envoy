@@ -83,3 +83,6 @@ deprecated:
 - area: tracing
   change: |
     OpenTracing is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
+- area: tracing
+  change: |
+    Opencensus is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
