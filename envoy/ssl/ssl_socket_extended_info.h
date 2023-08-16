@@ -68,8 +68,9 @@ public:
   /**
    * Called after the cert validation completes either synchronously or asynchronously.
    * @param succeeded true if the validation succeeded.
+   * @param async true if the validation is completed asynchronously.
    */
-  virtual void onCertificateValidationCompleted(bool succeeded) PURE;
+  virtual void onCertificateValidationCompleted(bool succeeded, bool async) PURE;
 
   /**
    * @return ValidateStatus the validation status.

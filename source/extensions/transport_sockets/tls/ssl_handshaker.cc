@@ -26,7 +26,7 @@ void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
   }
   extended_socket_info_->setCertificateValidationStatus(detailed_status);
   extended_socket_info_->setCertificateValidationAlert(tls_alert);
-  extended_socket_info_->onCertificateValidationCompleted(succeeded);
+  extended_socket_info_->onCertificateValidationCompleted(succeeded, true);
 }
 
 SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
@@ -44,14 +44,16 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
   return certificate_validation_status_;
 }
 
-void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded) {
+void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded, bool async) {
   cert_validation_result_ =
       succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
   if (cert_validate_result_callback_.has_value()) {
     // This is an async cert validation.
     cert_validate_result_callback_.reset();
     // Resume handshake.
-    ssl_handshaker_.handshakeCallbacks()->onAsynchronousCertValidationComplete();
+    if (async) {
+      ssl_handshaker_.handshakeCallbacks()->onAsynchronousCertValidationComplete();
+    }
   }
 }
 
@@ -95,10 +97,8 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_WRITE:
       return PostIoAction::KeepOpen;
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
-      state_ = Ssl::SocketState::HandshakeInProgressByPrivateKeyOperation;
-      return PostIoAction::KeepOpen;
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
-      state_ = Ssl::SocketState::HandshakeInProgressByCertificateVerification;
+      state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     case SSL_ERROR_SYSCALL:
       // By default, when SSL_ERROR_SYSCALL occurred, the underlying transport does not participate

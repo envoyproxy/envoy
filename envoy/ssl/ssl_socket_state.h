@@ -3,13 +3,7 @@
 namespace Envoy {
 namespace Ssl {
 
-enum class SocketState {
-  PreHandshake,
-  HandshakeInProgressByPrivateKeyOperation,
-  HandshakeInProgressByCertificateVerification,
-  HandshakeComplete,
-  ShutdownSent
-};
+enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
 } // namespace Ssl
 } // namespace Envoy
