@@ -1312,9 +1312,11 @@ TEST_P(ConnectionImplTest, HalfCloseThenResetClose) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+#if !defined(WIN32)
 // Test that no remote close event will be propagated back to peer, when a connection is
 // half-closed and then the connection is RST closed. Writing data to the half closed and then
 // reset connection will lead to broken pipe error rather than reset error.
+// This behavior is different for windows.
 TEST_P(ConnectionImplTest, HalfCloseThenResetCloseThenWriteData) {
   setUpBasicConnection();
   connect(true);
@@ -1361,6 +1363,7 @@ TEST_P(ConnectionImplTest, HalfCloseThenResetCloseThenWriteData) {
   server_connection_->write(server_buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 // Test that connections do not detect early close when half-close is enabled
 TEST_P(ConnectionImplTest, HalfCloseNoEarlyCloseDetection) {
