@@ -43,8 +43,9 @@ TEST_F(ReqWithoutQueryTest, TestStripQueryString) {
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("/request/path",
-            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+            formatter->format({request_headers_, response_headers_, response_trailers_, body_,
+                               AccessLog::AccessLogType::NotSet},
+                              stream_info_));
 }
 
 TEST_F(ReqWithoutQueryTest, TestSelectMainHeader) {
@@ -62,8 +63,9 @@ TEST_F(ReqWithoutQueryTest, TestSelectMainHeader) {
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("/original/path",
-            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+            formatter->format({request_headers_, response_headers_, response_trailers_, body_,
+                               AccessLog::AccessLogType::NotSet},
+                              stream_info_));
 }
 
 TEST_F(ReqWithoutQueryTest, TestSelectAlternativeHeader) {
@@ -81,8 +83,9 @@ TEST_F(ReqWithoutQueryTest, TestSelectAlternativeHeader) {
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("/request/path",
-            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+            formatter->format({request_headers_, response_headers_, response_trailers_, body_,
+                               AccessLog::AccessLogType::NotSet},
+                              stream_info_));
 }
 
 TEST_F(ReqWithoutQueryTest, TestTruncateHeader) {
@@ -99,8 +102,9 @@ TEST_F(ReqWithoutQueryTest, TestTruncateHeader) {
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("/requ", formatter->format(request_headers_, response_headers_, response_trailers_,
-                                       stream_info_, body_, AccessLog::AccessLogType::NotSet));
+  EXPECT_EQ("/requ", formatter->format({request_headers_, response_headers_, response_trailers_,
+                                        body_, AccessLog::AccessLogType::NotSet},
+                                       stream_info_));
 }
 
 TEST_F(ReqWithoutQueryTest, TestNonExistingHeader) {
@@ -117,8 +121,9 @@ TEST_F(ReqWithoutQueryTest, TestNonExistingHeader) {
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("-", formatter->format(request_headers_, response_headers_, response_trailers_,
-                                   stream_info_, body_, AccessLog::AccessLogType::NotSet));
+  EXPECT_EQ("-", formatter->format({request_headers_, response_headers_, response_trailers_, body_,
+                                    AccessLog::AccessLogType::NotSet},
+                                   stream_info_));
 }
 
 TEST_F(ReqWithoutQueryTest, TestFormatJson) {
@@ -146,8 +151,9 @@ TEST_F(ReqWithoutQueryTest, TestFormatJson) {
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const std::string actual =
-      formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                        body_, AccessLog::AccessLogType::NotSet);
+      formatter->format({request_headers_, response_headers_, response_trailers_, body_,
+                         AccessLog::AccessLogType::NotSet},
+                        stream_info_);
   EXPECT_TRUE(TestUtility::jsonStringEqual(actual, expected));
 }
 

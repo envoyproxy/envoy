@@ -44,9 +44,10 @@ void LocalResponsePolicy::formatBody(const Envoy::Http::RequestHeaderMap& reques
   }
 
   if (formatter_) {
-    formatter_->format(request_headers, response_headers,
-                       *Envoy::Http::StaticEmptyHeaders::get().response_trailers, stream_info, body,
-                       AccessLog::AccessLogType::NotSet);
+    formatter_->format({request_headers, response_headers,
+                        *Envoy::Http::StaticEmptyHeaders::get().response_trailers, body,
+                        AccessLog::AccessLogType::NotSet},
+                       stream_info);
   }
 }
 
