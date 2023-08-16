@@ -84,10 +84,10 @@ func envoyGoFilterOnDownstreamWrite(wrapper unsafe.Pointer, dataSize uint64, dat
 }
 
 //export envoyGoFilterOnUpstreamConnectionReady
-func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer) {}
+func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer, connID uint64) {}
 
 //export envoyGoFilterOnUpstreamConnectionFailure
-func envoyGoFilterOnUpstreamConnectionFailure(wrapper unsafe.Pointer, reason int) {}
+func envoyGoFilterOnUpstreamConnectionFailure(wrapper unsafe.Pointer, reason int, connID uint64) {}
 
 //export envoyGoFilterOnUpstreamData
 func envoyGoFilterOnUpstreamData(wrapper unsafe.Pointer, dataSize uint64, dataPtr uint64, sliceNum int, endOfStream int) {

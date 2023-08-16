@@ -38,10 +38,6 @@ template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val)
     // Do not include 32-byte per-entry overhead while counting header size.
     return false;
   }
-  if (name == "quic_reloadable_flag_quic_act_upon_invalid_header") {
-    // This flag changes quiche behavior that's incompatible with current Envoy.
-    return false;
-  }
 
   return val;
 }

@@ -26,7 +26,7 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
   const re2::RE2& re = getMetadataTranslatorPattern();
   ASSERT(re.ok());
   std::string new_header_value = header_value;
-  re2::StringPiece matches[3];
+  absl::string_view matches[3];
   while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 3)) {
     TRY_ASSERT_MAIN_THREAD {
       std::string new_format;
@@ -39,16 +39,16 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
       }
       new_format = parsed_params->asObjectArray()[0]->asString();
       for (size_t i = 1; i < parsed_params->asObjectArray().size(); i++) {
-        new_format += ":" + parsed_params->asObjectArray()[i]->asString();
+        absl::StrAppend(&new_format, ":", parsed_params->asObjectArray()[i]->asString());
       }
 
-      new_format = "%" + matches[1].as_string() + "_METADATA(" + new_format + ")%";
-      ENVOY_LOG_MISC(
-          warn,
-          "Header formatter: JSON format of {} parameters has been obsoleted. Use colon format: {}",
-          matches[1].as_string() + "_METADATA", new_format.c_str());
+      new_format = absl::StrCat("%", matches[1], "_METADATA(", new_format, ")%");
+      ENVOY_LOG_MISC(warn,
+                     "Header formatter: JSON format of {}_METADATA parameters has been obsoleted. "
+                     "Use colon format: {}",
+                     matches[1], new_format.c_str());
 
-      int subs = absl::StrReplaceAll({{matches[0].as_string(), new_format}}, &new_header_value);
+      int subs = absl::StrReplaceAll({{matches[0], new_format}}, &new_header_value);
       ASSERT(subs > 0);
     }
     END_TRY CATCH(Json::Exception & e, { return header_value; });
@@ -71,13 +71,13 @@ std::string HeaderParser::translatePerRequestState(const std::string& header_val
   const re2::RE2& re = getPerRequestTranslatorPattern();
   ASSERT(re.ok());
   std::string new_header_value = header_value;
-  re2::StringPiece matches[2];
+  absl::string_view matches[2];
   while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 2)) {
-    const std::string new_format = "%FILTER_STATE(" + matches[1].as_string() + ":PLAIN)%";
+    const std::string new_format = absl::StrCat("%FILTER_STATE(", matches[1], ":PLAIN)%");
 
     ENVOY_LOG_MISC(warn, "PER_REQUEST_STATE header formatter has been obsoleted. Use {}",
                    new_format.c_str());
-    int subs = absl::StrReplaceAll({{matches[0].as_string(), new_format}}, &new_header_value);
+    int subs = absl::StrReplaceAll({{matches[0], new_format}}, &new_header_value);
     ASSERT(subs > 0);
   }
   return new_header_value;

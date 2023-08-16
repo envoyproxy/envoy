@@ -55,10 +55,11 @@ public:
 
   FilterChainHelper(FilterConfigProviderManager& filter_config_provider_manager,
                     Server::Configuration::ServerFactoryContext& server_context,
-                    FilterCtx& factory_context, const std::string& stats_prefix)
+                    Upstream::ClusterManager& cluster_manager, FilterCtx& factory_context,
+                    const std::string& stats_prefix)
       : filter_config_provider_manager_(filter_config_provider_manager),
-        server_context_(server_context), factory_context_(factory_context),
-        stats_prefix_(stats_prefix) {}
+        server_context_(server_context), cluster_manager_(cluster_manager),
+        factory_context_(factory_context), stats_prefix_(stats_prefix) {}
 
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
@@ -148,13 +149,14 @@ private:
     }
 
     auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-        config_discovery, name, server_context_, factory_context_, last_filter_in_current_config,
-        filter_chain_type, nullptr);
+        config_discovery, name, server_context_, factory_context_, cluster_manager_,
+        last_filter_in_current_config, filter_chain_type, nullptr);
     filter_factories.push_back(std::move(filter_config_provider));
   }
 
   FilterConfigProviderManager& filter_config_provider_manager_;
   Server::Configuration::ServerFactoryContext& server_context_;
+  Upstream::ClusterManager& cluster_manager_;
   FilterCtx& factory_context_;
   const std::string& stats_prefix_;
 };
