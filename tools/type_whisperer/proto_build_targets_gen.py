@@ -43,14 +43,6 @@ load("@rules_proto//proto:defs.bzl", "proto_descriptor_set", "proto_library")
 licenses(["notice"])  # Apache 2
 
 proto_library(
-    name = "v2_protos",
-    visibility = ["//visibility:public"],
-    deps = [
-$v2_deps
-    ],
-)
-
-proto_library(
     name = "v3_protos",
     visibility = ["//visibility:public"],
     deps = [
@@ -72,7 +64,6 @@ proto_library(
     name = "all_protos",
     visibility = ["//visibility:public"],
     deps = [
-        ":v2_protos",
         ":v3_protos",
         ":xds_protos",
     ],
