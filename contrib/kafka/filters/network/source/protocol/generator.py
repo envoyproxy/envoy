@@ -128,8 +128,10 @@ class StatefulProcessor:
                     amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
                     message_spec = json.loads(amended)
                     api_key = message_spec['apiKey']
-                    message = self.parse_top_level_element(message_spec)
-                    messages.append(message)
+                    # (adam.kotwasinski) ConsumerGroupHeartbeat needs some more changes to parse.
+                    if api_key not in [68]:
+                        message = self.parse_top_level_element(message_spec)
+                        messages.append(message)
             except Exception as e:
                 print('could not process %s' % input_file)
                 raise
@@ -165,7 +167,7 @@ class StatefulProcessor:
             # So let's parse them and store them in state.
             common_structs = spec.get('commonStructs')
             if common_structs is not None:
-                for common_struct in common_structs:
+                for common_struct in reversed(common_structs):
                     common_struct_name = common_struct['name']
                     common_struct_versions = Statics.parse_version_string(
                         common_struct['versions'], versions[-1])
