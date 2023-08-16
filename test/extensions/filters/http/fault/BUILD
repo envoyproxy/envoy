@@ -55,7 +55,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["fault_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.fault"],
-    shard_count = 2,
     deps = [
         "//source/extensions/filters/http/fault:config",
         "//test/integration:http_protocol_integration_lib",

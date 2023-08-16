@@ -12,27 +12,30 @@ parameters:
 - name: cacheKeyDocker
   type: string
   default: ".devcontainer/Dockerfile"
-- name: cacheKeyDockerVersion
+- name: cacheKeyVersion
   type: string
-  default: $(cacheKeyBuildImage)
-- name: cacheKeyDockerName
+  default: $(cacheKeyVersion)
+- name: pathCacheTemp
   type: string
-  default: envoy_build_image
-- name: cacheKeyDockerPath
-  type: string
-  default: /mnt/docker
-- name: cacheKeyDockerTmpDir
-  type: string
-  default: /mnt/docker_cache
-- name: cacheKeyDockerNoTmpfs
+  default: $(pathCacheTemp)
+
+- name: tmpfsCacheDisabled
   type: string
   default: ''
-- name: cacheKey
+- name: tmpfsDockerDisabled
   type: string
-  default: $(cacheKeyBazelFiles)
-- name: cacheVersion
+  default: ''
+
+- name: cacheKeyBazel
   type: string
   default: $(cacheKeyBazel)
+- name: cacheVersion
+  type: string
+  default: $(cacheKeyVersion)
+
+- name: pathDockerBind
+  type: string
+  default: $(pathDockerBind)
 
 - name: rbe
   displayName: "Enable RBE"
@@ -72,6 +75,10 @@ parameters:
   type: string
   default: true
 
+- name: diskspaceHack
+  type: boolean
+  default: false
+
 - name: stepsPre
   type: stepList
   default: []
@@ -87,6 +94,10 @@ steps:
 - checkout: self
   fetchDepth: ${{ parameters.repoFetchDepth }}
   fetchTags: ${{ parameters.repoFetchTags }}
+
+- bash: ./.azure-pipelines/cleanup.sh
+  displayName: "Free disk space"
+  condition: and(succeeded(), eq('${{ parameters.diskspaceHack }}', true))
 
 # Set up tmpfs directories for self-hosted agents which have a surplus of mem.
 #
@@ -119,7 +130,7 @@ steps:
     done
     sudo chown -R azure-pipelines:azure-pipelines $(Build.StagingDirectory)/bazel_root/
   displayName: "Mount/tmpfs bazel directories"
-  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false))
+  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', false), ne('${{ parameters.tmpfsDockerDisabled }}', true))
 
 - bash: |
     set -e
@@ -132,30 +143,18 @@ steps:
     sudo chown -R vsts:vsts "${CACHE_DIRS[@]}" $(Build.StagingDirectory)/bazel_root/
     echo "Created bazel cache directories: "${CACHE_DIRS[*]}""
   displayName: "Create bazel directories"
-  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', true))
+  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', true), eq('${{ parameters.tmpfsDockerDisabled }}', true))
 
 # Caching
-- task: Cache@2
-  inputs:
-    key: '"${{ parameters.ciTarget }}" | "${{ parameters.cacheVersion }}" | "${{ parameters.artifactSuffix }}" | ${{ parameters.cacheKey }}'
-    path: $(Build.StagingDirectory)/bazel
-    cacheHitVar: BAZEL_CACHE_RESTORED
-  continueOnError: true
-- script: |
-    set -e
-    sudo tar xf $(Build.StagingDirectory)/bazel/cache.tar.zst -C $(Build.StagingDirectory) --warning=no-timestamp
-    sudo rm -rf $(Build.StagingDirectory)/bazel/*
-  displayName: "Cache/restore (${{ parameters.ciTarget }})"
-  condition: and(not(canceled()), eq(variables.BAZEL_CACHE_RESTORED, 'true'))
 - template: cached.yml
   parameters:
-    key: "${{ parameters.cacheKeyDocker }}"
-    version: "${{ parameters.cacheKeyDockerVersion }}"
-    name: "${{ parameters.cacheKeyDockerName }}"
-    path: "${{ parameters.cacheKeyDockerPath }}"
-    tmpDirectory: "${{ parameters.cacheKeyDockerTmpDir }}"
-    tmpNoTmpfs: "${{ parameters.cacheKeyDockerNoTmpfs }}"
+    keyBazel: "${{ parameters.cacheKeyBazel }}"
+    keyDocker: "${{ parameters.cacheKeyDocker }}"
+    pathDockerBind: "${{ parameters.pathDockerBind }}"
     arch: "${{ parameters.artifactSuffix }}"
+    pathTemp: "${{ parameters.pathCacheTemp }}"
+    tmpfsDisabled: "${{ parameters.tmpfsCacheDisabled }}"
+    tmpfsDockerDisabled: "${{ parameters.tmpfsDockerDisabled }}"
 
 - ${{ each step in parameters.stepsPre }}:
   - ${{ each pair in step }}:
@@ -195,9 +194,7 @@ steps:
     ${{ if parameters.rbe }}:
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ENVOY_RBE: "1"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"
     ${{ if eq(parameters.rbe, false) }}:
       BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci ${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
@@ -221,22 +218,9 @@ steps:
   - ${{ each pair in step }}:
       ${{ pair.key }}: ${{ pair.value }}
 
-- script: |
-    set -e
-    CACHE_DIRS=(
-        ".cache"
-        "bazel_root/install"
-        "repository_cache/"
-        "bazel_root/base/external")
-    mkdir -p $(Build.StagingDirectory)/bazel/
-    sudo tar cf - -C $(Build.StagingDirectory) "${CACHE_DIRS[@]}" \
-        | zstd - -T0 -o $(Build.StagingDirectory)/bazel/cache.tar.zst
-    echo "Created tarball ($(Build.StagingDirectory)/bazel/cache.tar.zst): ${CACHE_DIRS[@]}"
-  displayName: "Cache/save (${{ parameters.ciTarget }})"
-  condition: and(not(canceled()), ne(variables.BAZEL_CACHE_RESTORED, 'true'))
-
 - task: PublishTestResults@2
   inputs:
+    publishRunAttachments: false
     testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
     testRunTitle: "${{ parameters.ciTarget }}"
     searchFolder: $(Build.StagingDirectory)/bazel_root

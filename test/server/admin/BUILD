@@ -220,6 +220,7 @@ envoy_cc_test(
     deps = [
         ":admin_instance_lib",
         "//test/integration/filters:test_listener_filter_lib",
+        "//test/integration/filters:test_network_filter_lib",
     ],
 )
 

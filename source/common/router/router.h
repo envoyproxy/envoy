@@ -266,7 +266,8 @@ public:
           server_factory_ctx, context.initManager(), context.scope());
       Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
-          helper(*filter_config_provider_manager, server_factory_ctx, *upstream_ctx_, prefix);
+          helper(*filter_config_provider_manager, server_factory_ctx, context.clusterManager(),
+                 *upstream_ctx_, prefix);
       helper.processFilters(upstream_http_filters, "router upstream http", "router upstream http",
                             upstream_http_filter_factories_);
     }
@@ -565,7 +566,7 @@ public:
   const FilterStats& stats() { return stats_; }
 
 protected:
-  void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
+  void setRetryShadowBufferLimit(uint32_t retry_shadow_buffer_limit) {
     ASSERT(retry_shadow_buffer_limit_ > retry_shadow_buffer_limit);
     retry_shadow_buffer_limit_ = retry_shadow_buffer_limit;
   }
