@@ -31,17 +31,22 @@ public:
     Shutdown = 0x40,
   };
 
+  Request(uint32_t type, IoUringSocket& socket) : type_(type), socket_(socket) {}
   virtual ~Request() = default;
 
   /**
    * Return the request type.
    */
-  virtual uint32_t type() const PURE;
+  uint32_t type() const { return type_; }
 
   /**
    * Returns the io_uring socket the request belongs to.
    */
-  virtual IoUringSocket& socket() const PURE;
+  IoUringSocket& socket() const { return socket_; }
+
+private:
+  uint32_t type_;
+  IoUringSocket& socket_;
 };
 
 /**

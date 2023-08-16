@@ -8,18 +8,6 @@
 namespace Envoy {
 namespace Io {
 
-class BaseRequest : public Request {
-public:
-  BaseRequest(uint32_t type, IoUringSocket& socket);
-
-  // Request
-  uint32_t type() const override { return type_; }
-  IoUringSocket& socket() const override { return socket_; }
-
-  uint32_t type_;
-  IoUringSocket& socket_;
-};
-
 class IoUringSocketEntry;
 using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
 

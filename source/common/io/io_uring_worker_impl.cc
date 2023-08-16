@@ -3,8 +3,6 @@
 namespace Envoy {
 namespace Io {
 
-BaseRequest::BaseRequest(uint32_t type, IoUringSocket& socket) : type_(type), socket_(socket) {}
-
 IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent)
     : fd_(fd), parent_(parent) {}
 
@@ -61,7 +59,7 @@ IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket
 }
 
 void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result) {
-  Request* req = new BaseRequest(type, socket);
+  Request* req = new Request(type, socket);
   io_uring_->injectCompletion(socket.fd(), req, result);
   file_event_->activate(Event::FileReadyType::Read);
 }

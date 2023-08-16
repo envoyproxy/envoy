@@ -15,14 +15,11 @@ namespace {
 class TestRequest : public Request {
 public:
   TestRequest(int& data)
-      : data_(data), mock_io_uring_socket_(std::make_unique<MockIoUringSocket>()) {}
+      : Request(RequestType::Read, mock_io_uring_socket_), data_(data) {}
   ~TestRequest() { data_ = -1; }
 
-  uint32_t type() const override { return RequestType::Read; }
-  IoUringSocket& socket() const override { return *mock_io_uring_socket_; }
-
   int& data_;
-  std::unique_ptr<MockIoUringSocket> mock_io_uring_socket_;
+  MockIoUringSocket mock_io_uring_socket_;
 };
 
 class IoUringImplTest : public ::testing::Test {
