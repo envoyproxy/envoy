@@ -72,7 +72,8 @@ new_features:
 - area: tcp
   change: |
     added the support to detect and send TCP RST for raw buffer socket based connection, and this is disabled by default.
-    This doesn't support windows. It can be enabled or disabled by a setting method and the runtime guard
+    This literally is supported for linux. Windows also works but some behaviors are different.
+    It can be enabled or disabled by a setting method and the runtime guard
     ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
 
 deprecated:

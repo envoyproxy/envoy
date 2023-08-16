@@ -1220,7 +1220,7 @@ TEST_P(ConnectionImplTest, HalfCloseResetClose) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test that no remote close event will be propagate back to peer, when a connection is
+// Test that no remote close event will be propagated back to peer, when a connection is
 // half-closed and then the connection is normally closed. This is the current behavior.
 TEST_P(ConnectionImplTest, HalfCloseThenNormallClose) {
   setUpBasicConnection();
@@ -1266,7 +1266,7 @@ TEST_P(ConnectionImplTest, HalfCloseThenNormallClose) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test that no remote close event will be propagate back to peer, when a connection is
+// Test that no remote close event will be propagated back to peer, when a connection is
 // half-closed and then the connection is RST closed. This is same as other close type.
 TEST_P(ConnectionImplTest, HalfCloseThenResetClose) {
   setUpBasicConnection();
@@ -1309,6 +1309,56 @@ TEST_P(ConnectionImplTest, HalfCloseThenResetClose) {
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
   server_connection_->write(empty_buffer, true);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test that no remote close event will be propagated back to peer, when a connection is
+// half-closed and then the connection is RST closed. Writing data to the half closed and then
+// reset connection will lead to broken pipe error rather than reset error.
+TEST_P(ConnectionImplTest, HalfCloseThenResetCloseThenWriteData) {
+  setUpBasicConnection();
+  connect(true);
+
+  std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
+  server_connection_->enableHalfClose(true);
+  client_connection_->enableHalfClose(true);
+  client_connection_->addReadFilter(client_read_filter);
+
+  EXPECT_CALL(*read_filter_, onData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+    dispatcher_->exit();
+    return FilterStatus::StopIteration;
+  }));
+
+  Buffer::OwnedImpl empty_buffer;
+  // Client is half closed at first.
+  client_connection_->write(empty_buffer, true);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  Buffer::OwnedImpl buffer("data");
+  server_connection_->write(buffer, false);
+  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+        buffer.drain(buffer.length());
+        dispatcher_->exit();
+        return FilterStatus::StopIteration;
+      }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalReset))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  // After the half closed from one way, no event will be propagate back to server connection.
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteReset)).Times(0);
+  // Then client is going to reset the connection.
+  client_connection_->close(ConnectionCloseType::AbortReset);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Write error: Broken pipe, code: 12 rather than the reset error.
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  // Tring to write data to the closed connection.
+  Buffer::OwnedImpl server_buffer("data");
+  server_connection_->write(server_buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 

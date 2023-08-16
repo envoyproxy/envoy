@@ -178,6 +178,9 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
 }
 
 #if !defined(WIN32)
+// Test the behaviour when the connection is half closed and then the connection is reset by
+// the client. The behavior is different for windows, since RST support is literally supported for
+// unix like system, disabled the test for windows.
 TEST_P(TcpAsyncClientIntegrationTest, TestDownstremHalfClosedThenRST) {
   enableHalfClose(true);
   enableRstDetectSend(true);
