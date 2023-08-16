@@ -986,6 +986,10 @@ void ClusterManagerImpl::updateClusterCounts() {
 }
 
 ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view cluster) {
+  // If the thread local begins to shutdown, then return nullptr.
+  if (tls_.isShutdown()) {
+    return nullptr;
+  }
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);

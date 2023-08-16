@@ -670,6 +670,8 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
   checkStats(3 /*added*/, 0 /*modified*/, 0 /*removed*/, 3 /*active*/, 0 /*warming*/);
 
   factory_.tls_.shutdownThread();
+
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
