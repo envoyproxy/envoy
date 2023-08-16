@@ -6,7 +6,7 @@ Kafka Mesh filter
 The Apache Kafka mesh filter provides a facade for `Apache Kafka <https://kafka.apache.org/>`_
 producers. Produce requests sent to this filter insance can be forwarded to one of multiple
 clusters, depending on configured forwarding rules. Corresponding message versions from
-Kafka 3.4.0 are supported.
+Kafka 3.5.1 are supported.
 
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh>`
