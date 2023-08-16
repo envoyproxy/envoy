@@ -14,8 +14,7 @@ namespace {
 
 class TestRequest : public Request {
 public:
-  TestRequest(int& data)
-      : Request(RequestType::Read, mock_io_uring_socket_), data_(data) {}
+  TestRequest(int& data) : Request(RequestType::Read, mock_io_uring_socket_), data_(data) {}
   ~TestRequest() { data_ = -1; }
 
   int& data_;

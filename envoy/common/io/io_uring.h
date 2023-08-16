@@ -9,8 +9,6 @@
 namespace Envoy {
 namespace Io {
 
-
-
 class IoUringSocket;
 
 /**
