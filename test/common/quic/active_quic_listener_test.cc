@@ -398,7 +398,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
 TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
   initialize();
   testing::MockFunction<HotRestartPacketForwardingFunction> mock_packet_forwarding;
-  auto shutdown_options = std::make_shared<HotRestartPacketForwardingOptions>(mock_packet_forwarding.AsStdFunction());
+  auto shutdown_options =
+      std::make_shared<HotRestartPacketForwardingOptions>(mock_packet_forwarding.AsStdFunction());
   quic_listener_->shutdownListener(shutdown_options);
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);

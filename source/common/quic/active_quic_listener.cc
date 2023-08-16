@@ -166,7 +166,8 @@ void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewCo
 void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
 
 void ActiveQuicListener::shutdownListener(Network::ExtraShutdownListenerOptionsPtr options) {
-  HotRestartPacketForwardingOptions *p = dynamic_cast<HotRestartPacketForwardingOptions *>(options.get());
+  HotRestartPacketForwardingOptions* p =
+      dynamic_cast<HotRestartPacketForwardingOptions*>(options.get());
   if (p != nullptr) {
     quic_dispatcher_->onHotRestarting(worker_index_, p->hotRestartPacketForwardingFunction());
   }

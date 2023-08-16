@@ -22,8 +22,12 @@ namespace Quic {
 
 class HotRestartPacketForwardingOptions : virtual public Network::ExtraShutdownListenerOptions {
 public:
-  explicit HotRestartPacketForwardingOptions(HotRestartPacketForwardingFunction fn) : hot_restart_packet_forwarding_function_(fn) {}
-  HotRestartPacketForwardingFunction hotRestartPacketForwardingFunction() { return hot_restart_packet_forwarding_function_; }
+  explicit HotRestartPacketForwardingOptions(HotRestartPacketForwardingFunction fn)
+      : hot_restart_packet_forwarding_function_(fn) {}
+  HotRestartPacketForwardingFunction hotRestartPacketForwardingFunction() {
+    return hot_restart_packet_forwarding_function_;
+  }
+
 private:
   HotRestartPacketForwardingFunction hot_restart_packet_forwarding_function_;
 };
