@@ -2,10 +2,13 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
-import "envoy/config/core/v3/http_uri.proto";
+
+import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "OpentelemetryProto";
@@ -21,37 +24,40 @@ message OpenTelemetryConfig {
   // Configuration for sending traces to the collector over HTTP. Note that
   // this will only be used if the grpc_service is not set above.
   message HttpConfig {
-    enum HttpFormat {
-      // Binary Protobuf Encoding.
-      BINARY_PROTOBUF = 0;
-
-      // JSON Protobuf Encoding.
-      JSON_PROTOBUF = 1;
-    }
 
     // The upstream cluster that will receive OTLP traces over HTTP.
-    core.v3.HttpUri http_uri = 1;
+    string cluster_name = 1;
 
-    // OTLP/HTTP uses Protobuf payloads encoded either in binary format or in JSON format.
-    // See https://opentelemetry.io/docs/specs/otlp/#otlphttp.
-    HttpFormat http_format = 2;
+    // The path to the trace ingest endpoint. The path is appended with the host name configured in the cluster.
+    // Optional: If omitted, "/v1/traces" will be used as default.
+    string traces_path = 2;
 
-    // Optional path. If omitted, the default path of "/v1/traces" will be used.
-    string collector_path = 3;
+    // Sets the maximum duration in milliseconds that a response can take to arrive upon request.
+    google.protobuf.Duration timeout = 3 [(validate.rules).duration = {
+      required: true
+      gte {}
+    }];
 
-    // Hostname to include with the request to the collector in the Host header.
-    string collector_hostname = 4;
+    // Custom header values to be added to the OTLP HTTP request.
+    repeated config.core.v3.HeaderValue headers = 4;
+
+    // The hostname to include in the Host header of the OTLP HTTP request.
+    string hostname = 5;
   }
 
-  // The upstream gRPC cluster that will receive OTLP traces.
-  // Note that the tracer drops traces if the server does not read data fast enough.
-  // This field can be left empty to disable reporting traces to the collector.
-  core.v3.GrpcService grpc_service = 1;
+  oneof export_protocol {
+    option (validate.required) = true;
+
+    // The upstream gRPC cluster that will receive OTLP traces.
+    // Note that the tracer drops traces if the server does not read data fast enough.
+    // This field can be left empty to disable reporting traces to the collector.
+    core.v3.GrpcService grpc_service = 1;
+
+    // The configuration to export OTLP traces via HTTP.
+    HttpConfig http_config = 3;
+  }
 
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
   // If it is not provided, it will default to "unknown_service:envoy".
   string service_name = 2;
-
-  // This field can be also left empty to disable reporting traces to the collector.
-  HttpConfig http_config = 3;
 }

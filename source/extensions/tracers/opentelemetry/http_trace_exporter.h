@@ -32,6 +32,9 @@ public:
       envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config,
       OpenTelemetryTracerStats& tracing_stats);
 
+  // The default path to use when OpenTelemetryConfig::HttpConfig::traces_path is empty
+  const Http::LowerCaseString TRACES_PATH{"/v1/traces"};
+
   bool log(const ExportTraceServiceRequest& request) override;
 
   // Http::AsyncClient::Callbacks.

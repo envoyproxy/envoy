@@ -32,16 +32,23 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   // Create the tracer in Thread Local Storage.
   tls_slot_ptr_->set([opentelemetry_config, &factory_context, this](Event::Dispatcher& dispatcher) {
     OpenTelemetryTraceExporterPtr exporter;
-    if (opentelemetry_config.has_grpc_service()) {
+    switch (opentelemetry_config.export_protocol_case()) {
+    case envoy::config::trace::v3::OpenTelemetryConfig::ExportProtocolCase::kGrpcService: {
       Grpc::AsyncClientFactoryPtr&& factory =
           factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
               opentelemetry_config.grpc_service(), factory_context.scope(), true);
       const Grpc::RawAsyncClientSharedPtr& async_client_shared_ptr =
           factory->createUncachedRawAsyncClient();
       exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
-    } else if (opentelemetry_config.has_http_config()) {
+      break;
+    }
+    case envoy::config::trace::v3::OpenTelemetryConfig::ExportProtocolCase::kHttpConfig: {
       exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(
           factory_context.clusterManager(), opentelemetry_config.http_config(), tracing_stats_);
+      break;
+    }
+    default:
+      break;
     }
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
