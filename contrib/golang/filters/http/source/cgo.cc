@@ -240,8 +240,7 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   delete req;
 }
 
-void envoyGoConfigHttpFinalize(void* c, int reason) {
-  UNREFERENCED_PARAMETER(reason);
+void envoyGoConfigHttpFinalize(void* c) {
   // config is used by go, so need to use raw memory and then it is safe to release at the gc
   // finalize phase of the go object.
   auto config = reinterpret_cast<httpConfigInternal*>(c);

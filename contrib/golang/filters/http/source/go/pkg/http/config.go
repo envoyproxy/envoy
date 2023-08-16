@@ -32,7 +32,6 @@ package http
 import "C"
 
 import (
-	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -50,41 +49,8 @@ var (
 	configCache        = &sync.Map{} // uint64 -> *anypb.Any
 )
 
-var ErrDupConfigKey = errors.New("dup config key")
-
-var Configs = &configMap{}
-
-type configMap struct {
-	m sync.Map // *C.httpConfig -> *httpConfig
-}
-
-func (f *configMap) StoreConfig(key *C.httpConfig, req *httpConfig) error {
-	if _, loaded := f.m.LoadOrStore(key, req); loaded {
-		return ErrDupConfigKey
-	}
-	return nil
-}
-
-func (f *configMap) GetConfig(key *C.httpConfig) *httpConfig {
-	if v, ok := f.m.Load(key); ok {
-		return v.(*httpConfig)
-	}
-	return nil
-}
-
-func (f *configMap) DeleteConfig(key *C.httpConfig) {
-	f.m.Delete(key)
-}
-
-func (f *configMap) Clear() {
-	f.m.Range(func(key, _ interface{}) bool {
-		f.m.Delete(key)
-		return true
-	})
-}
-
 func configFinalize(c *httpConfig) {
-	c.Finalize(api.NormalFinalize)
+	c.Finalize()
 }
 
 func createConfig(c *C.httpConfig) *httpConfig {
@@ -94,16 +60,7 @@ func createConfig(c *C.httpConfig) *httpConfig {
 	// NP: make sure filter will be deleted.
 	runtime.SetFinalizer(config, configFinalize)
 
-	err := Configs.StoreConfig(c, config)
-	if err != nil {
-		panic(fmt.Sprintf("createConfig failed, err: %s", err.Error()))
-	}
-
 	return config
-}
-
-func getConfig(c *C.httpConfig) *httpConfig {
-	return Configs.GetConfig(c)
 }
 
 //export envoyGoFilterNewHttpPluginConfig
@@ -144,9 +101,8 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 }
 
 //export envoyGoFilterDestroyHttpPluginConfig
-func envoyGoFilterDestroyHttpPluginConfig(c *C.httpConfig, id uint64) {
+func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
 	configCache.Delete(id)
-	Configs.DeleteConfig(c)
 }
 
 //export envoyGoFilterMergeHttpPluginConfig

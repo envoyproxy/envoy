@@ -290,8 +290,8 @@ func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
-func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer, reason int) {
-	C.envoyGoConfigHttpFinalize(cfg, C.int(reason))
+func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer) {
+	C.envoyGoConfigHttpFinalize(cfg)
 }
 
 var cAPI api.HttpCAPI = &httpCApiImpl{}

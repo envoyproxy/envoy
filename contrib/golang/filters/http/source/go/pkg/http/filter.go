@@ -249,8 +249,8 @@ func (c *httpConfig) DefineMetric(metricType uint32, name string) api.Metric {
 	}
 }
 
-func (c *httpConfig) Finalize(reason int) {
-	cAPI.HttpConfigFinalize(unsafe.Pointer(c.config), reason)
+func (c *httpConfig) Finalize() {
+	cAPI.HttpConfigFinalize(unsafe.Pointer(c.config))
 }
 
 type metric struct {
