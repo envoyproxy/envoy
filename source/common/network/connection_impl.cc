@@ -141,7 +141,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "closing data_to_write={} type={}", *this,
                        data_to_write, enumToInt(type));
 
-#if !defined(WIN32)
   // RST will be sent only if enable_rst_detect_send_ is true, otherwise it is converted to normal
   // ConnectionCloseType::Abort
   if ((!enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) ||
@@ -149,7 +148,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
           "envoy.reloadable_features.detect_and_raise_rst_tcp_connection"))) {
     type = ConnectionCloseType::Abort;
   }
-#endif
 
   // The connection is closed by Envoy by sending RST, and the connection is closed immediately.
   if (type == ConnectionCloseType::AbortReset) {
@@ -675,7 +673,6 @@ void ConnectionImpl::onReadReady() {
   uint64_t new_buffer_size = read_buffer_->length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
 
-#if !defined(WIN32)
   // The socket is closed immediately when receiving RST.
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
@@ -686,7 +683,6 @@ void ConnectionImpl::onReadReady() {
       return;
     }
   }
-#endif
 
   // If this connection doesn't have half-close semantics, translate end_stream into
   // a connection close.
@@ -760,7 +756,6 @@ void ConnectionImpl::onWriteReady() {
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
-#if !defined(WIN32)
   // The socket is closed immediately when receiving RST.
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
@@ -772,7 +767,6 @@ void ConnectionImpl::onWriteReady() {
       return;
     }
   }
-#endif
 
   // NOTE: If the delayed_close_timer_ is set, it must only trigger after a delayed_close_timeout_
   // period of inactivity from the last write event. Therefore, the timer must be reset to its

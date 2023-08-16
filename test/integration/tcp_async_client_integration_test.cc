@@ -111,7 +111,6 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
   tcp_client->close();
 }
 
-#if !defined(WIN32)
 // Test if RST close can be detected from downstream and upstream is closed by RST.
 TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
   enableHalfClose(true);
@@ -144,9 +143,7 @@ TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
   ASSERT_TRUE(fake_upstream_connection->waitForRstDisconnect());
 }
-#endif
 
-#if !defined(WIN32)
 // Test if RST close can be detected from upstream.
 TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
   enableHalfClose(true);
@@ -179,7 +176,6 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
   tcp_client->waitForDisconnect();
 }
-#endif
 
 #if !defined(WIN32)
 TEST_P(TcpAsyncClientIntegrationTest, TestDownstremHalfClosedThenRST) {
