@@ -134,6 +134,7 @@ public:
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
+        disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
         disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())) {}
 
@@ -150,6 +151,7 @@ public:
   }
 
   bool allowModeOverride() const { return allow_mode_override_; }
+  bool disableImmediateResponse() const { return disable_immediate_response_; }
 
   const Filters::Common::MutationRules::Checker& mutationChecker() const {
     return mutation_checker_;
@@ -192,6 +194,9 @@ private:
   const Envoy::ProtobufWkt::Struct filter_metadata_;
   // If set to true, allow the processing mode to be modified by the ext_proc response.
   const bool allow_mode_override_;
+  // If set to true, disable the immediate response from the ext_proc server, which means
+  // closing the stream to the ext_proc server, and no more external processing.
+  const bool disable_immediate_response_;
   // Empty allowed_header_ means allow all.
   const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
