@@ -56,6 +56,8 @@ enum class OpCodes {
   AddWatch = 106,
 };
 
+const std::string opcodesToString(const OpCodes opcode);
+
 enum class WatcherType { Children = 1, Data = 2, Any = 3 };
 
 enum class AddWatchMode { Persistent, PersistentRecursive };
@@ -80,7 +82,9 @@ public:
   virtual ~DecoderCallbacks() = default;
 
   virtual void onDecodeError() PURE;
-  virtual void onRequestBytes(uint64_t bytes) PURE;
+  virtual void onConnectRequestBytes(const uint64_t bytes) PURE;
+  virtual void onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) PURE;
+  virtual void onRequestBytes(const OpCodes opcode, const uint64_t bytes) PURE;
   virtual void onConnect(bool readonly) PURE;
   virtual void onPing() PURE;
   virtual void onAuthRequest(const std::string& scheme) PURE;
@@ -104,7 +108,9 @@ public:
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
-  virtual void onResponseBytes(uint64_t bytes) PURE;
+  virtual void onConnectResponseBytes(const uint64_t bytes) PURE;
+  virtual void onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) PURE;
+  virtual void onResponseBytes(const OpCodes opcode, const uint64_t bytes) PURE;
   virtual void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
                                  const std::chrono::milliseconds latency) PURE;
   virtual void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
@@ -154,8 +160,8 @@ private:
   void decodeAndBufferHelper(Buffer::Instance& data, DecodeType dtype,
                              Buffer::OwnedImpl& zk_filter_buffer);
   void decode(Buffer::Instance& data, DecodeType dtype, uint64_t full_packets_len);
-  void decodeOnData(Buffer::Instance& data, uint64_t& offset);
-  void decodeOnWrite(Buffer::Instance& data, uint64_t& offset);
+  OpCodes decodeOnData(Buffer::Instance& data, uint64_t& offset);
+  OpCodes decodeOnWrite(Buffer::Instance& data, uint64_t& offset);
   void parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);

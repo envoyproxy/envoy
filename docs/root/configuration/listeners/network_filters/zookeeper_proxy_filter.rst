@@ -41,6 +41,33 @@ The following counters are available:
 
   decoder_error, Counter, Number of times a message wasn't decoded
   request_bytes, Counter, Number of bytes in decoded request messages
+  connect_rq_bytes, Counter, Number of bytes in decoded connect request messages
+  ping_rq_bytes, Counter, Number of bytes in decoded ping request messages
+  auth_rq_bytes, Counter, Number of bytes in decoded auth request messages
+  getdata_rq_bytes, Counter, Number of bytes in decoded getdata request messages
+  create_rq_bytes, Counter, Number of bytes in decoded create request messages
+  create2_rq_bytes, Counter, Number of bytes in decoded create2 request messages
+  createcontainer_rq_bytes, Counter, Number of bytes in decoded createcontainer request messages
+  createttl_rq_bytes, Counter, Number of bytes in decoded createttl request messages
+  setdata_rq_bytes, Counter, Number of bytes in decoded setdata request messages
+  getchildren_rq_bytes, Counter, Number of bytes in decoded getchildren request messages
+  getchildren2_rq_bytes, Counter, Number of bytes in decoded getchildren2 request messages
+  delete_rq_bytes, Counter, Number of bytes in decoded delete request messages
+  exists_rq_bytes, Counter, Number of bytes in decoded exists request messages
+  getacl_rq_bytes, Counter, Number of bytes in decoded getacl request messages
+  setacl_rq_bytes, Counter, Number of bytes in decoded setacl request messages
+  sync_rq_bytes, Counter, Number of bytes in decoded sync request messages
+  check_rq_bytes, Counter, Number of bytes in decoded check request messages
+  multi_rq_bytes, Counter, Number of bytes in decoded multi request messages
+  reconfig_rq_bytes, Counter, Number of bytes in decoded reconfig request messages
+  setwatches_rq_bytes, Counter, Number of bytes in decoded setwatches request messages
+  setwatches2_rq_bytes, Counter, Number of bytes in decoded setwatches2 request messages
+  addwatch_rq_bytes, Counter, Number of bytes in decoded addwatch request messages
+  checkwatches_rq_bytes, Counter, Number of bytes in decoded checkwatches request messages
+  removewatches_rq_bytes, Counter, Number of bytes in decoded removewatches request messages
+  getephemerals_rq_bytes, Counter, Number of bytes in decoded getephemerals request messages
+  getallchildrennumber_rq_bytes, Counter, Number of bytes in decoded getallchildrennumber request messages
+  close_rq_bytes, Counter, Number of bytes in decoded close request messages
   connect_rq, Counter, Number of regular connect (non-readonly) requests
   connect_readonly_rq, Counter, Number of connect requests with the readonly flag set
   ping_rq, Counter, Number of ping requests
@@ -70,6 +97,33 @@ The following counters are available:
   getallchildrennumber_rq, Counter, Number of getallchildrennumber requests
   close_rq, Counter, Number of close requests
   response_bytes, Counter, Number of bytes in decoded response messages
+  connect_resp_bytes, Counter, Number of bytes in decoded connect response messages
+  ping_resp_bytes, Counter, Number of bytes in decoded ping response messages
+  auth_resp_bytes, Counter, Number of bytes in decoded auth response messages
+  getdata_resp_bytes, Counter, Number of bytes in decoded getdata response messages
+  create_resp_bytes, Counter, Number of bytes in decoded create response messages
+  create2_resp_bytes, Counter, Number of bytes in decoded create2 response messages
+  createcontainer_resp_bytes, Counter, Number of bytes in decoded createcontainer response messages
+  createttl_resp_bytes, Counter, Number of bytes in decoded createttl response messages
+  setdata_resp_bytes, Counter, Number of bytes in decoded setdata response messages
+  getchildren_resp_bytes, Counter, Number of bytes in decoded getchildren response messages
+  getchildren2_resp_bytes, Counter, Number of bytes in decoded getchildren2 response messages
+  delete_resp_bytes, Counter, Number of bytes in decoded delete response messages
+  exists_resp_bytes, Counter, Number of bytes in decoded exists response messages
+  getacl_resp_bytes, Counter, Number of bytes in decoded getacl response messages
+  setacl_resp_bytes, Counter, Number of bytes in decoded setacl response messages
+  sync_resp_bytes, Counter, Number of bytes in decoded sync response messages
+  check_resp_bytes, Counter, Number of bytes in decoded check response messages
+  multi_resp_bytes, Counter, Number of bytes in decoded multi response messages
+  reconfig_resp_bytes, Counter, Number of bytes in decoded reconfig response messages
+  setwatches_resp_bytes, Counter, Number of bytes in decoded setwatches response messages
+  setwatches2_resp_bytes, Counter, Number of bytes in decoded setwatches2 response messages
+  addwatch_resp_bytes, Counter, Number of bytes in decoded addwatch response messages
+  checkwatches_resp_bytes, Counter, Number of bytes in decoded checkwatches response messages
+  removewatches_resp_bytes, Counter, Number of bytes in decoded removewatches response messages
+  getephemerals_resp_bytes, Counter, Number of bytes in decoded getephemerals response messages
+  getallchildrennumber_resp_bytes, Counter, Number of bytes in decoded getallchildrennumber response messages
+  close_resp_bytes, Counter, Number of bytes in decoded close response messages
   connect_resp, Counter, Number of connect responses
   ping_resp, Counter, Number of ping responses
   auth_resp, Counter, Number of auth responses

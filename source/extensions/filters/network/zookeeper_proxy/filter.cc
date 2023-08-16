@@ -22,6 +22,7 @@ namespace ZooKeeperProxy {
 
 ZooKeeperFilterConfig::ZooKeeperFilterConfig(
     const std::string& stat_prefix, const uint32_t max_packet_bytes,
+    const bool enable_per_opcode_request_response_bytes,
     const bool enable_latency_threshold_metrics,
     const std::chrono::milliseconds default_latency_threshold,
     const LatencyThresholdOverrideList& latency_threshold_overrides, Stats::Scope& scope)
@@ -31,6 +32,9 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
       connect_latency_(stat_name_set_->add("connect_response_latency")),
       unknown_scheme_rq_(stat_name_set_->add("unknown_scheme_rq")),
       unknown_opcode_latency_(stat_name_set_->add("unknown_opcode_latency")),
+      unknown_opcode_rq_bytes_(stat_name_set_->add("unknown_opcode_rq_bytes")),
+      unknown_opcode_resp_bytes_(stat_name_set_->add("unknown_opcode_resp_bytes")),
+      enable_per_opcode_request_response_bytes_(enable_per_opcode_request_response_bytes),
       enable_latency_threshold_metrics_(enable_latency_threshold_metrics),
       default_latency_threshold_(default_latency_threshold),
       latency_threshold_override_map_(parseLatencyThresholdOverrides(latency_threshold_overrides)) {
@@ -127,6 +131,10 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& resp_coun
   opcode_info.resp_slow_counter_ = &resp_slow_counter;
   opcode_info.opname_ = std::string(name);
   opcode_info.latency_name_ = stat_name_set_->add(absl::StrCat(name, "_latency"));
+  opcode_info.rq_bytes_counter_ =
+      stat_name_set_->add(absl::StrCat(opcodesToString(opcode), "_rq_bytes"));
+  opcode_info.resp_bytes_counter_ =
+      stat_name_set_->add(absl::StrCat(opcodesToString(opcode), "_resp_bytes"));
 }
 
 int32_t ZooKeeperFilterConfig::getOpCodeIndex(LatencyThresholdOverride_Opcode opcode) {
@@ -216,13 +224,77 @@ void ZooKeeperFilter::onDecodeError() {
   setDynamicMetadata("opname", "error");
 }
 
-void ZooKeeperFilter::onRequestBytes(const uint64_t bytes) {
+void ZooKeeperFilter::onConnectRequestBytes(const uint64_t bytes) {
+  Stats::StatName rq_bytes_stat_name = config_->stat_name_set_->add("connect_rq_bytes");
+  Stats::Counter& request_bytes_counter = Stats::Utility::counterFromStatNames(
+      config_->scope_, {config_->stat_prefix_, rq_bytes_stat_name});
+  request_bytes_counter.add(bytes);
+}
+
+void ZooKeeperFilter::onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) {
+  Stats::StatName rq_bytes_stat_name;
+  auto it = config_->op_code_map_.find(opcode);
+  if (it != config_->op_code_map_.end()) {
+    const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = it->second;
+    rq_bytes_stat_name = opcode_info.rq_bytes_counter_;
+
+    Stats::Counter& request_bytes_counter = Stats::Utility::counterFromStatNames(
+        config_->scope_, {config_->stat_prefix_, rq_bytes_stat_name});
+    request_bytes_counter.add(bytes);
+  }
+}
+
+void ZooKeeperFilter::onRequestBytes(const OpCodes opcode, const uint64_t bytes) {
   config_->stats_.request_bytes_.add(bytes);
+
+  if (config_->enable_per_opcode_request_response_bytes_) {
+    switch (opcode) {
+    case OpCodes::Connect:
+      onConnectRequestBytes(bytes);
+      break;
+    default:
+      onDefaultRequestBytes(opcode, bytes);
+      break;
+    }
+  }
+
   setDynamicMetadata("bytes", std::to_string(bytes));
 }
 
-void ZooKeeperFilter::onResponseBytes(const uint64_t bytes) {
+void ZooKeeperFilter::onConnectResponseBytes(const uint64_t bytes) {
+  Stats::StatName resp_bytes_stat_name = config_->stat_name_set_->add("connect_resp_bytes");
+  Stats::Counter& response_bytes_counter = Stats::Utility::counterFromStatNames(
+      config_->scope_, {config_->stat_prefix_, resp_bytes_stat_name});
+  response_bytes_counter.add(bytes);
+}
+
+void ZooKeeperFilter::onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) {
+  Stats::StatName resp_bytes_stat_name;
+  auto it = config_->op_code_map_.find(opcode);
+  if (it != config_->op_code_map_.end()) {
+    const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = it->second;
+    resp_bytes_stat_name = opcode_info.resp_bytes_counter_;
+
+    Stats::Counter& response_bytes_counter = Stats::Utility::counterFromStatNames(
+        config_->scope_, {config_->stat_prefix_, resp_bytes_stat_name});
+    response_bytes_counter.add(bytes);
+  }
+}
+
+void ZooKeeperFilter::onResponseBytes(const OpCodes opcode, const uint64_t bytes) {
   config_->stats_.response_bytes_.add(bytes);
+
+  if (config_->enable_per_opcode_request_response_bytes_) {
+    switch (opcode) {
+    case OpCodes::Connect:
+      onConnectResponseBytes(bytes);
+      break;
+    default:
+      onDefaultResponseBytes(opcode, bytes);
+      break;
+    }
+  }
+
   setDynamicMetadata("bytes", std::to_string(bytes));
 }
 

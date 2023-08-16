@@ -164,6 +164,7 @@ using OpcodeMap = absl::flat_hash_map<LatencyThresholdOverride_Opcode, int32_t>;
 class ZooKeeperFilterConfig {
 public:
   ZooKeeperFilterConfig(const std::string& stat_prefix, const uint32_t max_packet_bytes,
+                        const bool enable_per_opcode_request_response_bytes,
                         const bool enable_latency_threshold_metrics,
                         const std::chrono::milliseconds default_latency_threshold,
                         const LatencyThresholdOverrideList& latency_threshold_overrides,
@@ -186,6 +187,8 @@ public:
     Stats::Counter* resp_slow_counter_;
     std::string opname_;
     Stats::StatName latency_name_;
+    Stats::StatName rq_bytes_counter_;
+    Stats::StatName resp_bytes_counter_;
   };
 
   absl::flat_hash_map<OpCodes, OpCodeInfo> op_code_map_;
@@ -198,6 +201,9 @@ public:
   const Stats::StatName connect_latency_;
   const Stats::StatName unknown_scheme_rq_;
   const Stats::StatName unknown_opcode_latency_;
+  const Stats::StatName unknown_opcode_rq_bytes_;
+  const Stats::StatName unknown_opcode_resp_bytes_;
+  const bool enable_per_opcode_request_response_bytes_;
 
   ErrorBudgetResponseType errorBudgetDecision(const OpCodes opcode,
                                               const std::chrono::milliseconds latency) const;
@@ -271,7 +277,9 @@ public:
 
   // ZooKeeperProxy::DecoderCallback
   void onDecodeError() override;
-  void onRequestBytes(uint64_t bytes) override;
+  void onConnectRequestBytes(const uint64_t bytes) override;
+  void onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) override;
+  void onRequestBytes(const OpCodes opcode, const uint64_t bytes) override;
   void onConnect(bool readonly) override;
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
@@ -295,7 +303,9 @@ public:
   void onGetEphemeralsRequest(const std::string& path) override;
   void onGetAllChildrenNumberRequest(const std::string& path) override;
   void onCloseRequest() override;
-  void onResponseBytes(uint64_t bytes) override;
+  void onConnectResponseBytes(const uint64_t bytes) override;
+  void onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) override;
+  void onResponseBytes(const OpCodes opcode, const uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
                          const std::chrono::milliseconds latency) override;
   void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
