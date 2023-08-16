@@ -393,8 +393,9 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
   initialize();
-  testing::MockFunction<Network::HotRestartPacketForwardingFunction> mock_packet_forwarding;
-  quic_listener_->onHotRestarting(mock_packet_forwarding.AsStdFunction());
+  testing::MockFunction<HotRestartPacketForwardingFunction> mock_packet_forwarding;
+  auto shutdown_options = std::make_shared<HotRestartPacketForwardingOptions>(mock_packet_forwarding.AsStdFunction());
+  quic_listener_->shutdownListener(shutdown_options);
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 0);
@@ -404,22 +405,6 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_EQ(0u, quic_dispatcher_->NumSessions());
-}
-
-TEST_P(ActiveQuicListenerTest, ReceiveCHLOAfterHotRestartShouldBeNormalFlow) {
-  initialize();
-  testing::MockFunction<Network::HotRestartPacketForwardingFunction> mock_packet_forwarding;
-  quic_listener_->onHotRestarting(mock_packet_forwarding.AsStdFunction());
-  quic_listener_->onHotRestarting(nullptr);
-  quic::QuicBufferedPacketStore* const buffered_packets =
-      quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
-  maybeConfigureMocks(/* connection_count = */ 1);
-  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  EXPECT_CALL(mock_packet_forwarding, Call(_, _)).Times(0);
-  sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
-  EXPECT_NE(0u, quic_dispatcher_->NumSessions());
 }
 
 TEST_P(ActiveQuicListenerTest, NormalizeTimeouts) {

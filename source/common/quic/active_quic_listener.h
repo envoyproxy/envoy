@@ -20,6 +20,14 @@
 namespace Envoy {
 namespace Quic {
 
+class HotRestartPacketForwardingOptions : virtual public Network::ExtraShutdownListenerOptions {
+public:
+  explicit HotRestartPacketForwardingOptions(HotRestartPacketForwardingFunction fn) : hot_restart_packet_forwarding_function_(fn) {}
+  HotRestartPacketForwardingFunction hotRestartPacketForwardingFunction() { return hot_restart_packet_forwarding_function_; }
+private:
+  HotRestartPacketForwardingFunction hot_restart_packet_forwarding_function_;
+};
+
 // QUIC specific UdpListenerCallbacks implementation which delegates incoming
 // packets, write signals and listener errors to QuicDispatcher.
 class ActiveQuicListener : public Envoy::Server::ActiveUdpListenerBase,
@@ -61,8 +69,7 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override;
   void resumeListening() override;
-  void onHotRestarting(Network::HotRestartPacketForwardingFunction fn) override;
-  void shutdownListener() override;
+  void shutdownListener(Network::ExtraShutdownListenerOptionsPtr options) override;
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
@@ -108,7 +115,7 @@ public:
   createActiveUdpListener(Runtime::Loader& runtime, uint32_t worker_index,
                           Network::UdpConnectionHandler& parent,
                           Network::SocketSharedPtr&& listen_socket_ptr,
-                          Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
+                          Event::Dispatcher& dispatcher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
 

@@ -312,7 +312,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
 TEST_P(EnvoyQuicDispatcherTest, ForwardingCallbackIsCalledDuringHotRestart) {
   const uint32_t input_worker_index = 12;
   using Network::UdpRecvData;
-  testing::MockFunction<Network::HotRestartPacketForwardingFunction> mock_callback;
+  testing::MockFunction<HotRestartPacketForwardingFunction> mock_callback;
   envoy_quic_dispatcher_.onHotRestarting(input_worker_index, mock_callback.AsStdFunction());
 
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4

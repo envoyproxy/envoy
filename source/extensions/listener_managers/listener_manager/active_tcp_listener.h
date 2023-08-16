@@ -60,7 +60,7 @@ public:
 
   void pauseListening() override;
   void resumeListening() override;
-  void shutdownListener() override { listener_.reset(); }
+  void shutdownListener(Network::ExtraShutdownListenerOptionsPtr) override { listener_.reset(); }
 
   // Network::BalancedConnectionHandler
   uint64_t numConnections() const override { return num_listener_connections_; }

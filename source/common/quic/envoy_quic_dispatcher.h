@@ -15,6 +15,9 @@
 namespace Envoy {
 namespace Quic {
 
+using HotRestartPacketForwardingFunction =
+    std::function<void(uint32_t worker_index, const Network::UdpRecvData& packet)>;
+
 #define QUIC_DISPATCHER_STATS(COUNTER) COUNTER(stateless_reset_packets_sent)
 
 struct QuicDispatcherStats {
@@ -78,9 +81,7 @@ public:
   // Registers a function to intercept new connections. This can be called on the parent
   // instance during hot restart to facilitate passing new connections to the new instance,
   // while continuing to handle established, draining connections on the old instance.
-  //
-  // May be passed a nullptr function to reset to default behavior.
-  void onHotRestarting(uint32_t worker_index, Network::HotRestartPacketForwardingFunction fn);
+  void onHotRestarting(uint32_t worker_index, HotRestartPacketForwardingFunction fn);
 
 protected:
   // quic::QuicDispatcher

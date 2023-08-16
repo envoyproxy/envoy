@@ -17,8 +17,18 @@
 namespace Envoy {
 namespace Network {
 
-using HotRestartPacketForwardingFunction =
-    std::function<void(uint32_t worker_index, const Network::UdpRecvData& packet)>;
+// An effectively abstract class, used for dynamic class inheritance via dynamic_cast
+// such that options specific to individual listener types can be passed in
+// through the shutdownListener function, without other listener types needing
+// to know about it. Subclasses should specify `virtual ExtraShutdownListenerOptions`
+// so that they can be combined with other subclasses into a class containing multiple
+// types of options.
+class ExtraShutdownListenerOptions {
+public:
+  virtual ~ExtraShutdownListenerOptions() = default;
+};
+
+using ExtraShutdownListenerOptionsPtr = std::shared_ptr<ExtraShutdownListenerOptions>;
 
 /**
  * Abstract connection handler.
@@ -136,14 +146,11 @@ public:
 
     /**
      * Stop listening according to implementation's own definition.
+     * @param options can be dynamically cast to provide any extra options that some
+     *                subset of listeners might use, e.g. Quic listeners may need
+     *                to configure packet forwarding during hot restart.
      */
-    virtual void shutdownListener() PURE;
-
-    /**
-     * Inject optional custom handling of UDP packets during hot restart.
-     * It is up to the implementation to capture and call the provided function.
-     */
-    virtual void onHotRestarting(HotRestartPacketForwardingFunction) {}
+    virtual void shutdownListener(ExtraShutdownListenerOptionsPtr options = nullptr) PURE;
 
     /**
      * Update the listener config.

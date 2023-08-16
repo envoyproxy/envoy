@@ -150,14 +150,14 @@ void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewCo
 
 void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
 
-void ActiveQuicListener::shutdownListener() {
+void ActiveQuicListener::shutdownListener(Network::ExtraShutdownListenerOptionsPtr options) {
+  HotRestartPacketForwardingOptions *p = dynamic_cast<HotRestartPacketForwardingOptions *>(options.get());
+  if (p != nullptr) {
+    quic_dispatcher_->onHotRestarting(worker_index_, p->hotRestartPacketForwardingFunction());
+  }
   // Same as pauseListening() because all we want is to stop accepting new
   // connections.
   quic_dispatcher_->StopAcceptingNewConnections();
-}
-
-void ActiveQuicListener::onHotRestarting(Network::HotRestartPacketForwardingFunction fn) {
-  quic_dispatcher_->onHotRestarting(worker_index_, fn);
 }
 
 uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const {
@@ -329,7 +329,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
     Runtime::Loader& runtime, uint32_t worker_index, Network::UdpConnectionHandler& parent,
-    Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& disptacher,
+    Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& dispatcher,
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
   if (server_preferred_address_config_ != nullptr) {
@@ -353,7 +353,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
   }
 
   return createActiveQuicListener(
-      runtime, worker_index, concurrency_, disptacher, parent, std::move(listen_socket_ptr), config,
+      runtime, worker_index, concurrency_, dispatcher, parent, std::move(listen_socket_ptr), config,
       quic_config_, kernel_worker_routing_, enabled_, quic_stat_names_,
       packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
       proof_source_factory_.value(),
