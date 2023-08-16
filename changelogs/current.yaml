@@ -2,6 +2,10 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+area: jwt
+  change: |
+    Changed behavior of the jwt extraction, passing entire token for validation, instead cut him in the non-Base64 character.
+    This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.token_passed_entirely`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
