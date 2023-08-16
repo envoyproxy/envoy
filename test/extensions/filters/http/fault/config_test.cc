@@ -46,7 +46,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   cb(filter_callback);
 }
 
-TEST(FaultFilterConfigTest, SimpleConfigServerContext) {
+TEST(FaultFilterConfigTest, FaultFilterCorrectJsonWithServerContext) {
   const std::string yaml_string = R"EOF(
   filter_metadata:
     hello: "world"
