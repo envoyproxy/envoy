@@ -6733,7 +6733,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
                .setExpectedServerStats("ssl.connection_error"));
 }
 
-// Test private key provider and async cert validation can work together.
+// Test private key provider and cert validation can work together.
 TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
