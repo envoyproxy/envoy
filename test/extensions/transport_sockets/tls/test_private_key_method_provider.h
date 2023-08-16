@@ -63,7 +63,7 @@ public:
   TestPrivateKeyMethodProvider(
       const ProtobufWkt::Any& typed_config,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
-      std::string& private_key);
+      absl::string_view private_key);
   // Ssl::PrivateKeyMethodProvider
   void registerPrivateKeyMethod(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
                                 Event::Dispatcher& dispatcher) override;
@@ -89,7 +89,7 @@ public:
   Ssl::PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
       const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
-      std::string& private_key) override {
+      absl::string_view private_key) override {
     return std::make_shared<TestPrivateKeyMethodProvider>(config.typed_config(), factory_context,
                                                           private_key);
   }

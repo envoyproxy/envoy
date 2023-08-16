@@ -159,7 +159,7 @@ public:
       const envoy::extensions::private_key_providers::cryptomb::v3alpha::
           CryptoMbPrivateKeyMethodConfig& config,
       Server::Configuration::TransportSocketFactoryContext& private_key_provider_context,
-      IppCryptoSharedPtr ipp, std::string& private_key);
+      IppCryptoSharedPtr ipp, absl::string_view private_key);
 
   // Ssl::PrivateKeyMethodProvider
   void registerPrivateKeyMethod(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,

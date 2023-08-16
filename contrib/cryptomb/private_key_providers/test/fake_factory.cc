@@ -119,7 +119,7 @@ Ssl::PrivateKeyMethodProviderSharedPtr
 FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
     const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& proto_config,
     Server::Configuration::TransportSocketFactoryContext& private_key_provider_context,
-    std::string& private_key) {
+    absl::string_view private_key) {
   ProtobufTypes::MessagePtr message =
       std::make_unique<envoy::extensions::private_key_providers::cryptomb::v3alpha::
                            CryptoMbPrivateKeyMethodConfig>();

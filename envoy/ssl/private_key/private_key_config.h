@@ -24,7 +24,7 @@ public:
   virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
       const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
-      std::string& private_key) PURE;
+      absl::string_view private_key) PURE;
 
   std::string category() const override { return "envoy.tls.key_providers"; };
 };
