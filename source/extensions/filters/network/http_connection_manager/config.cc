@@ -126,10 +126,10 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
       KEEP_UNCHANGED;
 }
 
-Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
-    [[maybe_unused]] const envoy::extensions::filters::network::http_connection_manager::v3::
-        HttpConnectionManager& config,
-    [[maybe_unused]] Server::Configuration::ServerFactoryContext& server_context) {
+Http::HeaderValidatorFactoryPtr
+createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::network::
+                                 http_connection_manager::v3::HttpConnectionManager& config,
+                             [[maybe_unused]] Server::Configuration::FactoryContext& context) {
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
@@ -148,7 +148,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
         static_cast<
             ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
                 UriPathNormalizationOptions::PathWithEscapedSlashesAction>(
-            config.path_with_escaped_slashes_action()));
+            getPathWithEscapedSlashesAction(config, context)));
     uhv_config.mutable_http1_protocol_options()->set_allow_chunked_length(
         config.http_protocol_options().allow_chunked_length());
     uhv_config.set_headers_with_underscores_action(
@@ -172,8 +172,8 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
         fmt::format("Header validator extension not found: '{}'", header_validator_config.name()));
   }
 
-  header_validator_factory =
-      factory->createFromProto(header_validator_config.typed_config(), server_context);
+  header_validator_factory = factory->createFromProto(header_validator_config.typed_config(),
+                                                      context.getServerFactoryContext());
   if (!header_validator_factory) {
     throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
                                      header_validator_config.name()));
@@ -381,8 +381,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
                                      config.proxy_status_config())
                                : nullptr),
-      header_validator_factory_(
-          createHeaderValidatorFactory(config, context.getServerFactoryContext())),
+      header_validator_factory_(createHeaderValidatorFactory(config, context)),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
@@ -628,8 +627,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   Http::FilterChainHelper<Server::Configuration::FactoryContext,
                           Server::Configuration::NamedHttpFilterConfigFactory>
-      helper(filter_config_provider_manager_, context_.getServerFactoryContext(), context_,
-             stats_prefix_);
+      helper(filter_config_provider_manager_, context_.getServerFactoryContext(),
+             context_.clusterManager(), context_, stats_prefix_);
   helper.processFilters(config.http_filters(), "http", "http", filter_factories_);
 
   for (const auto& upgrade_config : config.upgrade_configs()) {

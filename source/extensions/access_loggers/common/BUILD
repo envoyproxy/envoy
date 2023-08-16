@@ -27,6 +27,7 @@ envoy_cc_library(
     srcs = ["grpc_access_logger_utils.cc"],
     hdrs = ["grpc_access_logger_utils.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
     ],
 )

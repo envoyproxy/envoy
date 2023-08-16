@@ -52,7 +52,9 @@ void Coverage::markRedirectCodeCovered(const Envoy::Router::Route& route) {
   coveredRoute(route).setRedirectCodeCovered();
 }
 
-double Coverage::report() {
+double Coverage::report(bool detailed_coverage_report) {
+  std::set<std::string> all_route_names;
+  std::set<std::string> covered_route_names;
   uint64_t num_routes = 0;
   for (const auto& host : route_config_.virtual_hosts()) {
     for (const auto& route : host.routes()) {
@@ -61,12 +63,21 @@ double Coverage::report() {
       } else {
         num_routes += 1;
       }
+      all_route_names.emplace(route.name());
     }
   }
+
+  if (detailed_coverage_report) {
+    for (auto& covered_route : covered_routes_) {
+      covered_route_names.emplace(covered_route->routeName());
+    }
+    printNotCoveredRouteNames(all_route_names, covered_route_names);
+  }
+
   return 100 * static_cast<double>(covered_routes_.size()) / num_routes;
 }
 
-double Coverage::detailedReport() {
+double Coverage::comprehensiveReport() {
   std::set<std::string> all_route_names;
   std::set<std::string> covered_route_names;
   uint64_t num_routes = 0;
@@ -102,6 +113,23 @@ void Coverage::printMissingTests(const std::set<std::string>& all_route_names,
         std::string route_text;
         Protobuf::TextFormat::PrintToString(route.match(), &route_text);
         std::cout << "Missing test for host: " << host.name() << ", route: " << route_text
+                  << std::endl;
+      }
+    }
+  }
+}
+
+void Coverage::printNotCoveredRouteNames(const std::set<std::string>& all_route_names,
+                                         const std::set<std::string>& covered_route_names) {
+  std::set<std::string> missing_route_names;
+  std::set_difference(all_route_names.begin(), all_route_names.end(), covered_route_names.begin(),
+                      covered_route_names.end(),
+                      std::inserter(missing_route_names, missing_route_names.end()));
+
+  for (const auto& host : route_config_.virtual_hosts()) {
+    for (const auto& route : host.routes()) {
+      if (missing_route_names.find(route.name()) != missing_route_names.end()) {
+        std::cout << "Missing test for host: " << host.name() << ", route name: " << route.name()
                   << std::endl;
       }
     }

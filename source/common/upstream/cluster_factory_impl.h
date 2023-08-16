@@ -159,13 +159,16 @@ private:
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
                                            context.messageValidationVisitor(), *config);
-    return createClusterWithConfig(cluster,
-                                   MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                       *config, context.messageValidationVisitor()),
-                                   context);
+    auto status_or_cluster =
+        createClusterWithConfig(cluster,
+                                MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                    *config, context.messageValidationVisitor()),
+                                context);
+    THROW_IF_STATUS_NOT_OK(status_or_cluster, throw);
+    return std::move(status_or_cluster.value());
   }
 
-  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
                           const ConfigProto& proto_config, ClusterFactoryContext& context) PURE;
 };
