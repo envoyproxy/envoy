@@ -381,7 +381,8 @@ request_rules:
       {"X-PYTHON-VERSION", "3.7"},
       {"X-IGNORE", "nothing"},
   };
-  const std::map<std::string, std::string> expected = {{"version", "v4.0"}, {"python_version", "3.7"}};
+  const std::map<std::string, std::string> expected = {{"version", "v4.0"},
+                                                       {"python_version", "3.7"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
