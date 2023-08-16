@@ -55,7 +55,7 @@ public:
    * Check whether the private key method initialized successfully.
    * @return true if the private key method initialized successfully, false if not.
    */
-  virtual bool checkInitialized() PURE;
+  virtual bool initialized() PURE;
 
 #ifdef OPENSSL_IS_BORINGSSL
   /**

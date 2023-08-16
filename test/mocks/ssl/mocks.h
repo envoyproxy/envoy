@@ -209,7 +209,7 @@ public:
               (SSL * ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
   MOCK_METHOD(void, unregisterPrivateKeyMethod, (SSL * ssl));
   MOCK_METHOD(bool, checkFips, ());
-  MOCK_METHOD(bool, checkInitialized, ());
+  MOCK_METHOD(bool, initialized, ());
 
 #ifdef OPENSSL_IS_BORINGSSL
   MOCK_METHOD(BoringSslPrivateKeyMethodSharedPtr, getBoringSslPrivateKeyMethod, ());

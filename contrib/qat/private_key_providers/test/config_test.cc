@@ -89,7 +89,7 @@ TEST_F(QatConfigTest, CreateRsa1024) {
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
   EXPECT_EQ(false, provider->checkFips());
-  EXPECT_EQ(provider->checkInitialized(), true);
+  EXPECT_EQ(provider->initialized(), true);
   Ssl::BoringSslPrivateKeyMethodSharedPtr method = provider->getBoringSslPrivateKeyMethod();
   EXPECT_NE(nullptr, method);
 }
@@ -105,7 +105,7 @@ TEST_F(QatConfigTest, CreateRsa2048) {
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
-  EXPECT_EQ(provider->checkInitialized(), true);
+  EXPECT_EQ(provider->initialized(), true);
 }
 
 TEST_F(QatConfigTest, CreateRsa3072) {
@@ -119,7 +119,7 @@ TEST_F(QatConfigTest, CreateRsa3072) {
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
-  EXPECT_EQ(provider->checkInitialized(), true);
+  EXPECT_EQ(provider->initialized(), true);
 }
 
 TEST_F(QatConfigTest, CreateRsa4096) {
@@ -133,7 +133,7 @@ TEST_F(QatConfigTest, CreateRsa4096) {
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
-  EXPECT_EQ(provider->checkInitialized(), true);
+  EXPECT_EQ(provider->initialized(), true);
 }
 
 TEST_F(QatConfigTest, CreateEcdsaP256) {

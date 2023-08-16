@@ -310,7 +310,7 @@ QatPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
 }
 
 bool QatPrivateKeyMethodProvider::checkFips() { return false; }
-bool QatPrivateKeyMethodProvider::checkInitialized() { return initialized_; }
+bool QatPrivateKeyMethodProvider::initialized() { return initialized_; }
 
 QatPrivateKeyConnection::QatPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb,
                                                  Event::Dispatcher& dispatcher, QatHandle& handle,

@@ -245,7 +245,7 @@ TEST_F(QatProviderRsaTest, TestQatDeviceInit) {
   libqat_->icpSalUserStart_return_value_ = CPA_STATUS_FAIL;
   Ssl::PrivateKeyMethodProviderSharedPtr provider =
       std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_, private_key_);
-  EXPECT_EQ(provider->checkInitialized(), false);
+  EXPECT_EQ(provider->initialized(), false);
   delete private_key;
 }
 
