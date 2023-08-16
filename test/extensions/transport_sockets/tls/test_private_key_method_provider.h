@@ -80,7 +80,6 @@ private:
   bssl::UniquePtr<EVP_PKEY> pkey_;
   TestPrivateKeyConnectionTestOptions test_options_;
   std::string mode_;
-  bool initialized{};
 };
 
 class TestPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {

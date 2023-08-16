@@ -2070,6 +2070,31 @@ TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndMethod) {
       "Certificate configuration can't have both pkcs12 and private_key_provider");
 }
 
+TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndMethod1) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - pkcs12:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_certkeychain.p12"
+      private_key_provider_list:
+        private_key_provider:
+        - provider_name: mock_provider
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              test_value: 100
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
+      "Certificate configuration can't have both pkcs12 and private_key_provider_list");
+}
+
 TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndKey) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(

@@ -46,10 +46,6 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       ocsp_staple_path_(Config::DataSource::getPath(config.ocsp_staple())
                             .value_or(ocsp_staple_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_method_(nullptr) {
-  // if (config.has_private_key_provider() && config.has_private_key()) {
-  //   throw EnvoyException(fmt::format(
-  //       "Certificate configuration can't have both private_key and private_key_provider"));
-  // }
   if (config.has_pkcs12()) {
     if (config.has_private_key()) {
       throw EnvoyException(
@@ -58,6 +54,10 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     if (config.has_certificate_chain()) {
       throw EnvoyException(
           fmt::format("Certificate configuration can't have both pkcs12 and certificate_chain"));
+    }
+    if (config.has_private_key_provider_list()) {
+      throw EnvoyException(
+          fmt::format("Certificate configuration can't have both pkcs12 and private_key_provider_list"));
     }
     if (config.has_private_key_provider()) {
       throw EnvoyException(
