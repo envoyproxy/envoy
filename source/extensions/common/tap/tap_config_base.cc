@@ -104,14 +104,12 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
       config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
                                                             tsf_context.messageValidationVisitor(),
                                                             tap_sink_factory);
-    } else if (absl::holds_alternative<HttpContextRef>(context)) {
+    } else {
       Server::Configuration::FactoryContext& http_context =
           absl::get<HttpContextRef>(context).get();
       config = Config::Utility::translateAnyToFactoryConfig(
           sinks[0].custom_sink().typed_config(),
           http_context.messageValidationContext().staticValidationVisitor(), tap_sink_factory);
-    } else {
-      PANIC("unknown context type");
     }
 
     sink_ = tap_sink_factory.createSinkPtr(*config, context);
