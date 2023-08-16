@@ -205,7 +205,7 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 }
 
 //export envoyGoFilterOnHttpLog
-func envoyGoFilterOnHttpLog(r *C.httpRequest, reason uint64) {
+func envoyGoFilterOnHttpLog(r *C.httpRequest) {
 	req := getRequest(r)
 	// do nothing as the request is finished
 	defer req.RecoverPanic()
