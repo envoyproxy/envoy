@@ -60,7 +60,6 @@ public:
   virtual ClientValidationStatus certificateValidationStatus() const PURE;
 
   /**
-   * Only called when doing asynchronous cert validation.
    * @return ValidateResultCallbackPtr a callback used to return the validation result.
    */
   virtual ValidateResultCallbackPtr createValidateResultCallback() PURE;
