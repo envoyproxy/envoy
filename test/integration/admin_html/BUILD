@@ -30,6 +30,7 @@ envoy_cc_test_binary(
 envoy_sh_test(
     name = "test_server_test",
     size = "large",
+    # coverage = False,
     srcs = envoy_select_admin_html(["test_server_test.sh"]),
     cc_binary = [":test_server"],
     data = [

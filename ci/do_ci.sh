@@ -41,12 +41,14 @@ else
 fi
 
 function collect_build_profile() {
-  declare -g build_profile_count=${build_profile_count:-1}
-  mv -f \
-     "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)/command.profile.gz" \
-     "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
-      || :
-  ((build_profile_count++))
+    local output_base
+    declare -g build_profile_count=${build_profile_count:-1}
+    output_base="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+    mv -f \
+       "${output_base}/command.profile.gz" \
+       "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
+        || :
+    ((build_profile_count++))
 }
 
 function bazel_with_collection() {
