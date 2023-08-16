@@ -51,6 +51,7 @@ else
 fi
 
 BAZEL_COVERAGE_OPTIONS=(--heap_dump_on_oom)
+EXTRA_STARTUP_OPTIONS=()
 
 if [[ -n "${BAZEL_GRPC_LOG}" ]]; then
     BAZEL_COVERAGE_OPTIONS+=(--remote_grpc_log="${BAZEL_GRPC_LOG}")
@@ -65,6 +66,9 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     BAZEL_COVERAGE_OPTIONS+=(
         "--config=fuzz-coverage")
 else
+    EXTRA_STARTUP_OPTIONS+=(
+        --host_jvm_args=-Xmx20g
+        --host_jvm_args=-XX:MaxDirectMemorySize=4G)
     BAZEL_COVERAGE_OPTIONS+=(
         "--config=test-coverage")
 fi
@@ -77,7 +81,7 @@ echo "Running bazel coverage with:"
 echo "  Options: ${BAZEL_BUILD_OPTIONS[*]} ${BAZEL_COVERAGE_OPTIONS[*]}"
 echo "  Targets: ${COVERAGE_TARGETS[*]}"
 
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" "${EXTRA_STARTUP_OPTIONS[@]}" coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
 echo "Collecting profile and testlogs"
 if [[ -n "${ENVOY_BUILD_PROFILE}" ]]; then

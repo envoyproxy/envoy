@@ -102,6 +102,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "check_extensions_against_registry_test",
+    size = "large",
     srcs = ["check_extensions_against_registry_test.cc"],
     data = [
         "//source/extensions:extensions_metadata.yaml",
