@@ -27,11 +27,7 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
           std::make_shared<QuicSslConnectionInfo>(*this), std::move(stream_info)),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
       listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
-      connection_stats_(connection_stats) {
-  // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so makes it bypass
-  // the default Datagram queue.
-  SetForceFlushForDefaultQueue(true);
-}
+      connection_stats_(connection_stats) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
