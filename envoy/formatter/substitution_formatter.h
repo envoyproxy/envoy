@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Formatter {
 
 /**
- * Substitution formatter context for HTTP access logs.
+ * Substitution formatter context for HTTP access logs or formatters.
  */
 class HttpFormatterContext {
 public:
@@ -128,6 +128,7 @@ private:
 // Alias of FormatterBase<HttpFormatterContext> for backward compatibility.
 using Formatter = FormatterBase<HttpFormatterContext>;
 using FormatterPtr = std::unique_ptr<Formatter>;
+using FormatterConstSharedPtr = std::shared_ptr<const Formatter>;
 
 class FormatterProvider : public FormatterProviderBase<HttpFormatterContext> {
 public:

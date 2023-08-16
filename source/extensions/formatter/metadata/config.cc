@@ -19,7 +19,7 @@ ProtobufTypes::MessagePtr MetadataFormatterFactory::createEmptyConfigProto() {
 
 std::string MetadataFormatterFactory::name() const { return "envoy.formatter.metadata"; }
 
-REGISTER_FACTORY(MetadataFormatterFactory, MetadataFormatterFactory::CommandParserFactory);
+REGISTER_FACTORY(MetadataFormatterFactory, ::Envoy::Formatter::CommandParserFactory);
 
 } // namespace Formatter
 } // namespace Extensions
