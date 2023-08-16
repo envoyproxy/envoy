@@ -208,13 +208,13 @@ TEST_F(IoUringWorkerIntegrationTest, Injection) {
       dynamic_cast<IoUringSocketTestImpl&>(io_uring_worker_->addTestSocket(server_socket_));
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
-  socket.injectCompletion(RequestType::Accept);
-  socket.injectCompletion(RequestType::Cancel);
-  socket.injectCompletion(RequestType::Close);
-  socket.injectCompletion(RequestType::Connect);
-  socket.injectCompletion(RequestType::Read);
-  socket.injectCompletion(RequestType::Write);
-  socket.injectCompletion(RequestType::Shutdown);
+  socket.injectCompletion(Request::RequestType::Accept);
+  socket.injectCompletion(Request::RequestType::Cancel);
+  socket.injectCompletion(Request::RequestType::Close);
+  socket.injectCompletion(Request::RequestType::Connect);
+  socket.injectCompletion(Request::RequestType::Read);
+  socket.injectCompletion(Request::RequestType::Write);
+  socket.injectCompletion(Request::RequestType::Shutdown);
 
   // Wait for server socket receive injected completion.
   while (socket.accept_result_ == -1 || socket.cancel_result_ == -1 || socket.close_result_ == -1 ||
@@ -250,8 +250,8 @@ TEST_F(IoUringWorkerIntegrationTest, MergeInjection) {
       dynamic_cast<IoUringSocketTestImpl&>(io_uring_worker_->addTestSocket(server_socket_));
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
-  socket.injectCompletion(RequestType::Read);
-  socket.injectCompletion(RequestType::Read);
+  socket.injectCompletion(Request::RequestType::Read);
+  socket.injectCompletion(Request::RequestType::Read);
 
   // Waiting for the server socket receive the injected completion.
   while (socket.read_result_ == -1) {

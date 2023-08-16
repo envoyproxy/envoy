@@ -73,45 +73,45 @@ public:
   IoUringWorker& getIoUringWorker() const override { return parent_; }
   os_fd_t fd() const override { return fd_; }
   void onAccept(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Accept)) {
-      injected_completions_ &= ~RequestType::Accept;
+    if (injected && (injected_completions_ & Request::RequestType::Accept)) {
+      injected_completions_ &= ~Request::RequestType::Accept;
     }
   }
   void onConnect(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Connect)) {
-      injected_completions_ &= ~RequestType::Connect;
+    if (injected && (injected_completions_ & Request::RequestType::Connect)) {
+      injected_completions_ &= ~Request::RequestType::Connect;
     }
   }
   void onRead(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Read)) {
-      injected_completions_ &= ~RequestType::Read;
+    if (injected && (injected_completions_ & Request::RequestType::Read)) {
+      injected_completions_ &= ~Request::RequestType::Read;
     }
   }
   void onWrite(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Write)) {
-      injected_completions_ &= ~RequestType::Write;
+    if (injected && (injected_completions_ & Request::RequestType::Write)) {
+      injected_completions_ &= ~Request::RequestType::Write;
     }
   }
   void onClose(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Close)) {
-      injected_completions_ &= ~RequestType::Close;
+    if (injected && (injected_completions_ & Request::RequestType::Close)) {
+      injected_completions_ &= ~Request::RequestType::Close;
     }
   }
   void onCancel(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Cancel)) {
-      injected_completions_ &= ~RequestType::Cancel;
+    if (injected && (injected_completions_ & Request::RequestType::Cancel)) {
+      injected_completions_ &= ~Request::RequestType::Cancel;
     }
   }
   void onShutdown(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & RequestType::Shutdown)) {
-      injected_completions_ &= ~RequestType::Shutdown;
+    if (injected && (injected_completions_ & Request::RequestType::Shutdown)) {
+      injected_completions_ &= ~Request::RequestType::Shutdown;
     }
   }
   void injectCompletion(uint32_t type) override;
 
 protected:
   /**
-   * For the socket to remove itself from the IoUringWorker and defer to delete.
+   * For the socket to remove itself from the IoUringWorker and defer deletion.
    */
   void cleanup();
 

@@ -10,7 +10,6 @@ envoy_package()
 
 envoy_cc_mock(
     name = "io_mocks",
-    srcs = [],
     hdrs = ["mocks.h"],
     deps = [
         "//envoy/common/io:io_uring_interface",

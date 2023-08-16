@@ -9,18 +9,7 @@
 namespace Envoy {
 namespace Io {
 
-/**
- * io_uring request type.
- */
-struct RequestType {
-  static constexpr uint32_t Accept = 0x1;
-  static constexpr uint32_t Connect = 0x2;
-  static constexpr uint32_t Read = 0x4;
-  static constexpr uint32_t Write = 0x8;
-  static constexpr uint32_t Close = 0x10;
-  static constexpr uint32_t Cancel = 0x20;
-  static constexpr uint32_t Shutdown = 0x40;
-};
+
 
 class IoUringSocket;
 
@@ -29,6 +18,19 @@ class IoUringSocket;
  */
 class Request {
 public:
+  /**
+   * io_uring request type.
+   */
+  enum RequestType {
+    Accept = 0x1,
+    Connect = 0x2,
+    Read = 0x4,
+    Write = 0x8,
+    Close = 0x10,
+    Cancel = 0x20,
+    Shutdown = 0x40,
+  };
+
   virtual ~Request() = default;
 
   /**
@@ -37,7 +39,7 @@ public:
   virtual uint32_t type() const PURE;
 
   /**
-   * Return on which io_uring socket the request belongs to.
+   * Returns the io_uring socket the request belongs to.
    */
   virtual IoUringSocket& socket() const PURE;
 };

@@ -42,7 +42,7 @@ IoUringWorkerImpl::IoUringWorkerImpl(IoUringPtr&& io_uring, Event::Dispatcher& d
 }
 
 IoUringWorkerImpl::~IoUringWorkerImpl() {
-  ENVOY_LOG(trace, "destruct io uring worker, existed sockets = {}", sockets_.size());
+  ENVOY_LOG(trace, "destruct io uring worker, existing sockets = {}", sockets_.size());
 
   dispatcher_.clearDeferredDeleteList();
 }
@@ -74,37 +74,37 @@ void IoUringWorkerImpl::onFileEvent() {
     ASSERT(req != nullptr);
 
     switch (req->type()) {
-    case RequestType::Accept:
+    case Request::RequestType::Accept:
       ENVOY_LOG(trace, "receive accept request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onAccept(req, result, injected);
       break;
-    case RequestType::Connect:
+    case Request::RequestType::Connect:
       ENVOY_LOG(trace, "receive connect request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onConnect(req, result, injected);
       break;
-    case RequestType::Read:
+    case Request::RequestType::Read:
       ENVOY_LOG(trace, "receive Read request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onRead(req, result, injected);
       break;
-    case RequestType::Write:
+    case Request::RequestType::Write:
       ENVOY_LOG(trace, "receive write request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onWrite(req, result, injected);
       break;
-    case RequestType::Close:
+    case Request::RequestType::Close:
       ENVOY_LOG(trace, "receive close request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onClose(req, result, injected);
       break;
-    case RequestType::Cancel:
+    case Request::RequestType::Cancel:
       ENVOY_LOG(trace, "receive cancel request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onCancel(req, result, injected);
       break;
-    case RequestType::Shutdown:
+    case Request::RequestType::Shutdown:
       ENVOY_LOG(trace, "receive shutdown request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onShutdown(req, result, injected);
