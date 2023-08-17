@@ -38,7 +38,8 @@ public:
                      uint32_t packets_to_read_to_connection_count_ratio,
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-                     QuicConnectionIdGeneratorPtr&& cid_generator);
+                     QuicConnectionIdGeneratorPtr&& cid_generator,
+                     QuicConnectionIdWorkerSelector worker_selector);
 
   ~ActiveQuicListener() override;
 
@@ -88,7 +89,8 @@ private:
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
   uint32_t packets_to_read_to_connection_count_ratio_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
-  QuicConnectionIdGeneratorPtr connection_id_generator_;
+  const QuicConnectionIdGeneratorPtr connection_id_generator_;
+  const QuicConnectionIdWorkerSelector select_connection_id_worker_;
   // Latches envoy.reloadable_features.quic_reject_all at the beginning of each event loop.
   bool reject_all_{false};
 };
@@ -144,6 +146,7 @@ private:
   QuicStatNames& quic_stat_names_;
   const uint32_t packets_to_read_to_connection_count_ratio_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
+  QuicConnectionIdWorkerSelector worker_selector_;
   bool kernel_worker_routing_{};
   ProcessContextOptRef context_;
 

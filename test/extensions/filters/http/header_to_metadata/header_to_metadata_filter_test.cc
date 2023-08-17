@@ -93,7 +93,7 @@ request_rules:
 TEST_F(HeaderToMetadataTest, BasicRequestTest) {
   initializeFilter(request_config_yaml);
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
-  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
+  const std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -111,7 +111,7 @@ TEST_F(HeaderToMetadataTest, BasicRequestTest) {
 TEST_F(HeaderToMetadataTest, BasicRequestDoubleHeadersTest) {
   initializeFilter(request_config_yaml);
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "foo"}, {"X-VERSION", "bar"}};
-  std::map<std::string, std::string> expected = {{"version", "foo,bar"}};
+  const std::map<std::string, std::string> expected = {{"version", "foo,bar"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -129,7 +129,7 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   // Global config is empty.
   initializeFilter("{}");
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
-  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
+  const std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
   // Setup per route config.
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
@@ -154,7 +154,7 @@ TEST_F(HeaderToMetadataTest, ConfigIsCached) {
   // Global config is empty.
   initializeFilter("{}");
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
-  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
+  const std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
   // Setup per route config.
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
@@ -173,7 +173,7 @@ TEST_F(HeaderToMetadataTest, ConfigIsCached) {
 TEST_F(HeaderToMetadataTest, DefaultEndpointsTest) {
   initializeFilter(request_config_yaml);
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-FOO", "bar"}};
-  std::map<std::string, std::string> expected = {{"default", "true"}};
+  const std::map<std::string, std::string> expected = {{"default", "true"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -194,7 +194,7 @@ response_rules:
 )EOF";
   initializeFilter(response_config_yaml);
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", "1"}};
-  std::map<std::string, std::string> expected = {{"auth", "1"}};
+  const std::map<std::string, std::string> expected = {{"auth", "1"}};
   Http::TestResponseHeaderMapImpl empty_headers;
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -250,7 +250,7 @@ response_rules:
   std::string data = "Non-ascii-characters";
   const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
-  std::map<std::string, std::string> expected = {{"auth", data}};
+  const std::map<std::string, std::string> expected = {{"auth", data}};
   Http::TestResponseHeaderMapImpl empty_headers;
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -381,7 +381,8 @@ request_rules:
       {"X-PYTHON-VERSION", "3.7"},
       {"X-IGNORE", "nothing"},
   };
-  std::map<std::string, std::string> expected = {{"version", "v4.0"}, {"python_version", "3.7"}};
+  const std::map<std::string, std::string> expected = {{"version", "v4.0"},
+                                                       {"python_version", "3.7"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -428,7 +429,7 @@ response_rules:
 )EOF";
   initializeFilter(response_config_yaml);
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-something", "thing"}};
-  std::map<std::string, std::string> expected = {{"something", "else"}};
+  const std::map<std::string, std::string> expected = {{"something", "else"}};
   Http::TestResponseHeaderMapImpl empty_headers;
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -546,7 +547,7 @@ request_rules:
   // Match with additional path elements.
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/cluster-prod-001/x/y"}};
-    std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001"}};
+    const std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001"}};
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -556,7 +557,7 @@ request_rules:
   // Match with no additional path elements.
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/cluster-prod-001"}};
-    std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001"}};
+    const std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001"}};
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -566,7 +567,7 @@ request_rules:
   // No match.
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
-    std::map<std::string, std::string> expected = {{"cluster", "/foo"}};
+    const std::map<std::string, std::string> expected = {{"cluster", "/foo"}};
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -576,7 +577,7 @@ request_rules:
   // No match with additional path elements.
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/foo/bar?x=2"}};
-    std::map<std::string, std::string> expected = {{"cluster", "/foo/bar?x=2"}};
+    const std::map<std::string, std::string> expected = {{"cluster", "/foo/bar?x=2"}};
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -670,7 +671,7 @@ response_rules:
 )EOF";
   initializeFilter(response_config_yaml);
   Http::TestResponseHeaderMapImpl incoming_headers{{"cookie", "bar=foo"}};
-  std::map<std::string, std::string> expected = {{"bar", "foo"}};
+  const std::map<std::string, std::string> expected = {{"bar", "foo"}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
@@ -693,7 +694,7 @@ response_rules:
 )EOF";
   initializeFilter(response_config_yaml);
   Http::TestResponseHeaderMapImpl incoming_headers{{"cookie", "meh=foo"}};
-  std::map<std::string, std::string> expected = {{"meh", "some_value"}};
+  const std::map<std::string, std::string> expected = {{"meh", "some_value"}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
@@ -716,7 +717,7 @@ request_rules:
 )EOF";
   initializeFilter(config);
   Http::TestRequestHeaderMapImpl headers{{"cookie", ""}};
-  std::map<std::string, std::string> expected = {{"foo", "some_value"}};
+  const std::map<std::string, std::string> expected = {{"foo", "some_value"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -744,7 +745,7 @@ request_rules:
   // match.
   {
     Http::TestRequestHeaderMapImpl headers{{"cookie", "foo=cluster-prod-001"}};
-    std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001 matched"}};
+    const std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001 matched"}};
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -754,7 +755,7 @@ request_rules:
   // No match.
   {
     Http::TestRequestHeaderMapImpl headers{{"cookie", "foo=cluster"}};
-    std::map<std::string, std::string> expected = {{"cluster", "cluster"}};
+    const std::map<std::string, std::string> expected = {{"cluster", "cluster"}};
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));

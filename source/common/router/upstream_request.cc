@@ -283,7 +283,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
-  stream_info_.response_code_ = static_cast<uint32_t>(response_code);
+  stream_info_.setResponseCode(static_cast<uint32_t>(response_code));
 
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
