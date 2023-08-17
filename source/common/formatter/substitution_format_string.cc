@@ -44,7 +44,9 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
                                            commands);
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat:
     return std::make_unique<JsonFormatterImpl>(
-        config.json_format(), true, config.omit_empty_values(), config.sort_properties(), commands);
+        config.json_format(), true, config.omit_empty_values(),
+        config.has_json_format_options() ? config.json_format_options().sort_properties() : false,
+        commands);
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
     return std::make_unique<FormatterImpl>(
         Config::DataSource::read(config.text_format_source(), true, context.api()), false,

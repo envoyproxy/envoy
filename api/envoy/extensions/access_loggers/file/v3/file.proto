@@ -60,7 +60,4 @@ message FileAccessLog {
     config.core.v3.SubstitutionFormatString log_format = 5
         [(validate.rules).message = {required: true}];
   }
-
-  // The output JSON string properties will be sorted if json_format is used and sort_properties is set to true.
-  bool sort_properties = 6;
 }

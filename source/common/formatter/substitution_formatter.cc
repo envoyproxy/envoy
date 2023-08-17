@@ -168,6 +168,7 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
     log_line = MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
   }
 #else
+  UNREFERENCED_PARAMETER(sort_properties_);
   IS_ENVOY_BUG("Json support compiled out");
 #endif
   return absl::StrCat(log_line, "\n");

@@ -47,7 +47,7 @@ AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
     formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
-        fal_config.json_format(), false, false, fal_config.sort_properties());
+        fal_config.json_format(), false, false, false);
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       kTypedJsonFormat: {
