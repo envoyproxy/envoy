@@ -33,9 +33,9 @@ public:
       const std::chrono::milliseconds default_latency_threshold = std::chrono::milliseconds(100),
       const LatencyThresholdOverrideList& latency_threshold_overrides =
           LatencyThresholdOverrideList(),
-      const bool enable_per_opcode_request_response_bytes = true) {
+      const bool enable_per_opcode_request_response_bytes_metrics = true) {
     config_ = std::make_shared<ZooKeeperFilterConfig>(
-        stat_prefix_, 1048576, enable_per_opcode_request_response_bytes,
+        stat_prefix_, 1048576, enable_per_opcode_request_response_bytes_metrics,
         enable_latency_threshold_metrics, default_latency_threshold, latency_threshold_overrides,
         scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
@@ -834,7 +834,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultAndOtherLatencyThresho
             ErrorBudgetResponseType::Slow);
 }
 
-TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestResponseBytes) {
+TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestResponseBytesMetrics) {
   std::chrono::milliseconds default_latency_threshold(100);
   LatencyThresholdOverrideList latency_threshold_overrides;
 

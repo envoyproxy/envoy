@@ -60,8 +60,8 @@ message ZooKeeperProxy {
   // Specifying latency threshold overrides multiple times for one opcode is not allowed.
   repeated LatencyThresholdOverride latency_threshold_overrides = 6;
 
-  // Whether to emit per opcode request/response bytes counters. If not set, defaults to false.
-  bool enable_per_opcode_request_response_bytes = 7;
+  // Whether to emit per opcode request/response bytes metrics. If not set, defaults to false.
+  bool enable_per_opcode_request_response_bytes_metrics = 7;
 }
 
 message LatencyThresholdOverride {

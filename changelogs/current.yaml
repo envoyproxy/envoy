@@ -116,7 +116,7 @@ new_features:
 
 - area: zookeeper
   change: |
-    Added support for emitting per opcode request/response bytes counters.
+    Added support for emitting per opcode request/response bytes metrics.
 deprecated:
 - area: tracing
   change: |
