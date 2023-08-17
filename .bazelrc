@@ -26,6 +26,8 @@ build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
 
+build --action_env=ARB=change --host_action_env=ARB=change
+
 # Pass CC, CXX and LLVM_CONFIG variables from the environment.
 # We assume they have stable values, so this won't cause action cache misses.
 build --action_env=CC --host_action_env=CC
