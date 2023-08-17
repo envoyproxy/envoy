@@ -32,8 +32,6 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
       connect_latency_(stat_name_set_->add("connect_response_latency")),
       unknown_scheme_rq_(stat_name_set_->add("unknown_scheme_rq")),
       unknown_opcode_latency_(stat_name_set_->add("unknown_opcode_latency")),
-      unknown_opcode_rq_bytes_(stat_name_set_->add("unknown_opcode_rq_bytes")),
-      unknown_opcode_resp_bytes_(stat_name_set_->add("unknown_opcode_resp_bytes")),
       enable_per_opcode_request_response_bytes_(enable_per_opcode_request_response_bytes),
       enable_latency_threshold_metrics_(enable_latency_threshold_metrics),
       default_latency_threshold_(default_latency_threshold),
@@ -244,16 +242,16 @@ void ZooKeeperFilter::onDefaultRequestBytes(const OpCodes opcode, const uint64_t
   }
 }
 
-void ZooKeeperFilter::onRequestBytes(const OpCodes opcode, const uint64_t bytes) {
+void ZooKeeperFilter::onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
   config_->stats_.request_bytes_.add(bytes);
 
-  if (config_->enable_per_opcode_request_response_bytes_) {
-    switch (opcode) {
+  if (config_->enable_per_opcode_request_response_bytes_ && opcode.has_value()) {
+    switch (*opcode) {
     case OpCodes::Connect:
       onConnectRequestBytes(bytes);
       break;
     default:
-      onDefaultRequestBytes(opcode, bytes);
+      onDefaultRequestBytes(*opcode, bytes);
       break;
     }
   }
@@ -281,16 +279,16 @@ void ZooKeeperFilter::onDefaultResponseBytes(const OpCodes opcode, const uint64_
   }
 }
 
-void ZooKeeperFilter::onResponseBytes(const OpCodes opcode, const uint64_t bytes) {
+void ZooKeeperFilter::onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
   config_->stats_.response_bytes_.add(bytes);
 
-  if (config_->enable_per_opcode_request_response_bytes_) {
-    switch (opcode) {
+  if (config_->enable_per_opcode_request_response_bytes_ && opcode.has_value()) {
+    switch (*opcode) {
     case OpCodes::Connect:
       onConnectResponseBytes(bytes);
       break;
     default:
-      onDefaultResponseBytes(opcode, bytes);
+      onDefaultResponseBytes(*opcode, bytes);
       break;
     }
   }

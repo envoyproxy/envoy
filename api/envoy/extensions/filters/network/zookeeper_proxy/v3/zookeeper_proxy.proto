@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
 // [#extension: envoy.filters.network.zookeeper_proxy]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ZooKeeperProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.zookeeper_proxy.v1alpha1.ZooKeeperProxy";
@@ -60,7 +60,7 @@ message ZooKeeperProxy {
   // Specifying latency threshold overrides multiple times for one opcode is not allowed.
   repeated LatencyThresholdOverride latency_threshold_overrides = 6;
 
-  // Whether to emit per opcode request/response bytes. If not set, defaults to false.
+  // Whether to emit per opcode request/response bytes counters. If not set, defaults to false.
   bool enable_per_opcode_request_response_bytes = 7;
 }
 

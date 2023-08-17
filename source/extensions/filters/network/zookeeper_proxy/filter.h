@@ -201,8 +201,6 @@ public:
   const Stats::StatName connect_latency_;
   const Stats::StatName unknown_scheme_rq_;
   const Stats::StatName unknown_opcode_latency_;
-  const Stats::StatName unknown_opcode_rq_bytes_;
-  const Stats::StatName unknown_opcode_resp_bytes_;
   const bool enable_per_opcode_request_response_bytes_;
 
   ErrorBudgetResponseType errorBudgetDecision(const OpCodes opcode,
@@ -279,7 +277,7 @@ public:
   void onDecodeError() override;
   void onConnectRequestBytes(const uint64_t bytes) override;
   void onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) override;
-  void onRequestBytes(const OpCodes opcode, const uint64_t bytes) override;
+  void onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnect(bool readonly) override;
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
@@ -305,7 +303,7 @@ public:
   void onCloseRequest() override;
   void onConnectResponseBytes(const uint64_t bytes) override;
   void onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) override;
-  void onResponseBytes(const OpCodes opcode, const uint64_t bytes) override;
+  void onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
                          const std::chrono::milliseconds latency) override;
   void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,

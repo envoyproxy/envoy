@@ -114,6 +114,9 @@ new_features:
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
 
+- area: zookeeper
+  change: |
+    Added support for emitting per opcode request/response bytes counters.
 deprecated:
 - area: tracing
   change: |
