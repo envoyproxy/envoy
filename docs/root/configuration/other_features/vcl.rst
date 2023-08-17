@@ -92,9 +92,6 @@ For information on how to build and/or install VPP see the getting started guide
     # Use session layer socket api for VCL attachments
     use-app-socket-api
 
-    # Enable VPP session layer
-    enable
-
     # VPP worker's message queues lengths
     event-queue-length 100000
   }
