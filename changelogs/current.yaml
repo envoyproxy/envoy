@@ -12,7 +12,7 @@ minor_behavior_changes:
 - area: http oauth2 filter
   change: |
     Change HMAC cookie encoding to hex-encoded only. This change can be reverted temporarily by
-    setting the runtime guard ``envoy.reloadable_features.hmac_encoding`` to false.
+    setting the runtime guard ``envoy.reloadable_features.hmac_hex_encoding_only`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

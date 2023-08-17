@@ -968,7 +968,7 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
 TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAtHmacEncoding) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.hmac_hex_encoding_only", "true"},
+      {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
   });
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
