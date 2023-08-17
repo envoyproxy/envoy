@@ -263,14 +263,6 @@ struct httpRequestInternal : httpRequest {
   std::weak_ptr<Filter> weakFilter() { return filter_; }
 };
 
-class FilterLogger : Logger::Loggable<Logger::Id::http> {
-public:
-  FilterLogger() = default;
-
-  void log(uint32_t level, absl::string_view message) const;
-  uint32_t level() const;
-};
-
 class GoStringFilterState : public StreamInfo::FilterState::Object {
 public:
   GoStringFilterState(absl::string_view value) : value_(value) {}

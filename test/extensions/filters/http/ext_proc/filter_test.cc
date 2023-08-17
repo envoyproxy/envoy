@@ -98,16 +98,6 @@ protected:
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
-    EXPECT_CALL(async_client_stream_info_, bytesSent()).WillRepeatedly(Return(100));
-    EXPECT_CALL(async_client_stream_info_, bytesReceived()).WillRepeatedly(Return(200));
-    EXPECT_CALL(async_client_stream_info_, upstreamClusterInfo());
-    EXPECT_CALL(testing::Const(async_client_stream_info_), upstreamInfo());
-    // Get pointer to MockUpstreamInfo.
-    std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
-        std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(
-            async_client_stream_info_.upstreamInfo());
-    EXPECT_CALL(testing::Const(*mock_upstream_info), upstreamHost());
-
     // Pointing dispatcher_.time_system_ to a SimulatedTimeSystem object.
     test_time_ = new Envoy::Event::SimulatedTimeSystem();
     dispatcher_.time_system_.reset(test_time_);
@@ -470,8 +460,6 @@ protected:
                 filter_config_name);
     const Envoy::ProtobufWkt::Struct& loggedMetadata = filterState->filterMetadata();
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
-    EXPECT_EQ(filterState->bytesSent(), 100);
-    EXPECT_EQ(filterState->bytesReceived(), 200);
   }
 
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
@@ -711,6 +699,40 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 
   expectFilterState(Envoy::ProtobufWkt::Struct());
+}
+
+TEST_F(HttpFilterTest, PostAndRespondImmediatelyWithDisabledConfig) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  disable_immediate_response: true
+  )EOF");
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  auto* immediate_response = resp1->mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+  immediate_response->set_body("Bad request");
+  immediate_response->set_details("Got a bad request");
+  auto* immediate_headers = immediate_response->mutable_headers();
+  auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_header()->set_key("content-type");
+  hdr1->mutable_header()->set_value("text/plain");
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(filter_->decodeData(req_data, true), FilterDataStatus::Continue);
+  EXPECT_EQ(filter_->decodeTrailers(request_trailers_), FilterTrailersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true), FilterHeadersStatus::Continue);
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 0);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
 // Using the default configuration, test the filter with a processor that

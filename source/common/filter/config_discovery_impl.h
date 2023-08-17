@@ -504,7 +504,7 @@ private:
       envoy::config::core::v3::TypedExtensionConfig filter_config;
       filter_config.set_name(ecds_filter->name());
       if (ecds_filter->lastConfig()) {
-        filter_config.mutable_typed_config()->PackFrom(*ecds_filter->lastConfig());
+        MessageUtil::packFrom(*filter_config.mutable_typed_config(), *ecds_filter->lastConfig());
       }
       auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
       filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
@@ -656,7 +656,7 @@ class UpstreamHttpFilterConfigProviderManagerImpl
               Server::Configuration::UpstreamHttpFactoryContext,
               Server::Configuration::UpstreamHttpFilterConfigFactory>> {
 public:
-  absl::string_view statPrefix() const override { return "http_filter."; }
+  absl::string_view statPrefix() const override { return "upstream_http_filter."; }
 
 protected:
   bool

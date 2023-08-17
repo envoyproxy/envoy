@@ -75,6 +75,7 @@ void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTraile
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                                 const std::string& message) {
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
+  callbacks_.logGrpcStreamInfo();
   stream_closed_ = true;
   if (status == Grpc::Status::Ok) {
     callbacks_.onGrpcClose();

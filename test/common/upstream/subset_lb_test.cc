@@ -221,23 +221,28 @@ public:
   void configureWeightedHostSet(const HostURLMetadataMap& first_locality_host_metadata,
                                 const HostURLMetadataMap& second_locality_host_metadata,
                                 MockHostSet& host_set, LocalityWeights locality_weights) {
-    HostVector first_locality;
     HostVector all_hosts;
+    HostVector first_locality_hosts;
+    envoy::config::core::v3::Locality first_locality;
+    first_locality.set_zone("0");
     for (const auto& it : first_locality_host_metadata) {
-      auto host = makeHost(it.first, it.second);
-      first_locality.emplace_back(host);
+      auto host = makeHost(it.first, it.second, first_locality);
+      first_locality_hosts.emplace_back(host);
       all_hosts.emplace_back(host);
     }
 
-    HostVector second_locality;
+    envoy::config::core::v3::Locality second_locality;
+    second_locality.set_zone("1");
+    HostVector second_locality_hosts;
     for (const auto& it : second_locality_host_metadata) {
-      auto host = makeHost(it.first, it.second);
-      second_locality.emplace_back(host);
+      auto host = makeHost(it.first, it.second, second_locality);
+      second_locality_hosts.emplace_back(host);
       all_hosts.emplace_back(host);
     }
 
     host_set.hosts_ = all_hosts;
-    host_set.hosts_per_locality_ = makeHostsPerLocality({first_locality, second_locality});
+    host_set.hosts_per_locality_ =
+        makeHostsPerLocality({first_locality_hosts, second_locality_hosts});
     host_set.healthy_hosts_ = host_set.hosts_;
     host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
     host_set.locality_weights_ = std::make_shared<const LocalityWeights>(locality_weights);
@@ -286,12 +291,22 @@ public:
                      const std::vector<HostURLMetadataMap>& local_host_metadata_per_locality) {
     EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
 
+    std::vector<std::shared_ptr<const envoy::config::core::v3::Locality>> localities;
+    for (uint32_t i = 0; i < 10; ++i) {
+      envoy::config::core::v3::Locality locality;
+      locality.set_zone(std::to_string(i));
+      localities.emplace_back(std::make_shared<const envoy::config::core::v3::Locality>(locality));
+    }
+    ASSERT(host_metadata_per_locality.size() <= localities.size());
+    ASSERT(local_host_metadata_per_locality.size() <= localities.size());
+
     HostVector hosts;
     std::vector<HostVector> hosts_per_locality;
-    for (const auto& host_metadata : host_metadata_per_locality) {
+    for (uint32_t i = 0; i < host_metadata_per_locality.size(); ++i) {
+      const auto& host_metadata = host_metadata_per_locality[i];
       HostVector locality_hosts;
       for (const auto& host_entry : host_metadata) {
-        HostSharedPtr host = makeHost(host_entry.first, host_entry.second);
+        HostSharedPtr host = makeHost(host_entry.first, host_entry.second, *localities[i]);
         hosts.emplace_back(host);
         locality_hosts.emplace_back(host);
       }
@@ -306,10 +321,11 @@ public:
 
     local_hosts_ = std::make_shared<HostVector>();
     std::vector<HostVector> local_hosts_per_locality_vector;
-    for (const auto& local_host_metadata : local_host_metadata_per_locality) {
+    for (uint32_t i = 0; i < local_host_metadata_per_locality.size(); ++i) {
+      const auto& local_host_metadata = local_host_metadata_per_locality[i];
       HostVector local_locality_hosts;
       for (const auto& host_entry : local_host_metadata) {
-        HostSharedPtr host = makeHost(host_entry.first, host_entry.second);
+        HostSharedPtr host = makeHost(host_entry.first, host_entry.second, *localities[i]);
         local_hosts_->emplace_back(host);
         local_locality_hosts.emplace_back(host);
       }
@@ -344,6 +360,18 @@ public:
 
     return makeTestHost(info_, url, m, simTime());
   }
+
+  HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata,
+                         const envoy::config::core::v3::Locality& locality) {
+    envoy::config::core::v3::Metadata m;
+    for (const auto& m_it : metadata) {
+      Config::Metadata::mutableMetadataValue(m, Config::MetadataFilters::get().ENVOY_LB, m_it.first)
+          .set_string_value(m_it.second);
+    }
+
+    return makeTestHost(info_, url, m, locality, simTime());
+  }
+
   HostSharedPtr makeHost(const std::string& url, const HostListMetadata& metadata) {
     envoy::config::core::v3::Metadata m;
     for (const auto& m_it : metadata) {
@@ -1666,11 +1694,14 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
 
-  modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}})}, {host_set_.hosts_[0]},
-              absl::optional<uint32_t>(0));
+  envoy::config::core::v3::Locality local_locality;
+  local_locality.set_zone("0");
 
-  modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}})}, {local_hosts_->at(0)},
-                   0);
+  modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}}, local_locality)},
+              {host_set_.hosts_[0]}, absl::optional<uint32_t>(0));
+
+  modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}}, local_locality)},
+                   {local_hosts_->at(0)}, 0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
@@ -1793,11 +1824,14 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 
-  modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}})}, {host_set_.hosts_[1]},
-              absl::optional<uint32_t>(0));
+  envoy::config::core::v3::Locality local_locality;
+  local_locality.set_zone("0");
+
+  modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}}, local_locality)},
+              {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)},
-                   {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}})}, 0);
+                   {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}}, local_locality)}, 0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr));
@@ -1916,11 +1950,14 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
 
-  modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}})}, {host_set_.hosts_[1]},
-              absl::optional<uint32_t>(0));
+  envoy::config::core::v3::Locality local_locality;
+  local_locality.set_zone("0");
 
-  modifyLocalHosts({local_hosts_->at(1)}, {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}})},
-                   0);
+  modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)},
+              {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
+
+  modifyLocalHosts({local_hosts_->at(1)},
+                   {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, local_locality)}, 0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));

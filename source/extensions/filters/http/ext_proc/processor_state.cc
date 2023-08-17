@@ -34,13 +34,17 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                                            CallbackState next_state) {
+  filter_.logGrpcStreamInfo();
+
   stopMessageTimer();
 
   if (call_start_time_.has_value()) {
     std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
-    filter_.loggingInfo().recordGrpcCall(duration, call_status, callback_state_,
-                                         trafficDirection());
+    ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+    if (logging_info != nullptr) {
+      logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection());
+    }
     call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;

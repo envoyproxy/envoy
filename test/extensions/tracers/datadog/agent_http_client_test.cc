@@ -499,8 +499,10 @@ TEST_F(DatadogAgentHttpClientTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     // Simulate addition of an irrelevant cluster.
     NiceMock<Upstream::MockThreadLocalCluster> unrelated_cluster;
     unrelated_cluster.cluster_.info_->name_ = "unrelated_cluster";
-    cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
-
+    Upstream::ThreadLocalClusterCommand command =
+        [&unrelated_cluster]() -> Upstream::ThreadLocalCluster& { return unrelated_cluster; };
+    cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster.cluster_.info_->name_,
+                                                   command);
     // Verify that no report will be sent.
     EXPECT_CALL(cm.thread_local_cluster_, httpAsyncClient()).Times(0);
     EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
@@ -519,7 +521,11 @@ TEST_F(DatadogAgentHttpClientTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 
   {
     // Simulate addition of the relevant cluster.
-    cluster_update_callbacks->onClusterAddOrUpdate(cm.thread_local_cluster_);
+    Upstream::ThreadLocalClusterCommand command = [&cm]() -> Upstream::ThreadLocalCluster& {
+      return cm.thread_local_cluster_;
+    };
+    cluster_update_callbacks->onClusterAddOrUpdate(cm.thread_local_cluster_.info()->name(),
+                                                   command);
 
     // Verify that report will be sent.
     EXPECT_CALL(cm.thread_local_cluster_, httpAsyncClient())
