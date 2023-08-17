@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 

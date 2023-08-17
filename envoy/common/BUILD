@@ -12,18 +12,12 @@ envoy_package()
 envoy_basic_cc_library(
     name = "base_includes",
     hdrs = [
+        "exception.h",
         "optref.h",
         "platform.h",
         "pure.h",
     ],
     external_deps = ["abseil_optional"],
-)
-
-envoy_basic_cc_library(
-    name = "exception_lib",
-    hdrs = [
-        "exception.h",
-    ],
 )
 
 envoy_cc_library(
