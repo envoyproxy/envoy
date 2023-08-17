@@ -67,11 +67,15 @@ def create_issues(access_token, runtime_and_pr):
         # Who is the author?
         if pr:
             # Extract PR title, number, and author.
-            pr_info = repo.get_pull(pr)
-            change_title = pr_info.title
             number = ('#%d') % pr
-            login = pr_info.user.login
-        else:
+            try:
+                pr_info = repo.get_pull(pr)
+                change_title = pr_info.title
+                login = pr_info.user.login
+            except:
+                print("Failed to fetch info for %s, trying backup method", number)
+
+        if not login:
             # Extract commit message, sha, and author.
             # Only keep commit message title (remove description), and truncate to 50 characters.
             change_title = commit.message.split('\n')[0][:50]
