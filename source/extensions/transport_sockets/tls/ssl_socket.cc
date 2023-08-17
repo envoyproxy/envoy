@@ -242,6 +242,7 @@ void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
                    callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
                    failure_reason_);
   }
+
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }
