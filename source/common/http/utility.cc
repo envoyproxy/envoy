@@ -596,17 +596,17 @@ Utility::QueryParamsMulti Utility::QueryParamsMulti::parseParameters(absl::strin
   return params;
 }
 
-void Utility::QueryParamsMulti::remove(absl::string_view key) { this->data.erase(key); }
+void Utility::QueryParamsMulti::remove(absl::string_view key) { this->data_.erase(key); }
 
 void Utility::QueryParamsMulti::add(absl::string_view key, absl::string_view value) {
-  auto result = this->data.emplace(std::string(key), std::vector<std::string>{std::string(value)});
+  auto result = this->data_.emplace(std::string(key), std::vector<std::string>{std::string(value)});
   if (!result.second) {
     result.first->second.push_back(std::string(value));
   }
 }
 
 void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_view value) {
-  this->data[key] = std::vector<std::string>{std::string(value)};
+  this->data_[key] = std::vector<std::string>{std::string(value)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
@@ -641,7 +641,7 @@ std::string Utility::replaceQueryString(const HeaderString& path,
 std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) {
   std::string new_path{Http::Utility::stripQueryString(path)};
 
-  if (!this->data.empty()) {
+  if (!this->data_.empty()) {
     absl::StrAppend(&new_path, this->toString());
   }
 
@@ -1097,7 +1097,7 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
 std::string Utility::QueryParamsMulti::toString() {
   std::string out;
   std::string delim = "?";
-  for (const auto& p : this->data) {
+  for (const auto& p : this->data_) {
     for (const auto& v : p.second) {
       absl::StrAppend(&out, delim, p.first, "=", v);
       delim = "&";

@@ -57,75 +57,66 @@ TEST(HttpUtility, parseQueryString) {
   auto input = "/hello";
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString(input));
-  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(map{},
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?";
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString(input));
-  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(map{},
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?hello";
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseAndDecodeQueryString(input));
   auto expected = map{{"hello", vec{""}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?hello%26";
   EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}), Utility::parseAndDecodeQueryString(input));
   expected = map{{"hello%26", vec{""}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
   expected = map{{"hello&", vec{""}}};
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?hello=world";
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}), Utility::parseAndDecodeQueryString(input));
   expected = map{{"hello", vec{"world"}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?hello=";
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseAndDecodeQueryString(input));
   expected = map{{"hello", vec{""}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?hello%26=";
   EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}), Utility::parseAndDecodeQueryString(input));
   expected = map{{"hello%26", vec{""}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
   expected = map{{"hello&", vec{""}}};
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?hello=&";
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseAndDecodeQueryString(input));
   expected = map{{"hello", vec{""}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?hello%26=&";
   EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}), Utility::parseAndDecodeQueryString(input));
   expected = map{{"hello%26", vec{""}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
   expected = map{{"hello&", vec{""}}};
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?hello=&hello2=world2";
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
@@ -133,9 +124,8 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
             Utility::parseAndDecodeQueryString(input));
   expected = map{{"hello", vec{""}}, {"hello2", vec{"world2"}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/logging?name=admin&level=trace";
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
@@ -143,9 +133,8 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
             Utility::parseAndDecodeQueryString(input));
   expected = map{{"name", vec{"admin"}}, {"level", vec{"trace"}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?param_value_has_encoded_ampersand=a%26b";
   EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a%26b"}}),
@@ -153,10 +142,9 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a&b"}}),
             Utility::parseAndDecodeQueryString(input));
   expected = map{{"param_value_has_encoded_ampersand", vec{"a%26b"}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
   expected = map{{"param_value_has_encoded_ampersand", vec{"a&b"}}};
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?params_has_encoded_%26=a%26b&ok=1";
   EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_%26", "a%26b"}, {"ok", "1"}}),
@@ -164,10 +152,9 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_&", "a&b"}, {"ok", "1"}}),
             Utility::parseAndDecodeQueryString(input));
   expected = map{{"params_has_encoded_%26", vec{"a%26b"}}, {"ok", vec{"1"}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
   expected = map{{"params_has_encoded_&", vec{"a&b"}}, {"ok", vec{"1"}}};
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   input = "/hello?params_%xy_%%yz=%xy%%yz";
   EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
@@ -175,9 +162,8 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
             Utility::parseAndDecodeQueryString(input));
   expected = map{{"params_%xy_%%yz", vec{"%xy%%yz"}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   // A sample of request path with query strings by Prometheus:
   // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
@@ -198,20 +184,18 @@ TEST(HttpUtility, parseQueryString) {
       {"filter",
        vec{"%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
            "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
   expected = map{
       {"filter", vec{"(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|"
                      "rq_complete|rq_active|cx_active))|(server.version)"}}};
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   // Requests with repeating keys
   input = "/foo?a=1&b=2&a=3%264&a=5";
   expected = map{{"a", vec{"1", "3%264", "5"}}, {"b", vec{"2"}}};
-  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
   expected = map{{"a", vec{"1", "3&4", "5"}}, {"b", vec{"2"}}};
-  EXPECT_EQ(expected,
-            Utility::QueryParamsMulti::parseAndDecodeQueryString(input).copy_map_for_testing());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 }
 
 TEST(HttpUtility, stripQueryString) {
