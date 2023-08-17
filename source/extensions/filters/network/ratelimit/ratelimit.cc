@@ -86,7 +86,7 @@ Network::FilterStatus Filter::onNewConnection() {
     client_->limit(
         *this, config_->domain(),
         config_->applySubstitutionFormatter(filter_callbacks_->connection().streamInfo()),
-        Tracing::NullSpan::instance(), filter_callbacks_->connection().streamInfo());
+        Tracing::NullSpan::instance(), filter_callbacks_->connection().streamInfo(), 0);
     calling_limit_ = false;
   }
 

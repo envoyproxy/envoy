@@ -400,6 +400,8 @@ ClusterManagerImpl::ClusterManagerImpl(
             Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
             Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
 
+    const bool use_eds_cache =
+        Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads");
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -419,7 +421,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
           local_info, std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), {}, false);
+          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
@@ -440,7 +442,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher, random_, *stats_.rootScope(), dyn_resources.ads_config(),
           local_info, std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, false);
+          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -1618,6 +1620,14 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
             name, enumToInt(status), cluster_manager->thread_local_dispatcher_.name());
         cluster_manager->cdm_.processClusterName(name, status);
       });
+}
+
+Config::EdsResourcesCacheOptRef ClusterManagerImpl::edsResourcesCache() {
+  // EDS caching is only supported for ADS.
+  if (ads_mux_) {
+    return ads_mux_->edsResourcesCache();
+  }
+  return {};
 }
 
 ClusterDiscoveryManager

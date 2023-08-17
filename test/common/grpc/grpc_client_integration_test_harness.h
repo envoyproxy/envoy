@@ -105,21 +105,32 @@ public:
   Event::Dispatcher& dispatcher_;
 };
 
+struct RequestArgs {
+  helloworld::HelloRequest* request = nullptr;
+  bool end_stream = false;
+};
+
 // Stream related test utilities.
 class HelloworldStream : public MockAsyncStreamCallbacks<helloworld::HelloReply> {
 public:
   HelloworldStream(DispatcherHelper& dispatcher_helper) : dispatcher_helper_(dispatcher_helper) {}
 
-  void sendRequest(bool end_stream = false) {
+  void sendRequest(RequestArgs request_args = {}) {
     helloworld::HelloRequest request_msg;
     request_msg.set_name(HELLO_REQUEST);
-    grpc_stream_->sendMessage(request_msg, end_stream);
+    // Update the request pointer to local request message when it is not set at caller site (i.e.,
+    // nullptr).
+    if (request_args.request == nullptr) {
+      request_args.request = &request_msg;
+    }
+
+    grpc_stream_->sendMessage(*request_args.request, request_args.end_stream);
 
     helloworld::HelloRequest received_msg;
     AssertionResult result =
         fake_stream_->waitForGrpcMessage(dispatcher_helper_.dispatcher_, received_msg);
     RELEASE_ASSERT(result, result.message());
-    EXPECT_THAT(request_msg, ProtoEq(received_msg));
+    EXPECT_THAT(*request_args.request, ProtoEq(received_msg));
   }
 
   void expectInitialMetadata(const TestMetadata& metadata) {
@@ -156,10 +167,29 @@ public:
     fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
 
-  void sendReply() {
+  // `check_response_size` only could be set to true in Envoy gRPC because bytes metering is only
+  // implemented in Envoy gPRC mode.
+  void sendReply(bool check_response_size = false) {
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
-    EXPECT_CALL(*this, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY))).WillExitIfNeeded();
+    EXPECT_CALL(*this, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY)))
+        .WillOnce(Invoke([this, check_response_size](const helloworld::HelloReply& reply_msg) {
+          if (check_response_size) {
+            auto recv_buf = Common::serializeMessage(reply_msg);
+            // gRPC message in Envoy gRPC mode is prepended with a frame header.
+            Common::prependGrpcFrameHeader(*recv_buf);
+            // Verify that the number of received byte that is tracked in the stream info equals to
+            // the length of reply response buffer.
+            auto upstream_meter = this->grpc_stream_->streamInfo().getUpstreamBytesMeter();
+            uint64_t total_bytes_rev = upstream_meter->wireBytesReceived();
+            uint64_t header_bytes_rev = upstream_meter->headerBytesReceived();
+            // In HTTP2 codec, H2_FRAME_HEADER_SIZE is always included in bytes meter so we need to
+            // account for it in the check here as well.
+            EXPECT_EQ(total_bytes_rev - header_bytes_rev,
+                      recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+          }
+          dispatcher_helper_.exitDispatcherIfNeeded();
+        }));
     dispatcher_helper_.setStreamEventPending();
     fake_stream_->sendGrpcMessage<helloworld::HelloReply>(reply);
   }
@@ -250,9 +280,8 @@ public:
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
-      FakeUpstreamConfig config(test_time_.timeSystem());
-      config.upstream_protocol_ = Http::CodecType::HTTP2;
-      fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
+      fake_upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
+      fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), fake_upstream_config_);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -448,6 +477,7 @@ public:
   }
 
   DangerousDeprecatedTestTime test_time_;
+  FakeUpstreamConfig fake_upstream_config_{test_time_.timeSystem()};
   std::unique_ptr<FakeUpstream> fake_upstream_;
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
