@@ -46,7 +46,7 @@ void Filter::initiateCall(const ThriftProxy::MessageMetadata& metadata) {
     state_ = State::Calling;
     initiating_call_ = true;
     client_->limit(*this, config_->domain(), descriptors, Tracing::NullSpan::instance(),
-                   decoder_callbacks_->streamInfo(), 0);
+                   decoder_callbacks_->streamInfo());
     initiating_call_ = false;
   }
 }

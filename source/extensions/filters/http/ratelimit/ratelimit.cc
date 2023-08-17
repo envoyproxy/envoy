@@ -70,7 +70,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     state_ = State::Calling;
     initiating_call_ = true;
     client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
-                   callbacks_->streamInfo(), 0);
+                   callbacks_->streamInfo());
     initiating_call_ = false;
   }
 }

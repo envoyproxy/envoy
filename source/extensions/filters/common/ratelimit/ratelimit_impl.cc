@@ -35,10 +35,8 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
                                    const std::string& domain,
-                                   const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                   uint32_t hits_addend) {
+                                   const std::vector<Envoy::RateLimit::Descriptor>& descriptors) {
   request.set_domain(domain);
-  request.set_hits_addend(hits_addend);
   for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
     envoy::extensions::common::ratelimit::v3::RateLimitDescriptor* new_descriptor =
         request.add_descriptors();
@@ -59,13 +57,12 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
-                           uint32_t hits_addend) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   envoy::service::ratelimit::v3::RateLimitRequest request;
-  createRequest(request, domain, descriptors, hits_addend);
+  createRequest(request, domain, descriptors);
 
   request_ =
       async_client_->send(service_method_, request, *this, parent_span,
