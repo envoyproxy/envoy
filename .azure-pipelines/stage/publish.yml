@@ -107,16 +107,14 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: docker-upload
-      # cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
       publishTestResults: false
-      # VERSION.txt is included to refresh Docker images for release
-      cacheKeyDocker: "ci/Dockerfile-envoy | VERSION.txt| $(cacheKeyBazelFiles)"
-      cacheKeyDockerName: publish_docker
-      cacheKeyDockerTmpDir: /var/azpcache
-      cacheKeyDockerNoTmpfs: true
-      cacheKeyDockerPath: ""
-      cacheKeyDockerVersion: "$(cacheKeyDockerBuild)"
+      pathDockerBind: ""
+      cacheKeyDocker: "$(cacheKeyDockerBuild)"
+      cacheKeyVersion: "$(cacheKeyDockerBuildVersion)"
+      pathCacheTemp: /var/azpcache
+      tmpfsCacheDisabled: true
+      diskspaceHack: true
       env:
         GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       stepsPre:
@@ -152,9 +150,11 @@ jobs:
           DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
       stepsPost:
       - script: |
-          sudo .azure-pipelines/docker/save_cache.sh /var/azpcache true
+          set -e
+          sudo .azure-pipelines/docker/save_cache.sh /var/azpcache/docker true
           sudo rm -rf /var/lib/docker
         displayName: "Cache/save (publish_docker)"
+        condition: and(succeeded(), ne(variables.DOCKER_CACHE_RESTORED, 'true'))
 
 - job: package_x64
   displayName: Linux debs (x64)
@@ -175,6 +175,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: bazel.distribution
+      tmpfsCacheDisabled: true
       stepsPre:
       - template: ../gpg.yml
         parameters:
@@ -195,7 +196,7 @@ jobs:
     and(not(canceled()),
         eq(${{ parameters.runPackaging }}, 'true'))
   timeoutInMinutes: 120
-  pool: "envoy-arm-large"
+  pool: "envoy-arm-small"
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
@@ -211,6 +212,7 @@ jobs:
       rbe: false
       artifactSuffix: ".arm64"
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      tmpfsDockerDisabled: true
       stepsPre:
       - template: ../gpg.yml
         parameters:
@@ -252,9 +254,7 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
           DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
@@ -270,9 +270,7 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-publish-latest'

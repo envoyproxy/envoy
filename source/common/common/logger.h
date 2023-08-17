@@ -563,22 +563,26 @@ public:
 #define ENVOY_TAGGED_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, CONNECTION, FORMAT, ...)              \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      TAGS.emplace("ConnectionId", std::to_string((CONNECTION).id()));                             \
-      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
-                          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT), \
-                          ##__VA_ARGS__);                                                          \
+      std::map<std::string, std::string> log_tags = TAGS;                                          \
+      log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
+      ENVOY_LOG_TO_LOGGER(                                                                         \
+          LOGGER, LEVEL,                                                                           \
+          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT),             \
+          ##__VA_ARGS__);                                                                          \
     }                                                                                              \
   } while (0)
 
 #define ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, STREAM, FORMAT, ...)                \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      TAGS.emplace("ConnectionId",                                                                 \
-                   (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0");     \
-      TAGS.emplace("StreamId", std::to_string((STREAM).streamId()));                               \
-      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
-                          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT), \
-                          ##__VA_ARGS__);                                                          \
+      std::map<std::string, std::string> log_tags = TAGS;                                          \
+      log_tags.emplace("ConnectionId",                                                             \
+                       (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
+      log_tags.emplace("StreamId", std::to_string((STREAM).streamId()));                           \
+      ENVOY_LOG_TO_LOGGER(                                                                         \
+          LOGGER, LEVEL,                                                                           \
+          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT),             \
+          ##__VA_ARGS__);                                                                          \
     }                                                                                              \
   } while (0)
 
@@ -661,8 +665,16 @@ public:
   } while (0)
 
 #define ENVOY_CONN_LOG_EVENT(LEVEL, EVENT_NAME, FORMAT, CONNECTION, ...)                           \
-  ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, "[C{}] " FORMAT, (CONNECTION).id(), \
-                            ##__VA_ARGS__);
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+      std::map<std::string, std::string> log_tags;                                                 \
+      log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
+      const auto combined_format = ::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT;  \
+      ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, fmt::runtime(combined_format), ##__VA_ARGS__);    \
+      ::Envoy::Logger::Registry::getSink()->logWithStableName(                                     \
+          EVENT_NAME, #LEVEL, (ENVOY_LOGGER()).name(), combined_format, ##__VA_ARGS__);            \
+    }                                                                                              \
+  } while (0)
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \
@@ -674,19 +686,44 @@ public:
     }                                                                                              \
   } while (0)
 
+#define ENVOY_LOG_FIRST_N_TO_LOGGER_IF(LOGGER, LEVEL, N, CONDITION, ...)                           \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) && (CONDITION)) {                                      \
+      static auto* countdown = new std::atomic<uint64_t>();                                        \
+      if (countdown->fetch_add(1) < N) {                                                           \
+        ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
+      }                                                                                            \
+    }                                                                                              \
+  } while (0)
+
 #define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
   ENVOY_LOG_FIRST_N_TO_LOGGER(ENVOY_LOGGER(), LEVEL, N, ##__VA_ARGS__)
+
+#define ENVOY_LOG_FIRST_N_IF(LEVEL, N, CONDITION, ...)                                             \
+  ENVOY_LOG_FIRST_N_TO_LOGGER_IF(ENVOY_LOGGER(), LEVEL, N, (CONDITION), ##__VA_ARGS__)
 
 #define ENVOY_LOG_FIRST_N_MISC(LEVEL, N, ...)                                                      \
   ENVOY_LOG_FIRST_N_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, N, ##__VA_ARGS__)
 
+#define ENVOY_LOG_FIRST_N_MISC_IF(LEVEL, N, CONDITION, ...)                                        \
+  ENVOY_LOG_FIRST_N_TO_LOGGER_IF(GET_MISC_LOGGER(), LEVEL, N, (CONDITION), ##__VA_ARGS__)
+
 #define ENVOY_LOG_ONCE_TO_LOGGER(LOGGER, LEVEL, ...)                                               \
   ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, 1, ##__VA_ARGS__)
 
+#define ENVOY_LOG_ONCE_TO_LOGGER_IF(LOGGER, LEVEL, CONDITION, ...)                                 \
+  ENVOY_LOG_FIRST_N_TO_LOGGER_IF(LOGGER, LEVEL, 1, (CONDITION), ##__VA_ARGS__)
+
 #define ENVOY_LOG_ONCE(LEVEL, ...) ENVOY_LOG_ONCE_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_LOG_ONCE_IF(LEVEL, CONDITION, ...)                                                   \
+  ENVOY_LOG_ONCE_TO_LOGGER_IF(ENVOY_LOGGER(), LEVEL, (CONDITION), ##__VA_ARGS__)
 
 #define ENVOY_LOG_ONCE_MISC(LEVEL, ...)                                                            \
   ENVOY_LOG_ONCE_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_LOG_ONCE_MISC_IF(LEVEL, CONDITION, ...)                                              \
+  ENVOY_LOG_ONCE_TO_LOGGER_IF(GET_MISC_LOGGER(), LEVEL, (CONDITION), ##__VA_ARGS__)
 
 #define ENVOY_LOG_EVERY_NTH_TO_LOGGER(LOGGER, LEVEL, N, ...)                                       \
   do {                                                                                             \

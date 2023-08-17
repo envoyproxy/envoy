@@ -22,6 +22,7 @@ struct UhvResponseCodeDetailValues {
   const std::string InvalidHostDeprecatedUserInfo = "uhv.invalid_host_deprecated_user_info";
   const std::string FragmentInUrlPath = "uhv.fragment_in_url_path";
   const std::string EscapedSlashesInPath = "uhv.escaped_slashes_in_url_path";
+  const std::string Percent00InPath = "uhv.percent_00_in_url_path";
 };
 
 using UhvResponseCodeDetail = ConstSingleton<UhvResponseCodeDetailValues>;

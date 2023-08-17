@@ -1052,10 +1052,11 @@ public:
   // We keep them in a separate data structure to avoid memory overhead for the routes that do not
   // use weighted clusters.
   struct WeightedClustersConfig {
-    WeightedClustersConfig(const std::vector<WeightedClusterEntrySharedPtr>& weighted_clusters,
+    WeightedClustersConfig(const std::vector<WeightedClusterEntrySharedPtr>&& weighted_clusters,
                            uint64_t total_cluster_weight,
                            const std::string& random_value_header_name)
-        : weighted_clusters_(weighted_clusters), total_cluster_weight_(total_cluster_weight),
+        : weighted_clusters_(std::move(weighted_clusters)),
+          total_cluster_weight_(total_cluster_weight),
           random_value_header_name_(random_value_header_name) {}
     const std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
     const uint64_t total_cluster_weight_;

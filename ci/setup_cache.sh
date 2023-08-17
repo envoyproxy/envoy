@@ -19,7 +19,7 @@ if [[ -n "${GCP_SERVICE_ACCOUNT_KEY:0:1}" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS+=" --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE}"
 
   if [[ -n "${GOOGLE_BES_PROJECT_ID}" ]]; then
-    export BAZEL_BUILD_EXTRA_OPTIONS+=" --config=google-bes --bes_instance_name=${GOOGLE_BES_PROJECT_ID}"
+    export BAZEL_BUILD_EXTRA_OPTIONS+=" --config=rbe-google-bes --bes_instance_name=${GOOGLE_BES_PROJECT_ID}"
   fi
 
 fi
@@ -29,10 +29,14 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
     echo "Set up bazel remote read/write cache at ${BAZEL_REMOTE_CACHE}."
 
     if [[ -z "${ENVOY_RBE}" ]]; then
-        export BAZEL_BUILD_EXTRA_OPTIONS+=" --jobs=HOST_CPUS*.99 --remote_timeout=600"
+        export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_timeout=600"
         echo "using local build cache."
         # Normalize branches - `release/vX.xx`, `vX.xx`, `vX.xx.x` -> `vX.xx`
-        BRANCH_NAME="$(echo "${CI_TARGET_BRANCH}" | cut -d/ -f2 | cut -d. -f-2)"
+        TARGET_BRANCH="${CI_TARGET_BRANCH}"
+        if [[ "$TARGET_BRANCH" =~ ^origin/ ]]; then
+            TARGET_BRANCH=$(echo "$TARGET_BRANCH" | cut -d/ -f2-)
+        fi
+        BRANCH_NAME="$(echo "${TARGET_BRANCH}" | cut -d/ -f2 | cut -d. -f-2)"
         if [[ "$BRANCH_NAME" == "merge" ]]; then
             # Manually run PR commit - there is no easy way of telling which branch
             # it is, so just set it to `main` - otherwise it tries to cache as `branch/merge`
@@ -45,6 +49,4 @@ if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
         export BAZEL_BUILD_EXTRA_OPTIONS+=" --remote_instance_name=${BAZEL_REMOTE_INSTANCE}"
         echo "instance_name: ${BAZEL_REMOTE_INSTANCE}."
     fi
-else
-    echo "No remote cache is set, skipping setup remote cache."
 fi

@@ -22,16 +22,24 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
           api_config_source, data.api_.randomGenerator(), SubscriptionFactory::RetryInitialDelayMs,
           SubscriptionFactory::RetryMaxDelayMs);
 
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/Config::Utility::factoryForGrpcApiConfigSource(
+          data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true)
+          ->createUncachedRawAsyncClient(),
+      /*dispatcher_=*/data.dispatcher_,
+      /*service_method_=*/deltaGrpcMethod(data.type_url_),
+      /*local_info_=*/data.local_info_,
+      /*rate_limit_settings_=*/Utility::parseRateLimitSettings(api_config_source),
+      /*scope_=*/data.scope_,
+      /*config_validators_=*/std::move(custom_config_validators),
+      /*xds_resources_delegate_=*/{},
+      /*xds_config_tracker_=*/data.xds_config_tracker_,
+      /*backoff_strategy_=*/std::move(backoff_strategy),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/nullptr // No EDS resources cache needed from collections.
+  };
   return std::make_unique<GrpcCollectionSubscriptionImpl>(
-      data.collection_locator_.value(),
-      std::make_shared<Config::NewGrpcMuxImpl>(
-          Config::Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(),
-                                                         api_config_source, data.scope_, true)
-              ->createUncachedRawAsyncClient(),
-          data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
-          Utility::parseRateLimitSettings(api_config_source), data.local_info_,
-          std::move(custom_config_validators), std::move(backoff_strategy),
-          data.xds_config_tracker_),
+      data.collection_locator_.value(), std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context),
       data.callbacks_, data.resource_decoder_, data.stats_, data.dispatcher_,
       Utility::configSourceInitialFetchTimeout(data.config_), /*is_aggregated=*/false,
       data.options_);

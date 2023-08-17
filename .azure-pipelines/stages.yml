@@ -57,6 +57,7 @@ stages:
   jobs:
   - template: env.yml
 
+
 - stage: prechecks
   displayName: Prechecks
   dependsOn: ["env"]
@@ -106,6 +107,7 @@ stages:
   jobs:
   - template: stage/checks.yml
     parameters:
+      cacheTestResults: ${{ parameters.cacheTestResults }}
       concurrencyChecks: ${{ parameters.concurrencyChecks }}
       authGCP: $(GcpServiceAccountKey)
       bucketGCP: $(GcsArtifactBucket)

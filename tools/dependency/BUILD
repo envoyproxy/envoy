@@ -67,7 +67,7 @@ genrule(
         --download_cves $@ \
         --repository_locations=$(location //bazel:all_repository_locations)
     """,
-    exec_tools = [
+    tools = [
         ":cve_download",
         "//bazel:all_repository_locations",
     ],
