@@ -93,19 +93,18 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
                       certificate_chain_path_));
     }
 
-    bool fallback = config.has_private_key_provider_list()
-                        ? config.private_key_provider_list().fallback()
-                        : true;
-    if ((private_key_.empty() || !fallback) && private_key_method_ == nullptr) {
+    if(((config.has_private_key_provider_list()&&config.private_key_provider_list().fallback()==false)||config.has_private_key_provider())&& private_key_method_ == nullptr){
       if (config.has_private_key_provider_list()) {
         throw EnvoyException(fmt::format("Failed to load private key provider list."));
-      } else if (config.has_private_key_provider()) {
+      } else {
         throw EnvoyException(fmt::format("Failed to load private key provider: {}",
                                          config.private_key_provider().provider_name()));
-      } else {
-        throw EnvoyException(
-            fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
-      }
+      } 
+    }
+
+    if (private_key_.empty() && private_key_method_==nullptr) {
+      throw EnvoyException(
+          fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
     }
   }
 }
