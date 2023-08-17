@@ -47,7 +47,8 @@ StartTLS transport socket as shown in the configuration example below:
 
 This can also be used with upstream_proxy_protocol on the upstream
 cluster to deliver the real client IP, etc, to an SMTP server that
-supports proxy protocol.
+supports proxy protocol. Note: using both upstream proxy protocol and
+upstream starttls is not currently supported. `issue<https://github.com/envoyproxy/envoy/issues/29121>`_
 
 .. _config_network_filters_smtp_proxy_stats:
 
