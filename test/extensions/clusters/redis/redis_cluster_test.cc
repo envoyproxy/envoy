@@ -147,7 +147,7 @@ protected:
         });
   }
 
-  absl::Status setupFactoryFromV3Yaml(const std::string& yaml, bool allow_failure = false) {
+  void setupFactoryFromV3Yaml(const std::string& yaml) {
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
@@ -163,10 +163,7 @@ protected:
         ssl_context_manager_, std::move(outlier_event_logger), false);
 
     RedisClusterFactory factory = RedisClusterFactory();
-    auto status =
-        factory.createClusterWithConfig(cluster_config, config, cluster_factory_context).status();
-    ASSERT(allow_failure || status.ok());
-    return status;
+    factory.createClusterWithConfig(cluster_config, config, cluster_factory_context);
   }
 
   void expectResolveDiscovery(Network::DnsLookupFamily dns_lookup_family,
@@ -1097,13 +1094,12 @@ TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
         cluster_refresh_timeout: 0.25s
   )EOF";
 
-  auto status = setupFactoryFromV3Yaml(basic_yaml_hosts, true);
-  ASSERT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "Redis cluster can only created with redis cluster type.");
+  EXPECT_THROW_WITH_MESSAGE(setupFactoryFromV3Yaml(basic_yaml_hosts), EnvoyException,
+                            "Redis cluster can only created with redis cluster type.");
 }
 
 TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
-  ASSERT_TRUE(setupFactoryFromV3Yaml(BasicConfig).ok());
+  setupFactoryFromV3Yaml(BasicConfig);
 }
 
 TEST_F(RedisClusterTest, RedisErrorResponse) {

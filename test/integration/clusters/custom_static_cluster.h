@@ -55,8 +55,7 @@ protected:
       : ConfigurableClusterFactoryBase(name), create_lb_(create_lb) {}
 
 private:
-  absl::StatusOr<
-      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
+  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
                           const test::integration::clusters::CustomStaticConfig& proto_config,
                           Upstream::ClusterFactoryContext& context) override {
