@@ -463,7 +463,7 @@ envoy_cc_test(
     srcs = [
         "http2_flood_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 6,
     tags = [
         "cpu:3",
     ],
