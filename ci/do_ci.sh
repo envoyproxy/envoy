@@ -416,9 +416,7 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
             export FUZZ_COVERAGE=true
         fi
-        # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-        BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" \
-            "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
+        "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
         ;;
@@ -625,16 +623,7 @@ case $CI_TARGET in
 
     info)
         setup_clang_toolchain
-        n=0
-        until [ "$n" -ge 10 ]; do
-            bazel info "${BAZEL_GLOBAL_OPTIONS[@]}" \
-                && break
-            n=$((n+1))
-            if [[ "$n" -ne 10 ]]; then
-                sleep 15
-                echo "Retrying fetch ..."
-            fi
-        done
+        bazel info "${BAZEL_GLOBAL_OPTIONS[@]}"
         ;;
 
     msan)

@@ -94,6 +94,9 @@ AssertionResult IntegrationTcpClient::waitForData(size_t length,
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  if (disconnected_) {
+    return;
+  }
   Event::TimerPtr timeout_timer =
       connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
   timeout_timer->enableTimer(TestUtility::DefaultTimeout);
