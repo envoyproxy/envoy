@@ -53,7 +53,7 @@ fi
 BAZEL_COVERAGE_OPTIONS=(--heap_dump_on_oom)
 
 if [[ -n "${BAZEL_GRPC_LOG}" ]]; then
-    BAZEL_COVERAGE_OPTIONS+=(--remote_grpc_log="${BAZEL_GRPC_LOG}"))
+    BAZEL_COVERAGE_OPTIONS+=(--remote_grpc_log="${BAZEL_GRPC_LOG}")
 fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
