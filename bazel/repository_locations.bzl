@@ -1364,12 +1364,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/dpkp/kafka-python/blob/{version}/LICENSE",
     ),
+    # TEST: https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/pull/157/
     proxy_wasm_cpp_sdk = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
         project_desc = "WebAssembly for Proxies (C++ SDK)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk",
-        version = "921039ae983ce053bf5cba78a85a3c08ff9791e5",
-        sha256 = "a11adfe4e6346d3318ff72643aa5569dc8439d7e8927ed148f93226fa255cc7a",
+        version = "2679d4bddaede88ca48e4cf9f1bdf884adb18bcd",
+        sha256 = "04ae5e2bad2c4b281f9874515ddf9d060529f0be3a30911b4c7c7bd73d65ce68",
         strip_prefix = "proxy-wasm-cpp-sdk-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1430,13 +1431,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/blob/v{version}/LICENSE",
     ),
+    # TEST: https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/pull/157/
     emsdk = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        # v3.1.7 with Bazel fixes
-        version = "0ea8f8a8707070e9a7c83fbb4a3065683bcf1799",
-        sha256 = "1ca0ff918d476c55707bb99bc0452be28ac5fb8f22a9260a8aae8a38d1bc0e27",
+        # v3.1.44 with Bazel platforms fixes
+        version = "9b0db91883452051aca8deddc932363aab29060b",
+        sha256 = "05bad056df1286f920c675504787510434ae8b1b2d83746e0a9b0589429dbe55",
         strip_prefix = "emsdk-{version}/bazel",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["test_only"],

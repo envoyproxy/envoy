@@ -58,7 +58,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         oss_fuzz = True,
         honggfuzz = False,
     )
-    emscripten_deps(emscripten_version = "3.1.7")
+    emscripten_deps(emscripten_version = "3.1.44")
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
     parser_deps()
