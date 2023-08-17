@@ -32,8 +32,8 @@ minor_behavior_changes:
     to once per year. Values lower than once per year will automatically be set to that value.
 - area: redis
   change: |
-    The redis network filter
-    :ref:`connection_rate_limit_per_sec <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
+    The redis network filter :ref:`connection_rate_limit_per_sec
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
     must be greater than 0. A config that sets this value to 0 will be rejected.
 
 bug_fixes:
