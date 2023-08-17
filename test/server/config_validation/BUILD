@@ -158,7 +158,6 @@ envoy_cc_test_library(
 
 envoy_cc_fuzz_test(
     name = "xds_fuzz_test",
-    size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
     deps = [
