@@ -37,8 +37,7 @@ constexpr size_t kMaxReplyLine = 1024;
 constexpr size_t kMaxReplyBytes = 65536;
 } // anonymous namespace
 
-Decoder::Result getLine(const Buffer::Instance& data, size_t max_line,
-                        std::string& line_out) {
+Decoder::Result getLine(const Buffer::Instance& data, size_t max_line, std::string& line_out) {
   const ssize_t crlf = data.search(CRLF.data(), CRLF.size(), 0, max_line);
   if (crlf == -1) {
     if (data.length() >= max_line) {
@@ -168,7 +167,7 @@ Decoder::Result DecoderImpl::decodeResponse(const Buffer::Instance& data, Respon
       break; // last line of multiline
     }
   }
-  ASSERT(code);  // we returned ProtocolError by now if we didn't populate code
+  ASSERT(code); // we returned ProtocolError by now if we didn't populate code
   result.code = *code;
   result.msg = msg;
   result.wire_len = total_reply;
