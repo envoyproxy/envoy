@@ -171,9 +171,9 @@ message Subset {
   // metadata. The same host may appear in multiple subsets.
   repeated LbSubsetSelector subset_selectors = 3;
 
-  // If true, redundant key/value pairs are allowed in the request (route, weighted cluster or dynamic)
-  // metadata. By default, only when the request metadata has **same** keys with one of the subset
-  // selectors and the values of related keys are matched, we will get valid subset. For example:
+  // By default, only when the request metadata has exactly **same** keys with one of subset selectors and
+  // the values of related keys are matched, the load balancer could get valid subset for the request.
+  // For example, given following subset selectors:
   //
   // .. code-block:: json
   //
@@ -182,24 +182,31 @@ message Subset {
   //       { "keys": [ "stage", "version" ] }
   //   ]}
   //
-  // A request with metadata ``{"redundant-key": "any", "stage": "prod", "version": "v1"}`` or
-  // ``{"redundant-key": "any", "version": "v1"}`` can never get valid subset even if the values of
-  // ``stage`` and ``version`` are matched because of the redundant key/value pair in the request
+  // A request with metadata ``{"redundant-key": "redundant-value", "stage": "prod", "version": "v1"}`` or
+  // ``{"redundant-key": "redundant-value", "version": "v1"}`` can never get valid subset even if the values
+  // of keys ``stage`` and ``version`` are matched because of the redundant key/value pair in the request
   // metadata.
   //
-  // By setting this to true, only the necessary key/value pairs will be evaluated and redundant key/value
-  // pairs will be ignored. Take the above example, if the request metadata is ``{"redundant-key": "any",
-  // "stage": "prod", "version": "v1"}``, the subset lb will keep the ``{"stage": "prod", "version": "v1"}``
-  // as the request metadata for the evaluation. If the request metadata is ``{"redundant-key": "any",
-  // "version": "v1"}``, the subset lb will keep the ``{"version": "v1"}`` as the request metadata for
-  // the evaluation.
+  // By setting this field to true, redundant key/value pairs are allowed in the request metadata. The keys
+  // of request metadata could be superset of keys of subset selectors.
+  //
+  // More specifically, if the keys of request metadata is superset of one of subset selectors, then only
+  // keys that in the selector keys will be evaluated. Take the above example, if the request metadata is
+  // ``{"redundant-key": "redundant-value", "stage": "prod", "version": "v1"}``, the load balancer would
+  // only evaluate ``stage`` and ``version`` and their values to find appropriate subset because ``stage``
+  // ``version`` are contained by the second subset selector and the redundant ``redundant-key`` will be
+  // ignored.
   //
   // .. note::
-  //   To avoid the performance impact and potential complexity, subset lb will keep at much as possible
-  //   key/value pairs in the request metadata. Take the above example, if the request metadata is
-  //   ``{"redundant-key": "any", "stage": "prod", "version": "v1"}``, the subset lb will keep the
-  //   ``{"stage": "prod", "version": "v1"}`` as the request metadata for the evaluation and will not
-  //   try the ``{"version": "v1"}`` as the request metadata.
+  //   If the keys of request metadata is superset of multiple different subset selectors keys, the subset
+  //   selector with most keys to win. For example, given subset selectors
+  //   ``{"subset_selectors": ["keys": ["A", "B", "C"], ["A", "B"]]}`` and request metadata ``{"A": "-",
+  //   "B": "-", "C": "-", "D": "-"}``, keys ``A``, ``B``, ``C`` will be evaluated.
+  //   If the keys of request metadata is superset of multiple different subset selectors keys and the number
+  //   of selector keys are same, then the one placed in front to win. For example, given subset selectors
+  //   ``{"subset_selectors": ["keys": ["A", "B"], ["C", "D"]]}`` and request metadata ``{"A": "-", "B": "-",
+  //   "C": "-", "D": "-"}``, keys ``A``, ``B`` will be evaluated.
+  //
   bool allow_redundant_keys = 10;
 
   // If true, routing to subsets will take into account the localities and locality weights of the

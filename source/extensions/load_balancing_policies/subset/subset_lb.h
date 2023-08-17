@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <bitset>
 #include <cstdint>
 #include <functional>
@@ -133,12 +134,14 @@ public:
       }
     }
 
-    // Sort subset selectors by number of keys, descending. This will ensure that the longest
-    // matching subset selector will be at the beginning of the list.
-    std::sort(subset_selectors_.begin(), subset_selectors_.end(),
-              [](const SubsetSelectorPtr& a, const SubsetSelectorPtr& b) -> bool {
-                return a->selectorKeys().size() > b->selectorKeys().size();
-              });
+    if (allow_redundant_keys_) {
+      // Sort subset selectors by number of keys, descending. This will ensure that the longest
+      // matching subset selector will be at the beginning of the list.
+      std::stable_sort(subset_selectors_.begin(), subset_selectors_.end(),
+                       [](const SubsetSelectorPtr& a, const SubsetSelectorPtr& b) -> bool {
+                         return a->selectorKeys().size() > b->selectorKeys().size();
+                       });
+    }
   }
 
   // Upstream::LoadBalancerSubsetInfo
