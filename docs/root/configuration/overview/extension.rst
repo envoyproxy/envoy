@@ -68,12 +68,9 @@ Statistics
 ^^^^^^^^^^
 
 In addition to the :ref:`statistics<subscription_statistics>` supported for xDS subscriptions, the following statistics
-are supported for listener filters, downstream network filters, and HTTP filters, rooted at *extension_config_discovery.<stat_prefix>.<extension_config_name>*.
-
-- For TCP listener filters, the value of *<stat_prefix>* is *tcp_listener_filter*.
-- For downstream network filters, the value of *<stat_prefix>* is *network_filter*.
-- For downstream HTTP filters, the value of *<stat_prefix>* is *http_filter*.
-- For upstream HTTP filters, the value of *<stat_prefix>* is *upstream_http_filter*.
+are supported for listener filters, downstream network filters, and HTTP filters, rooted at
+*extension_config_discovery.<stat_prefix>.<extension_config_name>*. For tcp listener filters, the value of *<stat_prefix>* is *tcp_listener_filter*.
+For downstream network filters, the value of *<stat_prefix>* is *network_filter*. For HTTP filters, the value of *<stat_prefix>* is *http_filter*.
 
 .. csv-table::
   :header: Name, Type, Description
