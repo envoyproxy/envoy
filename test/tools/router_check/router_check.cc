@@ -44,10 +44,6 @@ int main(int argc, char* argv[]) {
       checktool.setOnlyShowFailures();
     }
 
-    if (options.detailedCoverageReport()) {
-      checktool.setDetailedCoverageReport();
-    }
-
     const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
         checktool.compareEntries(options.testPath());
     if (!options.outputPath().empty()) {

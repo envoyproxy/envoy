@@ -85,14 +85,8 @@ public:
    */
   void setOnlyShowFailures() { only_show_failures_ = true; }
 
-  /**
-   * Set whether to print out detailed coverage report.
-   */
-  void setDetailedCoverageReport() { detailed_coverage_report_ = true; }
-
-  float coverage(bool comprehensive_coverage) {
-    return comprehensive_coverage ? coverage_.comprehensiveReport()
-                                  : coverage_.report(detailed_coverage_report_);
+  float coverage(bool detailed) {
+    return detailed ? coverage_.detailedReport() : coverage_.report();
   }
 
 private:
@@ -183,8 +177,6 @@ private:
 
   bool only_show_failures_{false};
 
-  bool detailed_coverage_report_{false};
-
   // The first member of each pair is the name of the test.
   // The second member is a list of any failing results for that test as strings.
   std::vector<std::pair<std::string, std::vector<std::string>>> tests_;
@@ -241,11 +233,6 @@ public:
   bool disableDeprecationCheck() const { return disable_deprecation_check_; }
 
   /**
-   * @return true if detailed coverage report is displayed.
-   */
-  bool detailedCoverageReport() const { return detailed_coverage_report_; }
-
-  /**
    * @return the path to save tests results.
    */
   const std::string& outputPath() const { return output_path_; }
@@ -258,7 +245,6 @@ private:
   bool is_detailed_;
   bool only_show_failures_;
   bool disable_deprecation_check_;
-  bool detailed_coverage_report_;
   std::string output_path_;
 };
 } // namespace Envoy
