@@ -233,7 +233,7 @@ void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
     if (failure_reason_.empty()) {
       failure_reason_ = "TLS error:";
     }
-    failure_reason_.append("SSL_ERROR_SYSCALL, check openssl doc for more details");
+    failure_reason_.append("SSL_ERROR_SYSCALL");
     saw_error = true;
   }
 
