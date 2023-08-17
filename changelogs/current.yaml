@@ -45,6 +45,10 @@ bug_fixes:
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+- area: quic
+  change: |
+    Removed ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` and legacy code paths.
+
 new_features:
 - area: access_log
   change: |
