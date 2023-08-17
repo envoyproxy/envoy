@@ -45,9 +45,9 @@ public:
   // is returned. Otherwise:
   // NeedMoreData: buffer contains an incomplete command
   // Bad: buffer contains data that is not a prefix of a valid command
-  virtual Result decodeCommand(Buffer::Instance& data, Command& result) = 0;
+  virtual Result decodeCommand(const Buffer::Instance& data, Command& result) = 0;
   // Attempts to decode an SMTP response from data.
-  virtual Result decodeResponse(Buffer::Instance& data, Response& result) = 0;
+  virtual Result decodeResponse(const Buffer::Instance& data, Response& result) = 0;
 
   // The following routines operate on the full wire bytes of a
   // response to EHLO that has previously been validated by
@@ -72,9 +72,9 @@ public:
 
   // if data starts with a valid smtp command, decodes into result and returns ReadyForNext
   // else returns NeedMoreData
-  Result decodeCommand(Buffer::Instance& data, Command& result) override;
+  Result decodeCommand(const Buffer::Instance& data, Command& result) override;
 
-  Result decodeResponse(Buffer::Instance& data, Response& result) override;
+  Result decodeResponse(const Buffer::Instance& data, Response& result) override;
 
   void addEsmtpCapability(absl::string_view, std::string&) override;
   void removeEsmtpCapability(absl::string_view, std::string&) override;

@@ -11,7 +11,7 @@ namespace SmtpProxy {
 
 namespace {
 
-static const absl::string_view CRLF = "\r\n";
+static constexpr absl::string_view CRLF = "\r\n";
 
 // While https://www.rfc-editor.org/rfc/rfc5321.html#section-4.5.3.1.4
 // prescribes a max command line of 512 bytes, individual SMTP
@@ -25,23 +25,21 @@ static const absl::string_view CRLF = "\r\n";
 // meant as a circuit breaker against obvious garbage. The real
 // implementation on either side is free to enforce a more precise
 // limit.
-const size_t kMaxCommandLine = 1024;
+constexpr size_t kMaxCommandLine = 1024;
 // Likewise, the rfc reply limit is 512 bytes
 // https://www.rfc-editor.org/rfc/rfc5321.html#section-4.5.3.1.5
-const size_t kMaxReplyLine = 1024;
+constexpr size_t kMaxReplyLine = 1024;
 
 // The smtp proxy filter only expects to consume the first ~3
 // responses from the upstream (greeting, ehlo, starttls), which
 // should be much smaller than this but again, don't buffer an
 // unbounded amount.
-const size_t kMaxReplyBytes = 65536;
-
-using RawLinePtr = std::unique_ptr<char[]>;
+constexpr size_t kMaxReplyBytes = 65536;
 } // anonymous namespace
 
-Decoder::Result getLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_line,
-                        absl::string_view& line, size_t max_line) {
-  const ssize_t crlf = data.search(CRLF.data(), CRLF.size(), start, max_line);
+Decoder::Result getLine(const Buffer::Instance& data, size_t max_line,
+                        std::string& line_out) {
+  const ssize_t crlf = data.search(CRLF.data(), CRLF.size(), 0, max_line);
   if (crlf == -1) {
     if (data.length() >= max_line) {
       return Decoder::Result::ProtocolError;
@@ -51,40 +49,44 @@ Decoder::Result getLine(Buffer::Instance& data, size_t start, RawLinePtr& raw_li
   }
   ASSERT(crlf >= 0);
   // empty line is invalid
-  if (static_cast<size_t>(crlf) == start) {
+  if (crlf == 0) {
     return Decoder::Result::ProtocolError;
   }
 
-  size_t len = crlf + CRLF.size() - start;
+  const size_t len = crlf + CRLF.size();
   ASSERT(len > CRLF.size());
-  raw_line.reset(new char[len]);
-  data.copyOut(start, len, raw_line.get());
-  line = absl::string_view(raw_line.get(), len);
-
+  auto front_slice = data.frontSlice();
+  if (front_slice.len_ >= len) {
+    line_out.append(static_cast<char*>(front_slice.mem_), len);
+  } else {
+    std::unique_ptr<char[]> tmp(new char[len]);
+    data.copyOut(0, len, tmp.get());
+    line_out.append(tmp.get(), len);
+  }
   return Decoder::Result::ReadyForNext;
 }
 
-Decoder::Result DecoderImpl::decodeCommand(Buffer::Instance& data, Command& result) {
-  RawLinePtr raw_line;
-  absl::string_view line;
-  Result res = getLine(data, 0, raw_line, line, kMaxCommandLine);
+Decoder::Result DecoderImpl::decodeCommand(const Buffer::Instance& data, Command& result) {
+  std::string line;
+  Result res = getLine(data, kMaxCommandLine, line);
   if (res != Result::ReadyForNext) {
     return res;
   }
-  result.wire_len = line.size();
+  absl::string_view line_remaining(line);
+  result.wire_len = line_remaining.size();
 
-  const bool trailing_crlf = absl::ConsumeSuffix(&line, CRLF);
+  const bool trailing_crlf = absl::ConsumeSuffix(&line_remaining, CRLF);
   ASSERT(trailing_crlf);
 
-  ssize_t space = line.find(' ');
-  if (space == -1) {
+  const size_t space = line_remaining.find(' ');
+  if (space == absl::string_view::npos) {
     // no arguments e.g.
     // NOOP\r\n
-    result.raw_verb = std::string(line);
+    result.raw_verb = std::string(line_remaining);
   } else {
     // EHLO mail.example.com\r\n
-    result.raw_verb = std::string(line.substr(0, space));
-    result.rest = std::string(line.substr(space + 1));
+    result.raw_verb = std::string(line_remaining.substr(0, space));
+    result.rest = std::string(line_remaining.substr(space + 1));
   }
 
   static const struct {
@@ -110,35 +112,36 @@ Decoder::Result DecoderImpl::decodeCommand(Buffer::Instance& data, Command& resu
   return Result::ReadyForNext;
 }
 
-Decoder::Result DecoderImpl::decodeResponse(Buffer::Instance& data, Response& result) {
-  RawLinePtr raw_line;
-
+Decoder::Result DecoderImpl::decodeResponse(const Buffer::Instance& data, Response& result) {
+  Buffer::OwnedImpl data_remaining(data);
   absl::optional<int> code;
-  size_t line_off = 0;
   std::string msg;
+  size_t total_reply = 0;
   for (;;) {
-    absl::string_view line;
-    const Result res = getLine(data, line_off, raw_line, line, kMaxReplyLine);
+    std::string line;
+    const Result res = getLine(data_remaining, kMaxReplyLine, line);
     if (res != Result::ReadyForNext) {
       return res;
     }
-    line_off += line.size();
-    if (line_off > kMaxReplyBytes) {
+    data_remaining.drain(line.size());
+    absl::string_view line_remaining(line);
+    total_reply += line_remaining.size();
+    if (total_reply > kMaxReplyBytes) {
       return Result::ProtocolError;
     }
     // https://www.rfc-editor.org/rfc/rfc5321.html#section-4.2
     //  Reply-line     = *( Reply-code "-" [ textstring ] CRLF )
     //                 Reply-code [ SP textstring ] CRLF
     //  Reply-code     = %x32-35 %x30-35 %x30-39
-    if (line.size() < 3) {
+    if (line_remaining.size() < 3) {
       return Result::ProtocolError;
     }
     for (int i = 0; i < 3; ++i) {
-      if (!absl::ascii_isdigit(line[i])) {
+      if (!absl::ascii_isdigit(line_remaining[i])) {
         return Result::ProtocolError;
       }
     }
-    absl::string_view code_str = line.substr(0, 3);
+    absl::string_view code_str = line_remaining.substr(0, 3);
     int this_code = 0;
     const bool atoi_result = absl::SimpleAtoi(code_str, &this_code);
     ASSERT(atoi_result);
@@ -148,15 +151,15 @@ Decoder::Result DecoderImpl::decodeResponse(Buffer::Instance& data, Response& re
     }
     code = this_code;
 
-    line = line.substr(3);
+    line_remaining.remove_prefix(3);
     char sp_or_dash = ' ';
-    if (!line.empty() && line != CRLF) {
-      sp_or_dash = line[0];
+    if (!line_remaining.empty() && line_remaining != CRLF) {
+      sp_or_dash = line_remaining[0];
       if (sp_or_dash != ' ' && sp_or_dash != '-') {
         return Result::ProtocolError;
       }
-      line = line.substr(1);
-      absl::StrAppend(&msg, line);
+      line_remaining.remove_prefix(1);
+      absl::StrAppend(&msg, line_remaining);
     }
 
     // ignore enhanced code for now
@@ -165,20 +168,18 @@ Decoder::Result DecoderImpl::decodeResponse(Buffer::Instance& data, Response& re
       break; // last line of multiline
     }
   }
-  if (!code) {
-    return Result::ProtocolError; // assert
-  }
+  ASSERT(code);  // we returned ProtocolError by now if we didn't populate code
   result.code = *code;
   result.msg = msg;
-  result.wire_len = line_off;
+  result.wire_len = total_reply;
   return Result::ReadyForNext;
 }
 
 // line is
 // 234-SIZE 1048576\r\n
 bool matchCapability(absl::string_view line, absl::string_view cap) {
-  line = line.substr(4); // 234-
-  line = line.substr(0, line.size() - CRLF.size());
+  line.remove_prefix(4); // 234-
+  line.remove_suffix(CRLF.size());
   if (!absl::StartsWithIgnoreCase(line, cap)) {
     return false;
   }
@@ -189,23 +190,23 @@ bool matchCapability(absl::string_view line, absl::string_view cap) {
   return false;
 }
 
-void DecoderImpl::addEsmtpCapability(absl::string_view cap, std::string& caps_in) {
+void DecoderImpl::addEsmtpCapability(absl::string_view cap, std::string& caps) {
   std::string caps_out;
-  absl::string_view caps = caps_in;
+  absl::string_view caps_remaining = caps;
   bool first = true;
 
-  while (!caps.empty()) {
-    size_t crlf = caps.find(CRLF);
+  while (!caps_remaining.empty()) {
+    const size_t crlf = caps_remaining.find(CRLF);
     if (crlf == absl::string_view::npos) {
       break; // invalid input
     }
-    absl::string_view line = caps.substr(0, crlf + CRLF.size());
-    caps = caps.substr(crlf + CRLF.size());
+    absl::string_view line = caps_remaining.substr(0, crlf + CRLF.size());
+    caps_remaining.remove_prefix(crlf + CRLF.size());
     if (!first && matchCapability(line, cap)) {
       return;
     }
     first = false;
-    if (caps.empty()) {
+    if (caps_remaining.empty()) {
       std::string line_out(line);
       line_out[3] = '-';
       absl::StrAppend(&caps_out, line_out, line_out.substr(0, 3), " ", cap, "\r\n");
@@ -215,21 +216,21 @@ void DecoderImpl::addEsmtpCapability(absl::string_view cap, std::string& caps_in
     absl::StrAppend(&caps_out, line);
   }
 
-  caps_in = std::move(caps_out);
+  caps = std::move(caps_out);
 }
 
-void DecoderImpl::removeEsmtpCapability(absl::string_view cap, std::string& caps_in) {
+void DecoderImpl::removeEsmtpCapability(absl::string_view cap, std::string& caps) {
   std::string caps_out;
-  absl::string_view caps = caps_in;
+  absl::string_view caps_remaining = caps;
   bool first = true;
   size_t last = 0;
-  while (!caps.empty()) {
-    size_t crlf = caps.find(CRLF);
+  while (!caps_remaining.empty()) {
+    const size_t crlf = caps_remaining.find(CRLF);
     if (crlf == absl::string_view::npos) {
       return; // invalid input
     }
-    absl::string_view line = caps.substr(0, crlf + CRLF.size());
-    caps = caps.substr(crlf + CRLF.size());
+    absl::string_view line = caps_remaining.substr(0, crlf + CRLF.size());
+    caps_remaining.remove_prefix(crlf + CRLF.size());
     if (!first && matchCapability(line, cap)) {
       continue;
     }
@@ -238,18 +239,18 @@ void DecoderImpl::removeEsmtpCapability(absl::string_view cap, std::string& caps
     absl::StrAppend(&caps_out, line);
   }
   caps_out[last + 3] = ' ';
-  caps_in = std::move(caps_out);
+  caps = std::move(caps_out);
 }
 
-bool DecoderImpl::hasEsmtpCapability(absl::string_view cap, absl::string_view caps) {
+bool DecoderImpl::hasEsmtpCapability(absl::string_view cap, absl::string_view caps_remaining) {
   bool first = true;
-  while (!caps.empty()) {
-    size_t crlf = caps.find("\r\n");
+  while (!caps_remaining.empty()) {
+    const size_t crlf = caps_remaining.find("\r\n");
     if (crlf == absl::string_view::npos) {
       break; // invalid input
     }
-    absl::string_view line = caps.substr(0, crlf + CRLF.size());
-    caps = caps.substr(crlf + CRLF.size());
+    absl::string_view line = caps_remaining.substr(0, crlf + CRLF.size());
+    caps_remaining.remove_prefix(crlf + CRLF.size());
     if (first) {
       first = false;
       continue;

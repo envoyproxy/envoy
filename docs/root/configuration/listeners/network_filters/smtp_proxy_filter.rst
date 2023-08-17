@@ -41,7 +41,7 @@ StartTLS transport socket as shown in the configuration example below:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
           tls_socket_config:
-            # "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
             common_tls_context:
 
 
