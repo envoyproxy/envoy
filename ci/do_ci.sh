@@ -416,6 +416,7 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
             export FUZZ_COVERAGE=true
         fi
+        export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
         "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
