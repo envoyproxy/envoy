@@ -185,7 +185,7 @@ TEST_F(AppleDnsImplTest, TypedAppleDnsResolverConfigExist) {
   typed_dns_resolver_config.set_name(std::string(Network::AppleDnsResolver));
   config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
   EXPECT_TRUE(config.has_typed_dns_resolver_config());
-  EXPECT_TRUE(checkUseAppleApiForDnsLookups(typed_dns_resolver_config));
+  EXPECT_TRUE(tryUseAppleApiForDnsLookups(typed_dns_resolver_config));
   typed_dns_resolver_config.Clear();
   typed_dns_resolver_config = Network::makeDnsResolverConfig(config);
   expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
