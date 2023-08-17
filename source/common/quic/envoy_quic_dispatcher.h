@@ -15,9 +15,6 @@
 namespace Envoy {
 namespace Quic {
 
-using HotRestartPacketForwardingFunction =
-    std::function<void(uint32_t worker_index, const Network::UdpRecvData& packet)>;
-
 #define QUIC_DISPATCHER_STATS(COUNTER) COUNTER(stateless_reset_packets_sent)
 
 struct QuicDispatcherStats {

@@ -28,6 +28,15 @@ public:
   virtual ~ExtraShutdownListenerOptions() = default;
 };
 
+// An interface for ExtraShutdownListenerOptions enabling us to forward UDP packets from
+// the parent instance to the child instance during hot restart draining.
+// This is currently supported for QUIC listeners.
+// TODO(mattklein123): determine if other UDP ports have a reason to do this.
+class HotRestartUdpPacketForwarding : virtual public ExtraShutdownListenerOptions {
+public:
+  virtual void forwardUdpPacket(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
+};
+
 using ExtraShutdownListenerOptionsPtr = std::shared_ptr<ExtraShutdownListenerOptions>;
 
 /**

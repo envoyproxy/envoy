@@ -20,18 +20,6 @@
 namespace Envoy {
 namespace Quic {
 
-class HotRestartPacketForwardingOptions : virtual public Network::ExtraShutdownListenerOptions {
-public:
-  explicit HotRestartPacketForwardingOptions(HotRestartPacketForwardingFunction fn)
-      : hot_restart_packet_forwarding_function_(fn) {}
-  HotRestartPacketForwardingFunction hotRestartPacketForwardingFunction() {
-    return hot_restart_packet_forwarding_function_;
-  }
-
-private:
-  HotRestartPacketForwardingFunction hot_restart_packet_forwarding_function_;
-};
-
 // QUIC specific UdpListenerCallbacks implementation which delegates incoming
 // packets, write signals and listener errors to QuicDispatcher.
 class ActiveQuicListener : public Envoy::Server::ActiveUdpListenerBase,
@@ -105,7 +93,7 @@ private:
   const QuicConnectionIdWorkerSelector select_connection_id_worker_;
   // Latches envoy.reloadable_features.quic_reject_all at the beginning of each event loop.
   bool reject_all_{false};
-  HotRestartPacketForwardingFunction hot_restart_packet_forwarding_function_;
+  std::shared_ptr<Network::HotRestartUdpPacketForwarding> hot_restart_udp_packet_forwarding_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

@@ -395,17 +395,20 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   readFromClientSockets();
 }
 
+class MockHotRestartUdpPacketForwarding : public Network::HotRestartUdpPacketForwarding {
+public:
+  MOCK_METHOD(void, forwardUdpPacket, (uint32_t worker_index, const Network::UdpRecvData& packet));
+};
+
 TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
   initialize();
-  testing::MockFunction<HotRestartPacketForwardingFunction> mock_packet_forwarding;
-  auto shutdown_options =
-      std::make_shared<HotRestartPacketForwardingOptions>(mock_packet_forwarding.AsStdFunction());
-  quic_listener_->shutdownListener(shutdown_options);
+  auto mock_packet_forwarding = std::make_shared<MockHotRestartUdpPacketForwarding>();
+  quic_listener_->shutdownListener(mock_packet_forwarding);
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 0);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  EXPECT_CALL(mock_packet_forwarding, Call(_, _));
+  EXPECT_CALL(*mock_packet_forwarding, forwardUdpPacket(_, _));
   sendCHLO(connection_id);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
