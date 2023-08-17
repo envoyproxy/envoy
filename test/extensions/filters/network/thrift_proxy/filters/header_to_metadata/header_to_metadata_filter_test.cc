@@ -74,7 +74,7 @@ request_rules:
       key: version
 )EOF";
   initializeFilter(request_config_yaml);
-  const std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
+  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -92,7 +92,7 @@ request_rules:
       key: version
 )EOF";
   initializeFilter(request_config_yaml);
-  const std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
+  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
   EXPECT_CALL(req_info_,
               setDynamicMetadata("envoy.filters.thrift.header_to_metadata", MapEq(expected)));
 
@@ -113,7 +113,7 @@ request_rules:
       value: world
 )EOF";
   initializeFilter(request_config_yaml);
-  const std::map<std::string, std::string> expected = {{"replace", "world"}};
+  std::map<std::string, std::string> expected = {{"replace", "world"}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -137,7 +137,7 @@ request_rules:
         substitution: "\\1"
 )EOF";
   initializeFilter(request_config_yaml);
-  const std::map<std::string, std::string> expected = {{"subbed", "world"}};
+  std::map<std::string, std::string> expected = {{"subbed", "world"}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -161,7 +161,7 @@ request_rules:
         substitution: "\\1"
 )EOF";
   initializeFilter(request_config_yaml);
-  const std::map<std::string, std::string> expected = {{"subbed", "does not match"}};
+  std::map<std::string, std::string> expected = {{"subbed", "does not match"}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -257,7 +257,7 @@ request_rules:
 )EOF";
   initializeFilter(request_config_yaml);
   std::string data = "Non-ascii-characters";
-  const std::map<std::string, std::string> expected = {{"base64_key", data}};
+  std::map<std::string, std::string> expected = {{"base64_key", data}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   const auto encoded = Base64::encode(data.c_str(), data.size());
@@ -366,7 +366,7 @@ request_rules:
       value: hi
 )EOF";
   initializeFilter(request_config_yaml);
-  const std::map<std::string, std::string> expected = {{"set", "hi"}};
+  std::map<std::string, std::string> expected = {{"set", "hi"}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -413,7 +413,7 @@ request_rules:
       value: world
 )EOF";
   initializeFilter(request_config_yaml);
-  const std::map<std::string, std::string> expected = {{"remove", "hello"}, {"keep", "world"}};
+  std::map<std::string, std::string> expected = {{"remove", "hello"}, {"keep", "world"}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -486,7 +486,7 @@ request_rules:
       value: world
 )EOF";
   initializeFilter(request_config_yaml);
-  const std::map<std::string, std::string> expected = {{"set", "hello"}, {"replace", "world"}};
+  std::map<std::string, std::string> expected = {{"set", "hello"}, {"replace", "world"}};
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
