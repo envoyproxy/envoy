@@ -207,6 +207,21 @@ steps:
     df -h
 
     echo
+
+    mkdir -p $(Build.StagingDirectory)/envoy/hprof
+
+    for hprof in $(find "$(Build.StagingDirectory)" -name "*heapdump.hprof"); do
+        echo "Copying ${hprof}"
+        cp -a $hprof $(Build.StagingDirectory)/envoy/hprof
+    done
+
+    cp -a "$(Build.StagingDirectory)/bazel_root/base/server/jvm.out" $(Build.StagingDirectory)/envoy
+
+    sudo systemctl status --no-pager bazel-remote > $(Build.StagingDirectory)/envoy/br.status
+
+    sudo journalctl --no-pager -xu bazel-remote > $(Build.StagingDirectory)/envoy/br.journal
+
+    echo
     du -ch "$(Build.StagingDirectory)" | grep -E "[0-9]{2,}M|[0-9]G"
 
     # Cleanup offending files with unicode names
