@@ -9,6 +9,7 @@
 # The number 3G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx3g
+startup --host_jvm_args=-XX:MaxDirectMemorySize=512m
 
 fetch --color=yes
 run --color=yes
@@ -211,6 +212,7 @@ build:coverage --experimental_generate_llvm_lcov
 build:coverage --collect_code_coverage
 build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],^//envoy[/:],^//contrib(?!/.*/test)[/:]"
 build:coverage --remote_download_toplevel
+build:coverage --define=tcmalloc=gperftools
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
@@ -481,7 +483,7 @@ build:rbe-engflow --remote_cache=grpcs://envoy.cluster.engflow.com
 build:rbe-engflow --remote_executor=grpcs://envoy.cluster.engflow.com
 build:rbe-engflow --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:rbe-engflow --bes_results_url=https://envoy.cluster.engflow.com/invocation/
-build:rbe-engflow --experimental_credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
+build:rbe-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
 build:rbe-engflow --grpc_keepalive_time=30s
 build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s

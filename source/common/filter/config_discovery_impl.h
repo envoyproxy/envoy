@@ -656,7 +656,7 @@ class UpstreamHttpFilterConfigProviderManagerImpl
               Server::Configuration::UpstreamHttpFactoryContext,
               Server::Configuration::UpstreamHttpFilterConfigFactory>> {
 public:
-  absl::string_view statPrefix() const override { return "http_filter."; }
+  absl::string_view statPrefix() const override { return "upstream_http_filter."; }
 
 protected:
   bool
