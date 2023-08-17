@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_mobile_swift_test(
     name = "test",
-    size = "large",
     srcs = [
         "EngineBuilderTests.swift",
         "GRPCRequestHeadersBuilderTests.swift",
