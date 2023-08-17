@@ -18,6 +18,14 @@ bool ScopeKey::operator==(const ScopeKey& other) const {
   return this->hash() == other.hash();
 }
 
+void throwProtoValidationExceptionOrPanic(std::string message) {
+#ifdef ENVOY_DISABLE_EXCEPTIONS // TODO(alyssawilk) remove non-standard exceptions.
+  PANIC(message);
+#else
+  throw ProtoValidationException(message);
+#endif
+}
+
 HeaderValueExtractorImpl::HeaderValueExtractorImpl(
     ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config)
     : FragmentBuilderBase(std::move(config)),
@@ -29,14 +37,12 @@ HeaderValueExtractorImpl::HeaderValueExtractorImpl(
       ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::kIndex) {
     if (header_value_extractor_config_.index() != 0 &&
         header_value_extractor_config_.element_separator().empty()) {
-      throw ProtoValidationException("Index > 0 for empty string element separator.",
-                                     header_value_extractor_config_);
+      throwProtoValidationExceptionOrPanic("Index > 0 for empty string element separator.");
     }
   }
   if (header_value_extractor_config_.extract_type_case() ==
       ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::EXTRACT_TYPE_NOT_SET) {
-    throw ProtoValidationException("HeaderValueExtractor extract_type not set.",
-                                   header_value_extractor_config_);
+    throwProtoValidationExceptionOrPanic("HeaderValueExtractor extract_type not set.");
   }
 }
 

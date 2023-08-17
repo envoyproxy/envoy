@@ -136,7 +136,7 @@ void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_gen
       }
 
       if (restarter == nullptr) {
-        throw EnvoyException("unable to select a dynamic base id");
+        throwEnvoyExceptionOrPanic("unable to select a dynamic base id");
       }
 
       restarter_.swap(restarter);
