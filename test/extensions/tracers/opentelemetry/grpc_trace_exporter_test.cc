@@ -41,7 +41,7 @@ public:
     opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-    EXPECT_CALL(stream_, sendMessageRaw_(_, false))
+    EXPECT_CALL(stream_, sendMessageRaw_(_, true))
         .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
           opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
