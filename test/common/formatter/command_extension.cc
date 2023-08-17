@@ -5,19 +5,13 @@
 namespace Envoy {
 namespace Formatter {
 
-absl::optional<std::string> TestFormatter::format(const Http::RequestHeaderMap&,
-                                                  const Http::ResponseHeaderMap&,
-                                                  const Http::ResponseTrailerMap&,
-                                                  const StreamInfo::StreamInfo&, absl::string_view,
-                                                  AccessLog::AccessLogType) const {
+absl::optional<std::string> TestFormatter::format(const HttpFormatterContext&,
+                                                  const StreamInfo::StreamInfo&) const {
   return "TestFormatter";
 }
 
-ProtobufWkt::Value TestFormatter::formatValue(const Http::RequestHeaderMap&,
-                                              const Http::ResponseHeaderMap&,
-                                              const Http::ResponseTrailerMap&,
-                                              const StreamInfo::StreamInfo&, absl::string_view,
-                                              AccessLog::AccessLogType) const {
+ProtobufWkt::Value TestFormatter::formatValue(const HttpFormatterContext&,
+                                              const StreamInfo::StreamInfo&) const {
   return ValueUtil::stringValue("");
 }
 
@@ -46,17 +40,13 @@ ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
 
 std::string TestCommandFactory::name() const { return "envoy.formatter.TestFormatter"; }
 
-absl::optional<std::string>
-AdditionalFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                            const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                            absl::string_view, AccessLog::AccessLogType) const {
+absl::optional<std::string> AdditionalFormatter::format(const HttpFormatterContext&,
+                                                        const StreamInfo::StreamInfo&) const {
   return "AdditionalFormatter";
 }
 
-ProtobufWkt::Value
-AdditionalFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const {
+ProtobufWkt::Value AdditionalFormatter::formatValue(const HttpFormatterContext&,
+                                                    const StreamInfo::StreamInfo&) const {
   return ValueUtil::stringValue("");
 }
 

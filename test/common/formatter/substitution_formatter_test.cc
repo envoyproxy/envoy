@@ -1738,51 +1738,51 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}};
   Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
   {
     RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>());
-    EXPECT_EQ("GET", formatter.format(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("GET")));
+    EXPECT_EQ("GET", formatter.format({&request_header, &response_header, &response_trailer},
+                                      stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("GET")));
   }
 
   {
     RequestHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
-    EXPECT_EQ("/", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                    body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("/")));
+    EXPECT_EQ(
+        "/", formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("/")));
   }
 
   {
     RequestHeaderFormatter formatter(":TEST", ":METHOD", absl::optional<size_t>());
-    EXPECT_EQ("GET", formatter.format(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("GET")));
+    EXPECT_EQ("GET", formatter.format({&request_header, &response_header, &response_trailer},
+                                      stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("GET")));
   }
 
   {
     RequestHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
 
   {
     RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>(2));
-    EXPECT_EQ("GE", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("GE")));
+    EXPECT_EQ("GE", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("GE")));
   }
 }
 
@@ -1791,34 +1791,30 @@ TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}};
   Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
   {
     HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::RequestHeaders);
-    EXPECT_EQ(formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet),
+    EXPECT_EQ(formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
               "16");
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(16)));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(16)));
   }
   {
     HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
-    EXPECT_EQ(formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet),
+    EXPECT_EQ(formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
               "10");
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(10)));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(10)));
   }
   {
     HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
-    EXPECT_EQ(formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet),
+    EXPECT_EQ(formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
               "23");
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(23)));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(23)));
   }
 }
 
@@ -1831,47 +1827,48 @@ TEST(SubstitutionFormatterTest, responseHeaderFormatter) {
 
   {
     ResponseHeaderFormatter formatter(":method", "", absl::optional<size_t>());
-    EXPECT_EQ("PUT", formatter.format(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("PUT")));
+    EXPECT_EQ("PUT", formatter.format({&request_header, &response_header, &response_trailer},
+                                      stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("PUT")));
   }
 
   {
     ResponseHeaderFormatter formatter("test", ":method", absl::optional<size_t>());
-    EXPECT_EQ("test", formatter.format(request_header, response_header, response_trailer,
-                                       stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("test")));
+    EXPECT_EQ("test", formatter.format({&request_header, &response_header, &response_trailer},
+                                       stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("test")));
   }
 
   {
     ResponseHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
-    EXPECT_EQ("PUT", formatter.format(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("PUT")));
+    EXPECT_EQ("PUT", formatter.format({&request_header, &response_header, &response_trailer},
+                                      stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("PUT")));
   }
 
   {
     ResponseHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
 
   {
     ResponseHeaderFormatter formatter(":method", "", absl::optional<size_t>(2));
-    EXPECT_EQ("PU", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("PU")));
+    EXPECT_EQ("PU", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("PU")));
   }
 }
 
@@ -1884,47 +1881,48 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
 
   {
     ResponseTrailerFormatter formatter(":method", "", absl::optional<size_t>());
-    EXPECT_EQ("POST", formatter.format(request_header, response_header, response_trailer,
-                                       stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("POST")));
+    EXPECT_EQ("POST", formatter.format({&request_header, &response_header, &response_trailer},
+                                       stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("POST")));
   }
 
   {
     ResponseTrailerFormatter formatter("test-2", ":method", absl::optional<size_t>());
-    EXPECT_EQ("test-2", formatter.format(request_header, response_header, response_trailer,
-                                         stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("test-2")));
+    EXPECT_EQ("test-2", formatter.format({&request_header, &response_header, &response_trailer},
+                                         stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("test-2")));
   }
 
   {
     ResponseTrailerFormatter formatter(":path", ":method", absl::optional<size_t>());
-    EXPECT_EQ("POST", formatter.format(request_header, response_header, response_trailer,
-                                       stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("POST")));
+    EXPECT_EQ("POST", formatter.format({&request_header, &response_header, &response_trailer},
+                                       stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("POST")));
   }
 
   {
     ResponseTrailerFormatter formatter("does_not_exist", "", absl::optional<size_t>());
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
 
   {
     ResponseTrailerFormatter formatter(":method", "", absl::optional<size_t>(2));
-    EXPECT_EQ("PO", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("PO")));
+    EXPECT_EQ("PO", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("PO")));
   }
 }
 
@@ -2397,60 +2395,62 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
       "DataLoss", "Unauthenticated"};
   for (size_t i = 0; i < grpc_statuses.size(); ++i) {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(grpc_statuses[i],
-              formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+    EXPECT_EQ(
+        grpc_statuses[i],
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("-1")));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("42738")));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_trailer.clear();
   }
   {
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("-1")));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("42738")));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_header.clear();
   }
   // Test "not gRPC request" with response_trailer
   {
     request_header = {{":method", "GET"}, {":path", "/health"}};
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
     response_trailer.clear();
     request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
@@ -2458,11 +2458,12 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
   {
     request_header = {{":method", "GET"}, {":path", "/health"}};
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "2"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
     response_header.clear();
     request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
@@ -2490,49 +2491,50 @@ TEST(SubstitutionFormatterTest,
       "DataLoss", "Unauthenticated"};
   for (size_t i = 0; i < grpc_statuses.size(); ++i) {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(grpc_statuses[i],
-              formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+    EXPECT_EQ(
+        grpc_statuses[i],
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("-1")));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("42738")));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_trailer.clear();
   }
   {
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("-1")));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("42738")));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_header.clear();
   }
 }
@@ -2566,60 +2568,62 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
                                          "UNAUTHENTICATED"};
   for (size_t i = 0; i < grpc_statuses.size(); ++i) {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(grpc_statuses[i],
-              formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+    EXPECT_EQ(
+        grpc_statuses[i],
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("-1")));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("42738")));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_trailer.clear();
   }
   {
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("-1")));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("42738")));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_header.clear();
   }
   // Test "not gRPC request" with response_trailer
   {
     request_header = {{":method", "GET"}, {":path", "/health"}};
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
     response_trailer.clear();
     request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
@@ -2627,11 +2631,12 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   {
     request_header = {{":method", "GET"}, {":path", "/health"}};
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "2"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
     response_header.clear();
     request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
@@ -2671,49 +2676,50 @@ TEST(SubstitutionFormatterTest,
                                          "UNAUTHENTICATED"};
   for (size_t i = 0; i < grpc_statuses.size(); ++i) {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(grpc_statuses[i],
-              formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+    EXPECT_EQ(
+        grpc_statuses[i],
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("-1")));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("42738")));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_trailer.clear();
   }
   {
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("-1")));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::stringValue("42738")));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_header.clear();
   }
 }
@@ -2732,60 +2738,62 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
 
   for (size_t i = 0; i < grpcStatuses; ++i) {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(std::to_string(i),
-              formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(i)));
+    EXPECT_EQ(
+        std::to_string(i),
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(i)));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(-1)));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(-1)));
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(42738)));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(42738)));
     response_trailer.clear();
   }
   {
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(-1)));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(-1)));
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(42738)));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(42738)));
     response_header.clear();
   }
   // Test "not gRPC request" with response_trailer
   {
     request_header = {{":method", "GET"}, {":path", "/health"}};
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
     response_trailer.clear();
     request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
@@ -2793,11 +2801,12 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   {
     request_header = {{":method", "GET"}, {":path", "/health"}};
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "2"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
     response_header.clear();
     request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
   }
@@ -2822,49 +2831,50 @@ TEST(SubstitutionFormatterTest,
 
   for (size_t i = 0; i < grpcStatuses; ++i) {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(std::to_string(i),
-              formatter.format(request_header, response_header, response_trailer, stream_info, body,
-                               AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(i)));
+    EXPECT_EQ(
+        std::to_string(i),
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(i)));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
-                                              stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ(
+        absl::nullopt,
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(-1)));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(-1)));
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(42738)));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(42738)));
     response_trailer.clear();
   }
   {
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
-                                     body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(-1)));
+    EXPECT_EQ("-1", formatter.format({&request_header, &response_header, &response_trailer},
+                                     stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(-1)));
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
-                                        stream_info, body, AccessLog::AccessLogType::NotSet));
-    EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet),
-                ProtoEq(ValueUtil::numberValue(42738)));
+    EXPECT_EQ("42738", formatter.format({&request_header, &response_header, &response_trailer},
+                                        stream_info));
+    EXPECT_THAT(
+        formatter.formatValue({&request_header, &response_header, &response_trailer}, stream_info),
+        ProtoEq(ValueUtil::numberValue(42738)));
     response_header.clear();
   }
 }

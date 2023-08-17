@@ -130,56 +130,8 @@ using Formatter = FormatterBase<HttpFormatterContext>;
 using FormatterPtr = std::unique_ptr<Formatter>;
 using FormatterConstSharedPtr = std::shared_ptr<const Formatter>;
 
-class FormatterProvider : public FormatterProviderBase<HttpFormatterContext> {
-public:
-  // FormatterProviderBase<HttpFormatterContext>
-  absl::optional<std::string> format(const HttpFormatterContext& context,
-                                     const StreamInfo::StreamInfo& info) const override {
-    return format(context.requestHeaders(), context.responseHeaders(), context.responseTrailers(),
-                  info, context.localReplyBody(), context.accessLogType());
-  }
-  ProtobufWkt::Value formatValue(const HttpFormatterContext& context,
-                                 const StreamInfo::StreamInfo& info) const override {
-    return formatValue(context.requestHeaders(), context.responseHeaders(),
-                       context.responseTrailers(), info, context.localReplyBody(),
-                       context.accessLogType());
-  }
-
-private:
-  /**
-   * Extract a value from the provided headers/trailers/stream.
-   * @param request_headers supplies the request headers.
-   * @param response_headers supplies the response headers.
-   * @param response_trailers supplies the response trailers.
-   * @param stream_info supplies the stream info.
-   * @param local_reply_body supplies the local reply body.
-   * @return absl::optional<std::string> optional string containing a single value extracted from
-   * the given headers/trailers/stream.
-   */
-  virtual absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
-                                             const Http::ResponseHeaderMap& response_headers,
-                                             const Http::ResponseTrailerMap& response_trailers,
-                                             const StreamInfo::StreamInfo& stream_info,
-                                             absl::string_view local_reply_body,
-                                             AccessLog::AccessLogType access_log_type) const PURE;
-  /**
-   * Extract a value from the provided headers/trailers/stream, preserving the value's type.
-   * @param request_headers supplies the request headers.
-   * @param response_headers supplies the response headers.
-   * @param response_trailers supplies the response trailers.
-   * @param stream_info supplies the stream info.
-   * @param local_reply_body supplies the local reply body.
-   * @return ProtobufWkt::Value containing a single value extracted from the given
-   *         headers/trailers/stream.
-   */
-  virtual ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
-                                         const Http::ResponseHeaderMap& response_headers,
-                                         const Http::ResponseTrailerMap& response_trailers,
-                                         const StreamInfo::StreamInfo& stream_info,
-                                         absl::string_view local_reply_body,
-                                         AccessLog::AccessLogType access_log_type) const PURE;
-};
-using FormatterProviderPtr = std::unique_ptr<FormatterProviderBase<HttpFormatterContext>>;
+using FormatterProvider = FormatterProviderBase<HttpFormatterContext>;
+using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
 
 using CommandParser = CommandParserBase<HttpFormatterContext>;
 using CommandParserPtr = std::unique_ptr<CommandParser>;
