@@ -2393,15 +2393,17 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
       }));
 
   EXPECT_CALL(*handler, log(_, _, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+      .WillOnce(Invoke([this](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                              const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_EQ(nullptr, stream_info.route());
+        // Even the request is invalid, will still try to find a route before response filter chain
+        // path.
+        EXPECT_EQ(route_config_provider_.route_config_->route_, stream_info.route());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))

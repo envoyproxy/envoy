@@ -57,26 +57,24 @@ std::string convertToWildcard(const std::string& resource_name) {
 }
 } // namespace
 
-GrpcMuxImpl::GrpcMuxImpl(
-    const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
-    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-    Stats::Scope& scope, const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
-    CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
-    XdsConfigTrackerOptRef xds_config_tracker, XdsResourcesDelegateOptRef xds_resources_delegate,
-    EdsResourcesCachePtr eds_resources_cache, const std::string& target_xds_authority)
-    : grpc_stream_(this, std::move(async_client), service_method, dispatcher, scope,
-                   std::move(backoff_strategy), rate_limit_settings),
-      local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      config_validators_(std::move(config_validators)), xds_config_tracker_(xds_config_tracker),
-      xds_resources_delegate_(xds_resources_delegate),
-      eds_resources_cache_(std::move(eds_resources_cache)),
-      target_xds_authority_(target_xds_authority), first_stream_request_(true),
-      dispatcher_(dispatcher),
-      dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
-          [this](absl::string_view resource_type_url) {
-            onDynamicContextUpdate(resource_type_url);
-          })) {
-  Config::Utility::checkLocalInfo("ads", local_info);
+GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
+    : grpc_stream_(this, std::move(grpc_mux_context.async_client_),
+                   grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
+                   grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
+                   grpc_mux_context.rate_limit_settings_),
+      local_info_(grpc_mux_context.local_info_), skip_subsequent_node_(skip_subsequent_node),
+      config_validators_(std::move(grpc_mux_context.config_validators_)),
+      xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
+      xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
+      eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
+      target_xds_authority_(grpc_mux_context.target_xds_authority_), first_stream_request_(true),
+      dispatcher_(grpc_mux_context.dispatcher_),
+      dynamic_update_callback_handle_(
+          grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
+              [this](absl::string_view resource_type_url) {
+                onDynamicContextUpdate(resource_type_url);
+              })) {
+  Config::Utility::checkLocalInfo("ads", local_info_);
   AllMuxes::get().insert(this);
 }
 
@@ -553,18 +551,27 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          XdsResourcesDelegateOptRef xds_resources_delegate, bool use_eds_resources_cache) override {
-    return std::make_shared<Config::GrpcMuxImpl>(
-        local_info, std::move(async_client), dispatcher,
+    GrpcMuxContext grpc_mux_context{
+        /*async_client_=*/std::move(async_client),
+        /*dispatcher_=*/dispatcher,
+        /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        scope, Utility::parseRateLimitSettings(ads_config),
-        ads_config.set_node_on_first_message_only(), std::move(config_validators),
-        std::move(backoff_strategy), xds_config_tracker, xds_resources_delegate,
+        /*local_info_=*/local_info,
+        /*rate_limit_settings_=*/Utility::parseRateLimitSettings(ads_config),
+        /*scope_=*/scope,
+        /*config_validators_=*/std::move(config_validators),
+        /*xds_resources_delegate_=*/xds_resources_delegate,
+        /*xds_config_tracker_=*/xds_config_tracker,
+        /*backoff_strategy_=*/std::move(backoff_strategy),
+        /*target_xds_authority_=*/Config::Utility::getGrpcControlPlane(ads_config).value_or(""),
+        /*eds_resources_cache_=*/
         (use_eds_resources_cache &&
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr,
-        Config::Utility::getGrpcControlPlane(ads_config).value_or(""));
+            : nullptr};
+    return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context,
+                                                 ads_config.set_node_on_first_message_only());
   }
 };
 

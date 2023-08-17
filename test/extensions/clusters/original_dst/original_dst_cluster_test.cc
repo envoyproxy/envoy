@@ -1162,6 +1162,19 @@ TEST_F(OriginalDstClusterTest, UseFilterStateWithPortOverride) {
   EXPECT_EQ("10.10.11.11:443", host1->address()->asString());
 }
 
+TEST(DestinationAddress, ObjectFactory) {
+  const std::string name = "envoy.network.transport_socket.original_dst_address";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string address = "10.0.0.10:8080";
+  auto object = factory->createFromBytes(address);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(address, object->serializeAsString());
+  EXPECT_EQ(nullptr, factory->createFromBytes("foo"));
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

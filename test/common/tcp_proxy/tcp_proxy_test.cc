@@ -1410,6 +1410,18 @@ TEST_F(TcpProxyTest, UpstreamStartSecureTransport) {
   filter_->startUpstreamSecureTransport();
 }
 
+TEST(PerConnectionCluster, ObjectFactory) {
+  const std::string name = "envoy.tcp_proxy.cluster";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string cluster = "per_connection_cluster";
+  auto object = factory->createFromBytes(cluster);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(cluster, object->serializeAsString());
+}
+
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy
