@@ -81,5 +81,9 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: tap
+  change: |
+    added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.output_sink_type.custom_sink>` to enable writing tap data
+    out to a custom sink extension.
 
 deprecated:
