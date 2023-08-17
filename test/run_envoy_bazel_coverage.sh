@@ -57,6 +57,10 @@ if [[ -n "${BAZEL_GRPC_LOG}" ]]; then
     BAZEL_COVERAGE_OPTIONS+=(--remote_grpc_log="${BAZEL_GRPC_LOG}")
 fi
 
+BAZEL_STARTUP_OPTIONS=(
+    ${BAZEL_STARTUP_OPTIONS[@]}
+    ${EXTRA_STARTUP_OPTIONS[@]})
+
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     # Filter targets to just fuzz tests.
     _targets=$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query "${BAZEL_GLOBAL_OPTIONS[@]}" "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
@@ -81,7 +85,7 @@ echo "Running bazel coverage with:"
 echo "  Options: ${BAZEL_BUILD_OPTIONS[*]} ${BAZEL_COVERAGE_OPTIONS[*]}"
 echo "  Targets: ${COVERAGE_TARGETS[*]}"
 
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" "${EXTRA_STARTUP_OPTIONS[@]}" coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
 echo "Collecting profile and testlogs"
 if [[ -n "${ENVOY_BUILD_PROFILE}" ]]; then
