@@ -433,6 +433,72 @@ TEST_F(JsonLoaderTest, AsString) {
   });
 }
 
+TEST_F(JsonLoaderTest, LoadFromStruct) {
+  const std::string json_string = R"EOF({
+    "struct": {
+      "struct_string": "plain_string_value",
+      "struct_protocol": "HTTP/1.1",
+      "struct_struct": {
+        "struct_struct_string": "plain_string_value",
+        "struct_struct_protocol": "HTTP/1.1",
+        "struct_struct_struct": {
+          "struct_struct_struct_string": "plain_string_value",
+          "struct_struct_struct_protocol": "HTTP/1.1",
+        },
+        "struct_struct_list": [
+          "struct_struct_list_string",
+          "HTTP/1.1",
+        ],
+      },
+      "struct_list": [
+        "struct_list_string",
+        "HTTP/1.1",
+        {
+          "struct_list_struct_string": "plain_string_value",
+          "struct_list_struct_protocol": "HTTP/1.1",
+        },
+        [
+          "struct_list_list_string",
+          "HTTP/1.1",
+        ],
+      ],
+    },
+    "list": [
+      "list_string",
+      "HTTP/1.1",
+      {
+        "list_struct_string": "plain_string_value",
+        "list_struct_protocol": "HTTP/1.1",
+        "list_struct_struct": {
+          "list_struct_struct_string": "plain_string_value",
+          "list_struct_struct_protocol": "HTTP/1.1",
+        },
+        "list_struct_list": [
+          "list_struct_list_string",
+          "HTTP/1.1",
+        ]
+      },
+      [
+        "list_list_string",
+        "HTTP/1.1",
+        {
+          "list_list_struct_string": "plain_string_value",
+          "list_list_struct_protocol": "HTTP/1.1",
+        },
+        [
+          "list_list_list_string",
+          "HTTP/1.1",
+        ],
+      ],
+    ],
+  })EOF";
+
+  const ProtobufWkt::Struct src = TestUtility::jsonToStruct(json_string);
+  ObjectSharedPtr json = Factory::loadFromProtobufStruct(src);
+  const auto output_json = json->asJsonString();
+  EXPECT_TRUE(TestUtility::jsonStringEqual(output_json, json_string));
+}
+
 } // namespace
 } // namespace Json
 } // namespace Envoy

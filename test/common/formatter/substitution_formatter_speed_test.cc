@@ -25,7 +25,7 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool type
     user-agent: '%REQ(USER-AGENT)%'
   )EOF";
   TestUtility::loadFromYaml(format_yaml, JsonLogFormat);
-  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed, false);
+  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed, false, false);
 }
 
 std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool typed) {

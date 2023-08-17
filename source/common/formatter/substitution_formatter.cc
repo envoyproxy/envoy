@@ -163,9 +163,7 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
   std::string log_line = "";
 #ifdef ENVOY_ENABLE_YAML
   if (sort_properties_) {
-    const auto sorted_struct = MessageUtil::sortProperties(output_struct);
-    const auto json_object = Json::Factory::loadFromProtobufStruct(sorted_struct);
-    log_line = json_object->asJsonString();
+    log_line = Json::Factory::loadFromProtobufStruct(output_struct)->asJsonString();
   } else {
     log_line = MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
   }

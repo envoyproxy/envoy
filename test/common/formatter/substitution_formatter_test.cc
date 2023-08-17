@@ -4240,7 +4240,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
       protocol: '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  JsonFormatterImpl formatter(key_mapping, false, false, false);
 
   const std::string expected = R"EOF({
     "request_duration": "5",
@@ -4254,6 +4254,48 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
       formatter.format(request_header, response_header, response_trailer, stream_info, body,
                        AccessLog::AccessLogType::NotSet);
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
+TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    request_duration: '%REQUEST_DURATION%'
+    bfield: valb
+    afield: vala
+    nested_level:
+      plain_string: plain_string_value
+      cfield: valc
+      protocol: '%PROTOCOL%'
+  )EOF",
+                            key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false, false, true);
+
+  const std::string expected =
+      "{\"afield\":\"vala\",\"bfield\":\"valb\",\"nested_level\":"
+      "{\"cfield\":\"valc\",\"plain_string\":\"plain_string_value\",\"protocol\":\"HTTP/1.1\"},"
+      "\"request_duration\":\"5\"}\n";
+
+  const std::string out_json =
+      formatter.format(request_header, response_header, response_trailer, stream_info, body,
+                       AccessLog::AccessLogType::NotSet);
+
+  // Check string equality to verify the order.
+  EXPECT_EQ(out_json, expected);
 }
 
 TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
