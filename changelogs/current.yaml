@@ -44,6 +44,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tcp
+  change: |
+    removed runtime key ``envoy.reloadable_features.tcp_pool_idle_timeout``.
 
 new_features:
 - area: access_log
