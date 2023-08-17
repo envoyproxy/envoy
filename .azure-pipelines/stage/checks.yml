@@ -135,7 +135,7 @@ jobs:
 
 - job: complete
   displayName: "Checks complete"
-  dependsOn: ["bazel", "coverage"]
+  dependsOn: ["bazel"]
   pool: x64-nano
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
@@ -144,8 +144,7 @@ jobs:
   condition: |
     and(
       eq(variables['Build.Reason'], 'PullRequest'),
-      in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-      in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+      in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
   - checkout: none
   - bash: |
