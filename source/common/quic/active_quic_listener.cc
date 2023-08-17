@@ -117,7 +117,11 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
-  quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
+  if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
+    if (hot_restart_packet_forwarding_function_ != nullptr) {
+      hot_restart_packet_forwarding_function_(worker_index_, std::move(data));
+    }
+  }
 
   if (quic_dispatcher_->HasChlosBuffered()) {
     // If there are any buffered CHLOs, activate a read event for the next event loop to process
@@ -169,7 +173,7 @@ void ActiveQuicListener::shutdownListener(Network::ExtraShutdownListenerOptionsP
   HotRestartPacketForwardingOptions* p =
       dynamic_cast<HotRestartPacketForwardingOptions*>(options.get());
   if (p != nullptr) {
-    quic_dispatcher_->onHotRestarting(worker_index_, p->hotRestartPacketForwardingFunction());
+    hot_restart_packet_forwarding_function_ = p->hotRestartPacketForwardingFunction();
   }
   // Same as pauseListening() because all we want is to stop accepting new
   // connections.

@@ -126,21 +126,22 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   return quic_session;
 }
 
+bool EnvoyQuicDispatcher::processPacket(const quic::QuicSocketAddress& self_address,
+                                        const quic::QuicSocketAddress& peer_address,
+                                        const quic::QuicReceivedPacket& packet) {
+  // Assume a packet was dispatched successfully, if OnFailedToDispatchPacket is not called.
+  packet_dispatch_success_ = true;
+  ProcessPacket(self_address, peer_address, packet);
+  return packet_dispatch_success_;
+}
+
 bool EnvoyQuicDispatcher::OnFailedToDispatchPacket(
     const quic::ReceivedPacketInfo& received_packet_info) {
-  if (hot_restart_forward_packet_ == nullptr) {
-    // If we're not hot restarting, do the default behavior.
-    return quic::QuicDispatcher::OnFailedToDispatchPacket(received_packet_info);
+  if (!accept_new_connections()) {
+    packet_dispatch_success_ = false;
+    return true;
   }
-  // We are hot restarting, forward the packet to the new instance.
-  Network::UdpRecvData packet;
-  packet.addresses_.local_ = quicAddressToEnvoyAddressInstance(received_packet_info.self_address);
-  packet.addresses_.peer_ = quicAddressToEnvoyAddressInstance(received_packet_info.peer_address);
-  packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(received_packet_info.packet.AsStringPiece());
-  packet.receive_time_ = MonotonicTime(
-      std::chrono::microseconds{received_packet_info.packet.receipt_time().ToDebuggingValue()});
-  hot_restart_forward_packet_(packet);
-  return true;
+  return quic::QuicDispatcher::OnFailedToDispatchPacket(received_packet_info);
 }
 
 void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
@@ -163,14 +164,6 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
 
 void EnvoyQuicDispatcher::updateListenerConfig(Network::ListenerConfig& new_listener_config) {
   listener_config_ = &new_listener_config;
-}
-
-void EnvoyQuicDispatcher::onHotRestarting(uint32_t worker_index,
-                                          HotRestartPacketForwardingFunction fn) {
-  ASSERT(fn);
-  hot_restart_forward_packet_ = [worker_index, fn](const Network::UdpRecvData& packet) {
-    fn(worker_index, packet);
-  };
 }
 
 } // namespace Quic
