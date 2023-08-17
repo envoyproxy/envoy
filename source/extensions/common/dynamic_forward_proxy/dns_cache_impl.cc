@@ -511,8 +511,8 @@ void DnsCacheImpl::addCacheEntry(
     value = absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
   } else {
     for (auto& addr : address_list) {
-      value += absl::StrCat((value.empty() ? "" : "\n"), addr->asString(), "|", ttl.count(), "|",
-                            seconds_since_epoch);
+      absl::StrAppend(&value, (value.empty() ? "" : "\n"), addr->asString(), "|", ttl.count(),
+                      "|", seconds_since_epoch);
     }
   }
   key_value_store_->addOrUpdate(host, value, absl::nullopt);
