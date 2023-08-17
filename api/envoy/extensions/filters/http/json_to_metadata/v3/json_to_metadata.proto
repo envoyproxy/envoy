@@ -112,5 +112,8 @@ message JsonToMetadata {
   }
 
   // Rules to match json body of requests
-  MatchRules request_rules = 1 [(validate.rules).message = {required: true}];
+  MatchRules request_rules = 1 [(validate.rules).message = {required: false}];
+
+  // Rules to match json body of responses
+  MatchRules response_rules = 2 [(validate.rules).message = {required: false}];
 }

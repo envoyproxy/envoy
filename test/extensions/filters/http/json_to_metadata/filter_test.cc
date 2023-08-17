@@ -67,12 +67,33 @@ request_rules:
       preserve_existing_metadata_value: true
 )EOF";
 
+  const std::string response_config_yaml_ = R"EOF(
+response_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'unknown'
+      preserve_existing_metadata_value: true
+    on_error:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'error'
+      preserve_existing_metadata_value: true
+)EOF";
+
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata config;
     TestUtility::loadFromYaml(yaml, config);
     config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope());
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   void sendData(const std::vector<std::string>& data_vector) {
@@ -104,8 +125,18 @@ request_rules:
     EXPECT_EQ(expected_result, filter_->decodeData(buffer_, end_stream));
   }
 
+  void
+  testResponseWithBody(const std::string& body, bool end_stream = true,
+                      Http::FilterDataStatus expected_result = Http::FilterDataStatus::Continue) {
+    buffer_.add(body);
+    ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
+
+    EXPECT_EQ(expected_result, filter_->encodeData(buffer_, end_stream));
+  }
+
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   envoy::config::core::v3::Metadata dynamic_metadata_;
   std::shared_ptr<FilterConfig> config_;
@@ -140,6 +171,30 @@ TEST_F(FilterTest, BasicStringMatch) {
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, BasicResponseStringMatch) {
+  initializeFilter(response_config_yaml_);
+  const std::string response_body =
+      R"delimiter(
+        {"version":"1.0.0",
+        "messages":[
+          {"role":"user","content":"content A"},
+          {"role":"assistant","content":"content B"},
+          {"role":"user","content":"content C"},
+          {"role":"assistant","content":"content D"},
+          {"role":"user","content":"content E"}],
+        "stream":true})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "1.0.0"}};
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testResponseWithBody(response_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_invalid_json_body"), 0);
 }
 
 TEST_F(FilterTest, BasicBoolMatch) {
