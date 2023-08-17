@@ -40,7 +40,7 @@ Do not allow any bots or app users to do so, unless this is specifically require
 For example, you could add a `job` condition to prevent any bots from triggering the workflow:
 
 ```yaml
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.schedule

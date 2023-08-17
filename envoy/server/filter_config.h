@@ -227,7 +227,7 @@ public:
     auto config_types = TypedFactory::configTypes();
 
     if (auto message = createEmptyRouteConfigProto(); message != nullptr) {
-      config_types.insert(message->GetDescriptor()->full_name());
+      config_types.insert(createReflectableMessage(*message)->GetDescriptor()->full_name());
     }
 
     return config_types;

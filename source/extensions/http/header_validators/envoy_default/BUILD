@@ -41,6 +41,7 @@ envoy_cc_library(
     visibility = [
         "//test/common/http/http1:__subpackages__",
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
+        "//test/integration:__subpackages__",
     ],
 )
 

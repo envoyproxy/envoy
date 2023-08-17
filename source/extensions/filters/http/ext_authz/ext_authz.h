@@ -319,7 +319,7 @@ private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
-  bool isBufferFull() const;
+  bool isBufferFull(uint64_t num_bytes_processing) const;
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {

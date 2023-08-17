@@ -222,6 +222,10 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
+  if (read_side_closed()) {
+    return;
+  }
+
   if (!headers_decompressed() || header_list.empty()) {
     onStreamError(absl::nullopt);
     return;
@@ -568,6 +572,8 @@ void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_->setStreamDecoder(request_decoder_);
 }
 #endif
+
+void EnvoyQuicServerStream::OnInvalidHeaders() { onStreamError(absl::nullopt); }
 
 } // namespace Quic
 } // namespace Envoy
