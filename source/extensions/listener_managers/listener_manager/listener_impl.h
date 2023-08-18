@@ -28,6 +28,8 @@
 namespace Envoy {
 namespace Server {
 
+class ListenerImpl;
+
 constexpr absl::string_view ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG{
     "envoy.reloadable_features.enable_update_listener_socket_options"};
 
@@ -72,7 +74,7 @@ public:
                           const std::string& listener_name, uint32_t tcp_backlog_size,
                           ListenerComponentFactory::BindType bind_type,
                           const Network::SocketCreationOptions& creation_options,
-                          uint32_t num_sockets);
+                          uint32_t num_sockets, Network::ListenerConfig& listener);
 
   // Network::ListenSocketFactory
   Network::Socket::Type socketType() const override { return socket_type_; }
@@ -95,7 +97,8 @@ private:
 
   Network::SocketSharedPtr createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
                                                              Network::Socket::Type socket_type,
-                                                             uint32_t worker_index);
+                                                             uint32_t worker_index,
+                                                             Network::ListenerConfig& listener);
 
   ListenerComponentFactory& factory_;
   // Initially, its port number might be 0. Once a socket is created, its port
@@ -186,8 +189,6 @@ private:
   const Server::DrainManagerPtr drain_manager_;
   bool is_quic_;
 };
-
-class ListenerImpl;
 
 // TODO(lambdai): Strip the interface since ListenerFactoryContext only need to support
 // ListenerFilterChain creation. e.g, Is listenerMetaData() required? Is it required only at

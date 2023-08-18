@@ -45,9 +45,11 @@ public:
    * @param address supplies the address of the socket to duplicate, e.g. tcp://127.0.0.1:5000.
    * @param worker_index supplies the socket/worker index to fetch. When using reuse_port sockets
    *        each socket is fetched individually to ensure no connection loss.
+   * @param listener is the listener which will be associated with the socket.
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */
-  virtual int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) PURE;
+  virtual int duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
+                                          Network::ListenerConfig& listener) PURE;
 
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a

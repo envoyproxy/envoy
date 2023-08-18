@@ -224,7 +224,8 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index,
+    Network::ListenerConfig& listener) {
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -238,7 +239,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
           fmt::format("socket type {} not supported for pipes", toString(socket_type)));
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
-    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index, listener);
     Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
     if (io_handle->isOpen()) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
@@ -258,7 +259,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   const std::string addr = absl::StrCat(scheme, address->asString());
 
   if (bind_type != BindType::NoBind) {
-    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index, listener);
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
       Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
@@ -1115,7 +1116,7 @@ void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
       listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
           *factory_, listener.addresses()[i], socket_type, listener.listenSocketOptions(i),
           listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
-          server_.options().concurrency()));
+          server_.options().concurrency(), listener));
     }
   }
   END_TRY

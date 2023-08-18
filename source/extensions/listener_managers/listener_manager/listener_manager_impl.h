@@ -96,10 +96,12 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return createUdpListenerFilterFactoryListImpl(filters, context);
   }
-  Network::SocketSharedPtr createListenSocket(
-      Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-      const Network::SocketCreationOptions& creation_options, uint32_t worker_index) override;
+  Network::SocketSharedPtr
+  createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                     Network::Socket::Type socket_type,
+                     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+                     const Network::SocketCreationOptions& creation_options, uint32_t worker_index,
+                     Network::ListenerConfig& listener) override;
 
   DrainManagerPtr
   createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override;

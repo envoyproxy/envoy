@@ -259,13 +259,13 @@ protected:
                            Network::Socket::Options::size_type expected_num_options,
                            ListenerComponentFactory::BindType bind_type = default_bind_type,
                            uint32_t worker_index = 0) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, _, worker_index))
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, _, worker_index, _))
         .WillOnce(
             Invoke([this, expected_num_options, &expected_state](
                        const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
                        const Network::Socket::OptionsSharedPtr& options,
                        ListenerComponentFactory::BindType, const Network::SocketCreationOptions&,
-                       uint32_t) -> Network::SocketSharedPtr {
+                       uint32_t, Network::ListenerConfig&) -> Network::SocketSharedPtr {
               EXPECT_NE(options.get(), nullptr);
               EXPECT_EQ(options->size(), expected_num_options);
               EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
@@ -377,11 +377,11 @@ protected:
 
     ListenerHandle* listener_origin = expectListenerCreate(true, true);
     if (multiple_addresses) {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0, _))
           .Times(2)
           .WillRepeatedly(Return(socket));
     } else {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0, _))
           .WillOnce(Return(socket));
     }
     EXPECT_CALL(listener_origin->target_, initialize());
@@ -395,11 +395,11 @@ protected:
 
     ListenerHandle* listener_updated = expectListenerCreate(true, true);
     if (multiple_addresses) {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0, _))
           .Times(2)
           .WillRepeatedly(Return(socket));
     } else {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0, _))
           .WillOnce(Return(socket));
     }
     EXPECT_CALL(listener_updated->target_, initialize());
@@ -425,7 +425,7 @@ protected:
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
     ListenerHandle* listener_origin = expectListenerCreate(true, true);
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0, _))
         .WillOnce(Return(socket));
     EXPECT_CALL(listener_origin->target_, initialize());
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
@@ -456,9 +456,10 @@ protected:
 
     ListenerHandle* listener_origin = expectListenerCreate(true, true);
     if (multiple_addresses) {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0, _))
+          .Times(2);
     } else {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0, _));
     }
     EXPECT_CALL(listener_origin->target_, initialize());
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));

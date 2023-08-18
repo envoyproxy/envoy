@@ -16,7 +16,8 @@ public:
   // Server::HotRestart
   MOCK_METHOD(void, drainParentListeners, ());
   MOCK_METHOD(int, duplicateParentListenSocket,
-              (const std::string& address, uint32_t worker_index));
+              (const std::string& address, uint32_t worker_index,
+               Network::ListenerConfig& listener));
   MOCK_METHOD(void, initialize, (Event::Dispatcher & dispatcher, Server::Instance& server));
   MOCK_METHOD(absl::optional<AdminShutdownResponse>, sendParentAdminShutdownRequest, ());
   MOCK_METHOD(void, sendParentTerminateRequest, ());
