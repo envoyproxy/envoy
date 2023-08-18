@@ -26,6 +26,9 @@ parameters:
   type: string
   default: ''
 
+- name: bazelConfigRBE
+  type: string
+  default: --config=remote-ci --config=rbe-google --jobs=$(RbeJobs)
 - name: cacheKeyBazel
   type: string
   default: $(cacheKeyBazel)
@@ -47,6 +50,13 @@ parameters:
 - name: bazelBuildExtraOptions
   type: string
   default: ""
+- name: bazelStartupExtraOptions
+  type: string
+  default: ""
+- name: bazelUseBES
+  displayName: "Upload bazel run data to BES"
+  type: boolean
+  default: true
 - name: envoyBuildFilterExample
   type: string
   default: ""
@@ -175,12 +185,17 @@ steps:
   displayName: "Enable IPv6"
   condition: ${{ parameters.managedAgent }}
 
-- script: ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ parameters.ciTarget }}'
+- script: |
+    if [[ "${{ parameters.bazelUseBES }}" != 'true' ]]; then
+        unset GOOGLE_BES_PROJECT_ID
+    fi
+    ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ parameters.ciTarget }}'
   workingDirectory: $(Build.SourcesDirectory)
   env:
     ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
     ENVOY_BUILD_FILTER_EXAMPLE: ${{ parameters.envoyBuildFilterExample }}
     GITHUB_TOKEN: "${{ parameters.authGithub }}"
+    BAZEL_STARTUP_EXTRA_OPTIONS: "${{ parameters.bazelStartupExtraOptions }}"
     ${{ if ne(parameters['cacheTestResults'], true) }}:
       BAZEL_NO_CACHE_TEST_RESULTS: 1
     ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
@@ -194,7 +209,7 @@ steps:
     ${{ if parameters.rbe }}:
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ENVOY_RBE: "1"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"
+      BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelConfigRBE }} ${{ parameters.bazelBuildExtraOptions }}"
     ${{ if eq(parameters.rbe, false) }}:
       BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci ${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
@@ -206,6 +221,20 @@ steps:
     echo "disk space at end of build:"
     df -h
 
+    for hprof in $(find "$(Build.StagingDirectory)" -name "*heapdump.hprof"); do
+        echo
+        mkdir -p $(Build.StagingDirectory)/envoy/hprof
+        echo "Copying ${hprof}"
+        cp -a $hprof $(Build.StagingDirectory)/envoy/hprof
+    done
+
+    cp -a "$(Build.StagingDirectory)/bazel_root/base/server/jvm.out" $(Build.StagingDirectory)/envoy
+
+    if [[ "${{ parameters.artifactSuffix }}" == ".arm64" ]]; then
+        # Dump bazel-remote logging (only required for arm/self-hosted).
+        sudo systemctl status --no-pager bazel-remote > $(Build.StagingDirectory)/envoy/br.status
+        sudo journalctl --no-pager -xu bazel-remote > $(Build.StagingDirectory)/envoy/br.journal
+    fi
     echo
     du -ch "$(Build.StagingDirectory)" | grep -E "[0-9]{2,}M|[0-9]G"
 
