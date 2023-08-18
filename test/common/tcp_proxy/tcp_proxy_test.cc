@@ -1426,15 +1426,16 @@ TEST_F(TcpProxyTest, UpstreamStartSecureTransport) {
   filter_->startUpstreamSecureTransport();
 }
 
-// Test that call to tcp_proxy filter's startUpstreamSecureTransport results
-// in upstream's startUpstreamSecureTransport call.
-TEST_F(TcpProxyTest, UpstreamStartSecureTransportWithSSL) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
-
-  setup(1, config);
-  raiseEventUpstreamConnected(0);
-  EXPECT_CALL(*upstream_connections_.at(0), startSecureTransport).WillOnce(Return(true));
-  filter_->startUpstreamSecureTransport();
+TEST(PerConnectionCluster, ObjectFactory) {
+  const std::string name = "envoy.tcp_proxy.cluster";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string cluster = "per_connection_cluster";
+  auto object = factory->createFromBytes(cluster);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(cluster, object->serializeAsString());
 }
 
 } // namespace
