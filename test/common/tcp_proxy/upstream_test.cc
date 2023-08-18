@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
