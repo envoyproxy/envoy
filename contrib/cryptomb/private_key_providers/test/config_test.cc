@@ -152,8 +152,9 @@ TEST_F(CryptoMbConfigTest, CreateRsa512) {
         private_key: { "filename": "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-512.pem" }
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml), EnvoyException,
-                            "Only RSA keys of 1024, 2048, 3072, and 4096 bits are supported.");
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(provider->initialized(), false);
 }
 
 TEST_F(CryptoMbConfigTest, CreateEcdsaP256) {

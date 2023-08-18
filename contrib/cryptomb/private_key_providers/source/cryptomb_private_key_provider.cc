@@ -570,7 +570,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
       key_size = 4096;
       break;
     default:
-      throw EnvoyException("Only RSA keys of 1024, 2048, 3072, and 4096 bits are supported.");
+      ENVOY_LOG(warn, "Only RSA keys of 1024, 2048, 3072, and 4096 bits are supported.");
+      return;
     }
 
     // If longer keys are ever supported, remember to change the signature buffer to be larger.
