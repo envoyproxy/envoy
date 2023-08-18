@@ -65,9 +65,6 @@ request_rules:
       key: version
       value: 'error'
       preserve_existing_metadata_value: true
-)EOF";
-
-  const std::string response_config_yaml_ = R"EOF(
 response_rules:
   rules:
   - selectors:
@@ -174,7 +171,7 @@ TEST_F(FilterTest, BasicStringMatch) {
 }
 
 TEST_F(FilterTest, BasicResponseStringMatch) {
-  initializeFilter(response_config_yaml_);
+  initializeFilter(request_config_yaml_);
   const std::string response_body =
       R"delimiter(
         {"version":"1.0.0",
