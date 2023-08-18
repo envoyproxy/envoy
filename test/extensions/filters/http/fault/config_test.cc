@@ -59,7 +59,6 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJsonWithServerContext) {
 
   envoy::extensions::filters::http::fault::v3::HTTPFault config;
   TestUtility::loadFromYamlAndValidate(yaml_string, config);
-
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb =
