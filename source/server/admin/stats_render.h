@@ -107,6 +107,7 @@ private:
   bool histograms_initialized_{false};
   Json::Streamer json_streamer_;
   OptRef<Json::Streamer::Map> json_stats_map_;
+  Json::Streamer::Map::ValuePtr stats_value_context_;
   OptRef<Json::Streamer::Array> json_stats_array_;
   OptRef<Json::Streamer::Map> json_histogram_map1_;
   OptRef<Json::Streamer::Map> json_histogram_map2_;

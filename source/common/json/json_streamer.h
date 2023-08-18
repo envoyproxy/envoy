@@ -38,12 +38,20 @@ public:
     using NameValue = std::pair<const absl::string_view, const absl::string_view>;
     using Entries = absl::Span<const NameValue>;
 
+    struct Value {
+      Value(Map& map) : map_(map) {}
+      ~Value() { map_.expecting_value_ = false; }
+      void addSanitized(absl::string_view value) { map_.streamer_.addSanitized(value); }
+      Map& map_;
+    };
+    using ValuePtr = std::unique_ptr<Value>;
+
     Map(Streamer& streamer) : Level(streamer, "{", "}") {}
-    void newKey(absl::string_view name);
+    ValuePtr newKey(absl::string_view name);
     void newEntries(const Entries& entries);
     virtual void newEntry() override;
     void newSanitizedValue(absl::string_view value);
-    void endValue();
+    // void endValue();
 
     bool expecting_value_{false};
   };

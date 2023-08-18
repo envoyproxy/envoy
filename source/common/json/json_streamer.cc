@@ -72,19 +72,21 @@ void Streamer::Map::newEntry() {
   }
 }
 
-void Streamer::Map::newKey(absl::string_view name) {
+Streamer::Map::ValuePtr Streamer::Map::newKey(absl::string_view name) {
   newEntry();
   streamer_.addFragments({"\"", name, "\":"});
+  ASSERT(!expecting_value_);
   expecting_value_ = true;
+  return std::make_unique<Value>(*this);
 }
 
-void Streamer::Map::newSanitizedValue(absl::string_view value) {
+/*void Streamer::Map::newSanitizedValue(absl::string_view value) {
   ASSERT(expecting_value_);
   streamer_.addSanitized(value);
   expecting_value_ = false;
-}
+  }*/
 
-void Streamer::Map::endValue() { expecting_value_ = false; }
+// void Streamer::Map::endValue() { expecting_value_ = false; }
 
 void Streamer::Map::newEntries(const Entries& entries) {
   for (const NameValue& entry : entries) {
