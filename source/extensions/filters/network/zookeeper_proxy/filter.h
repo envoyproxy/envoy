@@ -164,7 +164,8 @@ using OpcodeMap = absl::flat_hash_map<LatencyThresholdOverride_Opcode, int32_t>;
 class ZooKeeperFilterConfig {
 public:
   ZooKeeperFilterConfig(const std::string& stat_prefix, const uint32_t max_packet_bytes,
-                        const bool enable_per_opcode_request_response_bytes_metrics,
+                        const bool enable_per_opcode_request_bytes_metrics,
+                        const bool enable_per_opcode_response_bytes_metrics,
                         const bool enable_latency_threshold_metrics,
                         const std::chrono::milliseconds default_latency_threshold,
                         const LatencyThresholdOverrideList& latency_threshold_overrides,
@@ -201,7 +202,8 @@ public:
   const Stats::StatName connect_latency_;
   const Stats::StatName unknown_scheme_rq_;
   const Stats::StatName unknown_opcode_latency_;
-  const bool enable_per_opcode_request_response_bytes_metrics_;
+  const bool enable_per_opcode_request_bytes_metrics_;
+  const bool enable_per_opcode_response_bytes_metrics_;
 
   ErrorBudgetResponseType errorBudgetDecision(const OpCodes opcode,
                                               const std::chrono::milliseconds latency) const;

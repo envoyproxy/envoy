@@ -116,7 +116,8 @@ new_features:
 
 - area: zookeeper
   change: |
-    Added support for emitting per opcode request/response bytes metrics.
+    added support for emitting per opcode request bytes metrics via :ref:`enable_per_opcode_request_bytes_metrics <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.enable_per_opcode_request_bytes_metrics>`.
+    added support for emitting per opcode response bytes metrics via :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.enable_per_opcode_response_bytes_metrics>`.
 deprecated:
 - area: tracing
   change: |

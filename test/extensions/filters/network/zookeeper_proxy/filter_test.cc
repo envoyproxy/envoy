@@ -33,9 +33,10 @@ public:
       const std::chrono::milliseconds default_latency_threshold = std::chrono::milliseconds(100),
       const LatencyThresholdOverrideList& latency_threshold_overrides =
           LatencyThresholdOverrideList(),
-      const bool enable_per_opcode_request_response_bytes_metrics = true) {
+      const bool enable_per_opcode_request_bytes_metrics = true,
+      const bool enable_per_opcode_response_bytes_metrics = true) {
     config_ = std::make_shared<ZooKeeperFilterConfig>(
-        stat_prefix_, 1048576, enable_per_opcode_request_response_bytes_metrics,
+        stat_prefix_, 1048576, enable_per_opcode_request_bytes_metrics, enable_per_opcode_response_bytes_metrics,
         enable_latency_threshold_metrics, default_latency_threshold, latency_threshold_overrides,
         scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
@@ -834,11 +835,11 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultAndOtherLatencyThresho
             ErrorBudgetResponseType::Slow);
 }
 
-TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestResponseBytesMetrics) {
+TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestAndResponseBytesMetrics) {
   std::chrono::milliseconds default_latency_threshold(100);
   LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(true, default_latency_threshold, latency_threshold_overrides, false);
+  initialize(true, default_latency_threshold, latency_threshold_overrides, false, false);
 
   Buffer::OwnedImpl data = encodeConnect();
   expectSetDynamicMetadata({{{"opname", "connect"}}, {{"bytes", "32"}}});
@@ -847,6 +848,68 @@ TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestResponseBytesMetrics) {
   EXPECT_EQ(1UL, store_.counter("test.zookeeper.connect_rq").value());
   EXPECT_EQ(32UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, store_.counter("test.zookeeper.connect_rq_bytes").value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  data = encodeConnectResponse();
+  expectSetDynamicMetadata({{{"opname", "connect_response"},
+                             {"protocol_version", "0"},
+                             {"timeout", "10"},
+                             {"readonly", "0"}},
+                            {{"bytes", "24"}}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
+  EXPECT_EQ(1UL, config_->stats().connect_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().connect_resp_slow_.value());
+  EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, store_.counter("test.zookeeper.connect_resp_bytes").value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+}
+
+TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestBytesMetrics) {
+  std::chrono::milliseconds default_latency_threshold(100);
+  LatencyThresholdOverrideList latency_threshold_overrides;
+
+  initialize(true, default_latency_threshold, latency_threshold_overrides, false, true);
+
+  Buffer::OwnedImpl data = encodeConnect();
+  expectSetDynamicMetadata({{{"opname", "connect"}}, {{"bytes", "32"}}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1UL, store_.counter("test.zookeeper.connect_rq").value());
+  EXPECT_EQ(32UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, store_.counter("test.zookeeper.connect_rq_bytes").value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  data = encodeConnectResponse();
+  expectSetDynamicMetadata({{{"opname", "connect_response"},
+                             {"protocol_version", "0"},
+                             {"timeout", "10"},
+                             {"readonly", "0"}},
+                            {{"bytes", "24"}}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
+  EXPECT_EQ(1UL, config_->stats().connect_resp_fast_.value());
+  EXPECT_EQ(0UL, config_->stats().connect_resp_slow_.value());
+  EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(24UL, store_.counter("test.zookeeper.connect_resp_bytes").value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
+}
+
+TEST_F(ZooKeeperFilterTest, DisablePerOpcodeResponseBytesMetrics) {
+  std::chrono::milliseconds default_latency_threshold(100);
+  LatencyThresholdOverrideList latency_threshold_overrides;
+
+  initialize(true, default_latency_threshold, latency_threshold_overrides, true, false);
+
+  Buffer::OwnedImpl data = encodeConnect();
+  expectSetDynamicMetadata({{{"opname", "connect"}}, {{"bytes", "32"}}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1UL, store_.counter("test.zookeeper.connect_rq").value());
+  EXPECT_EQ(32UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(32UL, store_.counter("test.zookeeper.connect_rq_bytes").value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
   data = encodeConnectResponse();
