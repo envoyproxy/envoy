@@ -68,7 +68,8 @@ new_features:
     added support for lmove command.
 - area: tls
   change: |
-    added private_key_provider_list :ref:`private_key_provider_list <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider_list>`
+    added private_key_provider_list :ref:`private_key_provider_list 
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider_list>`
     to support multi private key providers and fallback.
 
 deprecated:
