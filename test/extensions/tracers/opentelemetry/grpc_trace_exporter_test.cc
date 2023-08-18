@@ -33,15 +33,15 @@ public:
             Invoke([this](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& cbs,
                           const Http::AsyncClient::StreamOptions&) {
               this->callbacks_ = dynamic_cast<TraceCallbacks*>(&cbs);
-              return &this->stream_;
+              return &this->conn_;
             }));
   }
 
   void expectTraceExportMessage(const std::string& expected_message_yaml) {
     opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
-    EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-    EXPECT_CALL(stream_, sendMessageRaw_(_, true))
+    EXPECT_CALL(conn_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+    EXPECT_CALL(conn_, sendMessageRaw_(_, true))
         .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
           opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
@@ -52,7 +52,7 @@ public:
 
 protected:
   Grpc::MockAsyncClient* async_client_;
-  Grpc::MockAsyncStream stream_;
+  Grpc::MockAsyncStream conn_;
   TraceCallbacks* callbacks_;
 };
 
@@ -75,8 +75,8 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, CreateExporterAndExportSpan) {
 TEST_F(OpenTelemetryGrpcTraceExporterTest, NoExportWithHighWatermark) {
   OpenTelemetryGrpcTraceExporter exporter(Grpc::RawAsyncClientPtr{async_client_});
 
-  EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
-  EXPECT_CALL(stream_, sendMessageRaw_(_, false)).Times(0);
+  EXPECT_CALL(conn_, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
+  EXPECT_CALL(conn_, sendMessageRaw_(_, false)).Times(0);
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request;
   opentelemetry::proto::trace::v1::Span span;
   span.set_name("tests");
@@ -100,10 +100,10 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithRemoteClose) {
   *request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_TRUE(exporter.log(request));
 
-  // Close the stream, now that we've created it.
+  // Close the connection, now that we've created it.
   callbacks_->onRemoteClose(Grpc::Status::Internal, "bad");
 
-  // Second call should make a new stream.
+  // Second call should make a new connection.
   expectTraceExportStart();
   expectTraceExportMessage(request_yaml);
   EXPECT_TRUE(exporter.log(request));
