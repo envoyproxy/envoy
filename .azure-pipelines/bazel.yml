@@ -231,7 +231,7 @@ steps:
     cp -a "$(Build.StagingDirectory)/bazel_root/base/server/jvm.out" $(Build.StagingDirectory)/envoy
 
     if [[ "${{ parameters.artifactSuffix }}" == ".arm64" ]]; then
-        # Dump bazel-remote logging (only required for arm/self-hosted
+        # Dump bazel-remote logging (only required for arm/self-hosted).
         sudo systemctl status --no-pager bazel-remote > $(Build.StagingDirectory)/envoy/br.status
         sudo journalctl --no-pager -xu bazel-remote > $(Build.StagingDirectory)/envoy/br.journal
     fi
