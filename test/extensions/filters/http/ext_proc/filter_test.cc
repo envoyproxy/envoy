@@ -701,6 +701,40 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   expectFilterState(Envoy::ProtobufWkt::Struct());
 }
 
+TEST_F(HttpFilterTest, PostAndRespondImmediatelyWithDisabledConfig) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  disable_immediate_response: true
+  )EOF");
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  auto* immediate_response = resp1->mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+  immediate_response->set_body("Bad request");
+  immediate_response->set_details("Got a bad request");
+  auto* immediate_headers = immediate_response->mutable_headers();
+  auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_header()->set_key("content-type");
+  hdr1->mutable_header()->set_value("text/plain");
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(filter_->decodeData(req_data, true), FilterDataStatus::Continue);
+  EXPECT_EQ(filter_->decodeTrailers(request_trailers_), FilterTrailersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true), FilterHeadersStatus::Continue);
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 0);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
+}
+
 // Using the default configuration, test the filter with a processor that
 // replies to the request_headers message with an "immediate response" message
 // during response headers processing that should result in a response being
