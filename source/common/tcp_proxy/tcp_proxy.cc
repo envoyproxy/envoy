@@ -93,7 +93,8 @@ Config::SharedConfig::SharedConfig(
     idle_timeout_ = std::chrono::hours(1);
   }
   if (config.has_tunneling_config()) {
-    tunneling_config_helper_ = std::make_unique<TunnelingConfigHelperImpl>(config, context);
+    tunneling_config_helper_ =
+        std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config(), context);
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
@@ -621,14 +622,14 @@ const std::string& TunnelResponseTrailers::key() {
 }
 
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
-    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
+        config_message,
     Server::Configuration::FactoryContext& context)
-    : use_post_(config_message.tunneling_config().use_post()),
-      header_parser_(Envoy::Router::HeaderParser::configure(
-          config_message.tunneling_config().headers_to_add())),
-      propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
-      propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
-      post_path_(config_message.tunneling_config().post_path()), server_factory_context_(context) {
+    : use_post_(config_message.use_post()),
+      header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
+      propagate_response_headers_(config_message.propagate_response_headers()),
+      propagate_response_trailers_(config_message.propagate_response_trailers()),
+      post_path_(config_message.post_path()), server_factory_context_(context) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }
@@ -636,7 +637,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
 
   envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
   substitution_format_config.mutable_text_format_source()->set_inline_string(
-      config_message.tunneling_config().hostname());
+      config_message.hostname());
   hostname_fmt_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
       substitution_format_config, context);
 }

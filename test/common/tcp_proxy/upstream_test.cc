@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
@@ -29,6 +30,7 @@ namespace Envoy {
 namespace TcpProxy {
 namespace {
 using envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy;
+using envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
 template <typename T> class HttpUpstreamTest : public testing::Test {
 public:
@@ -76,7 +78,7 @@ public:
   }
 
   void setupUpstream() {
-    tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(tcp_proxy_, context_);
+    tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, context_);
     route_ = std::make_unique<Http::NullRouteImpl>(
         cluster_.info()->name(), tunnel_config_->serverFactoryContext().singletonManager());
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
@@ -124,6 +126,7 @@ public:
   std::unique_ptr<HttpConnPool> conn_pool_;
   NiceMock<Stats::MockStore> store_;
   Stats::MockScope& scope_{store_.mockScope()};
+  TcpProxy_TunnelingConfig config_message_;
   std::unique_ptr<TunnelingConfigHelper> tunnel_config_;
   std::unique_ptr<Http::NullRouteImpl> route_;
   std::unique_ptr<HttpUpstream> upstream_;
@@ -313,7 +316,7 @@ public:
   }
 
   void setupUpstream() {
-    config_ = std::make_unique<TunnelingConfigHelperImpl>(tcp_proxy_, context_);
+    config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, context_);
     route_ = std::make_unique<Http::NullRouteImpl>(
         cluster_.info()->name(), config_->serverFactoryContext().singletonManager());
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *config_, callbacks_,
@@ -370,6 +373,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 
   TcpProxy tcp_proxy_;
+  TcpProxy_TunnelingConfig config_message_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   std::unique_ptr<TunnelingConfigHelper> config_;
   bool is_http2_ = true;

@@ -154,7 +154,8 @@ class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
                                   protected Logger::Loggable<Logger::Id::filter> {
 public:
   TunnelingConfigHelperImpl(
-      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
+          config_message,
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
@@ -468,7 +469,6 @@ public:
   };
 
   StreamInfo::StreamInfo& getStreamInfo();
-  // Tracing::NullSpan active_span_;
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
