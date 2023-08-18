@@ -8,27 +8,11 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/http/null_route_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace TcpProxy {
-
-const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
-    HttpConnPool::NullRateLimitPolicy::rate_limit_policy_entry_;
-const HttpConnPool::NullHedgePolicy HttpConnPool::RouteEntryImpl::hedge_policy_;
-const HttpConnPool::NullRateLimitPolicy HttpConnPool::RouteEntryImpl::rate_limit_policy_;
-const Router::InternalRedirectPolicyImpl HttpConnPool::RouteEntryImpl::internal_redirect_policy_;
-const Router::PathMatcherSharedPtr HttpConnPool::RouteEntryImpl::path_matcher_;
-const Router::PathRewriterSharedPtr HttpConnPool::RouteEntryImpl::path_rewriter_;
-const std::vector<Router::ShadowPolicyPtr> HttpConnPool::RouteEntryImpl::shadow_policies_;
-const HttpConnPool::NullVirtualHost HttpConnPool::RouteEntryImpl::virtual_host_;
-const HttpConnPool::NullRateLimitPolicy HttpConnPool::NullVirtualHost::rate_limit_policy_;
-const HttpConnPool::NullConfig HttpConnPool::NullVirtualHost::route_configuration_;
-const std::multimap<std::string, std::string> HttpConnPool::RouteEntryImpl::opaque_config_;
-const HttpConnPool::NullPathMatchCriterion HttpConnPool::RouteEntryImpl::path_match_criterion_;
-const HttpConnPool::RouteEntryImpl::ConnectConfigOptRef
-    HttpConnPool::RouteEntryImpl::connect_config_nullopt_;
-const std::list<Http::LowerCaseString> HttpConnPool::NullConfig::internal_only_headers_;
 
 using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
@@ -250,7 +234,8 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks),
       downstream_info_(downstream_info),
-      route_(std::make_shared<RouteImpl>(thread_local_cluster, context)) {
+      route_(std::make_shared<Http::NullRouteImpl>(
+          thread_local_cluster.info()->name(), config.serverFactoryContext().singletonManager())) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;

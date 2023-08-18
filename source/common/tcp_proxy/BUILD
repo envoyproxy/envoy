@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:null_route_impl_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:header_parser_lib",

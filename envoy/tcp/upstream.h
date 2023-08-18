@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/http/header_evaluator.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
@@ -48,6 +49,8 @@ public:
   virtual void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
+
+  virtual Server::Configuration::FactoryContext& serverFactoryContext() const PURE;
 };
 
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;

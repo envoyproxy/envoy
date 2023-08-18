@@ -616,7 +616,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
           config_message.tunneling_config().headers_to_add())),
       propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
-      post_path_(config_message.tunneling_config().post_path()) {
+      post_path_(config_message.tunneling_config().post_path()), server_factory_context_(context) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
   }

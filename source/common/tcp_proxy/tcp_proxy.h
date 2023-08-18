@@ -167,6 +167,9 @@ public:
   void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
+  Server::Configuration::FactoryContext& serverFactoryContext() const override {
+    return server_factory_context_;
+  }
 
 private:
   const bool use_post_;
@@ -175,6 +178,7 @@ private:
   const bool propagate_response_headers_;
   const bool propagate_response_trailers_;
   std::string post_path_;
+  Server::Configuration::FactoryContext& server_factory_context_;
 };
 
 /**
@@ -430,8 +434,9 @@ public:
     return upstream_options_;
   }
 
-  // These two functions allow enabling/disabling reads on the upstream and downstream connections.
-  // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
+  // These two functions allow enabling/disabling reads on the upstream and downstream
+  // connections. They are called by the Downstream/Upstream Watermark callbacks to limit
+  // buffering.
   void readDisableUpstream(bool disable);
   void readDisableDownstream(bool disable);
 
@@ -527,8 +532,8 @@ protected:
 
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  // The upstream handle (either TCP or HTTP). This is set in onGenericPoolReady and should persist
-  // until either the upstream or downstream connection is terminated.
+  // The upstream handle (either TCP or HTTP). This is set in onGenericPoolReady and should
+  // persist until either the upstream or downstream connection is terminated.
   std::unique_ptr<GenericUpstream> upstream_;
   // The connection pool used to set up |upstream_|.
   // This will be non-null from when an upstream connection is attempted until
