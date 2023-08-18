@@ -34,7 +34,7 @@ public:
   virtual GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) PURE;
   virtual GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                                       GoUint64 p3) PURE;
-  virtual void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p1) PURE;
+  virtual void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) PURE;
   virtual GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                              GoUint64 p3) PURE;
   virtual GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
@@ -51,7 +51,7 @@ public:
   GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) override;
   GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                               GoUint64 p3) override;
-  void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p1) override;
+  void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) override;
   GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                      GoUint64 p3) override;
   GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;

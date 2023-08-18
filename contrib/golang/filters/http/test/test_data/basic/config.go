@@ -28,9 +28,9 @@ type parser struct {
 func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
 	conf := &config{}
 	if callbacks != nil {
-		conf.counter = callbacks.DefineMetric(0, "test-counter")
-		conf.gauge = callbacks.DefineMetric(1, "test-gauge")
-		conf.histogram = callbacks.DefineMetric(2, "test-histogram")
+		conf.counter = callbacks.DefineMetric(api.Counter, "test-counter")
+		conf.gauge = callbacks.DefineMetric(api.Gauge, "test-gauge")
+		conf.histogram = callbacks.DefineMetric(api.Histogram, "test-histogram")
 	}
 	return conf, nil
 }

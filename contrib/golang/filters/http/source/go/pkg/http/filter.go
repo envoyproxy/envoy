@@ -243,7 +243,7 @@ type httpConfig struct {
 	config *C.httpConfig
 }
 
-func (c *httpConfig) DefineMetric(metricType uint32, name string) api.Metric {
+func (c *httpConfig) DefineMetric(metricType api.MetricType, name string) api.Metric {
 	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), metricType, name)
 	return &metric{
 		config:   c,
@@ -260,10 +260,10 @@ type metric struct {
 	metricId uint32
 }
 
-func (m *metric) IncrementMetric(offset int64) {
+func (m *metric) Increment(offset int64) {
 	cAPI.HttpIncrementMetric(unsafe.Pointer(m.config), m.metricId, offset)
 }
 
-func (m *metric) GetMetric() uint64 {
+func (m *metric) Get() uint64 {
 	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
 }

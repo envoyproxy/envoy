@@ -324,7 +324,7 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 	return strings.Clone(value)
 }
 
-func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType uint32, name string) uint32 {
+func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
 	var value uint32
 
 	res := C.envoyGoFilterHttpDefineMetric(unsafe.Pointer(cfg), C.uint32_t(metricType), unsafe.Pointer(&name), unsafe.Pointer(&value))

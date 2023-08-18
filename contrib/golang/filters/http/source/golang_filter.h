@@ -88,6 +88,7 @@ private:
 
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
+  // TODO(StarryVae): use rwlock.
   Thread::MutexBasicLockable mutex_{};
   MetricStoreSharedPtr metric_store_ ABSL_GUARDED_BY(mutex_);
   httpConfigInternal* config_{nullptr};

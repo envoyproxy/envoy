@@ -74,9 +74,9 @@ GoUint64 HttpFilterDsoImpl::envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUi
   return envoy_go_filter_merge_http_plugin_config_(p0, p1, p2, p3);
 }
 
-void HttpFilterDsoImpl::envoyGoFilterDestroyHttpPluginConfig(GoUint64 p1) {
+void HttpFilterDsoImpl::envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) {
   ASSERT(envoy_go_filter_destroy_http_plugin_config_ != nullptr);
-  return envoy_go_filter_destroy_http_plugin_config_(p1);
+  return envoy_go_filter_destroy_http_plugin_config_(p0);
 }
 
 GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,

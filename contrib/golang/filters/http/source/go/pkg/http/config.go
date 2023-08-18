@@ -57,7 +57,7 @@ func createConfig(c *C.httpConfig) *httpConfig {
 	config := &httpConfig{
 		config: c,
 	}
-	// NP: make sure filter will be deleted.
+	// NP: make sure httpConfig will be deleted.
 	runtime.SetFinalizer(config, configFinalize)
 
 	return config
@@ -69,8 +69,6 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 		cAPI.HttpLog(api.Error, "The Envoy Golang filter requires the `GODEBUG=cgocheck=0` environment variable set.")
 		return 0
 	}
-
-	http_config := createConfig(c)
 
 	buf := utils.BytesToSlice(uint64(c.config_ptr), uint64(c.config_len))
 	var any anypb.Any
@@ -86,6 +84,7 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 		if c.is_route_config == 1 {
 			parsedConfig, err = configParser.Parse(&any, nil)
 		} else {
+			http_config := createConfig(c)
 			parsedConfig, err = configParser.Parse(&any, http_config)
 		}
 		if err != nil {

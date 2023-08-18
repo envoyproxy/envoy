@@ -206,8 +206,18 @@ type FilterState interface {
 	GetString(key string) string
 }
 
+type MetricType uint32
+
+const (
+	Counter   MetricType = 0
+	Gauge     MetricType = 1
+	Histogram MetricType = 2
+)
+
 type ConfigCallbacks interface {
-	DefineMetric(metricType uint32, name string) Metric
+	// Define a metric, for different MetricType, name must be different,
+	// for same MetricType, the same name will share a metric.
+	DefineMetric(metricType MetricType, name string) Metric
 }
 
 type ConfigCallbackHandler interface {
@@ -215,6 +225,6 @@ type ConfigCallbackHandler interface {
 }
 
 type Metric interface {
-	IncrementMetric(offset int64)
-	GetMetric() uint64
+	Increment(offset int64)
+	Get() uint64
 }
