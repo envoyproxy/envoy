@@ -129,15 +129,52 @@ FilterConfig::initExpressions(const Protobuf::RepeatedPtrField<std::string>& mat
   }
   return expressions;
 }
+/* const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>& */
+/* initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers, */
+/*                 Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder) { */
+/*   absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr> expressions;
+ */
+/*   for (const auto& matcher : matchers) { */
+/*     auto parse_status = google::api::expr::parser::Parse(matcher); */
+/*     if (!parse_status.ok()) { */
+/*       throw EnvoyException("Unable to parse descriptor expression: " + */
+/*                            parse_status.status().ToString()); */
+/*     } */
+/*     expressions.emplace(matcher, Extensions::Filters::Common::Expr::createExpression( */
+/*                                      builder->builder(), parse_status.value().expr())); */
+/*   } */
+/*   return std::move(expressions); */
+/* } */
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()) {
-  if (config.has_overrides()) {
+  if (!config.has_overrides()) {
+    return;
+  }
+
+  const auto& overrides = config.overrides();
+  if (overrides.has_processing_mode()) {
     processing_mode_ = config.overrides().processing_mode();
   }
-  if (config.overrides().has_grpc_service()) {
-    grpc_service_ = config.overrides().grpc_service();
+  if (overrides.has_grpc_service()) {
+    grpc_service_ = overrides.grpc_service();
   }
+
+  if (!overrides.has_metadata_options()) {
+    return;
+  }
+
+  const auto& md_opts = overrides.metadata_options();
+  if (md_opts.has_forwarding_namespaces()) {
+    untyped_metadata_namespaces_ =
+        std::vector<std::string>(md_opts.forwarding_namespaces().untyped().begin(),
+                                 md_opts.forwarding_namespaces().untyped().begin());
+    typed_metadata_namespaces_ =
+        std::vector<std::string>(md_opts.forwarding_namespaces().typed().begin(),
+                                 md_opts.forwarding_namespaces().typed().begin());
+  }
+  disable_returned_metadata_ = md_opts.disable_returned_metadata();
+  bifurcate_returned_metadata_namespace_ = md_opts.bifurcate_returned_metadata_namespace();
 }
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
@@ -145,6 +182,18 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
   processing_mode_ = src.processing_mode_;
   if (src.grpcService().has_value()) {
     grpc_service_ = src.grpcService();
+  }
+  if (src.untypedMetadataNamespaces().has_value()) {
+    untyped_metadata_namespaces_ = src.untypedMetadataNamespaces();
+  }
+  if (src.typedMetadataNamespaces().has_value()) {
+    typed_metadata_namespaces_ = src.typedMetadataNamespaces();
+  }
+  if (src.disableReturnedMetadata().has_value()) {
+    disable_returned_metadata_ = src.disableReturnedMetadata();
+  }
+  if (src.bifurcateReturnedMetadataNamespace().has_value()) {
+    bifurcate_returned_metadata_namespace_ = src.bifurcateReturnedMetadataNamespace();
   }
 }
 
@@ -303,7 +352,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
   auto activation_ptr = Filters::Common::Expr::createActivation(decoding_state_.streamInfo(),
                                                                 &headers, nullptr, nullptr);
-  auto proto = evaluateAttributes(std::move(activation_ptr), config_->request_expr());
+  auto proto = evaluateAttributes(std::move(activation_ptr), config_->requestExpr());
 
   const auto status = onHeaders(decoding_state_, headers, end_stream, proto);
   ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
@@ -593,7 +642,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   auto activation_ptr = Filters::Common::Expr::createActivation(encoding_state_.streamInfo(),
                                                                 nullptr, &headers, nullptr);
-  auto proto = evaluateAttributes(std::move(activation_ptr), config_->response_expr());
+  auto proto = evaluateAttributes(std::move(activation_ptr), config_->responseExpr());
 
   const auto status = onHeaders(encoding_state_, headers, end_stream, proto);
   ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));

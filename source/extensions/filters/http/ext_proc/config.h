@@ -30,7 +30,7 @@ private:
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ServerFactoryContext&,
       ProtobufMessage::ValidationVisitor& validator) override;
 
   Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(

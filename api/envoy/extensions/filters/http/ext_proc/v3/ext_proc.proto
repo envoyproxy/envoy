@@ -98,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 18]
+// [#next-free-field: 17]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -205,16 +205,37 @@ message ExternalProcessor {
   // more external processing for this stream from now on.
   bool disable_immediate_response = 15;
 
-  // Specifies a list of metadata namespaces whose values, if present, will be passed to the
-  // ext_proc service as an opaque *protobuf::Struct*.
-  repeated string metadata_context_namespaces = 16;
+  // Options related to the sending and receiving of dynamic metadata
+  MetadataOptions metadata_options = 16;
+}
 
-  // Specifies a list of metadata namespaces whose values, if present, will be passed to the
-  // ext_proc service. :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` is passed as an ``protobuf::Any``.
-  //
-  // It works in a way similar to ``metadata_context_namespaces`` but allows envoy and external processing server to share the protobuf message definition
-  // in order to do a safe parsing.
-  repeated string typed_metadata_context_namespaces = 17;
+// The MetadataOptions structure defines options for the sending and receiving of
+// dynamic metadata. Specifically, which namespaces to send to the server, whether
+// metadata returned by the server may be written, and how that metadata may be written.
+message MetadataOptions {
+  message MetadataNamespacesToForward {
+      // Specifies a list of metadata namespaces whose values, if present,
+      // will be passed to the ext_proc service as an opaque *protobuf::Struct*.
+      repeated string untyped = 1;
+
+      // Specifies a list of metadata namespaces whose values, if present,
+      // will be passed to the ext_proc service as a *protobuf::Any*. This allows
+      // envoy and the external processing server to share the protobuf message
+      // definition for safe parsing.
+      repeated string typed = 2;
+  }
+
+  // Describes which typed or untyped dynamic metadata namespaces to forward to
+  // the external processing server
+  MetadataNamespacesToForward forwarding_namespaces = 1;
+
+  // If set to true, metadata returned from the external processing server will
+  // not be written into the stream's dynamic metadata.
+  bool disable_returned_metadata = 2;
+
+  // If set to true, returned metadata will be namespaced according to whether the
+  // processing occurred during decoding or encoding.
+  bool bifurcate_returned_metadata_namespace = 3;
 }
 
 // The HeaderForwardingRules structure specifies what headers are
@@ -257,7 +278,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
@@ -266,16 +287,17 @@ message ExtProcOverrides {
   // Set a different asynchronous processing option than the default.
   bool async_mode = 2;
 
-  // [#not-implemented-hide:]
   // Set different optional attributes than the default setting of the
   // ``request_attributes`` field.
   repeated string request_attributes = 3;
 
-  // [#not-implemented-hide:]
   // Set different optional properties than the default setting of the
   // ``response_attributes`` field.
   repeated string response_attributes = 4;
 
   // Set a different gRPC service for this route than the default.
   config.core.v3.GrpcService grpc_service = 5;
+
+  // Options related to the sending and receiving of dynamic metadata
+  MetadataOptions metadata_options = 6;
 }
