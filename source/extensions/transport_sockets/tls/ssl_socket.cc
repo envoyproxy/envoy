@@ -233,11 +233,7 @@ void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
     if (failure_reason_.empty()) {
       failure_reason_ = "TLS error:";
     }
-    failure_reason_.append(
-        "SSL_ERROR_SYSCALL error has occured, which indicates the operation failed externally to "
-        "the library. This is typically |errno| but may be something custom if using a custom "
-        "|BIO|. It may also be signaled if the transport returned EOF, in which case the "
-        "operation's return value will be zero.");
+    failure_reason_.append("SSL_ERROR_SYSCALL");
     saw_error = true;
   }
 
@@ -246,6 +242,7 @@ void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
                    callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
                    failure_reason_);
   }
+
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }
