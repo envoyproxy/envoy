@@ -16,6 +16,9 @@ public:
 
   DestinationAddress(Network::Address::InstanceConstSharedPtr address) : address_(address) {}
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  absl::optional<std::string> serializeAsString() const override {
+    return address_ ? absl::make_optional(address_->asString()) : absl::nullopt;
+  }
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;
