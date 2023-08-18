@@ -14,10 +14,9 @@ typedef struct {
 } httpConfig;
 */
 import "C"
-import "unsafe"
-
 import (
 	"sync"
+	"unsafe"
 )
 
 var configCache = &sync.Map{}
@@ -51,6 +50,10 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 //export envoyGoFilterOnHttpData
 func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
 	return 0
+}
+
+//export envoyGoFilterOnHttpLog
+func envoyGoFilterOnHttpLog(r *C.httpRequest) {
 }
 
 //export envoyGoFilterOnHttpDestroy
