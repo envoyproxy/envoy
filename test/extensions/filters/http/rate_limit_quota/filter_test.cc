@@ -12,11 +12,11 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/status_utility.h"
-#include "xds/type/matcher/v3/cel.pb.h"
-#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "xds/type/matcher/v3/cel.pb.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -521,6 +521,7 @@ TEST_F(FilterTest, DecodeHeaderWithMismatchHeader) {
 }
 
 TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
+  // Compiled CEL expression string: request.headers['authenticated_user'] == 'staging'
   std::string cel_expr_str = R"pb(
     expr {
       id: 8
@@ -563,16 +564,13 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
   xds::type::matcher::v3::Matcher matcher;
 
   auto* inner_matcher = matcher.mutable_matcher_list()->add_matchers();
-  auto* single_predicate = inner_matcher->mutable_predicate()
-                               ->mutable_single_predicate();
-  // Empty input!!
+  auto* single_predicate = inner_matcher->mutable_predicate()->mutable_single_predicate();
+
   xds::type::matcher::v3::HttpAttributesCelMatchInput cel_match_input;
   single_predicate->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
-  single_predicate->mutable_input()->mutable_typed_config()->PackFrom(
-      cel_match_input);
+  single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
 
   auto* custom_matcher = single_predicate->mutable_custom_match();
-  //custom_matcher->set_name("xds.type.matcher.CelMatcher");
   custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
 
   std::string on_match_str = R"pb(
@@ -616,7 +614,8 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
   createFilter();
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
-  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"authenticated_user", "staging"}};
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {
+      {"authenticated_user", "staging"}};
 
   buildCustomHeader(custom_value_pairs);
 
