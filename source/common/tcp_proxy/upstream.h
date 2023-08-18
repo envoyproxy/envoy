@@ -277,7 +277,7 @@ public:
   void setRouterUpstreamRequest(UpstreamRequestPtr) override {}
 };
 
-// This class interface with Router::UpstreamRequest instance which is initialized
+// This class owns Router::UpstreamRequest instance which is initialized
 // through the base class HttpUpstream::newStream() method. This class handles both
 // HTTP/1.1 and HTTP/2 upstream requests transparently and delegates the actual work to
 // Router::UpstreamRequest instance.
