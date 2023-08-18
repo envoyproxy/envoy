@@ -1105,7 +1105,7 @@ envoy.tracers.datadog:
 envoy.tracers.dynamic_ot:
   categories:
   - envoy.tracers
-  security_posture: robust_to_untrusted_downstream
+  security_posture: unknown
   status: stable
   type_urls:
   - envoy.config.trace.v3.DynamicOtConfig

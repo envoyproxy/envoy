@@ -19,6 +19,18 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
 
+FETCH_TARGETS=(
+    //contrib/...
+    //distribution/...
+    //docs/...
+    //source/...
+    //test/...
+    //tools/...
+    @nodejs//...
+    @envoy_api//...
+    @envoy_build_tools//...)
+
+
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
 elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
@@ -29,12 +41,14 @@ else
 fi
 
 function collect_build_profile() {
-  declare -g build_profile_count=${build_profile_count:-1}
-  mv -f \
-     "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)/command.profile.gz" \
-     "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
-      || :
-  ((build_profile_count++))
+    local output_base
+    declare -g build_profile_count=${build_profile_count:-1}
+    output_base="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+    mv -f \
+       "${output_base}/command.profile.gz" \
+       "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
+        || :
+    ((build_profile_count++))
 }
 
 function bazel_with_collection() {
@@ -325,6 +339,14 @@ case $CI_TARGET in
         }
         ;;
 
+    clean|expunge)
+        setup_clang_toolchain
+        if [[ "$CI_TARGET" == "expunge" ]]; then
+            CLEAN_ARGS+=(--expunge)
+        fi
+        bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
+        ;;
+
     compile_time_options)
         # See `compile-time-options` in `.bazelrc`
         setup_clang_toolchain
@@ -396,9 +418,8 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
             export FUZZ_COVERAGE=true
         fi
-        # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-        BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" \
-            "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
+        export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
+        "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
         ;;
@@ -546,6 +567,27 @@ case $CI_TARGET in
         cat bazel-bin/distribution/dockerhub/readme.md
         ;;
 
+    fetch)
+        setup_clang_toolchain
+        echo "Fetching ${FETCH_TARGETS[*]} ..."
+        FETCH_ARGS=(
+            --noshow_progress
+            --noshow_loading_progress)
+        # TODO(phlax): separate out retry logic
+        n=0
+        until [ "$n" -ge 10 ]; do
+            bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" \
+                  "${FETCH_ARGS[@]}" \
+                  "${FETCH_TARGETS[@]}" \
+                && break
+            n=$((n+1))
+            if [[ "$n" -ne 10 ]]; then
+                sleep 15
+                echo "Retrying fetch ..."
+            fi
+        done
+        ;;
+
     fix_proto_format)
         # proto_format.sh needs to build protobuf.
         setup_clang_toolchain
@@ -580,6 +622,11 @@ case $CI_TARGET in
             -- "${TEST_TARGETS[@]}"
         echo "bazel release build with gcc..."
         bazel_envoy_binary_build fastbuild
+        ;;
+
+    info)
+        setup_clang_toolchain
+        bazel info "${BAZEL_GLOBAL_OPTIONS[@]}"
         ;;
 
     msan)

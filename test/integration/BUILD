@@ -373,6 +373,7 @@ envoy_sh_test(
 
 envoy_sh_test(
     name = "run_envoy_test",
+    size = "large",
     srcs = ["run_envoy_test.sh"],
     cc_binary = [":hotrestart_main"],
     data = [
@@ -463,7 +464,7 @@ envoy_cc_test(
     srcs = [
         "http2_flood_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 6,
     tags = [
         "cpu:3",
     ],
@@ -554,6 +555,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":integration_lib",
         "//test/integration/filters:add_header_filter_config_lib",
+        "//test/integration/filters:add_header_filter_proto_cc_proto",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -768,7 +770,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "protocol_integration_test",
-    size = "large",
+    size = "enormous",
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],
@@ -2246,7 +2248,7 @@ envoy_cc_test(
 # selects.
 envoy_cc_test(
     name = "quic_protocol_integration_test",
-    size = "large",
+    size = "enormous",
     srcs = select({
         "//bazel:disable_http3": [],
         "//bazel:disable_admin_functionality": [],

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-22.04
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.push
