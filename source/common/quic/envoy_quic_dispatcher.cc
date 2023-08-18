@@ -130,15 +130,15 @@ bool EnvoyQuicDispatcher::processPacket(const quic::QuicSocketAddress& self_addr
                                         const quic::QuicSocketAddress& peer_address,
                                         const quic::QuicReceivedPacket& packet) {
   // Assume a packet was dispatched successfully, if OnFailedToDispatchPacket is not called.
-  packet_dispatch_success_ = true;
+  current_packet_dispatch_success_ = true;
   ProcessPacket(self_address, peer_address, packet);
-  return packet_dispatch_success_;
+  return current_packet_dispatch_success_;
 }
 
 bool EnvoyQuicDispatcher::OnFailedToDispatchPacket(
     const quic::ReceivedPacketInfo& received_packet_info) {
   if (!accept_new_connections()) {
-    packet_dispatch_success_ = false;
+    current_packet_dispatch_success_ = false;
     return true;
   }
   return quic::QuicDispatcher::OnFailedToDispatchPacket(received_packet_info);

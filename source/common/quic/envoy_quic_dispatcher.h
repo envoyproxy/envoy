@@ -89,7 +89,7 @@ protected:
       const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
 
   // quic::QuicDispatcher
-  // Sets packet_dispatch_success_ to false for processPacket's return value,
+  // Sets current_packet_dispatch_success_ to false for processPacket's return value,
   // then calls the parent class implementation.
   bool OnFailedToDispatchPacket(const quic::ReceivedPacketInfo& received_packet_info) override;
 
@@ -105,7 +105,7 @@ private:
   FilterChainToConnectionMap connections_by_filter_chain_;
   QuicDispatcherStats quic_stats_;
   QuicConnectionStats connection_stats_;
-  bool packet_dispatch_success_;
+  bool current_packet_dispatch_success_;
 };
 
 } // namespace Quic
