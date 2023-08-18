@@ -37,7 +37,7 @@ public:
   virtual void forwardUdpPacket(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
 };
 
-using ExtraShutdownListenerOptionsPtr = std::shared_ptr<ExtraShutdownListenerOptions>;
+using ExtraShutdownListenerOptionsSharedPtr = std::shared_ptr<ExtraShutdownListenerOptions>;
 
 /**
  * Abstract connection handler.
@@ -159,7 +159,7 @@ public:
      *                subset of listeners might use, e.g. Quic listeners may need
      *                to configure packet forwarding during hot restart.
      */
-    virtual void shutdownListener(ExtraShutdownListenerOptionsPtr options = nullptr) PURE;
+    virtual void shutdownListener(ExtraShutdownListenerOptionsSharedPtr options = nullptr) PURE;
 
     /**
      * Update the listener config.

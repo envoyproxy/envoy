@@ -169,7 +169,7 @@ void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewCo
 
 void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
 
-void ActiveQuicListener::shutdownListener(Network::ExtraShutdownListenerOptionsPtr options) {
+void ActiveQuicListener::shutdownListener(Network::ExtraShutdownListenerOptionsSharedPtr options) {
   hot_restart_udp_packet_forwarding_ =
       std::dynamic_pointer_cast<Network::HotRestartUdpPacketForwarding>(options);
   // Same as pauseListening() because all we want is to stop accepting new

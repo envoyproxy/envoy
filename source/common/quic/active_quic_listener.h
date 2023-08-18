@@ -62,7 +62,7 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override;
   void resumeListening() override;
-  void shutdownListener(Network::ExtraShutdownListenerOptionsPtr options) override;
+  void shutdownListener(Network::ExtraShutdownListenerOptionsSharedPtr options) override;
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
