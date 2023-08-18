@@ -394,7 +394,7 @@ TEST_P(EnvoyQuicDispatcherTest, ProcessPacketReturnsTrueForDispatchedPacketOnExi
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   // Stop accepting new connections after processing the CHLO.
   envoy_quic_dispatcher_.StopAcceptingNewConnections();
-  // Another packet for the existing connection should still be dispatchable.
+  // Another packet for the existing connection should still be dispatched successfully.
   auto packet = wrapPacket(*testEncryptedPacket(quic_version_, connection_id_, "hello"), clock);
   EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *packet));
   envoy_quic_dispatcher_.Shutdown();
