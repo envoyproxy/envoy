@@ -14,8 +14,8 @@
 
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/http/codec_client.h"
-#include "source/common/network/utility.h"
 #include "source/common/http/null_route_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/router.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
