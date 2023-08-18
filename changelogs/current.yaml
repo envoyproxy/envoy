@@ -73,3 +73,9 @@ new_features:
     to support multi private key providers and fallback.
 
 deprecated:
+- area: tls
+  change: |
+    The private_key_provider :ref:`private_key_provider
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` has been deprecated in favour of 
+    :ref:`private_key_provider_list 
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider_list>`.
