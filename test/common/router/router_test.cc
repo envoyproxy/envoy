@@ -819,7 +819,7 @@ TEST_F(RouterTest, ResponseCodeSetByUpstream) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-  EXPECT_EQ(callbacks_.streamInfo().responseCode().has_value(), true);
+  EXPECT_TRUE(callbacks_.streamInfo().responseCode().has_value());
   EXPECT_EQ(callbacks_.streamInfo().responseCode().value(), 200);
 }
 
