@@ -1971,13 +1971,22 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
       "Failed to load private key provider: mock_provider");
 }
 
-TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider1) {
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderForList) {
+envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
-  EXPECT_CALL(context_manager, privateKeyMethodManager())
-      .WillOnce(ReturnRef(private_key_method_manager));
+  auto private_key_method_provider_ptr1 =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  auto private_key_method_provider_ptr2 =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  EXPECT_CALL(factory_context_, sslContextManager()).Times(2).WillRepeatedly(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager()).Times(2).WillRepeatedly(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _)).Times(2)
+      .WillOnce(Return(private_key_method_provider_ptr1)).WillOnce(Return(private_key_method_provider_ptr2));
+  EXPECT_CALL(*private_key_method_provider_ptr1, initialized())
+      .WillOnce(Return(false));
+  EXPECT_CALL(*private_key_method_provider_ptr2, initialized())
+      .WillOnce(Return(false));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -1985,7 +1994,12 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider1) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider_list:
         private_key_provider:
-        - provider_name: mock_provider
+        - provider_name: mock_provider1
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              test_value: 100
+        - provider_name: mock_provider2
           typed_config:
             "@type": type.googleapis.com/google.protobuf.Struct
             value:
@@ -1995,6 +2009,151 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider1) {
   EXPECT_THROW_WITH_REGEX(
       ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
       "Failed to load private key provider list.");
+}
+
+TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()->add_tls_certificates();
+  Stats::IsolatedStoreImpl store;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager())
+      .WillOnce(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _))
+      .WillOnce(Return(private_key_method_provider_ptr));
+  EXPECT_CALL(*private_key_method_provider_ptr, initialized())
+      .WillOnce(Return(true));
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      private_key_provider:
+        provider_name: mock_provider
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            test_value: 100
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_THROW_WITH_MESSAGE(
+      Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
+          *store.rootScope(), server_context_config, std::vector<std::string>{})),
+      EnvoyException, "Failed to get BoringSSL private key method from provider");
+}
+
+TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager())
+      .WillOnce(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _))
+      .WillOnce(Return(private_key_method_provider_ptr));
+  EXPECT_CALL(*private_key_method_provider_ptr, initialized())
+      .WillOnce(Return(true));
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      private_key_provider:
+        provider_name: mock_provider
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            test_value: 100
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+}
+
+TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccessForList) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr1 =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  auto private_key_method_provider_ptr2 =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  EXPECT_CALL(factory_context_, sslContextManager()).Times(2).WillRepeatedly(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager()).Times(2).WillRepeatedly(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _)).Times(2)
+      .WillOnce(Return(private_key_method_provider_ptr1)).WillOnce(Return(private_key_method_provider_ptr2));
+  EXPECT_CALL(*private_key_method_provider_ptr1, initialized())
+      .WillOnce(Return(false));
+  EXPECT_CALL(*private_key_method_provider_ptr2, initialized())
+      .WillOnce(Return(true));
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      private_key_provider_list:
+        private_key_provider:
+        - provider_name: mock_provider1
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              test_value: 100
+        - provider_name: mock_provider2
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              test_value: 100
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+}
+
+TEST_F(ServerContextConfigImplTest, PrivateKeyMethodFallbackForList) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr1 =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  auto private_key_method_provider_ptr2 =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  EXPECT_CALL(factory_context_, sslContextManager()).Times(2).WillRepeatedly(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager()).Times(2).WillRepeatedly(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _)).Times(2)
+      .WillOnce(Return(private_key_method_provider_ptr1)).WillOnce(Return(private_key_method_provider_ptr2));
+  EXPECT_CALL(*private_key_method_provider_ptr1, initialized())
+      .WillOnce(Return(false));
+  EXPECT_CALL(*private_key_method_provider_ptr2, initialized())
+      .WillOnce(Return(false));
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+      private_key_provider_list:
+        fallback: true
+        private_key_provider:
+        - provider_name: mock_provider1
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              test_value: 100
+        - provider_name: mock_provider2
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              test_value: 100
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
 }
 
 // Test that if both typed and untyped matchers for sans are specified, we
