@@ -351,6 +351,16 @@ void UpstreamManagerImpl::writeToConnection(Buffer::Instance& buffer) {
   }
 }
 
+OptRef<Network::Connection> UpstreamManagerImpl::optionalConnection() {
+  if (is_cleaned_up_) {
+    return {};
+  }
+  if (owned_conn_data_ != nullptr) {
+    return {owned_conn_data_->connection()};
+  }
+  return {};
+}
+
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
   if (downstream_connection_closed_) {
     return Envoy::Network::FilterStatus::StopIteration;
@@ -371,11 +381,18 @@ void Filter::onDecodingFailure() {
   closeDownstreamConnection();
 }
 
-void Filter::writeToConnection(Buffer::Instance& data) {
+void Filter::writeToConnection(Buffer::Instance& buffer) {
   if (downstream_connection_closed_) {
     return;
   }
-  connection().write(data, false);
+  connection().write(buffer, false);
+}
+
+OptRef<Network::Connection> Filter::optionalConnection() {
+  if (downstream_connection_closed_) {
+    return {};
+  }
+  return {connection()};
 }
 
 void Filter::sendReplyDownstream(Response& response, ResponseEncoderCallback& callback) {

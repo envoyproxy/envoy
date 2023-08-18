@@ -321,6 +321,7 @@ public:
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> optionalConnection() override;
 
   // UpstreamManager
   void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) override;
@@ -362,7 +363,8 @@ public:
   // RequestDecoderCallback
   void onDecodingSuccess(RequestPtr request, ExtendedOptions options) override;
   void onDecodingFailure() override;
-  void writeToConnection(Buffer::Instance& data) override;
+  void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> optionalConnection() override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
