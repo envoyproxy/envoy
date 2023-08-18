@@ -24,10 +24,10 @@ public:
       opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse>;
 
   OpenTelemetryGrpcTraceExporterTest() : async_client_(new Grpc::MockAsyncClient) {
-    expectStreamStart();
+    expectTraceExportStart();
   }
 
-  void expectStreamStart() {
+  void expectTraceExportStart() {
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
         .WillOnce(
             Invoke([this](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& cbs,
@@ -37,7 +37,7 @@ public:
             }));
   }
 
-  void expectStreamMessage(const std::string& expected_message_yaml) {
+  void expectTraceExportMessage(const std::string& expected_message_yaml) {
     opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
@@ -59,7 +59,7 @@ protected:
 TEST_F(OpenTelemetryGrpcTraceExporterTest, CreateExporterAndExportSpan) {
   OpenTelemetryGrpcTraceExporter exporter(Grpc::RawAsyncClientPtr{async_client_});
 
-  expectStreamMessage(R"EOF(
+  expectTraceExportMessage(R"EOF(
     resource_spans:
       scope_spans:
         - spans:
@@ -93,7 +93,7 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithRemoteClose) {
           - name: "test"
   )EOF";
 
-  expectStreamMessage(request_yaml);
+  expectTraceExportMessage(request_yaml);
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request;
   opentelemetry::proto::trace::v1::Span span;
   span.set_name("test");
@@ -104,14 +104,14 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithRemoteClose) {
   callbacks_->onRemoteClose(Grpc::Status::Internal, "bad");
 
   // Second call should make a new stream.
-  expectStreamStart();
-  expectStreamMessage(request_yaml);
+  expectTraceExportStart();
+  expectTraceExportMessage(request_yaml);
   EXPECT_TRUE(exporter.log(request));
 }
 
 TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithNoopCallbacks) {
   OpenTelemetryGrpcTraceExporter exporter(Grpc::RawAsyncClientPtr{async_client_});
-  expectStreamMessage(R"EOF(
+  expectTraceExportMessage(R"EOF(
     resource_spans:
       scope_spans:
         - spans:
