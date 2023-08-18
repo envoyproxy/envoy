@@ -56,8 +56,8 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
           fmt::format("Certificate configuration can't have both pkcs12 and certificate_chain"));
     }
     if (config.has_private_key_provider_list()) {
-      throw EnvoyException(
-          fmt::format("Certificate configuration can't have both pkcs12 and private_key_provider_list"));
+      throw EnvoyException(fmt::format(
+          "Certificate configuration can't have both pkcs12 and private_key_provider_list"));
     }
     if (config.has_private_key_provider()) {
       throw EnvoyException(
@@ -69,8 +69,7 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
         private_key_method_ =
             factory_context.sslContextManager()
                 .privateKeyMethodManager()
-                .createPrivateKeyMethodProvider(provider, factory_context,
-                                                private_key_);
+                .createPrivateKeyMethodProvider(provider, factory_context, private_key_);
         if (private_key_method_ && private_key_method_->initialized()) {
           break;
         } else {
@@ -78,11 +77,10 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
         }
       }
     } else if (config.has_private_key_provider()) {
-      private_key_method_ =
-          factory_context.sslContextManager()
-              .privateKeyMethodManager()
-              .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context,
-                                              private_key_);
+      private_key_method_ = factory_context.sslContextManager()
+                                .privateKeyMethodManager()
+                                .createPrivateKeyMethodProvider(config.private_key_provider(),
+                                                                factory_context, private_key_);
       if (private_key_method_ && !private_key_method_->initialized()) {
         private_key_method_ = nullptr;
       }
@@ -93,16 +91,19 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
                       certificate_chain_path_));
     }
 
-    if(((config.has_private_key_provider_list()&&config.private_key_provider_list().fallback()==false)||config.has_private_key_provider())&& private_key_method_ == nullptr){
+    if (((config.has_private_key_provider_list() &&
+          config.private_key_provider_list().fallback() == false) ||
+         config.has_private_key_provider()) &&
+        private_key_method_ == nullptr) {
       if (config.has_private_key_provider_list()) {
         throw EnvoyException(fmt::format("Failed to load private key provider list."));
       } else {
         throw EnvoyException(fmt::format("Failed to load private key provider: {}",
                                          config.private_key_provider().provider_name()));
-      } 
+      }
     }
 
-    if (private_key_.empty() && private_key_method_==nullptr) {
+    if (private_key_.empty() && private_key_method_ == nullptr) {
       throw EnvoyException(
           fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
     }

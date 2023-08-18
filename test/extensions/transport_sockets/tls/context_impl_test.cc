@@ -1972,21 +1972,25 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderForList) {
-envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr1 =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
   auto private_key_method_provider_ptr2 =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_, sslContextManager()).Times(2).WillRepeatedly(ReturnRef(context_manager));
-  EXPECT_CALL(context_manager, privateKeyMethodManager()).Times(2).WillRepeatedly(ReturnRef(private_key_method_manager));
-  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _)).Times(2)
-      .WillOnce(Return(private_key_method_provider_ptr1)).WillOnce(Return(private_key_method_provider_ptr2));
-  EXPECT_CALL(*private_key_method_provider_ptr1, initialized())
-      .WillOnce(Return(false));
-  EXPECT_CALL(*private_key_method_provider_ptr2, initialized())
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_, sslContextManager())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _))
+      .Times(2)
+      .WillOnce(Return(private_key_method_provider_ptr1))
+      .WillOnce(Return(private_key_method_provider_ptr2));
+  EXPECT_CALL(*private_key_method_provider_ptr1, initialized()).WillOnce(Return(false));
+  EXPECT_CALL(*private_key_method_provider_ptr2, initialized()).WillOnce(Return(false));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2026,8 +2030,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _))
       .WillOnce(Return(private_key_method_provider_ptr));
-  EXPECT_CALL(*private_key_method_provider_ptr, initialized())
-      .WillOnce(Return(true));
+  EXPECT_CALL(*private_key_method_provider_ptr, initialized()).WillOnce(Return(true));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2059,8 +2062,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _))
       .WillOnce(Return(private_key_method_provider_ptr));
-  EXPECT_CALL(*private_key_method_provider_ptr, initialized())
-      .WillOnce(Return(true));
+  EXPECT_CALL(*private_key_method_provider_ptr, initialized()).WillOnce(Return(true));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2085,14 +2087,18 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccessForList) {
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
   auto private_key_method_provider_ptr2 =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_, sslContextManager()).Times(2).WillRepeatedly(ReturnRef(context_manager));
-  EXPECT_CALL(context_manager, privateKeyMethodManager()).Times(2).WillRepeatedly(ReturnRef(private_key_method_manager));
-  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _)).Times(2)
-      .WillOnce(Return(private_key_method_provider_ptr1)).WillOnce(Return(private_key_method_provider_ptr2));
-  EXPECT_CALL(*private_key_method_provider_ptr1, initialized())
-      .WillOnce(Return(false));
-  EXPECT_CALL(*private_key_method_provider_ptr2, initialized())
-      .WillOnce(Return(true));
+  EXPECT_CALL(factory_context_, sslContextManager())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _))
+      .Times(2)
+      .WillOnce(Return(private_key_method_provider_ptr1))
+      .WillOnce(Return(private_key_method_provider_ptr2));
+  EXPECT_CALL(*private_key_method_provider_ptr1, initialized()).WillOnce(Return(false));
+  EXPECT_CALL(*private_key_method_provider_ptr2, initialized()).WillOnce(Return(true));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2123,14 +2129,18 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodFallbackForList) {
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
   auto private_key_method_provider_ptr2 =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_, sslContextManager()).Times(2).WillRepeatedly(ReturnRef(context_manager));
-  EXPECT_CALL(context_manager, privateKeyMethodManager()).Times(2).WillRepeatedly(ReturnRef(private_key_method_manager));
-  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _)).Times(2)
-      .WillOnce(Return(private_key_method_provider_ptr1)).WillOnce(Return(private_key_method_provider_ptr2));
-  EXPECT_CALL(*private_key_method_provider_ptr1, initialized())
-      .WillOnce(Return(false));
-  EXPECT_CALL(*private_key_method_provider_ptr2, initialized())
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_, sslContextManager())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(context_manager));
+  EXPECT_CALL(context_manager, privateKeyMethodManager())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(private_key_method_manager));
+  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _, _))
+      .Times(2)
+      .WillOnce(Return(private_key_method_provider_ptr1))
+      .WillOnce(Return(private_key_method_provider_ptr2));
+  EXPECT_CALL(*private_key_method_provider_ptr1, initialized()).WillOnce(Return(false));
+  EXPECT_CALL(*private_key_method_provider_ptr2, initialized()).WillOnce(Return(false));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:

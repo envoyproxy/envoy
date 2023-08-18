@@ -532,8 +532,9 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 200));
 
-  std::string private_key_temp =
-      private_key.empty() ? Config::DataSource::read(conf.private_key(), false, api_) : std::string{private_key};
+  std::string private_key_temp = private_key.empty()
+                                     ? Config::DataSource::read(conf.private_key(), false, api_)
+                                     : std::string{private_key};
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key_temp.data()), private_key_temp.size()));
