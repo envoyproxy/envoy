@@ -416,9 +416,7 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
             export FUZZ_COVERAGE=true
         fi
-        # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-        BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" \
-            "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
+        "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
         ;;

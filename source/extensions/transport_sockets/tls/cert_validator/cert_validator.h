@@ -47,8 +47,8 @@ class CertValidator {
 public:
   // Wraps cert validation parameters added from time to time.
   struct ExtraValidationContext {
-    // Local address of the calling endpoint (optional field).
-    Envoy::Network::Address::InstanceConstSharedPtr local_address;
+    // The pointer to transport socket callbacks.
+    Network::TransportSocketCallbacks* callbacks;
   };
 
   virtual ~CertValidator() = default;

@@ -289,7 +289,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     const char* error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, absl::nullopt, error};
   }
   Envoy::Ssl::ClientValidationStatus detailed_status =
       Envoy::Ssl::ClientValidationStatus::NotValidated;
