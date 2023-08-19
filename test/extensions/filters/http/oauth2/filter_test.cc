@@ -1584,7 +1584,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
  *
  * Expected behavior: cookies are set.
  */
-TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensHmacHexEncoding) {
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
 
@@ -1620,7 +1620,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
                                    std::chrono::seconds(600));
 }
 
-TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensHmacEncoding) {
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
@@ -1660,132 +1660,132 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensHmacEncoding) {
                                    std::chrono::seconds(600));
 }
 
-TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_value) {
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.oauth_use_standard_max_age_value", "false"},
-    });
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_value_hmacHexEncoding) {
 
-    // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-    test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.oauth_use_standard_max_age_value", "false"},
+  });
 
-    // host_ must be set, which is guaranteed (ASAN).
-    Http::TestRequestHeaderMapImpl request_headers{
-        {Http::Headers::get().Host.get(), "traffic.example.com"},
-        {Http::Headers::get().Path.get(), "/_signout"},
-        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-    };
-    filter_->decodeHeaders(request_headers, false);
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
-    // Expected response after the callback is complete.
-    Http::TestRequestHeaderMapImpl expected_headers{
-        {Http::Headers::get().Status.get(), "302"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthHMAC="
-         "0bd123ec269cb1df1e8d3a97b0d51b313f6da792ad11cd0e6c546faa575934df;"
-         "version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthExpires=600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "BearerToken=access_code1;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "IdToken=some-id-token1;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "RefreshToken=some-refresh-token1;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().Location.get(), ""},
-    };
+  // host_ must be set, which is guaranteed (ASAN).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
 
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC="
+       "fc371d9edcff7773ccb94e04438a9d9b11516b74920ddb35388a0b3784df9e83;"
+       "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(), ""},
+  };
 
-    filter_->onGetAccessTokenSuccess("access_code1", "some-id-token1", "some-refresh-token1",
-                                     std::chrono::seconds(600));
-  }
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.oauth_use_standard_max_age_value", "false"},
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
-    });
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-    // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-    test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-
-    // host_ must be set, which is guaranteed (ASAN).
-    Http::TestRequestHeaderMapImpl request_headers{
-        {Http::Headers::get().Host.get(), "traffic.example.com"},
-        {Http::Headers::get().Path.get(), "/_signout"},
-        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-    };
-    filter_->decodeHeaders(request_headers, false);
-
-    // Expected response after the callback is complete.
-    Http::TestRequestHeaderMapImpl expected_headers{
-        {Http::Headers::get().Status.get(), "302"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthHMAC="
-         "ZmMzNzFkOWVkY2ZmNzc3M2NjYjk0ZTA0NDM4YTlkOWIxMTUxNmI3NDkyMGRkYjM1Mzg4YTBiMzc4NGRmOWU4Mw==;"
-         "version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthExpires=600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "BearerToken=access_code;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().Location.get(), ""},
-    };
-
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
-
-    filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
-                                     std::chrono::seconds(600));
-  }
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
 }
 
-TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly) {
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.oauth_make_token_cookie_httponly", "false"},
-    });
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_value) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.oauth_use_standard_max_age_value", "false"},
+      {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+  });
 
-    // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-    test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
-    // host_ must be set, which is guaranteed (ASAN).
-    Http::TestRequestHeaderMapImpl request_headers{
-        {Http::Headers::get().Host.get(), "traffic.example.com"},
-        {Http::Headers::get().Path.get(), "/_signout"},
-        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-    };
-    filter_->decodeHeaders(request_headers, false);
+  // host_ must be set, which is guaranteed (ASAN).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
 
-    // Expected response after the callback is complete.
-    Http::TestRequestHeaderMapImpl expected_headers{
-        {Http::Headers::get().Status.get(), "302"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthHMAC="
-         "e132b2c4f57f17bcb2bebd17809d9b91614e73cb7820e15e9f5936f5bf383004;"
-         "version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "BearerToken=access_code2;version=1;path=/;Max-Age=600;secure"},
-        {Http::Headers::get().SetCookie.get(),
-         "IdToken=some-id-token2;version=1;path=/;Max-Age=600;secure"},
-        {Http::Headers::get().SetCookie.get(),
-         "RefreshToken=some-refresh-token2;version=1;path=/;Max-Age=600;secure"},
-        {Http::Headers::get().Location.get(), ""},
-    };
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC="
+       "ZmMzNzFkOWVkY2ZmNzc3M2NjYjk0ZTA0NDM4YTlkOWIxMTUxNmI3NDkyMGRkYjM1Mzg4YTBiMzc4NGRmOWU4Mw==;"
+       "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(), ""},
+  };
 
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-    filter_->onGetAccessTokenSuccess("access_code2", "some-id-token2", "some-refresh-token2",
-                                     std::chrono::seconds(600));
-  }
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
 
+TEST_F(OAuth2Test,       OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly_hmacHexEncoding) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.oauth_make_token_cookie_httponly", "false"},
+  });
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  // host_ must be set, which is guaranteed (ASAN).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
+
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC="
+       "e132b2c4f57f17bcb2bebd17809d9b91614e73cb7820e15e9f5936f5bf383004;"
+       "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code2;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token2;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=some-refresh-token2;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code2", "some-id-token2", "some-refresh-token2",
+                                   std::chrono::seconds(600));
+}
+
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly)
   {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
@@ -1827,7 +1827,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_http
     filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
                                      std::chrono::seconds(600));
   }
-}
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
   Http::TestRequestHeaderMapImpl request_headers{
