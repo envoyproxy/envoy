@@ -75,7 +75,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
         // Return the matched result for `on_match` case.
         return match_result.result_();
       } else {
-        return absl::NotFoundError("Matching completed but no matched result was found.");
+        return absl::NotFoundError("Matching completed but no match result was found.");
       }
     } else {
       // The returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
