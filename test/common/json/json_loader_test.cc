@@ -500,7 +500,7 @@ TEST_F(JsonLoaderTest, LoadFromStruct) {
   ObjectSharedPtr json = Factory::loadFromProtobufStruct(src);
   const auto output_json = json->asJsonString();
   EXPECT_TRUE(TestUtility::jsonStringEqual(output_json, json_string));
-  }
+}
 
 } // namespace
 } // namespace Json
