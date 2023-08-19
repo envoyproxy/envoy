@@ -102,11 +102,14 @@ jobs:
   # TODO(phlax): Make this configurable and ratchet down!
   timeoutInMinutes: 240
   pool: "envoy-x64-large"
+  variables:
+    BAZEL_STARTUP_EXTRA: ''
   strategy:
     maxParallel: 2
     matrix:
       coverage:
         CI_TARGET: "coverage"
+        BAZEL_STARTUP_EXTRA: --host_jvm_args=-Xmx20g --host_jvm_args=-XX:MaxDirectMemorySize=4G
       fuzz_coverage:
         CI_TARGET: "fuzz_coverage"
   steps:
@@ -114,11 +117,13 @@ jobs:
     parameters:
       managedAgent: false
       ciTarget: bazel.$(CI_TARGET)
-      rbe: false
+      rbe: true
       # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
-      bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+      bazelConfigRBE: --config=ci --config=rbe-google --jobs=$(RbeJobs)
+      bazelBuildExtraOptions: --sandbox_base=/tmp/sandbox_base --define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+      bazelStartupExtraOptions: $(BAZEL_STARTUP_EXTRA)
+      bazelUseBES: false
       cacheTestResults: ${{ parameters.cacheTestResults }}
-
   - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)-upload'
     displayName: "Upload $(CI_TARGET) Report to GCS"
     env:
