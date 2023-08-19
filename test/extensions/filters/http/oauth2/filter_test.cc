@@ -1661,7 +1661,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
 }
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_value_hmacHexEncoding) {
-
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.oauth_use_standard_max_age_value", "false"},
@@ -1744,7 +1743,8 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_v
                                    std::chrono::seconds(600));
 }
 
-TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly_hmacHexEncoding) {
+TEST_F(OAuth2Test,
+       OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly_hmacHexEncoding) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.oauth_make_token_cookie_httponly", "false"},
