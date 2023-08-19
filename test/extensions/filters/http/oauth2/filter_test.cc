@@ -1786,48 +1786,47 @@ TEST_F(OAuth2Test,
                                    std::chrono::seconds(600));
 }
 
-TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly)
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.oauth_make_token_cookie_httponly", "false"},
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
-    });
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.oauth_make_token_cookie_httponly", "false"},
+      {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+  });
 
-    // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-    test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
 
-    // host_ must be set, which is guaranteed (ASAN).
-    Http::TestRequestHeaderMapImpl request_headers{
-        {Http::Headers::get().Host.get(), "traffic.example.com"},
-        {Http::Headers::get().Path.get(), "/_signout"},
-        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-    };
-    filter_->decodeHeaders(request_headers, false);
+  // host_ must be set, which is guaranteed (ASAN).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
 
-    // Expected response after the callback is complete.
-    Http::TestRequestHeaderMapImpl expected_headers{
-        {Http::Headers::get().Status.get(), "302"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthHMAC="
-         "ZTEzMmIyYzRmNTdmMTdiY2IyYmViZDE3ODA5ZDliOTE2MTRlNzNjYjc4MjBlMTVlOWY1OTM2ZjViZjM4MzAwNA==;"
-         "version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "BearerToken=access_code;version=1;path=/;Max-Age=600;secure"},
-        {Http::Headers::get().SetCookie.get(),
-         "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure"},
-        {Http::Headers::get().SetCookie.get(),
-         "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure"},
-        {Http::Headers::get().Location.get(), ""},
-    };
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC="
+       "ZTEzMmIyYzRmNTdmMTdiY2IyYmViZDE3ODA5ZDliOTE2MTRlNzNjYjc4MjBlMTVlOWY1OTM2ZjViZjM4MzAwNA==;"
+       "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().Location.get(), ""},
+  };
 
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-    filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
-                                     std::chrono::seconds(600));
-  }
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
   Http::TestRequestHeaderMapImpl request_headers{
