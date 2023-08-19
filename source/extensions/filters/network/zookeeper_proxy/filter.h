@@ -28,6 +28,35 @@ namespace ZooKeeperProxy {
 #define ALL_ZOOKEEPER_PROXY_STATS(COUNTER)                                                         \
   COUNTER(decoder_error)                                                                           \
   COUNTER(request_bytes)                                                                           \
+  COUNTER(connect_rq_bytes)                                                                        \
+  COUNTER(connect_readonly_rq_bytes)                                                               \
+  COUNTER(ping_rq_bytes)                                                                           \
+  COUNTER(auth_rq_bytes)                                                                           \
+  COUNTER(getdata_rq_bytes)                                                                        \
+  COUNTER(create_rq_bytes)                                                                         \
+  COUNTER(create2_rq_bytes)                                                                        \
+  COUNTER(createcontainer_rq_bytes)                                                                \
+  COUNTER(createttl_rq_bytes)                                                                      \
+  COUNTER(setdata_rq_bytes)                                                                        \
+  COUNTER(getchildren_rq_bytes)                                                                    \
+  COUNTER(getchildren2_rq_bytes)                                                                   \
+  COUNTER(getephemerals_rq_bytes)                                                                  \
+  COUNTER(getallchildrennumber_rq_bytes)                                                           \
+  COUNTER(delete_rq_bytes)                                                                         \
+  COUNTER(exists_rq_bytes)                                                                         \
+  COUNTER(getacl_rq_bytes)                                                                         \
+  COUNTER(setacl_rq_bytes)                                                                         \
+  COUNTER(sync_rq_bytes)                                                                           \
+  COUNTER(multi_rq_bytes)                                                                          \
+  COUNTER(reconfig_rq_bytes)                                                                       \
+  COUNTER(close_rq_bytes)                                                                          \
+  COUNTER(setauth_rq_bytes)                                                                        \
+  COUNTER(setwatches_rq_bytes)                                                                     \
+  COUNTER(setwatches2_rq_bytes)                                                                    \
+  COUNTER(addwatch_rq_bytes)                                                                       \
+  COUNTER(checkwatches_rq_bytes)                                                                   \
+  COUNTER(removewatches_rq_bytes)                                                                  \
+  COUNTER(check_rq_bytes)                                                                          \
   COUNTER(connect_rq)                                                                              \
   COUNTER(connect_readonly_rq)                                                                     \
   COUNTER(getdata_rq)                                                                              \
@@ -57,6 +86,34 @@ namespace ZooKeeperProxy {
   COUNTER(removewatches_rq)                                                                        \
   COUNTER(check_rq)                                                                                \
   COUNTER(response_bytes)                                                                          \
+  COUNTER(connect_resp_bytes)                                                                      \
+  COUNTER(ping_resp_bytes)                                                                         \
+  COUNTER(auth_resp_bytes)                                                                         \
+  COUNTER(getdata_resp_bytes)                                                                      \
+  COUNTER(create_resp_bytes)                                                                       \
+  COUNTER(create2_resp_bytes)                                                                      \
+  COUNTER(createcontainer_resp_bytes)                                                              \
+  COUNTER(createttl_resp_bytes)                                                                    \
+  COUNTER(setdata_resp_bytes)                                                                      \
+  COUNTER(getchildren_resp_bytes)                                                                  \
+  COUNTER(getchildren2_resp_bytes)                                                                 \
+  COUNTER(getephemerals_resp_bytes)                                                                \
+  COUNTER(getallchildrennumber_resp_bytes)                                                         \
+  COUNTER(delete_resp_bytes)                                                                       \
+  COUNTER(exists_resp_bytes)                                                                       \
+  COUNTER(getacl_resp_bytes)                                                                       \
+  COUNTER(setacl_resp_bytes)                                                                       \
+  COUNTER(sync_resp_bytes)                                                                         \
+  COUNTER(multi_resp_bytes)                                                                        \
+  COUNTER(reconfig_resp_bytes)                                                                     \
+  COUNTER(close_resp_bytes)                                                                        \
+  COUNTER(setauth_resp_bytes)                                                                      \
+  COUNTER(setwatches_resp_bytes)                                                                   \
+  COUNTER(setwatches2_resp_bytes)                                                                  \
+  COUNTER(addwatch_resp_bytes)                                                                     \
+  COUNTER(checkwatches_resp_bytes)                                                                 \
+  COUNTER(removewatches_resp_bytes)                                                                \
+  COUNTER(check_resp_bytes)                                                                        \
   COUNTER(connect_resp)                                                                            \
   COUNTER(ping_resp)                                                                               \
   COUNTER(auth_resp)                                                                               \
@@ -186,10 +243,10 @@ public:
     Stats::Counter* resp_counter_;
     Stats::Counter* resp_fast_counter_;
     Stats::Counter* resp_slow_counter_;
+    Stats::Counter* rq_bytes_counter_;
+    Stats::Counter* resp_bytes_counter_;
     std::string opname_;
     Stats::StatName latency_name_;
-    Stats::StatName rq_bytes_counter_;
-    Stats::StatName resp_bytes_counter_;
   };
 
   absl::flat_hash_map<OpCodes, OpCodeInfo> op_code_map_;
@@ -210,7 +267,8 @@ public:
 
 private:
   void initOpCode(OpCodes opcode, Stats::Counter& resp_counter, Stats::Counter& resp_fast_counter,
-                  Stats::Counter& resp_slow_counter, absl::string_view name);
+                  Stats::Counter& resp_slow_counter, Stats::Counter& rq_bytes_counter,
+                  Stats::Counter& resp_bytes_counter, absl::string_view name);
 
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
@@ -277,8 +335,6 @@ public:
 
   // ZooKeeperProxy::DecoderCallback
   void onDecodeError() override;
-  void onConnectRequestBytes(const uint64_t bytes) override;
-  void onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) override;
   void onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnect(bool readonly) override;
   void onPing() override;
@@ -303,8 +359,6 @@ public:
   void onGetEphemeralsRequest(const std::string& path) override;
   void onGetAllChildrenNumberRequest(const std::string& path) override;
   void onCloseRequest() override;
-  void onConnectResponseBytes(const uint64_t bytes) override;
-  void onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) override;
   void onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
                          const std::chrono::milliseconds latency) override;
@@ -319,6 +373,9 @@ public:
   void clearDynamicMetadata();
 
 private:
+  void onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) override;
+  void onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) override;
+
   Network::ReadFilterCallbacks* read_callbacks_{};
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<Decoder> decoder_;

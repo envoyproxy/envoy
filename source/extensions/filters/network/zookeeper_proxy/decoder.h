@@ -82,7 +82,6 @@ public:
   virtual ~DecoderCallbacks() = default;
 
   virtual void onDecodeError() PURE;
-  virtual void onConnectRequestBytes(const uint64_t bytes) PURE;
   virtual void onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) PURE;
   virtual void onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) PURE;
   virtual void onConnect(bool readonly) PURE;
@@ -108,7 +107,6 @@ public:
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
-  virtual void onConnectResponseBytes(const uint64_t bytes) PURE;
   virtual void onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) PURE;
   virtual void onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) PURE;
   virtual void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
