@@ -2358,6 +2358,11 @@ TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
         {"tcp://127.0.0.1:86", {{"version", "1.0"}, {"stage", "canary"}}}},
        {}, true);
 
+  TestLoadBalancerContext context_empty(
+      std::initializer_list<std::map<std::string, std::string>::value_type>{});
+  context_empty.matches_.reset();
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_empty));
+
   // Request metadata is same with {version, stage}.
   // version, stage will be kept and host 6 will be selected.
   TestLoadBalancerContext context_v_s_0({{"version", "1.0"}, {"stage", "canary"}});

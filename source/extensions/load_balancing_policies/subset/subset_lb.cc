@@ -30,16 +30,14 @@ namespace {
 Router::MetadataMatchCriteriaConstPtr
 filterCriteriaBySelectors(const std::vector<SubsetSelectorPtr>& subset_selectors,
                           const Router::MetadataMatchCriteria* match_criteria) {
-  if (match_criteria == nullptr) {
-    return nullptr;
-  }
-
-  for (const auto& selector : subset_selectors) {
-    const auto& selector_keys = selector->selectorKeys();
-    auto sub_match_criteria = match_criteria->filterMatchCriteria(selector_keys);
-    if (sub_match_criteria != nullptr &&
-        sub_match_criteria->metadataMatchCriteria().size() == selector_keys.size()) {
-      return sub_match_criteria;
+  if (match_criteria != nullptr) {
+    for (const auto& selector : subset_selectors) {
+      const auto& selector_keys = selector->selectorKeys();
+      auto sub_match_criteria = match_criteria->filterMatchCriteria(selector_keys);
+      if (sub_match_criteria != nullptr &&
+          sub_match_criteria->metadataMatchCriteria().size() == selector_keys.size()) {
+        return sub_match_criteria;
+      }
     }
   }
   return nullptr;
