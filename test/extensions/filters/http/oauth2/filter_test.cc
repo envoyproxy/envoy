@@ -1744,7 +1744,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_v
                                    std::chrono::seconds(600));
 }
 
-TEST_F(OAuth2Test,       OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly_hmacHexEncoding) {
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly_hmacHexEncoding) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
       {"envoy.reloadable_features.oauth_make_token_cookie_httponly", "false"},
@@ -1771,11 +1771,11 @@ TEST_F(OAuth2Test,       OAuthAccessTokenSucessWithTokens_oauth_make_token_cooki
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "BearerToken=access_code2;version=1;path=/;Max-Age=600;secure"},
+       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure"},
       {Http::Headers::get().SetCookie.get(),
-       "IdToken=some-id-token2;version=1;path=/;Max-Age=600;secure"},
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=some-refresh-token2;version=1;path=/;Max-Age=600;secure"},
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure"},
       {Http::Headers::get().Location.get(), ""},
   };
 
