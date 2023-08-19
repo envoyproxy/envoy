@@ -65,7 +65,9 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
     return absl::InternalError("Matcher tree has not been initialized yet.");
   } else {
     // Populate the request header.
-    data_ptr_->onRequestHeaders(headers);
+    if (!headers.empty()) {
+      data_ptr_->onRequestHeaders(headers);
+    }
 
     // Perform the matching.
     auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
