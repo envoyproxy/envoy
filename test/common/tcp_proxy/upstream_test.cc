@@ -47,7 +47,7 @@ public:
           .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options_)));
     }
     EXPECT_CALL(stream_encoder_options_, enableHalfClose()).Times(AnyNumber());
-    tcp_proxy_.mutable_tunneling_config()->set_hostname("default.host.com:443");
+    config_message_.set_hostname("default.host.com:443");
   }
 
   void expectCallOnEncodeData(std::string data_string, bool end_stream) {
@@ -313,7 +313,7 @@ public:
           .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options_)));
       is_http2_ = false;
     }
-    tcp_proxy_.mutable_tunneling_config()->set_hostname("default.host.com:443");
+    config_message_.set_hostname("default.host.com:443");
   }
 
   void setupUpstream() {
@@ -402,7 +402,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
-  this->tcp_proxy_.mutable_tunneling_config()->set_use_post(true);
+  this->config_message_.set_use_post(true);
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
@@ -420,8 +420,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
-  this->tcp_proxy_.mutable_tunneling_config()->set_use_post(true);
-  this->tcp_proxy_.mutable_tunneling_config()->set_post_path("/test");
+  this->config_message_.set_use_post(true);
+  this->config_message_.set_post_path("/test");
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
@@ -440,25 +440,25 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) 
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {
-  this->tcp_proxy_.mutable_tunneling_config()->set_use_post(false);
-  this->tcp_proxy_.mutable_tunneling_config()->set_post_path("/test");
+  this->config_message_.set_use_post(false);
+  this->config_message_.set_post_path("/test");
   EXPECT_THROW_WITH_MESSAGE(this->setupUpstream(), EnvoyException,
                             "Can't set a post path when POST method isn't used");
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
-  auto* header = this->tcp_proxy_.mutable_tunneling_config()->add_headers_to_add();
+  auto* header = this->config_message_.add_headers_to_add();
   auto* hdr = header->mutable_header();
   hdr->set_key("header0");
   hdr->set_value("value0");
 
-  header = this->tcp_proxy_.mutable_tunneling_config()->add_headers_to_add();
+  header = this->config_message_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value1");
   header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-  header = this->tcp_proxy_.mutable_tunneling_config()->add_headers_to_add();
+  header = this->config_message_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value2");
@@ -480,13 +480,13 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
-  auto* header = this->tcp_proxy_.mutable_tunneling_config()->add_headers_to_add();
+  auto* header = this->config_message_.add_headers_to_add();
   auto* hdr = header->mutable_header();
   hdr->set_key("key");
   hdr->set_value("value1");
   header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-  header = this->tcp_proxy_.mutable_tunneling_config()->add_headers_to_add();
+  header = this->config_message_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("key");
   hdr->set_value("value2");
@@ -531,12 +531,12 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamInfo) {
-  auto* header = this->tcp_proxy_.mutable_tunneling_config()->add_headers_to_add();
+  auto* header = this->config_message_.add_headers_to_add();
   auto* hdr = header->mutable_header();
   hdr->set_key("header0");
   hdr->set_value("value0");
 
-  header = this->tcp_proxy_.mutable_tunneling_config()->add_headers_to_add();
+  header = this->config_message_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("downstream_local_port");
   hdr->set_value("%DOWNSTREAM_LOCAL_PORT%");
@@ -565,7 +565,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamIn
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest,
            RequestEncoderHostnameWithDownstreamInfoRequestedServerName) {
-  this->tcp_proxy_.mutable_tunneling_config()->set_hostname("%REQUESTED_SERVER_NAME%:443");
+  this->config_message_.set_hostname("%REQUESTED_SERVER_NAME%:443");
   this->setupUpstream();
 
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
@@ -590,8 +590,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest,
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest,
            RequestEncoderHostnameWithDownstreamInfoDynamicMetadata) {
-  this->tcp_proxy_.mutable_tunneling_config()->set_hostname(
-      "%DYNAMIC_METADATA(tunnel:address)%:443");
+  this->config_message_.set_hostname("%DYNAMIC_METADATA(tunnel:address)%:443");
   this->setupUpstream();
 
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
