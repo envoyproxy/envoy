@@ -371,10 +371,6 @@ public:
                               Event::Dispatcher& dispatcher,
                               StreamInfo::StreamInfo& stream_info) override;
 
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks* callbacks) override {
-    router_->initializeReadFilterCallbacks(callbacks);
-  }
-
 private:
   friend class RedisCommandSplitterImplTest;
 
