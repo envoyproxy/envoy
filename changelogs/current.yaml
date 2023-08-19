@@ -2,9 +2,6 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: tracing
-  change: |
-    OpenTracing is now deprecated since the upstream project has been abandoned.
 
 - area: eds
   change: |
@@ -87,3 +84,6 @@ new_features:
     to suppport redundant keys in request metadata for subset load balancing.
 
 deprecated:
+- area: tracing
+  change: |
+    OpenTracing is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
