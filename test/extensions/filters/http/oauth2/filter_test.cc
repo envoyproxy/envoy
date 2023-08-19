@@ -1683,7 +1683,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_v
         {Http::Headers::get().Status.get(), "302"},
         {Http::Headers::get().SetCookie.get(),
          "OauthHMAC="
-         "fc371d9edcff7773ccb94e04438a9d9b11516b74920ddb35388a0b3784df9e83;"
+         "0bd123ec269cb1df1e8d3a97b0d51b313f6da792ad11cd0e6c546faa575934df;"
          "version=1;path=/;Max-Age=600;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
@@ -1772,17 +1772,17 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_http
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
-         "BearerToken=access_code1;version=1;path=/;Max-Age=600;secure"},
+         "BearerToken=access_code2;version=1;path=/;Max-Age=600;secure"},
         {Http::Headers::get().SetCookie.get(),
-         "IdToken=some-id-token1;version=1;path=/;Max-Age=600;secure"},
+         "IdToken=some-id-token2;version=1;path=/;Max-Age=600;secure"},
         {Http::Headers::get().SetCookie.get(),
-         "RefreshToken=some-refresh-token1;version=1;path=/;Max-Age=600;secure"},
+         "RefreshToken=some-refresh-token2;version=1;path=/;Max-Age=600;secure"},
         {Http::Headers::get().Location.get(), ""},
     };
 
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-    filter_->onGetAccessTokenSuccess("access_code1", "some-id-token1", "some-refresh-token1",
+    filter_->onGetAccessTokenSuccess("access_code2", "some-id-token2", "some-refresh-token2",
                                      std::chrono::seconds(600));
   }
 
