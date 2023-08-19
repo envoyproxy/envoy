@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/extensions/filters/network/redis_proxy/conn_pool.h"
 
@@ -65,13 +66,7 @@ public:
    * @param key mutable reference to the key of the current command.
    * @return a handle to the connection pool.
    */
-  virtual RouteSharedPtr upstreamPool(std::string& key) PURE;
-
-  /**
-   * Initializes read filter callbacks.
-   * @param callbacks supplies the read filter callbacks.
-   */
-  virtual void initializeReadFilterCallbacks(Network::ReadFilterCallbacks* callbacks) PURE;
+  virtual RouteSharedPtr upstreamPool(std::string& key, StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using RouterPtr = std::unique_ptr<Router>;

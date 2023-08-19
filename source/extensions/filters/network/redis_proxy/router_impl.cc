@@ -78,7 +78,7 @@ PrefixRoutes::PrefixRoutes(
   }
 }
 
-RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
+RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key, StreamInfo::StreamInfo& stream_info) {
   PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy = absl::AsciiStrToLower(key);
@@ -96,12 +96,13 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
     key.erase(0, value->prefix().length());
   }
   if (!value->keyFormatter().empty()) {
-    formatKey(key, value->keyFormatter());
+    formatKey(key, value->keyFormatter(), stream_info);
   }
   return value;
 }
 
-void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter) {
+void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter,
+                             StreamInfo::StreamInfo& stream_info) {
   // If key_formatter defines %KEY% command, then do a direct string replacement.
   // TODO(deveshkandpal24121990) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter
   if (redis_key_formatter.find(redis_key_formatter_command_) != std::string::npos) {
@@ -114,7 +115,7 @@ void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter) 
     auto provider_formatted_key =
         provider->formatValue(*Http::StaticEmptyHeaders::get().request_headers,
                               *Http::StaticEmptyHeaders::get().response_headers,
-                              *Http::StaticEmptyHeaders::get().response_trailers, *stream_info_,
+                              *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
                               absl::string_view(), AccessLog::AccessLogType::NotSet);
     if (provider_formatted_key.has_string_value()) {
       formatted_key = formatted_key + provider_formatted_key.string_value();

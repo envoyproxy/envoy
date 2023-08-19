@@ -72,30 +72,21 @@ public:
                    prefix_routes,
                Upstreams&& upstreams, Runtime::Loader& runtime);
 
-  RouteSharedPtr upstreamPool(std::string& key) override;
-
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks* callbacks) override {
-    // Capture the stream info so that we can use it for formatting. This is needed to
-    // to avoid lifetime issues if the stream is destroyed before formatting is done.
-    stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
-        callbacks->connection().dispatcher().timeSource(),
-        callbacks->connection().connectionInfoProviderSharedPtr());
-    stream_info_->setFrom(callbacks->connection().streamInfo(), nullptr);
-  }
+  RouteSharedPtr upstreamPool(std::string& key, StreamInfo::StreamInfo& stream_info) override;
 
   /**
    * Formats redis key based on substitution formatter expression that is defined.
    * @param key redis key to be formatted.
    * @param redis_key_formatter substitution formatter expression to format redis key.
    */
-  void formatKey(std::string& key, std::string redis_key_formatter);
+  void formatKey(std::string& key, std::string redis_key_formatter,
+                 StreamInfo::StreamInfo& stream_info);
 
 private:
   TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;
   const bool case_insensitive_;
   Upstreams upstreams_;
   PrefixSharedPtr catch_all_route_;
-  std::unique_ptr<StreamInfo::StreamInfoImpl> stream_info_;
   const std::string redis_key_formatter_command_ = "%KEY%";
 };
 

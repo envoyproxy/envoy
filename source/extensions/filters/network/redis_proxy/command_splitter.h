@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
@@ -91,14 +92,8 @@ public:
    *         onResponse() for a given request.
    */
   virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
-                                      SplitCallbacks& callbacks,
-                                      Event::Dispatcher& dispatcher) PURE;
-
-  /**
-   * Initializes read filter callbacks.
-   * @param callbacks supplies the read filter callbacks.
-   */
-  virtual void initializeReadFilterCallbacks(Network::ReadFilterCallbacks* callbacks) PURE;
+                                      SplitCallbacks& callbacks, Event::Dispatcher& dispatcher,
+                                      StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 } // namespace CommandSplitter

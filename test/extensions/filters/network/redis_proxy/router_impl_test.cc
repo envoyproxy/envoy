@@ -66,7 +66,8 @@ TEST(PrefixRoutesTest, RoutedToCatchAll) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("c:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_c, router.upstreamPool(key, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
@@ -81,7 +82,8 @@ TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
 
   std::string key("ab:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
@@ -116,9 +118,9 @@ TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.initializeReadFilterCallbacks(&filter_callbacks);
   std::string key("removeMe_catchAllKey");
-  EXPECT_EQ(upstream_catch_all, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_catch_all,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
   EXPECT_EQ("{catchAllKey}-catchAllEnv-subjectCN-{catchAllKey}", key);
 }
 
@@ -153,57 +155,9 @@ TEST(PrefixRoutesTest, TestFormatterWithPrefixRoute) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.initializeReadFilterCallbacks(&filter_callbacks);
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
-  EXPECT_EQ("{abc:bar}-test-subjectCN-{abc:bar}", key);
-}
-
-// This test validates the formatter works correctly when downstream connection is closed
-// while the formatter is being evaluated. This is to validate the lifetime issues with the
-// downstream connection.
-TEST(PrefixRoutesTest, TestFormatterWhenConnectionClosed) {
-  InSequence s;
-  auto upstream_c = std::make_shared<ConnPool::MockInstance>();
-  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  auto connection_ptr = &connection;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
-  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
-  const std::string format =
-      "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
-
-  stream_info.filterState()->setData(
-      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
-      StreamInfo::FilterState::StateType::ReadOnly);
-
-  Upstreams upstreams;
-  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
-  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
-  upstreams.emplace("fake_clusterC", upstream_c);
-
-  Runtime::MockLoader runtime_;
-  auto prefix_routes = createPrefixRoutes();
-  {
-    auto* route = prefix_routes.mutable_routes()->Add();
-    route->set_prefix("abc");
-    route->set_cluster("fake_clusterC");
-    route->set_key_formatter(format);
-  }
-  PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  EXPECT_CALL(filter_callbacks, connection())
-      .Times(3)
-      .WillOnce(ReturnPointee(connection_ptr))
-      .WillOnce(ReturnPointee(connection_ptr))
-      .WillOnce(ReturnPointee(connection_ptr));
-  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  router.initializeReadFilterCallbacks(&filter_callbacks);
-  std::string key("abc:bar");
-  // Clear the connection and validate that formatter still works.
-  connection_ptr = nullptr;
-  ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnPointee(connection_ptr));
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
   EXPECT_EQ("{abc:bar}-test-subjectCN-{abc:bar}", key);
 }
 
@@ -236,9 +190,9 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.initializeReadFilterCallbacks(&filter_callbacks);
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
   EXPECT_EQ("abc:bar", key);
 }
 
@@ -257,7 +211,8 @@ TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("AB:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, RemovePrefix) {
@@ -281,7 +236,8 @@ TEST(PrefixRoutesTest, RemovePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
   EXPECT_EQ(":bar", key);
 }
 
@@ -297,7 +253,8 @@ TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
 
   std::string key("a:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_b, router.upstreamPool(key, stream_info)->upstream());
   EXPECT_EQ("a:bar", key);
 }
 
@@ -320,11 +277,13 @@ TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
 
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
   std::string key1("a:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key1)->upstream());
+  EXPECT_EQ(upstream_b, router.upstreamPool(key1, stream_info)->upstream());
 
   std::string key2("also_route_to_b:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key2)->upstream());
+  EXPECT_EQ(upstream_b, router.upstreamPool(key2, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, DuplicatePrefix) {
