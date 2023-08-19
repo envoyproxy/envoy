@@ -444,6 +444,9 @@ TEST_F(JsonLoaderTest, LoadFromStruct) {
         "struct_struct_struct": {
           "struct_struct_struct_string": "plain_string_value",
           "struct_struct_struct_protocol": "HTTP/1.1",
+          "struct_struct_number": 53,
+          "struct_struct_null": null,
+          "struct_struct_bool": true,
         },
         "struct_struct_list": [
           "struct_struct_list_string",
@@ -497,7 +500,7 @@ TEST_F(JsonLoaderTest, LoadFromStruct) {
   ObjectSharedPtr json = Factory::loadFromProtobufStruct(src);
   const auto output_json = json->asJsonString();
   EXPECT_TRUE(TestUtility::jsonStringEqual(output_json, json_string));
-}
+  }
 
 } // namespace
 } // namespace Json
