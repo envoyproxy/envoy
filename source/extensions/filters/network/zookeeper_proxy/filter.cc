@@ -44,60 +44,80 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
   stat_name_set_->rememberBuiltins(
       {"auth_rq", "digest_rq", "host_rq", "ip_rq", "ping_response_rq", "world_rq", "x509_rq"});
 
-  initOpCode(OpCodes::Ping, stats_.ping_resp_, stats_.ping_resp_fast_, stats_.ping_resp_slow_, stats_.ping_rq_bytes_, stats_.ping_resp_bytes_,
-             "ping_response");
-  initOpCode(OpCodes::SetAuth, stats_.auth_resp_, stats_.auth_resp_fast_, stats_.auth_resp_slow_, stats_.auth_rq_bytes_, stats_.auth_resp_bytes_,
-             "auth_response");
+  initOpCode(OpCodes::Ping, stats_.ping_resp_, stats_.ping_resp_fast_, stats_.ping_resp_slow_,
+             stats_.ping_rq_bytes_, stats_.ping_resp_bytes_, "ping_response");
+  initOpCode(OpCodes::SetAuth, stats_.auth_resp_, stats_.auth_resp_fast_, stats_.auth_resp_slow_,
+             stats_.auth_rq_bytes_, stats_.auth_resp_bytes_, "auth_response");
   initOpCode(OpCodes::GetData, stats_.getdata_resp_, stats_.getdata_resp_fast_,
-             stats_.getdata_resp_slow_, stats_.getdata_rq_bytes_, stats_.getdata_resp_bytes_, "getdata_resp");
+             stats_.getdata_resp_slow_, stats_.getdata_rq_bytes_, stats_.getdata_resp_bytes_,
+             "getdata_resp");
   initOpCode(OpCodes::Create, stats_.create_resp_, stats_.create_resp_fast_,
-             stats_.create_resp_slow_, stats_.create_rq_bytes_, stats_.create_resp_bytes_, "create_resp");
+             stats_.create_resp_slow_, stats_.create_rq_bytes_, stats_.create_resp_bytes_,
+             "create_resp");
   initOpCode(OpCodes::Create2, stats_.create2_resp_, stats_.create2_resp_fast_,
-             stats_.create2_resp_slow_, stats_.create2_rq_bytes_, stats_.create2_resp_bytes_, "create2_resp");
+             stats_.create2_resp_slow_, stats_.create2_rq_bytes_, stats_.create2_resp_bytes_,
+             "create2_resp");
   initOpCode(OpCodes::CreateContainer, stats_.createcontainer_resp_,
-             stats_.createcontainer_resp_fast_, stats_.createcontainer_resp_slow_, stats_.createcontainer_rq_bytes_, stats_.createcontainer_resp_bytes_,
+             stats_.createcontainer_resp_fast_, stats_.createcontainer_resp_slow_,
+             stats_.createcontainer_rq_bytes_, stats_.createcontainer_resp_bytes_,
              "createcontainer_resp");
   initOpCode(OpCodes::CreateTtl, stats_.createttl_resp_, stats_.createttl_resp_fast_,
-             stats_.createttl_resp_slow_, stats_.createttl_rq_bytes_, stats_.createttl_resp_bytes_, "createttl_resp");
+             stats_.createttl_resp_slow_, stats_.createttl_rq_bytes_, stats_.createttl_resp_bytes_,
+             "createttl_resp");
   initOpCode(OpCodes::SetData, stats_.setdata_resp_, stats_.setdata_resp_fast_,
-             stats_.setdata_resp_slow_, stats_.setdata_rq_bytes_, stats_.setdata_resp_bytes_, "setdata_resp");
+             stats_.setdata_resp_slow_, stats_.setdata_rq_bytes_, stats_.setdata_resp_bytes_,
+             "setdata_resp");
   initOpCode(OpCodes::GetChildren, stats_.getchildren_resp_, stats_.getchildren_resp_fast_,
-             stats_.getchildren_resp_slow_, stats_.getchildren_rq_bytes_, stats_.getchildren_resp_bytes_, "getchildren_resp");
+             stats_.getchildren_resp_slow_, stats_.getchildren_rq_bytes_,
+             stats_.getchildren_resp_bytes_, "getchildren_resp");
   initOpCode(OpCodes::GetChildren2, stats_.getchildren2_resp_, stats_.getchildren2_resp_fast_,
-             stats_.getchildren2_resp_slow_, stats_.getchildren2_rq_bytes_, stats_.getchildren2_resp_bytes_, "getchildren2_resp");
+             stats_.getchildren2_resp_slow_, stats_.getchildren2_rq_bytes_,
+             stats_.getchildren2_resp_bytes_, "getchildren2_resp");
   initOpCode(OpCodes::Delete, stats_.delete_resp_, stats_.delete_resp_fast_,
-             stats_.delete_resp_slow_, stats_.delete_rq_bytes_, stats_.delete_resp_bytes_, "delete_resp");
+             stats_.delete_resp_slow_, stats_.delete_rq_bytes_, stats_.delete_resp_bytes_,
+             "delete_resp");
   initOpCode(OpCodes::Exists, stats_.exists_resp_, stats_.exists_resp_fast_,
-             stats_.exists_resp_slow_, stats_.exists_rq_bytes_, stats_.exists_resp_bytes_, "exists_resp");
+             stats_.exists_resp_slow_, stats_.exists_rq_bytes_, stats_.exists_resp_bytes_,
+             "exists_resp");
   initOpCode(OpCodes::GetAcl, stats_.getacl_resp_, stats_.getacl_resp_fast_,
-             stats_.getacl_resp_slow_, stats_.getacl_rq_bytes_, stats_.getacl_resp_bytes_, "getacl_resp");
+             stats_.getacl_resp_slow_, stats_.getacl_rq_bytes_, stats_.getacl_resp_bytes_,
+             "getacl_resp");
   initOpCode(OpCodes::SetAcl, stats_.setacl_resp_, stats_.setacl_resp_fast_,
-             stats_.setacl_resp_slow_, stats_.setacl_rq_bytes_, stats_.setacl_resp_bytes_, "setacl_resp");
-  initOpCode(OpCodes::Sync, stats_.sync_resp_, stats_.sync_resp_fast_, stats_.sync_resp_slow_, stats_.sync_rq_bytes_, stats_.sync_resp_bytes_,
-             "sync_resp");
-  initOpCode(OpCodes::Check, stats_.check_resp_, stats_.check_resp_fast_, stats_.check_resp_slow_, stats_.check_rq_bytes_, stats_.check_resp_bytes_,
-             "check_resp");
-  initOpCode(OpCodes::Multi, stats_.multi_resp_, stats_.multi_resp_fast_, stats_.multi_resp_slow_, stats_.multi_rq_bytes_, stats_.multi_resp_bytes_,
-             "multi_resp");
+             stats_.setacl_resp_slow_, stats_.setacl_rq_bytes_, stats_.setacl_resp_bytes_,
+             "setacl_resp");
+  initOpCode(OpCodes::Sync, stats_.sync_resp_, stats_.sync_resp_fast_, stats_.sync_resp_slow_,
+             stats_.sync_rq_bytes_, stats_.sync_resp_bytes_, "sync_resp");
+  initOpCode(OpCodes::Check, stats_.check_resp_, stats_.check_resp_fast_, stats_.check_resp_slow_,
+             stats_.check_rq_bytes_, stats_.check_resp_bytes_, "check_resp");
+  initOpCode(OpCodes::Multi, stats_.multi_resp_, stats_.multi_resp_fast_, stats_.multi_resp_slow_,
+             stats_.multi_rq_bytes_, stats_.multi_resp_bytes_, "multi_resp");
   initOpCode(OpCodes::Reconfig, stats_.reconfig_resp_, stats_.reconfig_resp_fast_,
-             stats_.reconfig_resp_slow_, stats_.reconfig_rq_bytes_, stats_.reconfig_resp_bytes_, "reconfig_resp");
+             stats_.reconfig_resp_slow_, stats_.reconfig_rq_bytes_, stats_.reconfig_resp_bytes_,
+             "reconfig_resp");
   initOpCode(OpCodes::SetWatches, stats_.setwatches_resp_, stats_.setwatches_resp_fast_,
-             stats_.setwatches_resp_slow_, stats_.setwatches_rq_bytes_, stats_.setwatches_resp_bytes_, "setwatches_resp");
+             stats_.setwatches_resp_slow_, stats_.setwatches_rq_bytes_,
+             stats_.setwatches_resp_bytes_, "setwatches_resp");
   initOpCode(OpCodes::SetWatches2, stats_.setwatches2_resp_, stats_.setwatches2_resp_fast_,
-             stats_.setwatches2_resp_slow_, stats_.setwatches2_rq_bytes_, stats_.setwatches2_resp_bytes_, "setwatches2_resp");
+             stats_.setwatches2_resp_slow_, stats_.setwatches2_rq_bytes_,
+             stats_.setwatches2_resp_bytes_, "setwatches2_resp");
   initOpCode(OpCodes::AddWatch, stats_.addwatch_resp_, stats_.addwatch_resp_fast_,
-             stats_.addwatch_resp_slow_, stats_.addwatch_rq_bytes_, stats_.addwatch_resp_bytes_, "addwatch_resp");
+             stats_.addwatch_resp_slow_, stats_.addwatch_rq_bytes_, stats_.addwatch_resp_bytes_,
+             "addwatch_resp");
   initOpCode(OpCodes::CheckWatches, stats_.checkwatches_resp_, stats_.checkwatches_resp_fast_,
-             stats_.checkwatches_resp_slow_, stats_.checkwatches_rq_bytes_, stats_.checkwatches_resp_bytes_, "checkwatches_resp");
+             stats_.checkwatches_resp_slow_, stats_.checkwatches_rq_bytes_,
+             stats_.checkwatches_resp_bytes_, "checkwatches_resp");
   initOpCode(OpCodes::RemoveWatches, stats_.removewatches_resp_, stats_.removewatches_resp_fast_,
-             stats_.removewatches_resp_slow_, stats_.removewatches_rq_bytes_, stats_.removewatches_resp_bytes_, "removewatches_resp");
+             stats_.removewatches_resp_slow_, stats_.removewatches_rq_bytes_,
+             stats_.removewatches_resp_bytes_, "removewatches_resp");
   initOpCode(OpCodes::GetEphemerals, stats_.getephemerals_resp_, stats_.getephemerals_resp_fast_,
-             stats_.getephemerals_resp_slow_, stats_.getephemerals_rq_bytes_, stats_.getephemerals_resp_bytes_, "getephemerals_resp");
+             stats_.getephemerals_resp_slow_, stats_.getephemerals_rq_bytes_,
+             stats_.getephemerals_resp_bytes_, "getephemerals_resp");
   initOpCode(OpCodes::GetAllChildrenNumber, stats_.getallchildrennumber_resp_,
-             stats_.getallchildrennumber_resp_fast_, stats_.getallchildrennumber_resp_slow_, stats_.getallchildrennumber_rq_bytes_, stats_.getallchildrennumber_resp_bytes_,
+             stats_.getallchildrennumber_resp_fast_, stats_.getallchildrennumber_resp_slow_,
+             stats_.getallchildrennumber_rq_bytes_, stats_.getallchildrennumber_resp_bytes_,
              "getallchildrennumber_resp");
-  initOpCode(OpCodes::Close, stats_.close_resp_, stats_.close_resp_fast_, stats_.close_resp_slow_, stats_.close_rq_bytes_, stats_.close_resp_bytes_,
-             "close_resp");
+  initOpCode(OpCodes::Close, stats_.close_resp_, stats_.close_resp_fast_, stats_.close_resp_slow_,
+             stats_.close_rq_bytes_, stats_.close_resp_bytes_, "close_resp");
 }
 
 ErrorBudgetResponseType
@@ -124,7 +144,8 @@ ZooKeeperFilterConfig::errorBudgetDecision(const OpCodes opcode,
 
 void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& resp_counter,
                                        Stats::Counter& resp_fast_counter,
-                                       Stats::Counter& resp_slow_counter, Stats::Counter& rq_bytes_counter,
+                                       Stats::Counter& resp_slow_counter,
+                                       Stats::Counter& rq_bytes_counter,
                                        Stats::Counter& resp_bytes_counter, absl::string_view name) {
   OpCodeInfo& opcode_info = op_code_map_[opcode];
   opcode_info.resp_counter_ = &resp_counter;

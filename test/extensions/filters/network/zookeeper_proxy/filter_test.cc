@@ -36,9 +36,9 @@ public:
       const bool enable_per_opcode_request_bytes_metrics = true,
       const bool enable_per_opcode_response_bytes_metrics = true) {
     config_ = std::make_shared<ZooKeeperFilterConfig>(
-        stat_prefix_, 1048576, enable_per_opcode_request_bytes_metrics, enable_per_opcode_response_bytes_metrics,
-        enable_latency_threshold_metrics, default_latency_threshold, latency_threshold_overrides,
-        scope_);
+        stat_prefix_, 1048576, enable_per_opcode_request_bytes_metrics,
+        enable_per_opcode_response_bytes_metrics, enable_latency_threshold_metrics,
+        default_latency_threshold, latency_threshold_overrides, scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
