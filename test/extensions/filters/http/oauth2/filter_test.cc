@@ -1782,7 +1782,7 @@ TEST_F(OAuth2Test,
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-  filter_->onGetAccessTokenSuccess("access_code2", "some-id-token2", "some-refresh-token2",
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
                                    std::chrono::seconds(600));
 }
 
