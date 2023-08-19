@@ -1672,8 +1672,8 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_v
 
     // host_ must be set, which is guaranteed (ASAN).
     Http::TestRequestHeaderMapImpl request_headers{
-        {Http::Headers::get().Host.get(), "traffic1.example.com"},
-        {Http::Headers::get().Path.get(), "/_signout1"},
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
     };
     filter_->decodeHeaders(request_headers, false);
@@ -1772,17 +1772,17 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_http
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
-         "BearerToken=access_code;version=1;path=/;Max-Age=600;secure"},
+         "BearerToken=access_code1;version=1;path=/;Max-Age=600;secure"},
         {Http::Headers::get().SetCookie.get(),
-         "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure"},
+         "IdToken=some-id-token1;version=1;path=/;Max-Age=600;secure"},
         {Http::Headers::get().SetCookie.get(),
-         "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure"},
+         "RefreshToken=some-refresh-token1;version=1;path=/;Max-Age=600;secure"},
         {Http::Headers::get().Location.get(), ""},
     };
 
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
-    filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+    filter_->onGetAccessTokenSuccess("access_code1", "some-id-token1", "some-refresh-token1",
                                      std::chrono::seconds(600));
   }
 
