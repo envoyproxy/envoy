@@ -41,6 +41,9 @@ bug_fixes:
 - area: extension_discovery_service
   change: |
     Fixed a bug causing crash if ECDS is used with upstream HTTP filters.
+- area: redis_proxy
+  change: |
+    Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
