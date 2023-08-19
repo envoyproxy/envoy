@@ -102,10 +102,9 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote --config=ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci"
           ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
             BAZEL_REMOTE_INSTANCE_BRANCH: "$(System.PullRequest.TargetBranch)"
           ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
