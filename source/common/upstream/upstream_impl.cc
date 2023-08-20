@@ -1092,6 +1092,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       http_filter_config_provider_manager_(
           Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
               server_context)),
+      network_filter_config_provider_manager_(
+          createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
@@ -1232,9 +1234,10 @@ ClusterInfoImpl::ClusterInfoImpl(
         envoy::config::cluster::v3::Filter::ConfigTypeCase::kConfigDiscovery) {
       ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
       filter_factories_.push_back(
-          network_config_provider_manager_.createDynamicFilterConfigProvider(
-              proto_config.config_discovery(), proto_config.name(), server_context, server_context,
-              factory_context.clusterManager(), is_terminal, "network", nullptr));
+          network_filter_config_provider_manager_->createDynamicFilterConfigProvider(
+              proto_config.config_discovery(), proto_config.name(),
+              server_context, server_context, factory_context.clusterManager(),
+              is_terminal, "network", nullptr));
       continue;
     }
 
@@ -1788,6 +1791,18 @@ std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::get
         thresholds.retry_budget(), min_retry_concurrency, default_retry_concurrency);
   }
   return std::make_pair(budget_percent, min_retry_concurrency);
+}
+
+SINGLETON_MANAGER_REGISTRATION(upstream_network_filter_config_provider_manager);
+
+std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+ClusterInfoImpl::createSingletonUpstreamNetworkFilterConfigProviderManager(
+    Server::Configuration::ServerFactoryContext& context) {
+  std::shared_ptr<UpstreamNetworkFilterConfigProviderManager> upstream_network_filter_config_provider_manager =
+       context.singletonManager().getTyped<UpstreamNetworkFilterConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(upstream_network_filter_config_provider_manager),
+          [] { return std::make_shared<Filter::UpstreamNetworkFilterConfigProviderManagerImpl>(); });
+  return upstream_network_filter_config_provider_manager;
 }
 
 ResourceManagerImplPtr
