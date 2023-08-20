@@ -1233,7 +1233,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, *factory_context_);
+        factory.createFilterFactoryFromProto(*message, upstream_context_);
     filter_factories_.push_back(network_config_provider_manager_.createStaticFilterConfigProvider(
         callback, proto_config.name()));
   }
