@@ -11,9 +11,9 @@ namespace Upstream {
  * Upstream Factory Context used by both Clusters and Routers to configure
  * upstream filters.
  */
-class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
+class UpstreamFactoryContextImpl : public Server::Configuration::UpstreamFactoryContext {
 public:
-  UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
+  UpstreamFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
                                  Init::Manager& init_manager, Stats::Scope& scope)
       : server_context_(context), init_manager_(init_manager), scope_(scope) {}
 

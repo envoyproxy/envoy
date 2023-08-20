@@ -1253,7 +1253,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
-    Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+    Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);

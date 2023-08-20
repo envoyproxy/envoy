@@ -557,8 +557,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "upstream_http_factory_context_lib",
-    hdrs = ["upstream_http_factory_context_impl.h"],
+    name = "upstream_factory_context_lib",
+    hdrs = ["upstream_factory_context_impl.h"],
     deps = [
         "//envoy/init:manager_interface",
         "//envoy/server:factory_context_interface",
