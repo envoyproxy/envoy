@@ -309,7 +309,7 @@ public:
 // Network upstream filter test
 class NetworkUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          Network::FilterFactoryCb, Server::Configuration::CommonFactoryContext,
+          Network::FilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
           UpstreamNetworkFilterConfigProviderManagerImpl, TestNetworkFilterFactory,
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
           Server::Configuration::MockFactoryContext> {
