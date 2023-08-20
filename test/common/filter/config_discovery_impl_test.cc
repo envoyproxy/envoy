@@ -312,7 +312,7 @@ class NetworkUpstreamFilterConfigDiscoveryImplTest
           Network::FilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
           UpstreamNetworkFilterConfigProviderManagerImpl, TestNetworkFilterFactory,
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
-          Server::Configuration::MockFactoryContext> {
+          Server::Configuration::MockUpstreamFactoryContext> {
 public:
   const std::string getFilterType() const override { return "upstream_network"; }
   const std::string getConfigReloadCounter() const override {
