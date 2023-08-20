@@ -1588,7 +1588,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
 std::string oauthHMAC;
 
 TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
-    TestScopedRuntime scoped_runtime;
+  TestScopedRuntime scoped_runtime;
   if (GetParam() == 1) {
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
@@ -1598,7 +1598,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
   } else {
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.hmac_hex_encoding_only", "true"},
-    });    
+    });
     oauthHMAC = "e132b2c4f57f17bcb2bebd17809d9b91614e73cb7820e15e9f5936f5bf383004;";
   }
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
