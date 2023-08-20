@@ -391,7 +391,7 @@ TEST_F(RedisProxyFilterTest, ImmediateResponse) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
         error->type(Common::Redis::RespType::Error);
         error->asString() = "no healthy upstream";
@@ -435,7 +435,7 @@ TEST_F(RedisProxyFilterTest, AuthWhenNotRequired) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_TRUE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
         error->type(Common::Redis::RespType::Error);
@@ -462,7 +462,7 @@ TEST_F(RedisProxyFilterTest, AuthAclWhenNotRequired) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_TRUE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
         error->type(Common::Redis::RespType::Error);
@@ -505,7 +505,7 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordCorrect) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::SimpleString);
@@ -532,7 +532,7 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordIncorrect) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);
@@ -579,7 +579,7 @@ TEST_F(RedisProxyFilterWithMultipleAuthPasswordsTest, AuthPasswordCorrect) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::SimpleString);
@@ -606,7 +606,7 @@ TEST_F(RedisProxyFilterWithMultipleAuthPasswordsTest, AuthNewPassword1Correct) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::SimpleString);
@@ -633,7 +633,7 @@ TEST_F(RedisProxyFilterWithMultipleAuthPasswordsTest, AuthNewPassword2Correct) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::SimpleString);
@@ -660,7 +660,7 @@ TEST_F(RedisProxyFilterWithMultipleAuthPasswordsTest, AuthPasswordIncorrect) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);
@@ -705,7 +705,7 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclCorrect) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::SimpleString);
@@ -732,7 +732,7 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclUsernameIncorrect) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);
@@ -759,7 +759,7 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclPasswordIncorrect) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);
@@ -808,7 +808,7 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclCorrect) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::SimpleString);
@@ -835,7 +835,7 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclCorrect1) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::SimpleString);
@@ -861,7 +861,7 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclCorrect2) {
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::SimpleString);
@@ -887,7 +887,7 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclUsernameIncorrec
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);
@@ -914,7 +914,7 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclPasswordIncorrec
   EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
       .WillOnce(Invoke([&](const Common::Redis::RespValue&,
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);

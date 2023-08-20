@@ -72,15 +72,16 @@ public:
                    prefix_routes,
                Upstreams&& upstreams, Runtime::Loader& runtime);
 
-  RouteSharedPtr upstreamPool(std::string& key, StreamInfo::StreamInfo& stream_info) override;
+  RouteSharedPtr upstreamPool(std::string& key, const StreamInfo::StreamInfo& stream_info) override;
 
   /**
    * Formats redis key based on substitution formatter expression that is defined.
    * @param key redis key to be formatted.
    * @param redis_key_formatter substitution formatter expression to format redis key.
+   * @param stream_info reference to the stream info used for formatting the key.
    */
   void formatKey(std::string& key, std::string redis_key_formatter,
-                 StreamInfo::StreamInfo& stream_info);
+                 const StreamInfo::StreamInfo& stream_info);
 
 private:
   TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;

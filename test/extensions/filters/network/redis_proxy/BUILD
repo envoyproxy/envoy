@@ -28,6 +28,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:connection_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",

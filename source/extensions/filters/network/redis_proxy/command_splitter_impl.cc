@@ -124,7 +124,7 @@ void SingleServerRequest::cancel() {
 
 SplitRequestPtr ErrorFaultRequest::create(SplitCallbacks& callbacks, CommandStats& command_stats,
                                           TimeSource& time_source, bool delay_command_latency,
-                                          StreamInfo::StreamInfo&) {
+                                          const StreamInfo::StreamInfo&) {
   std::unique_ptr<ErrorFaultRequest> request_ptr{
       new ErrorFaultRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
@@ -136,7 +136,7 @@ SplitRequestPtr ErrorFaultRequest::create(SplitCallbacks& callbacks, CommandStat
 std::unique_ptr<DelayFaultRequest>
 DelayFaultRequest::create(SplitCallbacks& callbacks, CommandStats& command_stats,
                           TimeSource& time_source, Event::Dispatcher& dispatcher,
-                          std::chrono::milliseconds delay, StreamInfo::StreamInfo&) {
+                          std::chrono::milliseconds delay, const StreamInfo::StreamInfo&) {
   return std::make_unique<DelayFaultRequest>(callbacks, command_stats, time_source, dispatcher,
                                              delay);
 }
@@ -158,7 +158,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
                                       Common::Redis::RespValuePtr&& incoming_request,
                                       SplitCallbacks& callbacks, CommandStats& command_stats,
                                       TimeSource& time_source, bool delay_command_latency,
-                                      StreamInfo::StreamInfo& stream_info) {
+                                      const StreamInfo::StreamInfo& stream_info) {
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source, delay_command_latency)};
   const auto route = router.upstreamPool(incoming_request->asArray()[1].asString(), stream_info);
@@ -183,7 +183,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
 SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool delay_command_latency,
-                                    StreamInfo::StreamInfo& stream_info) {
+                                    const StreamInfo::StreamInfo& stream_info) {
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
   // Ensure there are at least three args to the command or it cannot be hashed.
   if (incoming_request->asArray().size() < 4) {
@@ -236,7 +236,7 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
 SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool delay_command_latency,
-                                    StreamInfo::StreamInfo& stream_info) {
+                                    const StreamInfo::StreamInfo& stream_info) {
   std::unique_ptr<MGETRequest> request_ptr{
       new MGETRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
@@ -312,7 +312,7 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool delay_command_latency,
-                                    StreamInfo::StreamInfo& stream_info) {
+                                    const StreamInfo::StreamInfo& stream_info) {
   if ((incoming_request->asArray().size() - 1) % 2 != 0) {
     onWrongNumberOfArguments(callbacks, *incoming_request);
     command_stats.error_.inc();
@@ -389,7 +389,7 @@ SplitRequestPtr
 SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                   SplitCallbacks& callbacks, CommandStats& command_stats,
                                   TimeSource& time_source, bool delay_command_latency,
-                                  StreamInfo::StreamInfo& stream_info) {
+                                  const StreamInfo::StreamInfo& stream_info) {
   std::unique_ptr<SplitKeysSumResultRequest> request_ptr{
       new SplitKeysSumResultRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
@@ -459,7 +459,7 @@ SplitRequestPtr TransactionRequest::create(Router& router,
                                            Common::Redis::RespValuePtr&& incoming_request,
                                            SplitCallbacks& callbacks, CommandStats& command_stats,
                                            TimeSource& time_source, bool delay_command_latency,
-                                           StreamInfo::StreamInfo& stream_info) {
+                                           const StreamInfo::StreamInfo& stream_info) {
   Common::Redis::Client::Transaction& transaction = callbacks.transaction();
   std::string command_name = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
 
@@ -586,7 +586,7 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
                                           SplitCallbacks& callbacks, Event::Dispatcher& dispatcher,
-                                          StreamInfo::StreamInfo& stream_info) {
+                                          const StreamInfo::StreamInfo& stream_info) {
   if ((request->type() != Common::Redis::RespType::Array) || request->asArray().empty()) {
     onInvalidRequest(callbacks);
     return nullptr;

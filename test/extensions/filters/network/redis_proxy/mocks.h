@@ -29,7 +29,7 @@ public:
   ~MockRouter() override;
 
   MOCK_METHOD(RouteSharedPtr, upstreamPool,
-              (std::string & key, StreamInfo::StreamInfo& stream_info));
+              (std::string & key, const StreamInfo::StreamInfo& stream_info));
   MOCK_METHOD(void, initializeReadFilterCallbacks, (Network::ReadFilterCallbacks * callbacks));
   RouteSharedPtr route_;
 };
@@ -131,12 +131,12 @@ public:
 
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                               Event::Dispatcher& dispatcher,
-                              StreamInfo::StreamInfo& stream_info) override {
+                              const StreamInfo::StreamInfo& stream_info) override {
     return SplitRequestPtr{makeRequest_(*request, callbacks, dispatcher, stream_info)};
   }
   MOCK_METHOD(SplitRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
-               Event::Dispatcher& dispatcher, StreamInfo::StreamInfo& stream_info));
+               Event::Dispatcher& dispatcher, const StreamInfo::StreamInfo& stream_info));
 };
 
 } // namespace CommandSplitter

@@ -64,9 +64,11 @@ public:
    * Returns a connection pool that matches a given route. When no match is found, the catch all
    * pool is used. When remove prefix is set to true, the prefix will be removed from the key.
    * @param key mutable reference to the key of the current command.
+   * @param stream_info reference to the stream info used for formatting the key.
    * @return a handle to the connection pool.
    */
-  virtual RouteSharedPtr upstreamPool(std::string& key, StreamInfo::StreamInfo& stream_info) PURE;
+  virtual RouteSharedPtr upstreamPool(std::string& key,
+                                      const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using RouterPtr = std::unique_ptr<Router>;

@@ -78,7 +78,8 @@ PrefixRoutes::PrefixRoutes(
   }
 }
 
-RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key, StreamInfo::StreamInfo& stream_info) {
+RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key,
+                                          const StreamInfo::StreamInfo& stream_info) {
   PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy = absl::AsciiStrToLower(key);
@@ -102,7 +103,7 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key, StreamInfo::StreamIn
 }
 
 void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter,
-                             StreamInfo::StreamInfo& stream_info) {
+                             const StreamInfo::StreamInfo& stream_info) {
   // If key_formatter defines %KEY% command, then do a direct string replacement.
   // TODO(deveshkandpal24121990) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter
   if (redis_key_formatter.find(redis_key_formatter_command_) != std::string::npos) {
