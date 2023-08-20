@@ -211,9 +211,6 @@ void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogra
   ASSERT(totals.size() == min_size);
   ASSERT(intervals.size() == min_size);
   for (uint32_t i = 0; i < min_size; ++i) {
-    /*if (i != 0) {
-      array.newEntry();
-      }*/
     json_streamer_.mapEntries({{"cumulative", Json::Streamer::number(totals[i])},
                                {"interval", Json::Streamer::number(intervals[i])}});
   }
