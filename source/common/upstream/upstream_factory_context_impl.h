@@ -14,7 +14,7 @@ namespace Upstream {
 class UpstreamFactoryContextImpl : public Server::Configuration::UpstreamFactoryContext {
 public:
   UpstreamFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
-                                 Init::Manager& init_manager, Stats::Scope& scope)
+                             Init::Manager& init_manager, Stats::Scope& scope)
       : server_context_(context), init_manager_(init_manager), scope_(scope) {}
 
   Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
