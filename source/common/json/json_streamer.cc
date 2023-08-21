@@ -24,36 +24,25 @@ void Streamer::Level::close() {
     ASSERT(streamer_.topLevel() == this);
     is_closed_ = true;
     streamer_.addNoCopy(closer_);
-    // streamer_.pop(*this);
     streamer_.pop(this);
   }
 }
 
 Streamer::MapPtr Streamer::makeRootMap() {
   ASSERT(levels_.empty());
-  auto ret = std::make_unique<Map>(*this);
-  // levels_.push(ret.get());
-  return ret;
+  return std::make_unique<Map>(*this);
 }
 
 Streamer::MapPtr Streamer::Level::newMap() {
   ASSERT(streamer_.topLevel() == this);
-  // auto map =
   newEntry();
   return std::make_unique<Map>(streamer_);
-  // Map& ret = *map;
-  // levels_.push(std::move(map));
-  // return ret;
 }
 
 Streamer::ArrayPtr Streamer::Level::newArray() {
   ASSERT(streamer_.topLevel() == this);
-  // auto map =
   newEntry();
   return std::make_unique<Array>(streamer_);
-  // Map& ret = *map;
-  // levels_.push(std::move(map));
-  // return ret;
 }
 
 void Streamer::Map::addSanitized(absl::string_view value) {
