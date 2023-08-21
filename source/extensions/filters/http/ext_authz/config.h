@@ -14,24 +14,27 @@ namespace ExtAuthz {
 /**
  * Config registration for the external authorization filter. @see NamedHttpFilterConfigFactory.
  */
-class ExtAuthzFilterConfig
-    : public Common::FactoryBase<
+class ExtAuthzFilterFactory
+    : public Common::DualFactoryBase<
           envoy::extensions::filters::http::ext_authz::v3::ExtAuthz,
           envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute> {
 public:
-  ExtAuthzFilterConfig() : FactoryBase("envoy.filters.http.ext_authz") {}
+  ExtAuthzFilterFactory() : DualFactoryBase("envoy.filters.http.ext_authz") {}
 
 private:
   static constexpr uint64_t DefaultTimeout = 200;
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, DualInfo dual_info,
+      Server::Configuration::ServerFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };
+
+using UpstreamExtAuthzFilterFactory = ExtAuthzFilterFactory;
 
 } // namespace ExtAuthz
 } // namespace HttpFilters

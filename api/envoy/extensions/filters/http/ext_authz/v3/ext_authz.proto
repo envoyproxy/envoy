@@ -78,6 +78,7 @@ message ExtAuthz {
   // 3. At least one ``authorization response header`` is added to the client request, or is used for
   // altering another client request header.
   //
+  // 4. The filter is not being used as an upstream filter.
   bool clear_route_cache = 6;
 
   // Sets the HTTP status that is returned to the client when the authorization server returns an error
