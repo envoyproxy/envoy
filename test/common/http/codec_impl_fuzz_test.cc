@@ -111,17 +111,9 @@ public:
   // buffer level.
   enum class StreamState : int { PendingHeaders, PendingDataOrTrailers, Closed };
   static absl::string_view streamStateToString(StreamState state) {
-    switch (state) {
-    case StreamState::PendingHeaders:
-      static std::string pending_headers = "PendingHeaders";
-      return pending_headers;
-    case StreamState::PendingDataOrTrailers:
-      static std::string pending_data_or_trailers = "PendingDataOrTrailers";
-      return pending_data_or_trailers;
-    case StreamState::Closed:
-      static std::string closed = "Closed";
-      return closed;
-    }
+    static std::array<std::string, 3> stream_state_strings = {"PendingHeaders",
+                                                              "PendingDataOrTrailers", "Closed"};
+    return stream_state_strings[static_cast<int>(state)];
   }
 
   struct DirectionalState {
