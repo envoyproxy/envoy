@@ -2,9 +2,6 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: tracing
-  change: |
-    OpenTracing is now deprecated since the upstream project has been abandoned.
 
 - area: eds
   change: |
@@ -86,5 +83,12 @@ new_features:
     added :ref:`json_format_options <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format_options>` config option to
     support JSON output formatting and the :ref:`sort_properties <envoy_v3_api_field_config.core.v3.JsonFormatOptions.sort_properties>`
     option to print the JSON output with sorted properties.
+- area: tap
+  change: |
+    added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
+    out to a custom sink extension.
 
 deprecated:
+- area: tracing
+  change: |
+    OpenTracing is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
