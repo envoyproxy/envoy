@@ -70,6 +70,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "schedulable_cb_interface",
     hdrs = ["schedulable_cb.h"],
+    deps = ["//envoy/common:pure_lib"],
 )
 
 envoy_cc_library(
