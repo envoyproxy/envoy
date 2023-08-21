@@ -256,7 +256,6 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   updateReadBufferStats(0, 0);
   updateWriteBufferStats(0, 0);
 
-
   // As the socket closes, drain any remaining data.
   // The data won't be written out at this point, and where there are reference
   // counted buffer fragments, it helps avoid lifetime issues with the
