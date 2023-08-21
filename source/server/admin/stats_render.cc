@@ -100,7 +100,7 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
     : histogram_buckets_mode_(params.histogram_buckets_mode_), json_streamer_(response),
-      json_stats_map_(std::make_unique<Json::Streamer::Map>(json_streamer_)), response_(response) {
+      json_stats_map_(json_streamer_.makeRootMap()), response_(response) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   // We don't create a JSON data model for the stats output, as that makes
   // streaming difficult. Instead we emit the preamble in the constructor here,
@@ -314,7 +314,7 @@ void StatsJsonRender::populateBucketsVerbose(
 // Since histograms are buffered (see above), the finalize() method generates
 // all of them.
 void StatsJsonRender::finalize(Buffer::Instance& response) {
-  stats_value_context_.reset();
+  // stats_value_context_.reset();
 
   /*  json_histogram_array_.reset();
   json_histogram_map2_.reset();

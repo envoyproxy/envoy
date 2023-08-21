@@ -21,6 +21,7 @@ Streamer::Level::~Level() {
 
 void Streamer::Level::close() {
   if (!is_closed_) {
+    ASSERT(streamer_.topLevel() == this);
     is_closed_ = true;
     streamer_.addNoCopy(closer_);
     // streamer_.pop(*this);
@@ -28,7 +29,15 @@ void Streamer::Level::close() {
   }
 }
 
+Streamer::MapPtr Streamer::makeRootMap() {
+  ASSERT(levels_.empty());
+  auto ret = std::make_unique<Map>(*this);
+  // levels_.push(ret.get());
+  return ret;
+}
+
 Streamer::MapPtr Streamer::Level::newMap() {
+  ASSERT(streamer_.topLevel() == this);
   // auto map =
   newEntry();
   return std::make_unique<Map>(streamer_);
@@ -38,12 +47,18 @@ Streamer::MapPtr Streamer::Level::newMap() {
 }
 
 Streamer::ArrayPtr Streamer::Level::newArray() {
+  ASSERT(streamer_.topLevel() == this);
   // auto map =
   newEntry();
   return std::make_unique<Array>(streamer_);
   // Map& ret = *map;
   // levels_.push(std::move(map));
   // return ret;
+}
+
+void Streamer::Map::Value::addSanitized(absl::string_view value) {
+  ASSERT(map_.streamer_.topLevel() == &map_);
+  map_.streamer_.addSanitized(value);
 }
 
 /*void Streamer::Map::entries(const Map::Entries& entries) {
@@ -102,11 +117,33 @@ void Streamer::Map::newEntry() {
 }
 
 Streamer::Map::ValuePtr Streamer::Map::newKey(absl::string_view name) {
+  ASSERT(!value_);
   newEntry();
   streamer_.addFragments({"\"", name, "\":"});
   ASSERT(!expecting_value_);
   expecting_value_ = true;
-  return std::make_unique<Value>(*this);
+  auto ret = std::make_unique<Value>(*this);
+  value_ = *ret;
+  return ret;
+}
+
+Streamer::Map::Value::Value(Map& map) : map_(map) { ASSERT(map_.streamer_.topLevel() == &map); }
+
+Streamer::Map::Value::~Value() {
+  if (managed_) {
+    map_.clearValue();
+  }
+}
+
+Streamer::Map::~Map() {
+  if (value_.has_value()) {
+    value_->close();
+  }
+}
+
+void Streamer::Map::Value::close() {
+  map_.expecting_value_ = false;
+  managed_ = false;
 }
 
 /*void Streamer::Map::newSanitizedValue(absl::string_view value) {

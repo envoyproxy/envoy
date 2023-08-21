@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -48,21 +49,28 @@ public:
     using Entries = absl::Span<const NameValue>;
 
     struct Value {
-      Value(Map& map) : map_(map) {}
-      ~Value() { map_.expecting_value_ = false; }
-      void addSanitized(absl::string_view value) { map_.streamer_.addSanitized(value); }
+      explicit Value(Map& map);
+      ~Value();
+      void close();
+      void addSanitized(absl::string_view value);
       Map& map_;
+      bool managed_{true};
     };
     using ValuePtr = std::unique_ptr<Value>;
 
     Map(Streamer& streamer) : Level(streamer, "{", "}") {}
+    ~Map() override;
     ValuePtr newKey(absl::string_view name);
     void newEntries(const Entries& entries);
     virtual void newEntry() override;
     void newSanitizedValue(absl::string_view value);
-    // void endValue();
+    void clearValue() {
+      value_.reset();
+      expecting_value_ = false;
+    }
 
     bool expecting_value_{false};
+    OptRef<Value> value_;
   };
 
   struct Array : public Level {
@@ -82,6 +90,7 @@ public:
   static std::string quote(absl::string_view str);
 
   void clear();
+  MapPtr makeRootMap();
 
 private:
   friend Level;
