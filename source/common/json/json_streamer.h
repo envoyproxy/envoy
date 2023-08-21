@@ -15,7 +15,7 @@ namespace Json {
 
 class Streamer {
 public:
-  Streamer(Buffer::Instance& response) : response_(response) {}
+  explicit Streamer(Buffer::Instance& response) : response_(response) {}
 
   struct Array;
   using ArrayPtr = std::unique_ptr<Array>;
@@ -48,29 +48,30 @@ public:
     using NameValue = std::pair<const absl::string_view, const absl::string_view>;
     using Entries = absl::Span<const NameValue>;
 
-    struct Value {
-      explicit Value(Map& map);
-      ~Value();
+    struct DeferredValue {
+      explicit DeferredValue(Map& map);
+      ~DeferredValue();
       void close();
-      void addSanitized(absl::string_view value);
       Map& map_;
       bool managed_{true};
     };
-    using ValuePtr = std::unique_ptr<Value>;
+    using DeferredValuePtr = std::unique_ptr<DeferredValue>;
 
     Map(Streamer& streamer) : Level(streamer, "{", "}") {}
     ~Map() override;
-    ValuePtr newKey(absl::string_view name);
+    void newKey(absl::string_view name, std::function<void()>);
+    DeferredValuePtr deferValue();
     void newEntries(const Entries& entries);
     virtual void newEntry() override;
     void newSanitizedValue(absl::string_view value);
-    void clearValue() {
-      value_.reset();
+    void clearDeferredValue() {
+      deferred_value_.reset();
       expecting_value_ = false;
     }
+    void addSanitized(absl::string_view value);
 
     bool expecting_value_{false};
-    OptRef<Value> value_;
+    OptRef<DeferredValue> deferred_value_;
   };
 
   struct Array : public Level {

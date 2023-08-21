@@ -56,9 +56,11 @@ Streamer::ArrayPtr Streamer::Level::newArray() {
   // return ret;
 }
 
-void Streamer::Map::Value::addSanitized(absl::string_view value) {
-  ASSERT(map_.streamer_.topLevel() == &map_);
-  map_.streamer_.addSanitized(value);
+void Streamer::Map::addSanitized(absl::string_view value) {
+  ASSERT(streamer_.topLevel() == this);
+  ASSERT(expecting_value_);
+  streamer_.addSanitized(value);
+  expecting_value_ = false;
 }
 
 /*void Streamer::Map::entries(const Map::Entries& entries) {
@@ -116,32 +118,38 @@ void Streamer::Map::newEntry() {
   }
 }
 
-Streamer::Map::ValuePtr Streamer::Map::newKey(absl::string_view name) {
-  ASSERT(!value_);
+void Streamer::Map::newKey(absl::string_view name, std::function<void()> emit_value) {
+  ASSERT(!deferred_value_);
   newEntry();
   streamer_.addFragments({"\"", name, "\":"});
   ASSERT(!expecting_value_);
   expecting_value_ = true;
-  auto ret = std::make_unique<Value>(*this);
-  value_ = *ret;
+  emit_value();
+}
+
+Streamer::Map::DeferredValuePtr Streamer::Map::deferValue() {
+  auto ret = std::make_unique<DeferredValue>(*this);
+  deferred_value_ = *ret;
   return ret;
 }
 
-Streamer::Map::Value::Value(Map& map) : map_(map) { ASSERT(map_.streamer_.topLevel() == &map); }
+Streamer::Map::DeferredValue::DeferredValue(Map& map) : map_(map) {
+  ASSERT(map_.streamer_.topLevel() == &map);
+}
 
-Streamer::Map::Value::~Value() {
+Streamer::Map::DeferredValue::~DeferredValue() {
   if (managed_) {
-    map_.clearValue();
+    map_.clearDeferredValue();
   }
 }
 
 Streamer::Map::~Map() {
-  if (value_.has_value()) {
-    value_->close();
+  if (deferred_value_.has_value()) {
+    deferred_value_->close();
   }
 }
 
-void Streamer::Map::Value::close() {
+void Streamer::Map::DeferredValue::close() {
   map_.expecting_value_ = false;
   managed_ = false;
 }
