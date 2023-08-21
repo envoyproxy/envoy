@@ -2938,11 +2938,11 @@ filter_chains:
 
 TEST_P(ListenerManagerImplTest, NotSupportedDatagramUds) {
   ProdListenerComponentFactory real_listener_factory(server_);
-  ListenerImpl* null_listener = nullptr;
+  Network::MockListenerConfig listener;
   EXPECT_THROW_WITH_MESSAGE(
       real_listener_factory.createListenSocket(
           std::make_shared<Network::Address::PipeInstance>("/foo"), Network::Socket::Type::Datagram,
-          nullptr, default_bind_type, {}, 0, *null_listener),
+          nullptr, default_bind_type, {}, 0, listener),
       EnvoyException, "socket type SocketType::Datagram not supported for pipes");
 }
 
