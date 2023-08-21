@@ -82,6 +82,10 @@ new_features:
   change: |
     added :ref:`allow_redundant_keys <envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.allow_redundant_keys>`
     to suppport redundant keys in request metadata for subset load balancing.
+- area: tap
+  change: |
+    added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
+    out to a custom sink extension.
 
 deprecated:
 - area: tracing
