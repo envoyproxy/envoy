@@ -74,8 +74,9 @@ private:
   // completion of its work.
   std::unique_ptr<CacheInsertQueue> self_ownership_;
   // The queue needs to keep a copy of the cache alive; if only the filter
-  // keeps the cache alive then it's possible for the filter to be deleted while
-  // a cache action is still in flight.
+  // keeps the cache alive then it's possible for the filter config to be deleted
+  // while a cache action is still in flight, which can cause the cache to be
+  // deleted prematurely.
   std::shared_ptr<HttpCache> cache_;
 };
 
