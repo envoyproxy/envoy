@@ -81,12 +81,6 @@ public:
     virtual void newEntry() override;
   };
 
-  // void mapEntries(const Map::Entries& entries);
-  // void arrayEntries(const Array::Strings& strings);
-
-  // void pop(Level& level);
-  // void clear();
-
   static std::string number(double d);
   static std::string quote(absl::string_view str);
 

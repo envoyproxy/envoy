@@ -63,42 +63,12 @@ void Streamer::Map::addSanitized(absl::string_view value) {
   expecting_value_ = false;
 }
 
-/*void Streamer::Map::entries(const Map::Entries& entries) {
-  if (!levels_.empty()) {
-    levels_.top()->newEntry();
-  }
-  std::make_unique<Map>(*this)->newEntries(entries);
-  }*/
-
-/*void Streamer::arrayEntries(const Array::Strings& strings) {
-  if (!levels_.empty()) {
-    levels_.top()->newEntry();
-  }
-  std::make_unique<Array>(*this)->newEntries(strings);
-  }*/
-
-/*Streamer::ArrayPtr Streamer::newArray() {
-  //auto array =
-  return std::make_unique<Array>(*this);
-  //Array& ret = *array;
-  //levels_.push(std::move(array));
-  //return ret;
-  }
-*/
-
 void Streamer::pop(Level* level) {
   ASSERT(levels_.top() == level);
   levels_.pop();
 }
 
 void Streamer::push(Level* level) { levels_.push(level); }
-
-/*void Streamer::clear() {
-  while (!levels_.empty()) {
-    levels_.pop();
-  }
-  flush();
-  }*/
 
 void Streamer::Array::newEntry() {
   if (is_first_) {
@@ -153,14 +123,6 @@ void Streamer::Map::DeferredValue::close() {
   map_.expecting_value_ = false;
   managed_ = false;
 }
-
-/*void Streamer::Map::newSanitizedValue(absl::string_view value) {
-  ASSERT(expecting_value_);
-  streamer_.addSanitized(value);
-  expecting_value_ = false;
-  }*/
-
-// void Streamer::Map::endValue() { expecting_value_ = false; }
 
 void Streamer::Map::newEntries(const Entries& entries) {
   for (const NameValue& entry : entries) {
