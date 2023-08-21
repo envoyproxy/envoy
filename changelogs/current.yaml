@@ -65,7 +65,6 @@ new_features:
     config API to ignore the
     :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
     message from the external processing server.
-
 - area: http
   change: |
     added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
@@ -82,6 +81,10 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: otlp_stats_sink
+  change: |
+    added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
+    to OTLP stats sink that enables adding a static prefix to all stats flushed by this sink.
 
 deprecated:
 - area: tracing
