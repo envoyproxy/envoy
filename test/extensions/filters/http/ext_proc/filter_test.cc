@@ -101,7 +101,7 @@ protected:
     EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(dynamic_metadata_));
     EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
         .Times(AnyNumber())
-        .WillOnce(Invoke(this, &HttpFilterTest::doSetDynamicMetadata));
+        .WillRepeatedly(Invoke(this, &HttpFilterTest::doSetDynamicMetadata));
 
     // Pointing dispatcher_.time_system_ to a SimulatedTimeSystem object.
     test_time_ = new Envoy::Event::SimulatedTimeSystem();
@@ -3004,6 +3004,58 @@ TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
   EXPECT_EQ(1, config_->stats().rejected_header_mutations_.value());
 }
 
+// Verify that the filter sets the processing request with dynamic metadata.
+TEST_F(HttpFilterTest, SendDynamicMetadata) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    forwarding_namespaces:
+      untyped:
+      - test_untyped_metadata_namespace
+      typed:
+      - test_typed_metadata_namespace
+
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  Envoy::ProtobufWkt::Struct expected_untyped_metadata;
+  (*expected_untyped_metadata.mutable_fields())["scooby"].set_string_value("doo");
+  doSetDynamicMetadata("test_untyped_metadata_namespace", expected_untyped_metadata);
+
+  Envoy::ProtobufWkt::Any expected_typed_metadata;
+  Envoy::ProtobufWkt::Struct scrappy_doo;
+  (*scrappy_doo.mutable_fields())["scrappy"].set_string_value("doo");
+  (*scrappy_doo.mutable_fields())["@type"].set_string_value("type.googleapis.com/scrappydoo");
+  expected_typed_metadata.PackFrom(scrappy_doo);
+  (*dynamic_metadata_.mutable_typed_filter_metadata())["test_typed_metadata_namespace"] =
+      expected_typed_metadata;
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  // ensure the metadata that is attached to the processing request is identical to
+  // the metadata we specified above
+  EXPECT_EQ(last_request_.metadata_context().DebugString(), dynamic_metadata_.DebugString());
+
+  processResponseHeaders(false, absl::nullopt);
+
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  filter_->onDestroy();
+}
+
 // Verify that when returning an response with dynamic_metadata field set, the filter emits
 // dynamic metadata.
 TEST_F(HttpFilterTest, EmitDynamicMetadata) {
@@ -3041,12 +3093,110 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   envoy::config::core::v3::Metadata expected_metadata;
   const std::string yaml = R"EOF(
   filter_metadata:
-    envoy.filters.http.ext_proc.encoder:
+    envoy.filters.http.ext_proc:
       foo: bar
   )EOF";
 
   TestUtility::loadFromYaml(yaml, expected_metadata);
   EXPECT_EQ(dynamic_metadata_.DebugString(), expected_metadata.DebugString());
+
+  filter_->onDestroy();
+}
+
+// Verify that when returning an response with dynamic_metadata field set, the filter emits
+// dynamic metadata with appropriately bifurcated namespaces.
+TEST_F(HttpFilterTest, EmitBifurcatedDynamicMetadata) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    bifurcate_returned_metadata_namespace: true
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
+    (*metadata_mut)["request_foo"].set_string_value("request_bar");
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
+    (*metadata_mut)["response_foo"].set_string_value("response_bar");
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  envoy::config::core::v3::Metadata expected_metadata;
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    envoy.filters.http.ext_proc.decoder:
+      request_foo: request_bar
+    envoy.filters.http.ext_proc.encoder:
+      response_foo: response_bar
+  )EOF";
+
+  TestUtility::loadFromYaml(yaml, expected_metadata);
+  EXPECT_EQ(dynamic_metadata_.DebugString(), expected_metadata.DebugString());
+
+  filter_->onDestroy();
+}
+
+// Verify that when returning an response with dynamic_metadata field set, the filter emits
+// dynamic metadata with appropriately bifurcated namespaces.
+TEST_F(HttpFilterTest, DisableEmitDynamicMetadata) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    disable_returned_metadata: true
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
+    (*metadata_mut)["request_foo"].set_string_value("request_bar");
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
+    (*metadata_mut)["response_foo"].set_string_value("response_bar");
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(dynamic_metadata_.DebugString(), "");
 
   filter_->onDestroy();
 }
