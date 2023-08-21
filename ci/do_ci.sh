@@ -41,12 +41,14 @@ else
 fi
 
 function collect_build_profile() {
-  declare -g build_profile_count=${build_profile_count:-1}
-  mv -f \
-     "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)/command.profile.gz" \
-     "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
-      || :
-  ((build_profile_count++))
+    local output_base
+    declare -g build_profile_count=${build_profile_count:-1}
+    output_base="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+    mv -f \
+       "${output_base}/command.profile.gz" \
+       "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
+        || :
+    ((build_profile_count++))
 }
 
 function bazel_with_collection() {
@@ -416,9 +418,8 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
             export FUZZ_COVERAGE=true
         fi
-        # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-        BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" \
-            "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
+        export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
+        "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
         ;;
@@ -580,9 +581,12 @@ case $CI_TARGET in
                   "${FETCH_TARGETS[@]}" \
                 && break
             n=$((n+1))
-            if [[ "$n" -ne 10 ]]; then
+            if [[ "$n" -lt 10 ]]; then
                 sleep 15
                 echo "Retrying fetch ..."
+            else
+                echo "Fetch failed"
+                exit 1
             fi
         done
         ;;

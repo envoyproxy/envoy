@@ -159,10 +159,6 @@ public:
   void handleOnMissing() override;
 
 private:
-  static TransportPtr createTransport(TransportType transport) {
-    return NamedTransportConfigFactory::getFactory(transport).createTransport();
-  }
-
   static ProtocolPtr createProtocol(ProtocolType protocol) {
     return NamedProtocolConfigFactory::getFactory(protocol).createProtocol();
   }

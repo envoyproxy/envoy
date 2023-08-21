@@ -374,6 +374,7 @@ class PerConnectionCluster : public StreamInfo::FilterState::Object {
 public:
   PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
+  absl::optional<std::string> serializeAsString() const override { return cluster_; }
   static const std::string& key();
 
 private:
