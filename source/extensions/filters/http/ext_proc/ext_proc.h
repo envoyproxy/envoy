@@ -124,10 +124,6 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
-/* const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>& */
-/* initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers, */
-/*                 Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder); */
-
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
@@ -147,8 +143,6 @@ public:
         disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
         builder_(builder), request_expr_(initExpressions(config.request_attributes())),
         response_expr_(initExpressions(config.response_attributes())),
-        /* request_expr_(initExpressions(config.request_attributes(), builder)), */
-        /* response_expr_(initExpressions(config.response_attributes(), builder)), */
         untyped_metadata_namespaces_(
             config.metadata_options().forwarding_namespaces().untyped().begin(),
             config.metadata_options().forwarding_namespaces().untyped().end()),
@@ -382,7 +376,7 @@ private:
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
   void setDecoderDynamicMetadata(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
-  void addDynamicMetadata(envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void addDynamicMetadata(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;

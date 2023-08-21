@@ -129,22 +129,6 @@ FilterConfig::initExpressions(const Protobuf::RepeatedPtrField<std::string>& mat
   }
   return expressions;
 }
-/* const absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr>& */
-/* initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers, */
-/*                 Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder) { */
-/*   absl::flat_hash_map<std::string, Extensions::Filters::Common::Expr::ExpressionPtr> expressions;
- */
-/*   for (const auto& matcher : matchers) { */
-/*     auto parse_status = google::api::expr::parser::Parse(matcher); */
-/*     if (!parse_status.ok()) { */
-/*       throw EnvoyException("Unable to parse descriptor expression: " + */
-/*                            parse_status.status().ToString()); */
-/*     } */
-/*     expressions.emplace(matcher, Extensions::Filters::Common::Expr::createExpression( */
-/*                                      builder->builder(), parse_status.value().expr())); */
-/*   } */
-/*   return std::move(expressions); */
-/* } */
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()) {
@@ -282,7 +266,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
-  addDynamicMetadata(req);
+  addDynamicMetadata(state, req);
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
@@ -669,7 +653,7 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
   ProcessingRequest req;
-  addDynamicMetadata(req);
+  addDynamicMetadata(state, req);
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
@@ -679,7 +663,7 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
-  addDynamicMetadata(req);
+  addDynamicMetadata(state, req);
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
@@ -733,66 +717,49 @@ void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout)
   stats_.override_message_timeout_received_.inc();
 }
 
-void Filter::addDynamicMetadata(ProcessingRequest& req) {
-  envoy::config::core::v3::Metadata metadata_context;
+void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
+  // get the callbacks from the ProcessorState. This will be the appropriate
+  // callbacks for the current state of the filter
+  auto* cb = state.callbacks();
+  envoy::config::core::v3::Metadata forwarding_metadata;
 
   // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_proc
   // service. If metadata key is set in both the connection and request metadata then the value
-  // will be the request metadata value. If metadata key is set in both the encoder and decoder
-  // streams, then the value will be the encoder value
-  const auto& connection_decoder_metadata =
-      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
-  const auto& request_decoder_metadata =
-      decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-  const auto& connection_encoder_metadata =
-      encoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
-  const auto& request_encoder_metadata =
-      encoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  // will be the request metadata value. The metadata will only be searched for the callbacks
+  // corresponding to the traffic direction at the time of the external processing request.
+  const auto& connection_metadata =
+      cb->connection()->streamInfo().dynamicMetadata().filter_metadata();
+  const auto& request_metadata =
+      cb->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
-    if (const auto metadata_it = request_decoder_metadata.find(context_key);
-        metadata_it != request_decoder_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = request_encoder_metadata.find(context_key);
-               metadata_it != request_encoder_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = connection_decoder_metadata.find(context_key);
-               metadata_it != connection_decoder_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = connection_encoder_metadata.find(context_key);
-               metadata_it != connection_encoder_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    if (const auto metadata_it = request_metadata.find(context_key);
+        metadata_it != request_metadata.end()) {
+      (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_metadata.find(context_key);
+               metadata_it != connection_metadata.end()) {
+      (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
 
   // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
   // ext_proc service. If metadata key is set in both the connection and request metadata then
-  // the value will be the request metadata value. If metadata key is set in both the encoder and
-  // decoder streams, then the value will be the encoder value
-  const auto& connection_decoder_typed_metadata =
-      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
-  const auto& request_decoder_typed_metadata =
-      decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
-  const auto& connection_encoder_typed_metadata =
-      encoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
-  const auto& request_encoder_typed_metadata =
-      encoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  // the value will be the request metadata value. The metadata will only be searched for the callbacks
+  // corresponding to the traffic direction at the time of the external processing request.
+  const auto& connection_typed_metadata =
+      cb->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
+  const auto& request_typed_metadata =
+      cb->streamInfo().dynamicMetadata().typed_filter_metadata();
   for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
-    if (const auto metadata_it = request_decoder_typed_metadata.find(context_key);
-        metadata_it != request_decoder_typed_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = request_encoder_typed_metadata.find(context_key);
-               metadata_it != request_encoder_typed_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = connection_decoder_typed_metadata.find(context_key);
-               metadata_it != connection_decoder_typed_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = connection_encoder_typed_metadata.find(context_key);
-               metadata_it != connection_encoder_typed_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    if (const auto metadata_it = request_typed_metadata.find(context_key);
+        metadata_it != request_typed_metadata.end()) {
+      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (const auto metadata_it = connection_typed_metadata.find(context_key);
+               metadata_it != connection_typed_metadata.end()) {
+      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
 
-  *req.mutable_metadata_context() = metadata_context;
+  *req.mutable_metadata_context() = forwarding_metadata;
 }
 
 void setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
