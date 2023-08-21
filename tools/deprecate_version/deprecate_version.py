@@ -65,6 +65,7 @@ def create_issues(access_token, runtime_and_pr):
     issues = []
     for runtime_guard, pr, commit in runtime_and_pr:
         # Who is the author?
+        login = None
         if pr:
             # Extract PR title, number, and author.
             number = ('#%d') % pr
@@ -72,7 +73,7 @@ def create_issues(access_token, runtime_and_pr):
                 pr_info = repo.get_pull(pr)
                 change_title = pr_info.title
                 login = pr_info.user.login
-            except:
+            except github.GithubException:
                 print("Failed to fetch info for %s, trying backup method", number)
 
         if not login:
