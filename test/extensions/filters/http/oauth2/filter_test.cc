@@ -150,7 +150,8 @@ public:
   void expectValidCookies(const CookieNames& cookie_names) {
     // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
     test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-    // Generate a 5000-character long token for testing one of refresh_token, access_token or id_token.
+    // Generate a 5000-character long token for testing one of refresh_token, access_token or
+    // id_token.
     std::string long_token(5000, 'x');
 
     const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
@@ -167,9 +168,9 @@ public:
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.refresh_token_, "_0=", long_token.substr(0, 4000))},
         {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.refresh_token_, "_1=", long_token.substr(4000, 5000), ";version=test")},
-        {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.refresh_token_, "_count=2")},
+         absl::StrCat(cookie_names.refresh_token_, "_1=", long_token.substr(4000, 5000),
+                      ";version=test")},
+        {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.refresh_token_, "_count=2")},
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.oauth_hmac_, "="
                                                 "ZGI4NTEyNzAzNTI2NmVlZTM0Y2E0MGIxYjYzZmY3ND"
@@ -488,11 +489,19 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
  * Expected behavior: the filter should redirect to the server name with cleared OAuth cookies.
  */
 TEST_F(OAuth2Test, RequestSignout) {
+  std::string long_token(5000, 'x');
+
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_signout"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat("BearerToken_0=", long_token.substr(0, 4000))},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat("BearerToken_1=", long_token.substr(4000, 5000),
+                    ";version=1;path=/;Max-Age=600;secure;HttpOnly")},
+      {Http::Headers::get().Cookie.get(), "BearerToken_count=2"},
   };
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -500,7 +509,11 @@ TEST_F(OAuth2Test, RequestSignout) {
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
-       "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+       "BearerToken_0=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken_1=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken_count=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
        "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
@@ -1362,9 +1375,9 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithVeryLargeTokens) {
       {Http::Headers::get().SetCookie.get(),
        absl::StrCat("BearerToken_0=", long_token.substr(0, 4000))},
       {Http::Headers::get().SetCookie.get(),
-       absl::StrCat("BearerToken_1=", long_token.substr(4000, 5000), ";version=1;path=/;Max-Age=600;secure;HttpOnly")},
-      {Http::Headers::get().SetCookie.get(),
-       "BearerToken_count=2"},      
+       absl::StrCat("BearerToken_1=", long_token.substr(4000, 5000),
+                    ";version=1;path=/;Max-Age=600;secure;HttpOnly")},
+      {Http::Headers::get().SetCookie.get(), "BearerToken_count=2"},
       {Http::Headers::get().SetCookie.get(),
        "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
