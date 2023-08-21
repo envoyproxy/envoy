@@ -111,3 +111,23 @@ MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PAT
 if [[ "${MISSING_OUTPUT}" != *"Missing test for host: www2_staging, route: prefix: \"/\""*"Missing test for host: default, route: prefix: \"/api/application_data\""* ]]; then
   exit 1
 fi
+
+# Detaied coverage flag
+echo "test report should contain missing tests with detailed coverage flag"
+MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/DetailedCoverage.yaml" "-t" "${PATH_CONFIG}/DetailedCoverage.golden.proto.json" "--detailed-coverage" 2>&1) ||
+  echo "${MISSING_OUTPUT:-no-output}"
+if ! echo "${MISSING_OUTPUT}" | grep -qE "Missing test for host: localhost, route name: new_endpoint2-.+"; then
+  exit 1
+fi
+
+if ! echo "${MISSING_OUTPUT}" | grep -qE "Missing test for host: localhost, route name: -.+"; then
+  exit 1
+fi
+
+echo "test report shoud not contain missing tests without detailed coverage flag"
+MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/DetailedCoverage.yaml" "-t" "${PATH_CONFIG}/DetailedCoverage.golden.proto.json" 2>&1) ||
+  echo "${MISSING_OUTPUT:-no-output}"
+if echo "${MISSING_OUTPUT}" | grep -qE "Missing test for host:.+"; then
+  echo "Error"
+  exit 1
+fi

@@ -282,10 +282,10 @@ class HttpUpstreamFilterConfigDiscoveryImplTest
 public:
   const std::string getFilterType() const override { return "http"; }
   const std::string getConfigReloadCounter() const override {
-    return "extension_config_discovery.http_filter.foo.config_reload";
+    return "extension_config_discovery.upstream_http_filter.foo.config_reload";
   }
   const std::string getConfigFailCounter() const override {
-    return "extension_config_discovery.http_filter.foo.config_fail";
+    return "extension_config_discovery.upstream_http_filter.foo.config_fail";
   }
 };
 
