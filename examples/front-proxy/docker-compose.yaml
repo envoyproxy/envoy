@@ -5,10 +5,10 @@ services:
       context: .
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
-      service1:
-        condition: service_healthy
-      service2:
-        condition: service_healthy
+      service-envoy-1:
+        condition: service_started
+      service-envoy-2:
+        condition: service_started
     ports:
     - "${PORT_PROXY:-8080}:8080"
     - "${PORT_HTTPS:-8443}:8443"
