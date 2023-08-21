@@ -59,7 +59,7 @@ void Streamer::pop(Level* level) {
 
 void Streamer::push(Level* level) { levels_.push(level); }
 
-void Streamer::Array::newEntry() {
+void Streamer::Level::newEntry() {
   if (is_first_) {
     is_first_ = false;
   } else {
@@ -70,10 +70,8 @@ void Streamer::Array::newEntry() {
 void Streamer::Map::newEntry() {
   if (expecting_value_) {
     expecting_value_ = false;
-  } else if (is_first_) {
-    is_first_ = false;
   } else {
-    streamer_.addNoCopy(",");
+    Level::newEntry();
   }
 }
 
@@ -93,7 +91,7 @@ Streamer::Map::DeferredValuePtr Streamer::Map::deferValue() {
 }
 
 Streamer::Map::DeferredValue::DeferredValue(Map& map) : map_(map) {
-  ASSERT(map_.streamer_.topLevel() == &map);
+  ASSERT(map_.topLevel() == &map);
 }
 
 Streamer::Map::DeferredValue::~DeferredValue() {

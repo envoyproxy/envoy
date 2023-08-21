@@ -10,7 +10,12 @@ namespace Envoy {
 namespace benchmark {
 
 bool skipExpensiveBenchmarks();
-// void setStartupHook(std::function<void()>);
+
+/**
+ * Establishes a function to run before the test process exits. This enables
+ * threads, mocks, and other objects that are expensive to create to be shared
+ * between test methods.
+ */
 void setCleanupHook(std::function<void()>);
 
 } // namespace benchmark

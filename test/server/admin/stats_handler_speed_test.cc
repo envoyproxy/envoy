@@ -13,23 +13,10 @@
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
-
-/*namespace Stats {
-class ThreadLocalStoreTestingPeer {
- public:
-  static void mergeHistograms(ThreadLocalStoreImpl& store) {
-    store.mergeInternal([](){});
-  }
-};
-}*/
-
 namespace Server {
 
 class StatsHandlerTest : public Stats::ThreadLocalRealThreadsMixin {
 public:
-  /*
-StatsHandlerTest() : alloc_(symbol_table_), store_(alloc_) { init(); }
-  */
   StatsHandlerTest() : ThreadLocalRealThreadsMixin(1) {
     runOnMainBlocking([this]() { init(); });
     Envoy::benchmark::setCleanupHook([this]() { delete this; });

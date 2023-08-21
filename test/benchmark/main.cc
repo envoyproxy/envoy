@@ -14,7 +14,6 @@
 using namespace Envoy;
 
 static bool skip_expensive_benchmarks = false;
-// static std::function<void()> startup_hook = []() {};
 static std::function<void()> cleanup_hook = []() {};
 
 // Boilerplate main(), which discovers benchmarks and runs them. This uses two

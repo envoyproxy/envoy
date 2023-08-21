@@ -78,16 +78,6 @@ public:
   void finalize(Buffer::Instance& response) override;
 
 private:
-  // using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
-
-  // Summarizes the buckets in the specified histogram, collecting JSON objects.
-  // Note, we do not flush this buffer to the network when it grows large, and
-  // if this becomes an issue it should be possible to do, noting that we are
-  // one or two levels nesting below the list of scalar stats due to the Envoy
-  // stats json schema, where histograms are grouped together.
-  // void populateQuantiles(const Stats::ParentHistogram& histogram, absl::string_view label,
-  //                       ProtobufWkt::ListValue* computed_quantile_value_array);
-
   // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
                       const std::vector<uint64_t>& interval_buckets,
@@ -96,7 +86,6 @@ private:
   void generateHistogramDetail(const std::string& name, const Stats::ParentHistogram& histogram);
   void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
                               Json::Streamer::Map& map);
-  // void populateBucketsTerse(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
   void renderHistogramStart();
   void populateSupportedPercentiles(Json::Streamer::Map& map);
   void populatePercentiles(const Stats::ParentHistogram& histogram, Json::Streamer::Map& map);
