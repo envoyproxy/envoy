@@ -372,11 +372,15 @@ private:
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
+  void
+  setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
+                     std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
   void setEncoderDynamicMetadata(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
   void setDecoderDynamicMetadata(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
-  void addDynamicMetadata(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void addDynamicMetadata(ProcessorState& state,
+                          envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;

@@ -729,8 +729,7 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
   // corresponding to the traffic direction at the time of the external processing request.
   const auto& connection_metadata =
       cb->connection()->streamInfo().dynamicMetadata().filter_metadata();
-  const auto& request_metadata =
-      cb->streamInfo().dynamicMetadata().filter_metadata();
+  const auto& request_metadata = cb->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
     if (const auto metadata_it = request_metadata.find(context_key);
         metadata_it != request_metadata.end()) {
@@ -743,33 +742,39 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
 
   // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
   // ext_proc service. If metadata key is set in both the connection and request metadata then
-  // the value will be the request metadata value. The metadata will only be searched for the callbacks
-  // corresponding to the traffic direction at the time of the external processing request.
+  // the value will be the request metadata value. The metadata will only be searched for the
+  // callbacks corresponding to the traffic direction at the time of the external processing
+  // request.
   const auto& connection_typed_metadata =
       cb->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
-  const auto& request_typed_metadata =
-      cb->streamInfo().dynamicMetadata().typed_filter_metadata();
+  const auto& request_typed_metadata = cb->streamInfo().dynamicMetadata().typed_filter_metadata();
   for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
     if (const auto metadata_it = request_typed_metadata.find(context_key);
         metadata_it != request_typed_metadata.end()) {
-      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
     } else if (const auto metadata_it = connection_typed_metadata.find(context_key);
                metadata_it != connection_typed_metadata.end()) {
-      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
     }
   }
 
   *req.mutable_metadata_context() = forwarding_metadata;
 }
 
-void setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
-                        std::unique_ptr<ProcessingResponse>& response) {
-  if (response->has_dynamic_metadata()) {
-    auto ss = std::stringstream();
-    ss << "envoy.filters.http.ext_proc." << ns;
-    auto md_ns = ss.str();
-    cb->streamInfo().setDynamicMetadata(md_ns, response->dynamic_metadata());
+void Filter::setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
+                                std::unique_ptr<ProcessingResponse>& response) {
+  if (config_->disableReturnedMetadata() || !response->has_dynamic_metadata()) {
+    return;
   }
+  std::string md_ns = "envoy.filters.http.ext_proc";
+  if (config_->bifurcateReturnedMetadataNamespace()) {
+    auto ss = std::stringstream(md_ns);
+    ss << "." << ns;
+    md_ns = ss.str();
+  }
+  cb->streamInfo().setDynamicMetadata(md_ns, response->dynamic_metadata());
 }
 
 void Filter::setEncoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {

@@ -214,15 +214,15 @@ message ExternalProcessor {
 // metadata returned by the server may be written, and how that metadata may be written.
 message MetadataOptions {
   message MetadataNamespacesToForward {
-      // Specifies a list of metadata namespaces whose values, if present,
-      // will be passed to the ext_proc service as an opaque *protobuf::Struct*.
-      repeated string untyped = 1;
+    // Specifies a list of metadata namespaces whose values, if present,
+    // will be passed to the ext_proc service as an opaque *protobuf::Struct*.
+    repeated string untyped = 1;
 
-      // Specifies a list of metadata namespaces whose values, if present,
-      // will be passed to the ext_proc service as a *protobuf::Any*. This allows
-      // envoy and the external processing server to share the protobuf message
-      // definition for safe parsing.
-      repeated string typed = 2;
+    // Specifies a list of metadata namespaces whose values, if present,
+    // will be passed to the ext_proc service as a *protobuf::Any*. This allows
+    // envoy and the external processing server to share the protobuf message
+    // definition for safe parsing.
+    repeated string typed = 2;
   }
 
   // Describes which typed or untyped dynamic metadata namespaces to forward to
