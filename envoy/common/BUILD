@@ -13,9 +13,15 @@ envoy_basic_cc_library(
     name = "base_includes",
     hdrs = [
         "platform.h",
-        "pure.h",
     ],
     external_deps = ["abseil_strings"],
+)
+
+envoy_basic_cc_library(
+    name = "pure_lib",
+    hdrs = [
+        "pure.h",
+    ],
 )
 
 envoy_basic_cc_library(
@@ -56,12 +62,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resource_interface",
     hdrs = ["resource.h"],
-    deps = [":base_includes"],
+    deps = [":pure_lib"],
 )
 
 envoy_cc_library(
     name = "time_interface",
     hdrs = ["time.h"],
+    deps = [":pure_lib"],
 )
 
 envoy_cc_library(
