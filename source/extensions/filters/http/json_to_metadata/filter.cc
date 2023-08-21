@@ -410,7 +410,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->responseRules(), response_processing_finished_, *encoder_callbacks_);
+    handleAllOnMissing(config_->responseRules(), response_processing_finished_,
+                       *encoder_callbacks_);
     config_->stats().rsp_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
