@@ -1,5 +1,8 @@
 name: Publish & verify
 
+permissions:
+  contents: read
+
 on:
   # This runs untrusted code, do not expose secrets in the verify job
   workflow_dispatch:
@@ -19,12 +22,9 @@ concurrency:
     }}-${{ github.workflow }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 jobs:
   env:
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (!contains(github.actor, '[bot]')

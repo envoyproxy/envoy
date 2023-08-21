@@ -2714,4 +2714,30 @@ TEST_P(IntegrationTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
 }
 
+TEST_P(IntegrationTest, TestDuplicatedContentLengthSameValue) {
+  config_helper_.disableDelayClose();
+  initialize();
+
+  std::string response;
+  const std::string full_request = "POST / HTTP/1.1\r\n"
+                                   "Host: host\r\n"
+                                   "content-length: 20\r\n"
+                                   "content-length: 20\r\n\r\n";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+}
+
+TEST_P(IntegrationTest, TestDuplicatedContentLengthDifferentValue) {
+  config_helper_.disableDelayClose();
+  initialize();
+
+  std::string response;
+  const std::string full_request = "POST / HTTP/1.1\r\n"
+                                   "Host: host\r\n"
+                                   "content-length: 20\r\n"
+                                   "content-length: 53\r\n\r\n";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+}
+
 } // namespace Envoy

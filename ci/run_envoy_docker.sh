@@ -63,6 +63,12 @@ else
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
+if [[ -n "$ENVOY_DOCKER_PLATFORM" ]]; then
+    echo "Setting Docker platform: ${ENVOY_DOCKER_PLATFORM}"
+    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    ENVOY_DOCKER_OPTIONS+=(--platform "$ENVOY_DOCKER_PLATFORM")
+fi
+
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
 # images').
 [[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
@@ -113,6 +119,7 @@ docker run --rm \
        -e BAZEL_EXTRA_TEST_OPTIONS \
        -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
+       -e BAZEL_STARTUP_EXTRA_OPTIONS \
        -e CI_TARGET_BRANCH \
        -e DOCKERHUB_USERNAME \
        -e DOCKERHUB_PASSWORD \

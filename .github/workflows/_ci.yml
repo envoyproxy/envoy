@@ -92,7 +92,7 @@ jobs:
     steps:
     - if: ${{ inputs.cache_build_image }}
       name: Restore Docker cache (${{ inputs.cache_build_image }})
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.10
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.0.16
       with:
         image_tag: ${{ inputs.cache_build_image }}
 
@@ -115,20 +115,7 @@ jobs:
       run: git config --global --add safe.directory /__w/envoy/envoy
 
     - if: ${{ inputs.diskspace_hack }}
-      name: Cruft removal
-      run: |
-        echo "Disk space before cruft removal"
-        df -h
-
-        TO_REMOVE=(
-            /opt/hostedtoolcache
-            /usr/local/lib/android
-            /usr/local/.ghcup)
-
-        for removal in "${TO_REMOVE[@]}"; do
-            echo "Removing: ${removal} ..."
-            sudo rm -rf "$removal"
-        done
+      uses: ./.github/actions/diskspace
     - run: |
         echo "disk space at beginning of build:"
         df -h
@@ -136,7 +123,7 @@ jobs:
 
     - if: ${{ inputs.run_pre }}
       name: Run pre action ${{ inputs.run_pre && format('({0})', inputs.run_pre) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.16
       with:
         uses: ${{ inputs.run_pre }}
         with: ${{ inputs.run_pre_with }}
@@ -160,7 +147,7 @@ jobs:
 
     - if: ${{ inputs.run_post }}
       name: Run post action ${{ inputs.run_pre && format('({0})', inputs.run_post) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.10
+      uses: envoyproxy/toolshed/gh-actions/using/recurse@actions-v0.0.16
       with:
         uses: ${{ inputs.run_post }}
         with: ${{ inputs.run_post_with }}

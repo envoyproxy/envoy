@@ -373,6 +373,7 @@ envoy_sh_test(
 
 envoy_sh_test(
     name = "run_envoy_test",
+    size = "large",
     srcs = ["run_envoy_test.sh"],
     cc_binary = [":hotrestart_main"],
     data = [
@@ -463,7 +464,7 @@ envoy_cc_test(
     srcs = [
         "http2_flood_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 6,
     tags = [
         "cpu:3",
     ],
@@ -554,6 +555,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":integration_lib",
         "//test/integration/filters:add_header_filter_config_lib",
+        "//test/integration/filters:add_header_filter_proto_cc_proto",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -768,7 +770,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "protocol_integration_test",
-    size = "large",
+    size = "enormous",
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],
@@ -1285,6 +1287,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
+    shard_count = 2,
     tags = [
         "cpu:3",
         "nofips",
@@ -2245,7 +2248,7 @@ envoy_cc_test(
 # selects.
 envoy_cc_test(
     name = "quic_protocol_integration_test",
-    size = "large",
+    size = "enormous",
     srcs = select({
         "//bazel:disable_http3": [],
         "//bazel:disable_admin_functionality": [],
@@ -2466,15 +2469,18 @@ envoy_cc_test(
     srcs = [
         "default_header_validator_integration_test.cc",
     ],
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//source/common/http:character_set_validation_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/http/header_validators/envoy_default:character_tables",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",

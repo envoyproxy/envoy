@@ -1940,7 +1940,7 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& 
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
     // buffer safe requests with body which is not common.
-    setRetryShadownBufferLimit(0);
+    setRetryShadowBufferLimit(0);
   }
   return retry_state;
 }
