@@ -62,6 +62,7 @@ void FileInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_he
       cache_->cachePath(), [this, end_stream, header_proto,
                             insert_complete](absl::StatusOr<AsyncFileHandle> open_result) {
         absl::MutexLock lock(&mu_);
+        cancel_action_in_flight_ = nullptr;
         if (!open_result.ok()) {
           cancelInsert("failed to create anonymous file");
           return;
