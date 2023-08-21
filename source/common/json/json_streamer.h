@@ -16,6 +16,11 @@ class Streamer {
 public:
   Streamer(Buffer::Instance& response) : response_(response) {}
 
+  struct Array;
+  using ArrayPtr = std::unique_ptr<Array>;
+  struct Map;
+  using MapPtr = std::unique_ptr<Map>;
+
   // A Level represents the current map or array. We keep track
   // of what character is needed to close it, and whether or not
   // the first entry has been added.
@@ -24,6 +29,8 @@ public:
     virtual ~Level();
 
     virtual void newEntry() = 0;
+    MapPtr newMap();
+    ArrayPtr newArray();
 
   protected:
     Streamer& streamer_;
@@ -63,17 +70,16 @@ public:
     virtual void newEntry() override;
   };
 
-  Map& newMap();
-  Array& newArray();
+  // void mapEntries(const Map::Entries& entries);
+  // void arrayEntries(const Array::Strings& strings);
 
-  void mapEntries(const Map::Entries& entries);
-  void arrayEntries(const Array::Strings& strings);
-
-  void pop(Level& level);
-  void clear();
+  // void pop(Level& level);
+  // void clear();
 
   static std::string number(double d);
   static std::string quote(absl::string_view str);
+
+  void flush();
 
 private:
   friend Map;
@@ -84,7 +90,6 @@ private:
   void addDouble(double number);
   void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
   void addFragments(const Array::Strings& src);
-  void flush();
 
   Buffer::Instance& response_;
   std::vector<absl::string_view> fragments_;

@@ -94,11 +94,12 @@ private:
                       const std::vector<uint64_t>& cumulative_buckets);
 
   void generateHistogramDetail(const std::string& name, const Stats::ParentHistogram& histogram);
-  void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
-  void populateBucketsTerse(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
+  void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                              Json::Streamer::Map& map);
+  // void populateBucketsTerse(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
   void renderHistogramStart();
-  void populateSupportedPercentiles();
-  void populatePercentiles(const Stats::ParentHistogram& histogram);
+  void populateSupportedPercentiles(Json::Streamer::Map& map);
+  void populatePercentiles(const Stats::ParentHistogram& histogram, Json::Streamer::Map& map);
   void drainIfNeeded(Buffer::Instance& response);
 
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
@@ -106,12 +107,12 @@ private:
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
   bool histograms_initialized_{false};
   Json::Streamer json_streamer_;
-  OptRef<Json::Streamer::Map> json_stats_map_;
+  Json::Streamer::MapPtr json_stats_map_;
   Json::Streamer::Map::ValuePtr stats_value_context_;
-  OptRef<Json::Streamer::Array> json_stats_array_;
-  OptRef<Json::Streamer::Map> json_histogram_map1_;
-  OptRef<Json::Streamer::Map> json_histogram_map2_;
-  OptRef<Json::Streamer::Array> json_histogram_array_;
+  Json::Streamer::ArrayPtr json_stats_array_;
+  Json::Streamer::MapPtr json_histogram_map1_;
+  Json::Streamer::MapPtr json_histogram_map2_;
+  Json::Streamer::ArrayPtr json_histogram_array_;
   Buffer::Instance& response_;
 };
 

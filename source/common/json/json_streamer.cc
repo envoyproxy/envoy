@@ -12,47 +12,62 @@ Streamer::Level::Level(Streamer& streamer, absl::string_view opener, absl::strin
   streamer_.addNoCopy(opener);
 }
 
-Streamer::Level::~Level() { streamer_.addNoCopy(closer_); }
-
-Streamer::Map& Streamer::newMap() {
-  auto map = std::make_unique<Map>(*this);
-  Map& ret = *map;
-  levels_.push(std::move(map));
-  return ret;
+Streamer::Level::~Level() {
+  streamer_.addNoCopy(closer_);
+  // streamer_.pop(*this);
 }
 
-void Streamer::mapEntries(const Map::Entries& entries) {
+Streamer::MapPtr Streamer::Level::newMap() {
+  // auto map =
+  newEntry();
+  return std::make_unique<Map>(streamer_);
+  // Map& ret = *map;
+  // levels_.push(std::move(map));
+  // return ret;
+}
+
+Streamer::ArrayPtr Streamer::Level::newArray() {
+  // auto map =
+  newEntry();
+  return std::make_unique<Array>(streamer_);
+  // Map& ret = *map;
+  // levels_.push(std::move(map));
+  // return ret;
+}
+
+/*void Streamer::Map::entries(const Map::Entries& entries) {
   if (!levels_.empty()) {
     levels_.top()->newEntry();
   }
   std::make_unique<Map>(*this)->newEntries(entries);
-}
+  }*/
 
-void Streamer::arrayEntries(const Array::Strings& strings) {
+/*void Streamer::arrayEntries(const Array::Strings& strings) {
   if (!levels_.empty()) {
     levels_.top()->newEntry();
   }
   std::make_unique<Array>(*this)->newEntries(strings);
-}
+  }*/
 
-Streamer::Array& Streamer::newArray() {
-  auto array = std::make_unique<Array>(*this);
-  Array& ret = *array;
-  levels_.push(std::move(array));
-  return ret;
-}
+/*Streamer::ArrayPtr Streamer::newArray() {
+  //auto array =
+  return std::make_unique<Array>(*this);
+  //Array& ret = *array;
+  //levels_.push(std::move(array));
+  //return ret;
+  }
 
 void Streamer::pop(Level& level) {
   ASSERT(levels_.top().get() == &level);
   levels_.pop();
-}
+  }*/
 
-void Streamer::clear() {
+/*void Streamer::clear() {
   while (!levels_.empty()) {
     levels_.pop();
   }
   flush();
-}
+  }*/
 
 void Streamer::Array::newEntry() {
   if (is_first_) {
