@@ -19,7 +19,7 @@ services:
       context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
-        ENVOY_CONFIG: ./service-envoy-1.yaml
+        ENVOY_CONFIG: ./service-envoy.yaml
     depends_on:
       service1:
         condition: service_healthy
