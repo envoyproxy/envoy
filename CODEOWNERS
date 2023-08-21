@@ -351,7 +351,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/client_ssl_auth/ @UNOWNED @UNOWNED
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
-/contrib/golang/ @doujiang24 @wangfakang @StarryVae
+/contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
