@@ -86,7 +86,7 @@ void FilterConfigSubscription::start() {
   }
 }
 
-void FilterConfigSubscription::onConfigUpdate(
+absl::Status FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
   ConfigVersionSharedPtr next =
       std::make_shared<ConfigVersion>(version_info, factory_context_.timeSource().systemTime());
@@ -134,9 +134,10 @@ void FilterConfigSubscription::onConfigUpdate(
   // is safe to mark the subscription as ready and publish the warmed parent resources.
   ENVOY_LOG(debug, "Updated filter config {} created, warming done", filter_config_name_);
   init_target_.ready();
+  return absl::OkStatus();
 }
 
-void FilterConfigSubscription::onConfigUpdate(
+absl::Status FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
@@ -151,8 +152,9 @@ void FilterConfigSubscription::onConfigUpdate(
         [me = shared_from_this()]() { me->updateComplete(); });
   } else if (!added_resources.empty()) {
     ASSERT(added_resources.size() == 1);
-    onConfigUpdate(added_resources, added_resources[0].get().version());
+    return onConfigUpdate(added_resources, added_resources[0].get().version());
   }
+  return absl::OkStatus();
 }
 
 void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
@@ -227,8 +229,11 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
     });
 
     if (last_config_valid) {
-      provider.onConfigUpdate(*subscription->lastConfig(), subscription->lastVersionInfo(),
+      auto status = provider.onConfigUpdate(*subscription->lastConfig(), subscription->lastVersionInfo(),
                               nullptr);
+      if (!status.ok()) {
+        throw EnvoyException(std::string(status.message()));
+      }
     }
   }
 

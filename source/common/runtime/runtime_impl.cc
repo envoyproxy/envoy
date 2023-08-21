@@ -594,7 +594,7 @@ void RtdsSubscription::createSubscription() {
       {});
 }
 
-void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+absl::Status RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                       const std::string&) {
   validateUpdateSize(resources.size(), 0);
   const auto& runtime =
@@ -607,9 +607,10 @@ void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceR
   proto_.CopyFrom(runtime.layer());
   parent_.loadNewSnapshot();
   init_target_.ready();
+  return absl::OkStatus();
 }
 
-void RtdsSubscription::onConfigUpdate(
+absl::Status RtdsSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   validateUpdateSize(added_resources.size(), removed_resources.size());
@@ -617,10 +618,11 @@ void RtdsSubscription::onConfigUpdate(
   // This is a singleton subscription, so we can only have the subscribed resource added or removed,
   // but not both.
   if (!added_resources.empty()) {
-    onConfigUpdate(added_resources, added_resources[0].get().version());
+    return onConfigUpdate(added_resources, added_resources[0].get().version());
   } else {
     onConfigRemoved(removed_resources);
   }
+  return absl::OkStatus();
 }
 
 void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

@@ -369,7 +369,7 @@ ScopedRdsConfigSubscription::removeScopes(
   return to_be_removed_rds_providers;
 }
 
-void ScopedRdsConfigSubscription::onConfigUpdate(
+absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
@@ -428,13 +428,17 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
                         (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
                         version_info) ||
       !to_be_removed_rds_providers.empty();
-  ConfigSubscriptionCommonBase::onConfigUpdate();
+  auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
+      if (!status.ok()) {
+        throw EnvoyException(std::string(status.message()));
+      }
   if (any_applied) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
   }
   stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
   stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
+  return absl::OkStatus();
 }
 
 void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_name,
@@ -459,14 +463,14 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
 
 // TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
 // CdsApiImpl::onConfigUpdate.
-void ScopedRdsConfigSubscription::onConfigUpdate(
+absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& scoped_route : scoped_route_map_) {
     *to_remove_repeated.Add() = scoped_route.first;
   }
-  onConfigUpdate(resources, to_remove_repeated, version_info);
+  return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
 Protobuf::RepeatedPtrField<std::string>

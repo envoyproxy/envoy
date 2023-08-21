@@ -208,10 +208,10 @@ private:
   // Envoy::Config::SubscriptionCallbacks
 
   // NOTE: both delta form and state-of-the-world form onConfigUpdate(resources, version_info) will
-  // throw an EnvoyException on any error and essentially reject an update.
-  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
+  // throw an EnvoyException or return failure on any error and essentially reject an update.
+  absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+  absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
