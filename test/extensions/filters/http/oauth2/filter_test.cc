@@ -150,6 +150,8 @@ public:
   void expectValidCookies(const CookieNames& cookie_names) {
     // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
     test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+    // Generate a 5000-character long token for testing one of refresh_token, access_token or id_token.
+    std::string long_token(5000, 'x');
 
     const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
 
@@ -161,10 +163,17 @@ public:
          fmt::format("{}={};version=test", cookie_names.oauth_expires_, expires_at_s)},
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
+        // creating a refresh token longer than 4000 characters
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.refresh_token_, "_0=", long_token.substr(0, 4000))},
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.refresh_token_, "_1=", long_token.substr(4000, 5000), ";version=test")},
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.refresh_token_, "_count=2")},
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.oauth_hmac_, "="
-                                                "NzQyYmI0YTJkMzFjMmU4Njg2MTdiZGUzYWQzZjkxZjJiMTgwZD"
-                                                "I5OWQ2YzhjODBkN2Y4Zjg2OGFmMWFiMWM0Mg=="
+                                                "ZGI4NTEyNzAzNTI2NmVlZTM0Y2E0MGIxYjYzZmY3ND"
+                                                "IzNDY2MTk3YTA5NTAyZjM0MzQwZDA0MDQ2NjI3NmMyYQ=="
                                                 ";version=test")},
     };
 
@@ -175,6 +184,7 @@ public:
     EXPECT_TRUE(cookie_validator->hmacIsValid());
     EXPECT_TRUE(cookie_validator->timestampIsValid());
     EXPECT_TRUE(cookie_validator->isValid());
+    EXPECT_EQ(cookie_validator->refreshToken(), long_token);
 
     // If we advance time beyond 10s the timestamp should no longer be valid.
     test_time_.advanceTimeWait(std::chrono::seconds(11));
@@ -1322,6 +1332,52 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
                                    std::chrono::seconds(600));
 }
 
+/**
+ * Testing oauth response after tokens are set with very large access_token.
+ *
+ * Expected behavior: cookies suffixed with chunk index are set.
+ */
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithVeryLargeTokens) {
+  std::string long_token(5000, 'x');
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  // host_ must be set, which is guaranteed (ASAN).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
+
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC="
+       "MjdiYWU4NjJhNmIyYWM4ODRjMGI4M2IxYjg1MWI3YzkyNjY0NTllZTM2NDQxYjIzOThmYTUyOTM2NDM3OWU5OA==;"
+       "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       absl::StrCat("BearerToken_0=", long_token.substr(0, 4000))},
+      {Http::Headers::get().SetCookie.get(),
+       absl::StrCat("BearerToken_1=", long_token.substr(4000, 5000), ";version=1;path=/;Max-Age=600;secure;HttpOnly")},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken_count=2"},      
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess(long_token, "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_value) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
@@ -1362,6 +1418,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_v
   filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
                                    std::chrono::seconds(600));
 }
+
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_httponly) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
