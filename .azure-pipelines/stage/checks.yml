@@ -95,7 +95,6 @@ jobs:
           artifactName: "$(CI_TARGET).fixes"
         timeoutInMinutes: 10
         condition: and(failed(), eq(variables['CI_TARGET'], 'bazel.clang_tidy'))
-
       - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)-upload'
         displayName: "Upload $(CI_TARGET) Report to GCS"
         condition: and(not(canceled()), or(eq(variables['CI_TARGET'], 'bazel.coverage'), eq(variables['CI_TARGET'], 'bazel.fuzz_coverage')))
