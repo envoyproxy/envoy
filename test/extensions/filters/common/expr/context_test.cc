@@ -490,6 +490,8 @@ TEST(Context, ConnectionAttributes) {
   const absl::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));
+  const std::string downstream_transport_failure_reason = "TlsError";
+  info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
@@ -670,6 +672,13 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(connection_termination_details.value(), value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(DownstreamTransportFailureReason)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(downstream_transport_failure_reason, value.value().StringOrDie().value());
   }
 
   {
