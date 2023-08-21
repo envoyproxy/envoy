@@ -35,6 +35,10 @@ bug_fixes:
     :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
     :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
     values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
+- area: http1
+  change: |
+    Fixed a bug where HTTP/1.1 requests with "Connection: close" header is handled differently if the requested is internally redirected. Without internal redirect, the response will also have a "Connection: close" header and the connection will be closed after finishing that request. Requests with internal redirect should be handled in the same way. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.http1_connection_close_header_in_redirect`` to false.
 - area: extension_discovery_service
   change: |
     Fixed a bug causing crash if ECDS is used with upstream HTTP filters.
