@@ -3,6 +3,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/transport.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "source/extensions/common/tap/tap_config_base.h"
 #include "source/extensions/transport_sockets/tap/tap_config.h"
@@ -51,8 +52,10 @@ class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                             public std::enable_shared_from_this<SocketTapConfigImpl> {
 public:
   SocketTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                      Extensions::Common::Tap::Sink* admin_streamer, TimeSource& time_system)
-      : Extensions::Common::Tap::TapConfigBaseImpl(std::move(proto_config), admin_streamer),
+                      Extensions::Common::Tap::Sink* admin_streamer, TimeSource& time_system,
+                      Server::Configuration::TransportSocketFactoryContext& context)
+      : Extensions::Common::Tap::TapConfigBaseImpl(std::move(proto_config), admin_streamer,
+                                                   context),
         time_source_(time_system) {}
 
   // SocketTapConfig
