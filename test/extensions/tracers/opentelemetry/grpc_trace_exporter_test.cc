@@ -100,10 +100,10 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithRemoteClose) {
   *request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_TRUE(exporter.log(request));
 
-  // Close the connection, now that we've created it.
+  // Terminate the request, now that we've created it.
   callbacks_->onRemoteClose(Grpc::Status::Internal, "bad");
 
-  // Second call should make a new connection.
+  // Second call should make a new request.
   expectTraceExportStart();
   expectTraceExportMessage(request_yaml);
   EXPECT_TRUE(exporter.log(request));
