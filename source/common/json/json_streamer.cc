@@ -8,13 +8,24 @@ namespace Envoy {
 namespace Json {
 
 Streamer::Level::Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
-    : streamer_(streamer), is_first_(true), closer_(closer) {
+    : streamer_(streamer), closer_(closer) {
   streamer_.addNoCopy(opener);
+  streamer_.push(this);
 }
 
 Streamer::Level::~Level() {
-  streamer_.addNoCopy(closer_);
-  // streamer_.pop(*this);
+  if (!is_closed_) {
+    close();
+  }
+}
+
+void Streamer::Level::close() {
+  if (!is_closed_) {
+    is_closed_ = true;
+    streamer_.addNoCopy(closer_);
+    // streamer_.pop(*this);
+    streamer_.pop(this);
+  }
 }
 
 Streamer::MapPtr Streamer::Level::newMap() {
@@ -56,11 +67,14 @@ Streamer::ArrayPtr Streamer::Level::newArray() {
   //levels_.push(std::move(array));
   //return ret;
   }
+*/
 
-void Streamer::pop(Level& level) {
-  ASSERT(levels_.top().get() == &level);
+void Streamer::pop(Level* level) {
+  ASSERT(levels_.top() == level);
   levels_.pop();
-  }*/
+}
+
+void Streamer::push(Level* level) { levels_.push(level); }
 
 /*void Streamer::clear() {
   while (!levels_.empty()) {
@@ -143,6 +157,13 @@ std::string Streamer::quote(absl::string_view str) { return absl::StrCat("\"", s
 void Streamer::flush() {
   response_.addFragments(fragments_);
   fragments_.clear();
+}
+
+void Streamer::clear() {
+  while (!levels_.empty()) {
+    levels_.top()->close();
+  }
+  flush();
 }
 
 void Streamer::addFragments(const Array::Strings& src) {

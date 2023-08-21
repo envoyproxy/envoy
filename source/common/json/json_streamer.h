@@ -31,10 +31,12 @@ public:
     virtual void newEntry() = 0;
     MapPtr newMap();
     ArrayPtr newArray();
+    void close();
 
   protected:
     Streamer& streamer_;
-    bool is_first_;
+    bool is_first_{true};
+    bool is_closed_{false};
 
   private:
     absl::string_view closer_;
@@ -79,22 +81,27 @@ public:
   static std::string number(double d);
   static std::string quote(absl::string_view str);
 
-  void flush();
+  void clear();
 
 private:
+  friend Level;
   friend Map;
   friend Array;
 
+  void push(Level* level);
+  void pop(Level* level);
   void addSanitized(absl::string_view token);
   void addCopy(absl::string_view token);
   void addDouble(double number);
   void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
   void addFragments(const Array::Strings& src);
+  void flush();
+  Level* topLevel() const { return levels_.top(); }
 
   Buffer::Instance& response_;
   std::vector<absl::string_view> fragments_;
   std::string buffer_;
-  std::stack<LevelPtr> levels_;
+  std::stack<Level*> levels_;
 };
 
 } // namespace Json

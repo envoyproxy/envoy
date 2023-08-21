@@ -316,13 +316,13 @@ void StatsJsonRender::populateBucketsVerbose(
 void StatsJsonRender::finalize(Buffer::Instance& response) {
   stats_value_context_.reset();
 
-  json_histogram_array_.reset();
+  /*  json_histogram_array_.reset();
   json_histogram_map2_.reset();
   json_histogram_map1_.reset();
   json_stats_array_.reset();
   stats_value_context_.reset();
-  json_stats_map_.reset();
-  json_streamer_.flush();
+  json_stats_map_.reset();*/
+  json_streamer_.clear();
 
   // json_streamer_.clear();
   drainIfNeeded(response);
