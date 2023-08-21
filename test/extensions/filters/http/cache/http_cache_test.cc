@@ -11,9 +11,7 @@
 
 #include "gtest/gtest.h"
 
-using testing::ContainerEq;
 using testing::TestWithParam;
-using testing::ValuesIn;
 
 namespace Envoy {
 namespace Extensions {

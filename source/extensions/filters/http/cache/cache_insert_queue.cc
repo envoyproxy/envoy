@@ -66,12 +66,13 @@ private:
   std::unique_ptr<Http::ResponseTrailerMap> trailers_;
 };
 
-CacheInsertQueue::CacheInsertQueue(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
+CacheInsertQueue::CacheInsertQueue(std::shared_ptr<HttpCache> cache,
+                                   Http::StreamEncoderFilterCallbacks& encoder_callbacks,
                                    InsertContextPtr insert_context, AbortInsertCallback abort)
     : dispatcher_(encoder_callbacks.dispatcher()), insert_context_(std::move(insert_context)),
       low_watermark_bytes_(encoder_callbacks.encoderBufferLimit() / 2),
       high_watermark_bytes_(encoder_callbacks.encoderBufferLimit()),
-      encoder_callbacks_(encoder_callbacks), abort_callback_(abort) {}
+      encoder_callbacks_(encoder_callbacks), abort_callback_(abort), cache_(cache) {}
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                      const ResponseMetadata& metadata, bool end_stream) {

@@ -33,7 +33,7 @@ using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
 CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
                          const std::string&, Stats::Scope&, TimeSource& time_source,
-                         OptRef<HttpCache> http_cache)
+                         std::shared_ptr<HttpCache> http_cache)
     : time_source_(time_source), cache_(http_cache),
       vary_allow_list_(config.allowed_vary_headers()) {}
 
@@ -148,7 +148,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
       // so they're thread-safe. During CacheFilter::onDestroy the queue is given ownership
       // of itself and all the callbacks are cancelled, so they are also filter-destruction-safe.
       insert_queue_ =
-          std::make_unique<CacheInsertQueue>(*encoder_callbacks_, std::move(insert_context),
+          std::make_unique<CacheInsertQueue>(cache_, *encoder_callbacks_, std::move(insert_context),
                                              // Cache aborted callback.
                                              [this]() {
                                                insert_queue_ = nullptr;
