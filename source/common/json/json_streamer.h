@@ -172,17 +172,47 @@ public:
     OptRef<DeferredValue> deferred_value_;
   };
 
+  /**
+   * Represents a JSON array while it is being serialized. No data is buffered
+   * in the structure; just enough state to be able emit delimiters properly.
+   */
   class Array : public Level {
   public:
     Array(Streamer& streamer) : Level(streamer, "[", "]") {}
     using Strings = absl::Span<const absl::string_view>;
+
+    /**
+     * Renders an array of entry strings as strings. The strings
+     * are rendered directly; quotes are not added by this function.
+     * So if you want a JSON string you must add quotes yourself
+     * prior to calling this.
+     *
+     * @param entries the array of string entries.
+     */
     void newEntries(const Strings& entries);
   };
 
+  /**
+   * Converts a number to a string.
+   */
   static std::string number(double d);
+
+  /**
+   * Adds quotes around a string so it renders as a JSON string.
+   */
   static std::string quote(absl::string_view str);
 
+  /**
+   * Unwinds the stack of levels, properlying closing all of them
+   * using the appropriate delimiters.
+   */
   void clear();
+
+  /**
+   * Makes a root map for the streamer. A similar function can be added
+   * easily if this class is to be used for a JSON structure with a
+   * top-level array.
+   */
   MapPtr makeRootMap();
 
 private:
@@ -190,14 +220,50 @@ private:
   friend Map;
   friend Array;
 
+  /**
+   * Pushes a new level onto the stack.
+   */
   void push(Level* level);
+
+  /**
+   * Pops a level off of a stack, asserting that it matches.
+   */
   void pop(Level* level);
+
+  /**
+   * Takes a raw string, sanitizes it using JSON syntax, adds quotes,
+   * and streams it out.
+   */
   void addSanitized(absl::string_view token);
+
+  /**
+   * Serializes a string without adding quotes, copying the bytes.
+   */
   void addCopy(absl::string_view token);
+
+  /**
+   * Serializes a number.
+   */
   void addDouble(double number);
+
+  /**
+   * Serializes a string, without copying the bytes.
+   */
   void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
+
+  /**
+   * Adds an array of string fragments.
+   */
   void addFragments(const Array::Strings& src);
+
+  /**
+   * Flushes out any pending fragments.
+   */
   void flush();
+
+  /**
+   * @return the top Level*. This is used for asserts.
+   */
   Level* topLevel() const { return levels_.top(); }
 
   Buffer::Instance& response_;
