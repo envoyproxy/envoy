@@ -28,9 +28,9 @@ namespace JsonToMetadata {
   COUNTER(rq_mismatched_content_type)                                                              \
   COUNTER(rq_no_body)                                                                              \
   COUNTER(rq_invalid_json_body)                                                                    \
-  COUNTER(rsp_success)                                                                              \
-  COUNTER(rsp_mismatched_content_type)                                                              \
-  COUNTER(rsp_no_body)                                                                              \
+  COUNTER(rsp_success)                                                                             \
+  COUNTER(rsp_mismatched_content_type)                                                             \
+  COUNTER(rsp_no_body)                                                                             \
   COUNTER(rsp_invalid_json_body)
 
 /**
@@ -67,7 +67,7 @@ public:
 
   JsonToMetadataStats& stats() { return stats_; }
   // True if we have rules for requests
-  bool doRequest()  const { return !request_rules_.empty(); }
+  bool doRequest() const { return !request_rules_.empty(); }
   bool doResponse() const { return !response_rules_.empty(); }
   const Rules& requestRules() const { return request_rules_; }
   const Rules& responseRules() const { return response_rules_; }
@@ -125,9 +125,11 @@ private:
                                const Rule& rule, StructMap& struct_map);
 
   // Process the case without body, i.e., on_missing is applied for all rules.
-  void handleAllOnMissing(const Rules& rules, bool& processing_finished_flag, Http::StreamFilterCallbacks& filter_callback);
+  void handleAllOnMissing(const Rules& rules, bool& processing_finished_flag,
+                          Http::StreamFilterCallbacks& filter_callback);
   // Process the case with error, i.e., on_error is applied for all rules.
-  void handleAllOnError(const Rules& rules, bool& processing_finished_flag, Http::StreamFilterCallbacks& filter_callback);
+  void handleAllOnError(const Rules& rules, bool& processing_finished_flag,
+                        Http::StreamFilterCallbacks& filter_callback);
   // Parse the body while we have the whole json.
   void processBody(const Buffer::Instance* body, const Rules& rules, bool& processing_finished_flag,
                    Stats::Counter& success, Stats::Counter& no_body, Stats::Counter& non_json,

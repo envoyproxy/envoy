@@ -91,7 +91,8 @@ FilterConfig::FilterConfig(
       request_allow_content_types_(generateRequestAllowContentTypes(proto_config)),
       response_allow_content_types_(generateResponseAllowContentTypes(proto_config)),
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()),
-      response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()) {}
+      response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()) {
+}
 
 Rules FilterConfig::generateRequestRules(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config)
@@ -409,8 +410,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->responseRules(), request_processing_finished_, *encoder_callbacks_);
-    config_->stats().rq_no_body_.inc();
+    handleAllOnMissing(config_->responseRules(), response_processing_finished_, *encoder_callbacks_);
+    config_->stats().rsp_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
   return Http::FilterHeadersStatus::StopIteration;
@@ -427,7 +428,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
     if (!decoder_callbacks_->decodingBuffer() ||
         decoder_callbacks_->decodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->requestRules(), request_processing_finished_, *decoder_callbacks_);
+      handleAllOnMissing(config_->requestRules(), request_processing_finished_,
+                         *decoder_callbacks_);
       config_->stats().rq_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
@@ -449,8 +451,9 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 
     if (!encoder_callbacks_->encodingBuffer() ||
         encoder_callbacks_->encodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->responseRules(), response_processing_finished_, *encoder_callbacks_);
-      config_->stats().rq_no_body_.inc();
+      handleAllOnMissing(config_->responseRules(), response_processing_finished_,
+                         *encoder_callbacks_);
+      config_->stats().rsp_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
     processResponseBody();

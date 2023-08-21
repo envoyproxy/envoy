@@ -124,7 +124,7 @@ response_rules:
 
   void
   testResponseWithBody(const std::string& body, bool end_stream = true,
-                      Http::FilterDataStatus expected_result = Http::FilterDataStatus::Continue) {
+                       Http::FilterDataStatus expected_result = Http::FilterDataStatus::Continue) {
     buffer_.add(body);
     ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
 
