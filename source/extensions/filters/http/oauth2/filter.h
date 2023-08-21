@@ -292,7 +292,7 @@ private:
   size_t setChunkedCookies(Http::ResponseHeaderMap& headers, const std::string& key,
                            const std::string& data, size_t maxChunkSize) const;
   void setCookieOrChunkedCookies(Http::ResponseHeaderMap& headers, const std::string& key,
-                                 const std::string& data, size_t maxChunkSize = 4000) const;
+                                 const std::string& data, const size_t maxChunkSize = 4000) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };

@@ -590,7 +590,7 @@ size_t OAuth2Filter::setChunkedCookies(Http::ResponseHeaderMap& headers, const s
 
 void OAuth2Filter::setCookieOrChunkedCookies(Http::ResponseHeaderMap& headers,
                                              const std::string& key, const std::string& data,
-                                             size_t maxChunkSize) const {
+                                             const size_t maxChunkSize) const {
   if (data.size() <= maxChunkSize) {
     // If the data is smaller than the maximum chunk size, no need to split
     setCookie(headers, key, data);
