@@ -204,10 +204,13 @@ std::string OAuth2CookieValidator::combineChunkedCookies(
         combinedValue += it->second;
       } else {
         // TODO(kanurag94): log warning here
-        return EMPTY_STRING;
+        return EMPTY_STRING; // Return an empty string indicating an error
       }
     }
+    return combinedValue; // Return the combined value if all chunks are present
   }
+
+  // If _count cookie is not found, return the original value if it exists
   return findValue(cookies, keyPrefix);
 }
 
@@ -469,6 +472,34 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   config_->stats().oauth_unauthorized_rq_.inc();
 }
 
+void OAuth2Filter::deleteChunkedCookies(const Http::RequestHeaderMap& headers,
+                                        Http::ResponseHeaderMapPtr& response_headers,
+                                        const std::string& cookieName) {
+  std::string countCookieName = cookieName + "_count";
+
+  // Find the count cookie and extract the count value
+  const auto& cookies = Http::Utility::parseCookies(
+      headers, [countCookieName](absl::string_view key) -> bool { return key == countCookieName; });
+
+  std::string countValue = findValue(cookies, countCookieName);
+  if (!countValue.empty()) {
+    int count = std::stoi(countValue);
+
+    // Delete individual chunked cookies and _count cookie
+    for (int i = 0; i < count; ++i) {
+      response_headers->addReferenceKey(
+          Http::Headers::get().SetCookie,
+          fmt::format(CookieDeleteFormatString, cookieName + "_" + std::to_string(i)));
+    }
+    response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                      fmt::format(CookieDeleteFormatString, countCookieName));
+  } else {
+    // Delete regular cookie
+    response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                      fmt::format(CookieDeleteFormatString, cookieName));
+  }
+}
+
 /**
  * Modifies the state of the filter by adding response headers to the decoder_callbacks
  */
@@ -480,15 +511,11 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
       fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_hmac_));
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_));
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_));
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_));
+  // Delete chunked cookies and _count cookie
+  deleteChunkedCookies(headers, response_headers, config_->cookieNames().bearer_token_);
+  deleteChunkedCookies(headers, response_headers, config_->cookieNames().id_token_);
+  deleteChunkedCookies(headers, response_headers, config_->cookieNames().refresh_token_);
+
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 

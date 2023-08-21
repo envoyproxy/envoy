@@ -281,6 +281,9 @@ private:
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
 
+  void deleteChunkedCookies(const Http::RequestHeaderMap& headers,
+                            Http::ResponseHeaderMapPtr& response_headers,
+                            const std::string& cookieName);
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   std::string getEncodedToken() const;
