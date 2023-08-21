@@ -9,6 +9,8 @@ const Name = "basic"
 
 func init() {
 	api.LogCritical("init")
+	api.LogCritical(api.GetLogLevel().String())
+
 	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, nil)
 }
 

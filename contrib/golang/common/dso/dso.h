@@ -40,6 +40,7 @@ public:
                                              GoUint64 p3) PURE;
   virtual GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                            GoUint64 p3) PURE;
+  virtual void envoyGoFilterOnHttpLog(httpRequest* p0) PURE;
   virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
   virtual void envoyGoRequestSemaDec(httpRequest* p0) PURE;
 };
@@ -57,6 +58,7 @@ public:
   GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                      GoUint64 p3) override;
   GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;
+  void envoyGoFilterOnHttpLog(httpRequest* p0) override;
   void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) override;
   void envoyGoRequestSemaDec(httpRequest* p0) override;
 
@@ -70,6 +72,7 @@ private:
                                               GoUint64 p3) = {nullptr};
   GoUint64 (*envoy_go_filter_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                             GoUint64 p3) = {nullptr};
+  void (*envoy_go_filter_on_http_log_)(httpRequest* p0) = {nullptr};
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
   void (*envoy_go_filter_go_request_sema_dec_)(httpRequest* p0) = {nullptr};
 };
