@@ -3071,7 +3071,8 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
     response_body_mode: "NONE"
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
-
+  metadata_options:
+    enable_returned_metadata: true
   )EOF");
 
   Buffer::OwnedImpl empty_chunk;
@@ -3118,6 +3119,7 @@ TEST_F(HttpFilterTest, EmitBifurcatedDynamicMetadata) {
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
   metadata_options:
+    enable_returned_metadata: true
     bifurcate_returned_metadata_namespace: true
   )EOF");
 
@@ -3172,7 +3174,7 @@ TEST_F(HttpFilterTest, DisableEmitDynamicMetadata) {
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
   metadata_options:
-    disable_returned_metadata: true
+    enable_returned_metadata: false
   )EOF");
 
   Buffer::OwnedImpl empty_chunk;

@@ -149,7 +149,7 @@ public:
         typed_metadata_namespaces_(
             config.metadata_options().forwarding_namespaces().typed().begin(),
             config.metadata_options().forwarding_namespaces().typed().end()),
-        disable_returned_metadata_(config.metadata_options().disable_returned_metadata()),
+        enable_returned_metadata_(config.metadata_options().enable_returned_metadata()),
         bifurcate_returned_metadata_namespace_(
             config.metadata_options().bifurcate_returned_metadata_namespace()) {}
 
@@ -199,7 +199,7 @@ public:
     return typed_metadata_namespaces_;
   }
 
-  bool disableReturnedMetadata() const { return disable_returned_metadata_; }
+  bool enableReturnedMetadata() const { return enable_returned_metadata_; }
 
   bool bifurcateReturnedMetadataNamespace() const { return bifurcate_returned_metadata_namespace_; }
 
@@ -250,7 +250,7 @@ private:
       response_expr_;
   const std::vector<std::string> untyped_metadata_namespaces_;
   const std::vector<std::string> typed_metadata_namespaces_;
-  const bool disable_returned_metadata_;
+  const bool enable_returned_metadata_;
   const bool bifurcate_returned_metadata_namespace_;
 };
 
@@ -278,7 +278,7 @@ public:
   const absl::optional<std::vector<std::string>>& typedMetadataNamespaces() const {
     return typed_metadata_namespaces_;
   }
-  absl::optional<bool> disableReturnedMetadata() const { return disable_returned_metadata_; }
+  absl::optional<bool> enableReturnedMetadata() const { return enable_returned_metadata_; }
   absl::optional<bool> bifurcateReturnedMetadataNamespace() const {
     return bifurcate_returned_metadata_namespace_;
   }
@@ -290,7 +290,7 @@ private:
 
   absl::optional<std::vector<std::string>> untyped_metadata_namespaces_;
   absl::optional<std::vector<std::string>> typed_metadata_namespaces_;
-  absl::optional<bool> disable_returned_metadata_;
+  absl::optional<bool> enable_returned_metadata_;
   absl::optional<bool> bifurcate_returned_metadata_namespace_;
 };
 

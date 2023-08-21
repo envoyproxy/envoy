@@ -157,7 +157,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
         std::vector<std::string>(md_opts.forwarding_namespaces().typed().begin(),
                                  md_opts.forwarding_namespaces().typed().begin());
   }
-  disable_returned_metadata_ = md_opts.disable_returned_metadata();
+  enable_returned_metadata_ = md_opts.enable_returned_metadata();
   bifurcate_returned_metadata_namespace_ = md_opts.bifurcate_returned_metadata_namespace();
 }
 
@@ -173,8 +173,8 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
   if (src.typedMetadataNamespaces().has_value()) {
     typed_metadata_namespaces_ = src.typedMetadataNamespaces();
   }
-  if (src.disableReturnedMetadata().has_value()) {
-    disable_returned_metadata_ = src.disableReturnedMetadata();
+  if (src.enableReturnedMetadata().has_value()) {
+    enable_returned_metadata_ = src.enableReturnedMetadata();
   }
   if (src.bifurcateReturnedMetadataNamespace().has_value()) {
     bifurcate_returned_metadata_namespace_ = src.bifurcateReturnedMetadataNamespace();
@@ -769,7 +769,7 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
 
 void Filter::setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
                                 std::unique_ptr<ProcessingResponse>& response) {
-  if (config_->disableReturnedMetadata() || !response->has_dynamic_metadata()) {
+  if (!config_->enableReturnedMetadata() || !response->has_dynamic_metadata()) {
     return;
   }
   std::string md_ns = "envoy.filters.http.ext_proc";

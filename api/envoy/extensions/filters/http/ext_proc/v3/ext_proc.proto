@@ -230,8 +230,8 @@ message MetadataOptions {
   MetadataNamespacesToForward forwarding_namespaces = 1;
 
   // If set to true, metadata returned from the external processing server will
-  // not be written into the stream's dynamic metadata.
-  bool disable_returned_metadata = 2;
+  // be written into the stream's dynamic metadata.
+  bool enable_returned_metadata = 2;
 
   // If set to true, returned metadata will be namespaced according to whether the
   // processing occurred during decoding or encoding.
