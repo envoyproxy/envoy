@@ -247,12 +247,15 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
     delayed_close_timer_ = nullptr;
   }
 
+  stream_info_.setDownstreamTransportFailureReason(transport_socket_->failureReason());
+
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
   transport_socket_->closeSocket(close_type);
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
   updateWriteBufferStats(0, 0);
+
 
   // As the socket closes, drain any remaining data.
   // The data won't be written out at this point, and where there are reference
