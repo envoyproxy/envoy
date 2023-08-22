@@ -446,8 +446,18 @@ Decoder::Result DecoderImpl::onDataInNegotiating(Buffer::Instance& data, bool fr
   // packet temporarily buffered to be sent upstream.
   bool upstreamSSL = false;
   state_ = State::InitState;
-  if (data.length() == 1) {
-    const char c = data.peekInt<char, ByteOrder::Host, 1>(0);
+
+  /*
+   * (shiponcs):
+   * The length can be >= 1 for Write Buffer being not cleared,
+   * when upstream and downstream tls both are enabled,
+   * before receiving 'S' or 'N' from upstream for which
+   * the write buffer becomes "SN"/"SS" instead of "S"/"N".
+   * So we need to read the last(latest) byte from the buffer.
+   *
+   * */
+  if (data.length() >= 1) {
+    const char c = data.peekInt<char, ByteOrder::Host, 1>(data.length() - 1);
     if (c == 'S') {
       upstreamSSL = true;
     } else {
