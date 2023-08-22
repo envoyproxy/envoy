@@ -1149,28 +1149,51 @@ TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-class LookupStatusTest
-    : public ::testing::TestWithParam<std::tuple<absl::optional<CacheEntryStatus>, FilterState>> {
-protected:
-  absl::optional<CacheEntryStatus> cacheEntryStatus() { return std::get<0>(GetParam()); }
-  FilterState filterState() { return std::get<1>(GetParam()); }
-};
-
-TEST_P(LookupStatusTest, ResolveLookupStatusUnexpectedState) {
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
-            LookupStatus::Unknown);
+TEST(LookupStatusDeathTest, ResolveLookupStatusBugFilterStates) {
+  EXPECT_ENVOY_BUG(
+      CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation, FilterState::Initial),
+      "Unexpected filter state in requestCacheStatus");
+  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                                    FilterState::DecodeServingFromCache),
+                   "Unexpected filter state in requestCacheStatus");
+  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                                    FilterState::Destroyed),
+                   "Unexpected filter state in requestCacheStatus");
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    LookupStatusTest, LookupStatusTest,
-    testing::Values(std::make_tuple(CacheEntryStatus::RequiresValidation, FilterState::Initial),
-                    std::make_tuple(CacheEntryStatus::RequiresValidation,
-                                    FilterState::DecodeServingFromCache),
-                    std::make_tuple(CacheEntryStatus::RequiresValidation, FilterState::Destroyed),
-                    std::make_tuple(absl::nullopt, FilterState::ValidatingCachedResponse),
-                    std::make_tuple(absl::nullopt, FilterState::DecodeServingFromCache),
-                    std::make_tuple(absl::nullopt, FilterState::EncodeServingFromCache),
-                    std::make_tuple(absl::nullopt, FilterState::Destroyed)));
+TEST(LookupStatusTest, ResolveLookupStatusReturnsCorrectStatuses) {
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Initial),
+            LookupStatus::RequestIncomplete);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::NotServingFromCache),
+            LookupStatus::RequestNotCacheable);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
+            LookupStatus::Unknown);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
+            LookupStatus::Unknown);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::DecodeServingFromCache),
+            LookupStatus::Unknown);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::EncodeServingFromCache),
+            LookupStatus::Unknown);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Destroyed),
+            LookupStatus::Unknown);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                             FilterState::ValidatingCachedResponse),
+            LookupStatus::RequestIncomplete);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                             FilterState::EncodeServingFromCache),
+            LookupStatus::StaleHitWithSuccessfulValidation);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                             FilterState::ResponseServedFromCache),
+            LookupStatus::StaleHitWithSuccessfulValidation);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                             FilterState::NotServingFromCache),
+            LookupStatus::StaleHitWithFailedValidation);
+  EXPECT_EQ(
+      CacheFilter::resolveLookupStatus(CacheEntryStatus::FoundNotModified, FilterState::Destroyed),
+      LookupStatus::CacheHit);
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(CacheEntryStatus::LookupError, FilterState::Destroyed),
+            LookupStatus::LookupError);
+}
 
 // A new type alias for a different type of tests that use the exact same class
 using ValidationHeadersTest = CacheFilterTest;
