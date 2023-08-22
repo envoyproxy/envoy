@@ -135,7 +135,7 @@ public:
      * emit the value. The supplied function may emit the value in
      * one of three ways:
      *   1. Instantiating and populating a subordinate map or array.
-     *   2. Call newSanitizedValue() with a value to be json-sanitized,
+     *   2. Call addSanitized() with a value to be json-sanitized,
      *      quoted, and emitted.
      *   3. Call deferValue() which returns a structure that can be saved
      *      and and resolved at a later time. This makes it possible to
@@ -157,17 +157,23 @@ public:
      */
     void newEntries(const Entries& entries);
 
-    void newSanitizedValue(absl::string_view value);
-    void clearDeferredValue() {
-      deferred_value_.reset();
-      expecting_value_ = false;
-    }
+    /**
+     * Sanitizes a value using the JSON sanitizer, adds double-quotes, and sets
+     * it as the current map value. This routine must only be called from the
+     * lambda passed to newKey().
+     */
     void addSanitized(absl::string_view value);
 
   protected:
     virtual void newEntry() override;
 
   private:
+    void clearDeferredValue() {
+      deferred_value_.reset();
+      expecting_value_ = false;
+    }
+
+    friend DeferredValue;
     bool expecting_value_{false};
     OptRef<DeferredValue> deferred_value_;
   };
