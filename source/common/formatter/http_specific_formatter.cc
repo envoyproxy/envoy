@@ -410,7 +410,7 @@ static const std::string DEFAULT_FORMAT =
     "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
 
-FormatterPtr HttpHttpSubstitutionFormatUtils::defaultSubstitutionFormatter() {
+FormatterPtr HttpSubstitutionFormatUtils::defaultSubstitutionFormatter() {
   return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
 }
 
