@@ -76,7 +76,6 @@ private:
   uint32_t last_cx_rx_data_segments_{};
   uint32_t last_cx_tx_retransmitted_segments_{};
   uint32_t last_cx_rx_bytes_received_{};
-  uint32_t last_cx_tx_bytes_sent_{};
   uint32_t last_cx_tx_unsent_bytes_{};
   uint32_t last_cx_tx_unacked_segments_{};
 };

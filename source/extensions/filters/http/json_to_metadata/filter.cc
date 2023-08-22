@@ -386,7 +386,10 @@ void Filter::processResponseBody() {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  ASSERT(config_->doRequest());
+  ASSERT(config_->doRequest() || config_->doResponse());
+  if (!config_->doRequest()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
   if (!config_->requestContentTypeAllowed(headers.getContentTypeValue())) {
     request_processing_finished_ = true;
     config_->stats().rq_mismatched_content_type_.inc();
@@ -402,7 +405,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
-  ASSERT(config_->doResponse());
+  ASSERT(config_->doRequest() || config_->doResponse());
+  if (!config_->doResponse()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
   if (!config_->responseContentTypeAllowed(headers.getContentTypeValue())) {
     response_processing_finished_ = true;
     config_->stats().rsp_mismatched_content_type_.inc();
@@ -419,7 +425,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(config_->doRequest());
+  ASSERT(config_->doRequest() || config_->doResponse());
+  if (!config_->doRequest()) {
+    return Http::FilterDataStatus::Continue;
+  }
   if (request_processing_finished_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -442,7 +451,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(config_->doResponse());
+  ASSERT(config_->doRequest() || config_->doResponse());
+  if (!config_->doResponse()) {
+    return Http::FilterDataStatus::Continue;
+  }
   if (request_processing_finished_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -465,7 +477,10 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
-  ASSERT(config_->doRequest());
+  ASSERT(config_->doRequest() || config_->doResponse());
+  if (!config_->doRequest()) {
+    return Http::FilterTrailersStatus::Continue;
+  }
   if (!request_processing_finished_) {
     processRequestBody();
   }
@@ -473,7 +488,10 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
-  ASSERT(config_->doResponse());
+  ASSERT(config_->doRequest() || config_->doResponse());
+  if (!config_->doResponse()) {
+    return Http::FilterTrailersStatus::Continue;
+  }
   if (!response_processing_finished_) {
     processResponseBody();
   }
