@@ -22,6 +22,7 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_str_format"],
     deps = [
+        ":substitution_format_utility_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/runtime:runtime_interface",
@@ -49,5 +50,19 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "substitution_format_utility_lib",
+    srcs = ["substitution_format_utility.cc"],
+    hdrs = ["substitution_format_utility.h"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/http:protocol_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stream_info:utility_lib",
     ],
 )

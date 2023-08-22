@@ -191,7 +191,7 @@ static void BM_FormatterCommandParsing(benchmark::State& state) {
   const std::string token = "Listener:namespace:key";
   std::string listener, names, key;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    Formatter::SubstitutionFormatParser::parseSubcommand(token, ':', listener, names, key);
+    Formatter::SubstitutionFormatUtils::parseSubcommand(token, ':', listener, names, key);
   }
 }
 BENCHMARK(BM_FormatterCommandParsing);

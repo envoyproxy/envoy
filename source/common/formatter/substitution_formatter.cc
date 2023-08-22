@@ -59,7 +59,7 @@ void CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags, const std::str
   }
 }
 
-FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
+FormatterPtr HttpSubstitutionFormatUtils::defaultSubstitutionFormatter() {
   return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
 }
 
@@ -339,9 +339,9 @@ ProtobufWkt::Struct StructFormatter::format(const Http::RequestHeaderMap& reques
   return structFormatMapCallback(struct_output_format_, visitor).struct_value();
 }
 
-void SubstitutionFormatParser::parseSubcommandHeaders(const std::string& subcommand,
-                                                      std::string& main_header,
-                                                      std::string& alternative_header) {
+void SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcommand,
+                                                     std::string& main_header,
+                                                     std::string& alternative_header) {
   // subs is used only to check if there are more than 2 headers separated by '?'.
   std::vector<std::string> subs;
   alternative_header = "";
