@@ -190,7 +190,7 @@ message Subset {
   // By setting this field to true, redundant key/value pairs are allowed in the request metadata. The keys
   // of request metadata could be superset of keys of subset selectors.
   //
-  // More specifically, if the keys of request metadata is superset of one of subset selectors, then only
+  // More specifically, if the keys of a request metadata is a superset of one of the subset selectors, then only
   // keys that in the selector keys will be evaluated. Take the above example, if the request metadata is
   // ``{"redundant-key": "redundant-value", "stage": "prod", "version": "v1"}``, the load balancer will
   // only evaluate ``stage`` and ``version`` and their values to find appropriate subset because ``stage``
