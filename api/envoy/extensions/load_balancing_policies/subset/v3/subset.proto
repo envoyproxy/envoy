@@ -191,7 +191,7 @@ message Subset {
   // of a request metadata will be superset of the keys of the subset selectors.
   //
   // More specifically, if the keys of a request metadata is a superset of one of the subset selectors, then only
-  // keys that in the selector keys will be evaluated. Take the above example, if the request metadata is
+  // the values of the keys that in the selector keys will be matched. Take the above example, if the request metadata is
   // ``{"redundant-key": "redundant-value", "stage": "prod", "version": "v1"}``, the load balancer will
   // only evaluate ``stage`` and ``version`` and their values to find appropriate subset because ``stage``
   // ``version`` are contained by the second subset selector and the redundant ``redundant-key`` will be
