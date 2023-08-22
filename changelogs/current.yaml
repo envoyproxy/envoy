@@ -2,6 +2,7 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
 - area: eds
   change: |
     Introduced caching of EDS assignments when used with ADS. Prior to this change, Envoy required that EDS assignments were sent
@@ -37,6 +38,12 @@ bug_fixes:
     :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
     :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
     values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
+- area: extension_discovery_service
+  change: |
+    Fixed a bug causing crash if ECDS is used with upstream HTTP filters.
+- area: tls
+  change: |
+    fixed a bug where handshake may fail when both private key provider and cert validation are set.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -57,6 +64,14 @@ new_features:
 - area: extension_discovery_service
   change: |
     added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
+- area: ext_proc
+  change: |
+    added
+    :ref:`disable_immediate_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_immediate_response>`
+    config API to ignore the
+    :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
+    message from the external processing server.
+
 - area: http
   change: |
     added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
@@ -69,5 +84,15 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: tap
+  change: |
+    added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
+    out to a custom sink extension.
 
 deprecated:
+- area: tracing
+  change: |
+    OpenTracing is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
+- area: tracing
+  change: |
+    Opencensus is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.

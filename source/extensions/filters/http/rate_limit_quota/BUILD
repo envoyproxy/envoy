@@ -25,6 +25,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/matching/input_matchers/cel_matcher:config",
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
     ],

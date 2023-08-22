@@ -410,7 +410,11 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;
+
+private:
   absl::optional<uint32_t> response_code_;
+
+public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};

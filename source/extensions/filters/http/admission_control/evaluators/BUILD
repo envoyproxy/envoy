@@ -18,6 +18,8 @@ envoy_cc_library(
         "success_criteria_evaluator.h",
     ],
     deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/common:pure_lib",
         "//envoy/grpc:status",
         "//source/common/common:enum_to_int",
         "//source/common/common:fmt_lib",

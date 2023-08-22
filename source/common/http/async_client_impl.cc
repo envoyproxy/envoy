@@ -301,7 +301,7 @@ void AsyncRequestSharedImpl::onComplete() {
 
 void AsyncRequestSharedImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
-  streamInfo().response_code_ = response_code;
+  streamInfo().setResponseCode(response_code);
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 

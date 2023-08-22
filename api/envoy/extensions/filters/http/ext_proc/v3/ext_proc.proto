@@ -205,7 +205,6 @@ message ExternalProcessor {
   // message in an external processor response. In such case, no local reply will be sent.
   // Instead, the stream to the external processor will be closed. There will be no
   // more external processing for this stream from now on.
-  // [#not-implemented-hide:]
   bool disable_immediate_response = 15;
 }
 

@@ -204,6 +204,19 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 	return uint64(status)
 }
 
+//export envoyGoFilterOnHttpLog
+func envoyGoFilterOnHttpLog(r *C.httpRequest) {
+	req := getRequest(r)
+	// do nothing as the request is finished
+	defer req.RecoverPanic()
+	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
+		req.sema.Done()
+	}
+
+	f := req.httpFilter
+	f.OnLog()
+}
+
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
