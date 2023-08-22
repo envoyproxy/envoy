@@ -544,6 +544,7 @@ envoy_cc_test(
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         ":utility_lib",
+        ":test_local_address_selector",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -805,11 +806,23 @@ envoy_cc_test(
     size = "large",
     srcs = ["local_address_selector_integration_test.cc"],
     deps = [
+        "test_local_address_selector",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_local_address_selector",
+    hdrs = [
+        "test_local_address_selector.h",
+    ],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
     ],
 )

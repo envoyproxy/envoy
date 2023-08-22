@@ -29,6 +29,7 @@
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/common/upstream/test_local_address_selector.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -3217,38 +3218,6 @@ TEST_F(StaticClusterImplTest, LedsUnsupported) {
       StaticClusterImpl cluster(cluster_config, factory_context), EnvoyException,
       "LEDS is only supported when EDS is used. Static cluster staticcluster cannot use LEDS.");
 }
-
-class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
-
-public:
-  TestUpstreamLocalAddressSelector(
-      std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses)
-      : upstream_local_addresses_{std::move(upstream_local_addresses)} {}
-
-  UpstreamLocalAddress
-  getUpstreamLocalAddressImpl(const Network::Address::InstanceConstSharedPtr&) const override {
-    current_idx_ = (current_idx_ + 1) % upstream_local_addresses_.size();
-    return upstream_local_addresses_[current_idx_];
-  }
-
-private:
-  std::vector<UpstreamLocalAddress> upstream_local_addresses_;
-  mutable size_t current_idx_ = 0;
-};
-
-class TestUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
-  UpstreamLocalAddressSelectorConstSharedPtr createLocalAddressSelector(
-      std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
-      absl::optional<std::string>) const override {
-    return std::make_shared<TestUpstreamLocalAddressSelector>(upstream_local_addresses);
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Empty>();
-  }
-
-  std::string name() const override { return "test.upstream.local.address.selector"; }
-};
 
 // Test ability to register custom local address selector.
 TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {

@@ -3,6 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/upstream/upstream.h"
 
+#include "test/common/upstream/test_local_address_selector.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/registry.h"
@@ -11,7 +12,7 @@
 namespace Envoy {
 namespace Upstream {
 
-// Basic test that instantiates the DefaultLocalAddressSelector.
+// Basic test that instantiates the ``DefaultLocalAddressSelector``.
 TEST_P(HttpProtocolIntegrationTest, Basic) {
 
   // Specify both IPv4 and IPv6 source addresses, so the right one is picked
@@ -43,22 +44,15 @@ TEST_P(HttpProtocolIntegrationTest, Basic) {
   EXPECT_EQ(0U, response->body().size());
 }
 
+// Basic test that instantiates a custom upstream local address selector.
 TEST_P(HttpProtocolIntegrationTest, CustomUpstreamLocalAddressSelector) {
 
-  ::testing::StrictMock<MockUpstreamLocalAddressSelectorFactory> factory;
-  Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> register_factory(factory);
-
-  Network::Address::InstanceConstSharedPtr source_address;
-  std::shared_ptr<::testing::StrictMock<MockUpstreamLocalAddressSelector>> local_address_selector =
-      std::make_shared<::testing::StrictMock<MockUpstreamLocalAddressSelector>>(source_address);
-  // Setup expectations.
-  EXPECT_CALL(factory, createLocalAddressSelector(_, _))
-      .WillOnce(::testing::Return(local_address_selector));
-  EXPECT_CALL(*local_address_selector, getUpstreamLocalAddressImpl(_))
-      .WillOnce(::testing::Return(UpstreamLocalAddress()));
+  std::shared_ptr<size_t> num_calls = std::make_shared<size_t>(0);
+  TestUpstreamLocalAddressSelectorFactory factory(num_calls, true);
+  Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> registration(factory);
 
   auto const port_value = 1234;
-  // Create a config that is invalid for the DefaultLocalAddressSelector.
+  // Create a config that is invalid for the ``DefaultLocalAddressSelector``.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto bind_config = bootstrap.mutable_cluster_manager()->mutable_upstream_bind_config();
     auto local_address_selector_config = bind_config->mutable_local_address_selector();
@@ -86,6 +80,9 @@ TEST_P(HttpProtocolIntegrationTest, CustomUpstreamLocalAddressSelector) {
   // received at by client
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
+  // Verify that we called ``getUpstreamLocalAddressImpl`` on ``TestUpstreamLocalAddressSelector``.
+  EXPECT_EQ(*num_calls, 1);
+
   // Verify the proxied request was received upstream, as expected.
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
@@ -93,6 +90,98 @@ TEST_P(HttpProtocolIntegrationTest, CustomUpstreamLocalAddressSelector) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(0U, response->body().size());
+}
+
+// Verify that the bind config specified on the cluster config overrides the one
+// on the cluster manager.
+TEST_P(HttpProtocolIntegrationTest, BindConfigOverride) {
+
+  // Set up custom local address selector factory
+  std::shared_ptr<size_t> num_calls = std::make_shared<size_t>(0);
+  TestUpstreamLocalAddressSelectorFactory factory(num_calls, true);
+  Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> registration(factory);
+  setUpstreamCount(2);
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Specify a cluster with bind config.
+    bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
+        *bootstrap.mutable_static_resources()->mutable_clusters(0));
+    bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
+    auto bind_config =
+        bootstrap.mutable_static_resources()->mutable_clusters(1)->mutable_upstream_bind_config();
+    ProtobufWkt::Empty empty;
+    auto address_selector_config = bind_config->mutable_local_address_selector();
+    address_selector_config->mutable_typed_config()->PackFrom(empty);
+    address_selector_config->set_name("test.upstream.local.address.selector");
+  });
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto default_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        default_route->mutable_route()->set_cluster("cluster_0");
+        default_route->mutable_match()->set_prefix("/path1");
+
+        // Add route that should direct to cluster with custom bind config.
+        auto second_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
+        second_route->mutable_route()->set_cluster("cluster_1");
+        second_route->mutable_match()->set_prefix("/path2");
+      });
+
+  initialize();
+
+  // Send request to cluster_0
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/path1/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  // Verify the proxied response was received downstream, as expected.
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512, response->body().size());
+
+  auto first_connection = std::move(fake_upstream_connection_);
+  codec_client_->close();
+
+  // Verify that the custom local address selector was not invoked.
+  EXPECT_EQ(*num_calls, 0);
+
+  // Send request to cluster_1.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers2{{":method", "GET"},
+                                                  {":path", "/path2/long/url"},
+                                                  {":scheme", "http"},
+                                                  {":authority", "host"}};
+  response = codec_client_->makeRequestWithBody(request_headers2, 1024);
+  waitForNextUpstreamRequest(1);
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify that we called ``getUpstreamLocalAddressImpl`` on ``TestUpstreamLocalAddressSelector``.
+  EXPECT_EQ(*num_calls, 1);
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024, upstream_request_->bodyLength());
+  // Verify the proxied response was received downstream, as expected.
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512, response->body().size());
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, HttpProtocolIntegrationTest,
