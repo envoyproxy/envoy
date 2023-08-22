@@ -133,7 +133,8 @@ TEST_F(AsyncClientImplTest, BasicStream) {
       .WillOnce(Invoke(
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
-            // The 'decoder' should also implemented the Router::UpstreamToDownstream.
+            // The backing object of 'decoder' should also implemented the
+            // Router::UpstreamToDownstream.
             const auto* upstream_to_downstream =
                 dynamic_cast<Router::UpstreamToDownstream*>(&decoder);
             EXPECT_NE(nullptr, upstream_to_downstream);
