@@ -148,9 +148,9 @@ public:
 
     /**
      * Stop listening according to implementation's own definition.
-     * @param options can be dynamically cast to provide any extra options that some
-     *                subset of listeners might use, e.g. Quic listeners may need
-     *                to configure packet forwarding during hot restart.
+     * @param options provides extra options that some subset of listeners might
+     *                use, e.g. Quic listeners may need to configure packet forwarding
+     *                during hot restart.
      */
     virtual void shutdownListener(const ExtraShutdownListenerOptions& options) PURE;
 
