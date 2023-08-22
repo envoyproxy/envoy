@@ -733,25 +733,27 @@ FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_
 FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct);
 
 FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value) {
-  if (protobuf_value.has_string_value()) {
+  switch (protobuf_value.kind_case()) {
+  case ProtobufWkt::Value::kStringValue:
     return Field::createValue(protobuf_value.string_value());
-  } else if (protobuf_value.has_number_value()) {
+  case ProtobufWkt::Value::kNumberValue:
     return Field::createValue(protobuf_value.number_value());
-  } else if (protobuf_value.has_bool_value()) {
+  case ProtobufWkt::Value::kBoolValue:
     return Field::createValue(protobuf_value.bool_value());
-  } else if (protobuf_value.has_null_value()) {
+  case ProtobufWkt::Value::kNullValue:
     return Field::createNull();
-  } else if (protobuf_value.has_list_value()) {
+  case ProtobufWkt::Value::kListValue: {
     FieldSharedPtr array = Field::createArray();
     for (const auto& list_value : protobuf_value.list_value().values()) {
       array->append(loadFromProtobufValueInternal(list_value));
     }
     return array;
-  } else if (protobuf_value.has_struct_value()) {
-    return loadFromProtobufStructInternal(protobuf_value.struct_value());
   }
-
-  PANIC("not implemented");
+  case ProtobufWkt::Value::kStructValue:
+    return loadFromProtobufStructInternal(protobuf_value.struct_value());
+  default:
+    PANIC("not implemented");
+  }
 }
 
 FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct) {

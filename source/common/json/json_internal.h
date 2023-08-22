@@ -27,7 +27,7 @@ public:
   static absl::StatusOr<ObjectSharedPtr> loadFromStringNoThrow(const std::string& json);
 
   /**
-   * Constructs a Json Object from a string.
+   * Constructs a Json Object from a Protobuf struct.
    */
   static ObjectSharedPtr loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct);
 
