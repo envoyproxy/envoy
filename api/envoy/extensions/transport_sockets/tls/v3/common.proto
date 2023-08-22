@@ -241,7 +241,6 @@ message TlsCertificate {
   // error.
   PrivateKeyProvider private_key_provider = 6;
 
-  bool fallback = 9;
   // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
   // TLS private key is not password encrypted.
   config.core.v3.DataSource password = 3 [(udpa.annotations.sensitive) = true];
