@@ -171,7 +171,7 @@ message Subset {
   // metadata. The same host may appear in multiple subsets.
   repeated LbSubsetSelector subset_selectors = 3;
 
-  // By default, only when the request metadata has exactly **same** keys with one of subset selectors and
+  // By default, only when the request metadata has exactly the **same** keys as one of subset selectors and
   // the values of related keys are matched, the load balancer could get valid subset for the request.
   // For example, given following subset selectors:
   //
