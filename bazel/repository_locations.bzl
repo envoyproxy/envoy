@@ -1154,7 +1154,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
-            "envoy.filters.http.rate_limit_quota",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
