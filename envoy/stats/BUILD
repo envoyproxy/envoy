@@ -33,6 +33,7 @@ envoy_cc_library(
     deps = [
         ":refcount_ptr_interface",
         "//envoy/common:interval_set_interface",
+        "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
     ],
 )

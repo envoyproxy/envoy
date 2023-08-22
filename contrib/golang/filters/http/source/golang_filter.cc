@@ -201,9 +201,17 @@ void Filter::onDestroy() {
 
 // access_log is executed before the log of the stream filter
 void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
+                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info,
                  Envoy::AccessLog::AccessLogType) {
-  // Todo log phase of stream filter
+  // `log` may be called multiple times with different log type
+  if (!stream_info.requestComplete().has_value()) {
+    return;
+  }
+
+  // TODO: support mid-request logging
+  auto& state = getProcessorState();
+  state.log();
+  dynamic_lib_->envoyGoFilterOnHttpLog(req_);
 }
 
 /*** common APIs for filter, both decode and encode ***/
@@ -1381,41 +1389,6 @@ ProcessorState& Filter::getProcessorState() {
   return enter_encoding_ ? dynamic_cast<ProcessorState&>(encoding_state_)
                          : dynamic_cast<ProcessorState&>(decoding_state_);
 };
-
-/* FilterLogger */
-void FilterLogger::log(uint32_t level, absl::string_view message) const {
-  switch (static_cast<spdlog::level::level_enum>(level)) {
-  case spdlog::level::trace:
-    ENVOY_LOG(trace, "{}", message);
-    return;
-  case spdlog::level::debug:
-    ENVOY_LOG(debug, "{}", message);
-    return;
-  case spdlog::level::info:
-    ENVOY_LOG(info, "{}", message);
-    return;
-  case spdlog::level::warn:
-    ENVOY_LOG(warn, "{}", message);
-    return;
-  case spdlog::level::err:
-    ENVOY_LOG(error, "{}", message);
-    return;
-  case spdlog::level::critical:
-    ENVOY_LOG(critical, "{}", message);
-    return;
-  case spdlog::level::off:
-    // means not logging
-    return;
-  case spdlog::level::n_levels:
-    PANIC("not implemented");
-  }
-
-  ENVOY_LOG(error, "undefined log level {} with message '{}'", level, message);
-
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
-uint32_t FilterLogger::level() const { return static_cast<uint32_t>(ENVOY_LOGGER().level()); }
 
 } // namespace Golang
 } // namespace HttpFilters

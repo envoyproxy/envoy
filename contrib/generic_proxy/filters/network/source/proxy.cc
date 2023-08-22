@@ -37,7 +37,11 @@ ActiveStream::ActiveStream(Filter& parent, RequestPtr request, ExtendedOptions o
     : parent_(parent), downstream_request_stream_(std::move(request)),
       downstream_request_options_(options),
       stream_info_(parent_.time_source_,
-                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()) {
+                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()),
+      request_timer_(new Stats::HistogramCompletableTimespanImpl(parent_.stats_.request_time_ms_,
+                                                                 parent_.time_source_)) {
+  parent_.stats_.request_.inc();
+  parent_.stats_.request_active_.inc();
 
   connection_manager_tracing_config_ = parent_.config_->tracingConfig();
 
@@ -165,6 +169,7 @@ void ActiveStream::continueEncoding() {
 void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer) {
   ASSERT(parent_.connection().state() == Network::Connection::State::Open);
   parent_.connection().write(buffer, false);
+  parent_.stats_.response_.inc();
   parent_.deferredStream(*this);
 }
 
@@ -177,6 +182,9 @@ void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
 
 void ActiveStream::completeRequest() {
   stream_info_.onRequestComplete();
+
+  request_timer_->complete();
+  parent_.stats_.request_active_.dec();
 
   if (active_span_) {
     Tracing::TracerUtility::finalizeSpan(*active_span_, *downstream_request_stream_, stream_info_,
@@ -318,6 +326,8 @@ void UpstreamManagerImpl::onDecodingFailure() {
 
   ENVOY_LOG(error, "generic proxy bound upstream manager: decoding failure");
 
+  parent_.stats_.response_decoding_error_.inc();
+
   while (!registered_response_callbacks_.empty()) {
     auto it = registered_response_callbacks_.begin();
     auto cb = it->second;
@@ -355,6 +365,8 @@ void Filter::onDecodingSuccess(RequestPtr request, ExtendedOptions options) {
 }
 
 void Filter::onDecodingFailure() {
+  stats_.request_decoding_error_.inc();
+
   resetStreamsForUnexpectedError();
   closeDownstreamConnection();
 }

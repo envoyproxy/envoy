@@ -69,7 +69,7 @@ type NetworkCAPI interface {
 	SetFilterState(f unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 
 	// UpstreamConnect creates an envoy upstream connection to address
-	UpstreamConnect(libraryID string, addr string) unsafe.Pointer
+	UpstreamConnect(libraryID string, addr string, connID uint64) unsafe.Pointer
 	// UpstreamWrite writes buffer data into upstream connection.
 	UpstreamWrite(f unsafe.Pointer, bufferPtr unsafe.Pointer, bufferLen int, endStream int)
 	// UpstreamClose closes the upstream connection

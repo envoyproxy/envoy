@@ -96,7 +96,6 @@ Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_e
 
 void vclEndptFromAddress(vppcom_endpt_t& endpt,
                          Envoy::Network::Address::InstanceConstSharedPtr address) {
-  endpt.is_cut_thru = 0;
   if (address->ip()->version() == Envoy::Network::Address::IpVersion::v4) {
     const sockaddr_in* in = reinterpret_cast<const sockaddr_in*>(address->sockAddr());
     endpt.is_ip4 = 1;
