@@ -187,13 +187,16 @@ message Subset {
   // of keys ``stage`` and ``version`` are matched because of the redundant key/value pair in the request
   // metadata.
   //
-  // By setting this field to true, redundant key/value pairs are allowed in the request metadata. The keys
-  // of a request metadata will be superset of the keys of the subset selectors.
+  // By setting this field to true, the most appropriate keys will be filtered out from the request metadata
+  // according to the subset selectors. And then the filtered keys and related values will be matched to find
+  // the valid host subset. By this way, redundant key/value pairs are allowed in the request metadata. The keys
+  // of a request metadata could be superset of the keys of the subset selectors and need not to be exactly the
+  // same as the keys of the subset selectors.
   //
   // More specifically, if the keys of a request metadata is a superset of one of the subset selectors, then only
-  // the values of the keys that in the selector keys will be matched. Take the above example, if the request metadata is
-  // ``{"redundant-key": "redundant-value", "stage": "prod", "version": "v1"}``, the load balancer will
-  // only match the values of ``stage`` and ``version`` to find an appropriate subset because ``stage``
+  // the values of the keys that in the selector keys will be matched. Take the above example, if the request
+  // metadata is ``{"redundant-key": "redundant-value", "stage": "prod", "version": "v1"}``, the load balancer
+  // will only match the values of ``stage`` and ``version`` to find an appropriate subset because ``stage``
   // ``version`` are contained by the second subset selector and the redundant ``redundant-key`` will be
   // ignored.
   //
