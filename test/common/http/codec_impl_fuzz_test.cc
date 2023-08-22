@@ -338,6 +338,12 @@ public:
         }
         encoder->getStream().resetStream(
             static_cast<Http::StreamResetReason>(directional_action.reset_stream()));
+        if (http_protocol_ < Protocol::Http2 && response) {
+          // Invoke the stream reset callback in case the HTTP response has been
+          // encoded and then the fuzzer does a reset stream call which for
+          // HTTP/1 should lead to the connection being closed.
+          stream_reset_callback_();
+        }
         request_.stream_state_ = response_.stream_state_ = StreamState::Closed;
       }
       break;
