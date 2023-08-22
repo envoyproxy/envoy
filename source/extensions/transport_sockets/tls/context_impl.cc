@@ -526,7 +526,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
   if (result.status != ValidationResults::ValidationStatus::Pending) {
     extended_socket_info->setCertificateValidationStatus(result.detailed_status);
     extended_socket_info->onCertificateValidationCompleted(
-        result.status == ValidationResults::ValidationStatus::Successful);
+        result.status == ValidationResults::ValidationStatus::Successful, false);
   }
   return result;
 }

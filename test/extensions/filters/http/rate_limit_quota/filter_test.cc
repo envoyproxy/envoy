@@ -15,6 +15,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "xds/type/matcher/v3/cel.pb.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -516,6 +518,115 @@ TEST_F(FilterTest, DecodeHeaderWithMismatchHeader) {
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+}
+
+TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
+  // Compiled CEL expression string: request.headers['authenticated_user'] == 'staging'
+  std::string cel_expr_str = R"pb(
+    expr {
+      id: 8
+      call_expr {
+        function: "_==_"
+        args {
+          id: 6
+          call_expr {
+            function: "_[_]"
+            args {
+              id: 5
+              select_expr {
+                operand {
+                  id: 4
+                  ident_expr {name: "request"}
+                }
+                field: "headers"
+              }
+            }
+            args {
+              id: 7
+              const_expr {
+                string_value: "authenticated_user"
+              }
+            }
+          }
+        }
+        args {
+          id: 9
+          const_expr { string_value: "staging" }
+        }
+      }
+    }
+  )pb";
+  google::api::expr::v1alpha1::CheckedExpr checked_expr;
+  Protobuf::TextFormat::ParseFromString(cel_expr_str, &checked_expr);
+
+  xds::type::matcher::v3::CelMatcher cel_matcher;
+  cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+  xds::type::matcher::v3::Matcher matcher;
+
+  auto* inner_matcher = matcher.mutable_matcher_list()->add_matchers();
+  auto* single_predicate = inner_matcher->mutable_predicate()->mutable_single_predicate();
+
+  xds::type::matcher::v3::HttpAttributesCelMatchInput cel_match_input;
+  single_predicate->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
+  single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
+
+  auto* custom_matcher = single_predicate->mutable_custom_match();
+  custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
+
+  std::string on_match_str = R"pb(
+    action {
+      name: "rate_limit_quota"
+      typed_config {
+        [type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings] {
+          bucket_id_builder {
+            bucket_id_builder {
+              key: "authenticated_user"
+              value {
+                custom_value {
+                  name: "test_1"
+                  typed_config {
+                    [type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput] {
+                      header_name: "authenticated_user"
+                    }
+                  }
+                }
+              }
+            }
+            bucket_id_builder {
+              key: "name"
+              value {
+                string_value: "prod"
+              }
+            }
+          }
+          reporting_interval {
+            seconds: 60
+          }
+        }
+      }
+    }
+  )pb";
+  xds::type::matcher::v3::Matcher::OnMatch on_match;
+  Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
+  inner_matcher->mutable_on_match()->MergeFrom(on_match);
+  config_.mutable_bucket_matchers()->MergeFrom(matcher);
+  std::cout << config_.DebugString() << std::endl;
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
+  // in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {
+      {"authenticated_user", "staging"}};
+
+  buildCustomHeader(custom_value_pairs);
+
+  // The expected bucket ids has one additional pair that is built statically via `string_value`
+  // from the config.
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({"name", "prod"});
+  verifyRequestMatchingSucceeded(expected_bucket_ids);
+
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse resp;
+  filter_->onQuotaResponse(resp);
 }
 
 } // namespace

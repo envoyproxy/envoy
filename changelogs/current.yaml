@@ -2,9 +2,6 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: tracing
-  change: |
-    OpenTracing is now deprecated since the upstream project has been abandoned.
 
 - area: eds
   change: |
@@ -44,6 +41,9 @@ bug_fixes:
 - area: redis_proxy
   change: |
     Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.
+- area: tls
+  change: |
+    fixed a bug where handshake may fail when both private key provider and cert validation are set.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -84,5 +84,15 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: tap
+  change: |
+    added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
+    out to a custom sink extension.
 
 deprecated:
+- area: tracing
+  change: |
+    OpenTracing is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
+- area: tracing
+  change: |
+    Opencensus is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
