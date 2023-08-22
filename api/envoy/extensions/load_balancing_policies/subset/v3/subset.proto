@@ -183,7 +183,7 @@ message Subset {
   //   ]}
   //
   // A request with metadata ``{"redundant-key": "redundant-value", "stage": "prod", "version": "v1"}`` or
-  // ``{"redundant-key": "redundant-value", "version": "v1"}`` can never get valid subset even if the values
+  // ``{"redundant-key": "redundant-value", "version": "v1"}`` will not have a valid subset even if the values
   // of keys ``stage`` and ``version`` are matched because of the redundant key/value pair in the request
   // metadata.
   //
