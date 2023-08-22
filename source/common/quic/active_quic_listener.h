@@ -94,7 +94,7 @@ private:
   // Latches envoy.reloadable_features.quic_reject_all at the beginning of each event loop.
   bool reject_all_{false};
   // During hot restart, an optional handler for packets that weren't for existing connections.
-  OptRef<Network::NondispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
+  OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

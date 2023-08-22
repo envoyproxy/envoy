@@ -22,14 +22,14 @@ namespace Network {
 // are not for an existing connection.
 // This is currently supported for QUIC listeners to forward packets to the child instance.
 // TODO(mattklein123): determine if other UDP listeners have a reason to do this.
-class NondispatchedUdpPacketHandler {
+class NonDispatchedUdpPacketHandler {
 public:
-  virtual ~NondispatchedUdpPacketHandler() = default;
+  virtual ~NonDispatchedUdpPacketHandler() = default;
   virtual void handle(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
 };
 
 struct ExtraShutdownListenerOptions {
-  OptRef<NondispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
+  OptRef<NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
 };
 
 /**
