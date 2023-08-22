@@ -188,7 +188,7 @@ message Subset {
   // metadata.
   //
   // By setting this field to true, redundant key/value pairs are allowed in the request metadata. The keys
-  // of request metadata could be superset of keys of subset selectors.
+  // of a request metadata will be superset of the keys of the subset selectors.
   //
   // More specifically, if the keys of a request metadata is a superset of one of the subset selectors, then only
   // keys that in the selector keys will be evaluated. Take the above example, if the request metadata is
