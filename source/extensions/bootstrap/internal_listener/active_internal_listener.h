@@ -75,7 +75,7 @@ public:
       listener_->enable();
     }
   }
-  void shutdownListener(std::shared_ptr<Network::ExtraShutdownListenerOptions>) override {
+  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
     listener_.reset();
   }
   void updateListenerConfig(Network::ListenerConfig& config) override;

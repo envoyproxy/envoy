@@ -62,7 +62,7 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override;
   void resumeListening() override;
-  void shutdownListener(Network::ExtraShutdownListenerOptionsSharedPtr options) override;
+  void shutdownListener(const Network::ExtraShutdownListenerOptions& options) override;
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
@@ -93,7 +93,8 @@ private:
   const QuicConnectionIdWorkerSelector select_connection_id_worker_;
   // Latches envoy.reloadable_features.quic_reject_all at the beginning of each event loop.
   bool reject_all_{false};
-  std::shared_ptr<Network::HotRestartUdpPacketForwarding> hot_restart_udp_packet_forwarding_;
+  // During hot restart, an optional handler for packets that weren't for existing connections.
+  OptRef<Network::NondispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

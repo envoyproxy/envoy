@@ -60,7 +60,7 @@ public:
 
   void pauseListening() override;
   void resumeListening() override;
-  void shutdownListener(Network::ExtraShutdownListenerOptionsSharedPtr) override {
+  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
     listener_.reset();
   }
 

@@ -118,8 +118,8 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
-    if (hot_restart_udp_packet_forwarding_ != nullptr) {
-      hot_restart_udp_packet_forwarding_->forwardUdpPacket(worker_index_, std::move(data));
+    if (non_dispatched_udp_packet_handler_.has_value()) {
+      non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
     }
   }
 
@@ -169,9 +169,9 @@ void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewCo
 
 void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
 
-void ActiveQuicListener::shutdownListener(Network::ExtraShutdownListenerOptionsSharedPtr options) {
-  hot_restart_udp_packet_forwarding_ =
-      std::dynamic_pointer_cast<Network::HotRestartUdpPacketForwarding>(options);
+void ActiveQuicListener::shutdownListener(const Network::ExtraShutdownListenerOptions& options) {
+  non_dispatched_udp_packet_handler_ = options.non_dispatched_udp_packet_handler_;
+
   // Same as pauseListening() because all we want is to stop accepting new
   // connections.
   quic_dispatcher_->StopAcceptingNewConnections();

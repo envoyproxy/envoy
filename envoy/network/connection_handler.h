@@ -17,27 +17,20 @@
 namespace Envoy {
 namespace Network {
 
-// An effectively abstract class, used for dynamic class inheritance via dynamic_cast
-// such that options specific to individual listener types can be passed in
-// through the shutdownListener function, without other listener types needing
-// to know about it. Subclasses should specify `virtual ExtraShutdownListenerOptions`
-// so that they can be combined with other subclasses into a class containing multiple
-// types of options.
-class ExtraShutdownListenerOptions {
+// This interface allows for a listener to perform an alternative behavior when a
+// packet can't be routed correctly during draining; for example QUIC packets that
+// are not for an existing connection.
+// This is currently supported for QUIC listeners to forward packets to the child instance.
+// TODO(mattklein123): determine if other UDP listeners have a reason to do this.
+class NondispatchedUdpPacketHandler {
 public:
-  virtual ~ExtraShutdownListenerOptions() = default;
+  virtual ~NondispatchedUdpPacketHandler() = default;
+  virtual void handle(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
 };
 
-// An interface for ExtraShutdownListenerOptions enabling us to forward UDP packets from
-// the parent instance to the child instance during hot restart draining.
-// This is currently supported for QUIC listeners.
-// TODO(mattklein123): determine if other UDP ports have a reason to do this.
-class HotRestartUdpPacketForwarding : virtual public ExtraShutdownListenerOptions {
-public:
-  virtual void forwardUdpPacket(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
+struct ExtraShutdownListenerOptions {
+  OptRef<NondispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
 };
-
-using ExtraShutdownListenerOptionsSharedPtr = std::shared_ptr<ExtraShutdownListenerOptions>;
 
 /**
  * Abstract connection handler.
@@ -159,7 +152,7 @@ public:
      *                subset of listeners might use, e.g. Quic listeners may need
      *                to configure packet forwarding during hot restart.
      */
-    virtual void shutdownListener(ExtraShutdownListenerOptionsSharedPtr options = nullptr) PURE;
+    virtual void shutdownListener(const ExtraShutdownListenerOptions& options) PURE;
 
     /**
      * Update the listener config.
