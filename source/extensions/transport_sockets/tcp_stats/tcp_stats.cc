@@ -143,7 +143,8 @@ void TcpStatsSocket::recordStats() {
                  tcp_info->tcpi_total_retrans);
   update_counter(config_->stats_.cx_rx_bytes_received_, last_cx_rx_bytes_received_,
                  tcp_info->tcpi_bytes_received);
-
+  update_counter(config_->stats_.cx_tx_bytes_sent_, last_cx_tx_bytes_sent_,
+                 tcp_info->tcpi_bytes_sent);
 
   update_gauge(config_->stats_.cx_tx_unsent_bytes_, last_cx_tx_unsent_bytes_,
                tcp_info->tcpi_notsent_bytes);
