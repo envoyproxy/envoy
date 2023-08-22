@@ -63,13 +63,13 @@ public:
   void setupValidDriverWithHttpExporter() {
     const std::string yaml_string = R"EOF(
     http_config:
-      http_uri:
-        uri: "https://www.example.com/v1/traces"
-        cluster: opentelemetry_collector
-        timeout: 0.250s
-      http_format: BINARY_PROTOBUF
-      collector_path: "/v1/traces"
-      collector_hostname: "example.com"
+      cluster_name: "my_o11y_backend"
+      traces_path: "/otlp/v1/traces"
+      hostname: "some-o11y.com"
+      headers:
+        - key: "Authorization"
+          value: "auth-token"
+      timeout: 0.250s
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -535,15 +535,14 @@ resource_spans:
 
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
   context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->name_ =
-      "opentelemetry_collector";
+      "my_o11y_backend";
   context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
-      {"opentelemetry_collector"});
+      {"my_o11y_backend"});
   ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
           httpAsyncClient())
       .WillByDefault(ReturnRef(
           context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
-  context_.server_factory_context_.cluster_manager_.initializeClusters({"opentelemetry_collector"},
-                                                                       {});
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
   setupValidDriverWithHttpExporter();
 
   Http::TestRequestHeaderMapImpl request_headers{
