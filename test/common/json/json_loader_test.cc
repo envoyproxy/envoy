@@ -502,6 +502,14 @@ TEST_F(JsonLoaderTest, LoadFromStruct) {
   EXPECT_TRUE(TestUtility::jsonStringEqual(output_json, json_string));
 }
 
+TEST_F(JsonLoaderTest, LoadFromStructUnknownValueCase) {
+  ProtobufWkt::Struct src;
+  ProtobufWkt::Value value_not_set;
+  (*src.mutable_fields())["field"] = value_not_set;
+  EXPECT_THROW_WITH_MESSAGE(Factory::loadFromProtobufStruct(src), Exception,
+                            "Protobuf value case not implemented");
+}
+
 } // namespace
 } // namespace Json
 } // namespace Envoy

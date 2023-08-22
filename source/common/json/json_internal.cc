@@ -752,7 +752,7 @@ FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_
   case ProtobufWkt::Value::kStructValue:
     return loadFromProtobufStructInternal(protobuf_value.struct_value());
   default:
-    PANIC("not implemented");
+    throw Exception("Protobuf value case not implemented");
   }
 }
 
