@@ -597,7 +597,7 @@ void OAuth2Filter::setCookieOrChunkedCookies(Http::ResponseHeaderMap& headers,
     return;
   }
 
-  ENVOY_LOG(debug, "cookie {} size is greater than {}: \n{}", key, maxChunkSize);
+  ENVOY_LOG(debug, "cookie {} size is greater than {}", key, maxChunkSize);
   size_t chunkCount = setChunkedCookies(headers, key, data, maxChunkSize);
 
   // Also, set an additional cookie to store the number of chunks
