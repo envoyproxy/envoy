@@ -273,6 +273,7 @@ filegroup(
 
 envoy_cc_fuzz_test(
     name = "route_fuzz_test",
+    size = "large",
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
     deps = [

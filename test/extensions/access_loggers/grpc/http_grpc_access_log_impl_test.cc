@@ -317,7 +317,7 @@ response: {}
     stream_info.protocol_ = Http::Protocol::Http10;
     stream_info.addBytesReceived(10);
     stream_info.addBytesSent(20);
-    stream_info.response_code_ = 200;
+    stream_info.setResponseCode(200);
     stream_info.response_code_details_ = "via_upstream";
     absl::string_view route_name_view("route-name-test");
     stream_info.setRouteName(route_name_view);

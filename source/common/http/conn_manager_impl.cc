@@ -932,7 +932,7 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  filter_manager_.streamInfo().response_code_ = response_code;
+  filter_manager_.streamInfo().setResponseCode(response_code);
 
   if (filter_manager_.streamInfo().health_check_request_) {
     return;

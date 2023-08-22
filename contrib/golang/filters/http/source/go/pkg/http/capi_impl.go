@@ -283,7 +283,7 @@ func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
 }
 
 func (c *httpCApiImpl) HttpLogLevel() api.LogType {
-	return api.LogType(C.envoyGoFilterLogLevel())
+	return api.GetLogLevel()
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
