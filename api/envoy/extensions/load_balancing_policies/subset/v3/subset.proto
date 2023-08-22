@@ -173,7 +173,7 @@ message Subset {
 
   // By default, only when the request metadata has exactly the **same** keys as one of subset selectors and
   // the values of the related keys are matched, the load balancer will have a valid subset for the request.
-  // For example, given following subset selectors:
+  // For example, given the following subset selectors:
   //
   // .. code-block:: json
   //
