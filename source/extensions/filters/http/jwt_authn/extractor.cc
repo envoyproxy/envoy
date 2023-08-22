@@ -9,6 +9,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/singleton/const_singleton.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/btree_map.h"
 #include "absl/strings/match.h"
