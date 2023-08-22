@@ -28,6 +28,9 @@ public:
   virtual void handle(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
 };
 
+// Additional options for ConnectionHandler::ActiveListener::shutdownListener.
+// As a struct so that in the event of future additional parameters, the change
+// is isolated rather than cascading through all layers, mocks, etc.
 struct ExtraShutdownListenerOptions {
   OptRef<NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
 };
