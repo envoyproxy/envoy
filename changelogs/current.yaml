@@ -39,7 +39,7 @@ bug_fixes:
   change: |
     Fixed a bug where HTTP/1.1 requests with "Connection: close" header is handled differently if the requested is internally redirected.
     Without internal redirect, the response will also have a "Connection: close" header and the connection will be closed after finishing
-      that request. Requests with internal redirect should be handled in the same way. This behavior can be reverted by setting runtime
+    that request. Requests with internal redirect should be handled in the same way. This behavior can be reverted by setting runtime
     ``envoy.reloadable_features.http1_connection_close_header_in_redirect`` to false.
 - area: extension_discovery_service
   change: |
