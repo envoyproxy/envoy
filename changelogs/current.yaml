@@ -195,6 +195,23 @@ new_features:
 - area: access_log
   change: |
     added a field lookup to %FILTER_STATE% for objects that have reflection enabled.
+- area: ext_proc
+  change: |
+    added
+    :ref:`metadata_options <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.metadata_options>`
+    config API to enable sending and receiving metadata from/to the external processing server. Both typed and untyped dynamic
+    metadata may be sent to the server. If
+    :ref:`enable_returned_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.enable_returned_metadata>`
+    is enabled, returned metadata may be written to ``envoy.filters.http.ext_proc`` dynamic metadata namespace, or
+    bifurcated into ``envoy.filters.http.ext_proc.decoder`` and ``envoy.filters.http.ext_proc.encoder`` with
+    ``MetadataOptions.bifurcate_returned_metadata_namespace``.
+- area: ext_proc
+  change: |
+    implemented
+    :ref:`request_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.request_attributes>`
+    and
+    :ref:`response_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.response_attributes>`
+    config APIs to enable sending and receiving attributes from/to the external processing server.
 - area: http
   change: |
     added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
