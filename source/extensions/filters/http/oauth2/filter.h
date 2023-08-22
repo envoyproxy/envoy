@@ -287,12 +287,14 @@ private:
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   std::string getEncodedToken() const;
-  void setCookie(Http::ResponseHeaderMap& headers, const std::string& key,
-                 const std::string& value) const;
+  void setCookie(Http::ResponseHeaderMap& headers, const std::string& key, const std::string& value,
+                 const std::string& cookie_tail) const;
   size_t setChunkedCookies(Http::ResponseHeaderMap& headers, const std::string& key,
-                           const std::string& data, size_t maxChunkSize) const;
+                           const std::string& data, const std::string& cookie_tail,
+                           size_t chunkSize) const;
   void setCookieOrChunkedCookies(Http::ResponseHeaderMap& headers, const std::string& key,
-                                 const std::string& data, const size_t maxChunkSize = 4000) const;
+                                 const std::string& data, const std::string& cookie_tail,
+                                 const size_t maxChunkSize = 4000) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };

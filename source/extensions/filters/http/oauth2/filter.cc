@@ -571,17 +571,19 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
 }
 
 void OAuth2Filter::setCookie(Http::ResponseHeaderMap& headers, const std::string& key,
-                             const std::string& value) const {
-  headers.addReferenceKey(Http::Headers::get().SetCookie, absl::StrCat(key, "=", value));
+                             const std::string& value, const std::string& cookie_tail) const {
+  headers.addReferenceKey(Http::Headers::get().SetCookie,
+                          absl::StrCat(key, "=", value, cookie_tail));
 }
 
 size_t OAuth2Filter::setChunkedCookies(Http::ResponseHeaderMap& headers, const std::string& key,
-                                       const std::string& data, size_t maxChunkSize) const {
+                                       const std::string& data, const std::string& cookie_tail,
+                                       size_t chunkSize) const {
   size_t chunkCount = 0;
 
-  for (size_t i = 0; i < data.size(); i += maxChunkSize) {
-    std::string chunk = data.substr(i, maxChunkSize);
-    setCookie(headers, key + "_" + std::to_string(i / maxChunkSize), chunk);
+  for (size_t i = 0; i < data.size(); i += chunkSize) {
+    std::string chunk = data.substr(i, chunkSize);
+    setCookie(headers, key + "_" + std::to_string(i / chunkSize), chunk, cookie_tail);
     chunkCount++;
   }
 
@@ -590,18 +592,23 @@ size_t OAuth2Filter::setChunkedCookies(Http::ResponseHeaderMap& headers, const s
 
 void OAuth2Filter::setCookieOrChunkedCookies(Http::ResponseHeaderMap& headers,
                                              const std::string& key, const std::string& data,
+                                             const std::string& cookie_tail,
                                              const size_t maxChunkSize) const {
-  if (data.size() <= maxChunkSize) {
-    // If the data is smaller than the maximum chunk size, no need to split
-    setCookie(headers, key, data);
+  // maxChunkSize is the maximum size of the cookie
+  // chunkSize is the size of chunk in which data should be split
+  // considering the cookie_tail size
+  const size_t chunkSize = maxChunkSize - cookie_tail.size();
+  if (data.size() <= chunkSize) {
+    // If the data is smaller than the possible chunkSize, no need to split
+    setCookie(headers, key, data, cookie_tail);
     return;
   }
 
-  ENVOY_LOG(debug, "cookie {} size is greater than {}", key, maxChunkSize);
-  size_t chunkCount = setChunkedCookies(headers, key, data, maxChunkSize);
+  ENVOY_LOG(debug, "cookie {} size is greater than {}", key, chunkSize);
+  size_t chunkCount = setChunkedCookies(headers, key, data, cookie_tail, chunkSize);
 
   // Also, set an additional cookie to store the number of chunks
-  setCookie(headers, key + "_count", std::to_string(chunkCount));
+  setCookie(headers, key + "_count", std::to_string(chunkCount), cookie_tail);
 }
 
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
@@ -633,16 +640,16 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
             ? cookie_tail_http_only
             : cookie_tail;
-    setCookieOrChunkedCookies(headers, cookie_names.bearer_token_,
-                              absl::StrCat(access_token_, cookie_attribute_httponly));
+    setCookieOrChunkedCookies(headers, cookie_names.bearer_token_, access_token_,
+                              cookie_attribute_httponly);
     if (id_token_ != EMPTY_STRING) {
-      setCookieOrChunkedCookies(headers, cookie_names.id_token_,
-                                absl::StrCat(id_token_, cookie_attribute_httponly));
+      setCookieOrChunkedCookies(headers, cookie_names.id_token_, id_token_,
+                                cookie_attribute_httponly);
     }
 
     if (refresh_token_ != EMPTY_STRING) {
-      setCookieOrChunkedCookies(headers, cookie_names.refresh_token_,
-                                absl::StrCat(refresh_token_, cookie_attribute_httponly));
+      setCookieOrChunkedCookies(headers, cookie_names.refresh_token_, refresh_token_,
+                                cookie_attribute_httponly);
     }
   }
 }
