@@ -128,6 +128,10 @@ extern GoUint64 envoyGoFilterOnHttpData(httpRequest* r,
                                         GoUint64 buffer,
                                         GoUint64 length); // NOLINT(readability-identifier-naming)
 
+// go:linkname envoyGoFilterOnHttpLog
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpLog
+extern void envoyGoFilterOnHttpLog(httpRequest* r);
+
 // go:linkname envoyGoFilterOnHttpDestroy
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpDestroy
 extern void envoyGoFilterOnHttpDestroy(httpRequest* r, GoUint64 reason);

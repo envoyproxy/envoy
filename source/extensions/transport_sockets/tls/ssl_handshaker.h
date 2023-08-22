@@ -59,7 +59,7 @@ public:
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
   Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
   Ssl::ValidateResultCallbackPtr createValidateResultCallback() override;
-  void onCertificateValidationCompleted(bool succeeded) override;
+  void onCertificateValidationCompleted(bool succeeded, bool async) override;
   Ssl::ValidateStatus certificateValidationResult() const override {
     return cert_validation_result_;
   }
