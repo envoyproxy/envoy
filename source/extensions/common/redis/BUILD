@@ -16,7 +16,7 @@ envoy_cc_library(
     name = "cluster_refresh_manager_interface",
     hdrs = ["cluster_refresh_manager.h"],
     deps = [
-        "//envoy/common:base_includes",
+        "//envoy/common:pure_lib",
     ],
 )
 
