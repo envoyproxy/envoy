@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "source/common/http/http1/parser.h"
 
 #include "absl/base/attributes.h"
@@ -41,6 +43,7 @@ private:
   void OnHeaderInput(absl::string_view input) override;
   void OnHeader(absl::string_view key, absl::string_view value) override;
   void OnTrailerInput(absl::string_view input) override;
+  void OnTrailers(std::unique_ptr<quiche::BalsaHeaders> /*trailers*/) override{};
   void ProcessHeaders(const quiche::BalsaHeaders& headers) override;
   void ProcessTrailers(const quiche::BalsaHeaders& trailer) override;
   void OnRequestFirstLineInput(absl::string_view line_input, absl::string_view method_input,
@@ -51,7 +54,7 @@ private:
                                 absl::string_view reason_input) override;
   void OnChunkLength(size_t chunk_length) override;
   void OnChunkExtensionInput(absl::string_view input) override;
-  void OnInterimHeaders(quiche::BalsaHeaders headers) override;
+  void OnInterimHeaders(std::unique_ptr<quiche::BalsaHeaders> headers) override;
   void HeaderDone() override;
   void ContinueHeaderDone() override;
   void MessageDone() override;

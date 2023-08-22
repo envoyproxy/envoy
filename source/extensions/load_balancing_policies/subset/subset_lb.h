@@ -13,6 +13,7 @@
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/macros.h"
@@ -203,7 +204,8 @@ private:
   public:
     HostSubsetImpl(const HostSet& original_host_set, bool locality_weight_aware,
                    bool scale_locality_weight)
-        : HostSetImpl(original_host_set.priority(), original_host_set.overprovisioningFactor()),
+        : HostSetImpl(original_host_set.priority(), original_host_set.weightedPriorityHealth(),
+                      original_host_set.overprovisioningFactor()),
           original_host_set_(original_host_set), locality_weight_aware_(locality_weight_aware),
           scale_locality_weight_(scale_locality_weight) {}
 
@@ -248,7 +250,7 @@ private:
     LoadBalancerPtr lb_;
 
   protected:
-    HostSetImplPtr createHostSet(uint32_t priority,
+    HostSetImplPtr createHostSet(uint32_t priority, absl::optional<bool> weighted_priority_health,
                                  absl::optional<uint32_t> overprovisioning_factor) override;
 
   private:
@@ -289,6 +291,9 @@ public:
     }
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
+    }
+    const StreamInfo::StreamInfo* requestStreamInfo() const override {
+      return wrapped_->requestStreamInfo();
     }
     const Http::RequestHeaderMap* downstreamHeaders() const override {
       return wrapped_->downstreamHeaders();
@@ -460,9 +465,6 @@ private:
   void processSubsets(uint32_t priority, const HostVector& all_hosts);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
-  HostConstSharedPtr
-  tryChooseHostFromMetadataMatchCriteriaSingle(const Router::MetadataMatchCriteria& match_criteria,
-                                               bool& host_chosen);
 
   absl::optional<SubsetSelectorFallbackParamsRef>
   tryFindSelectorFallbackParams(LoadBalancerContext* context);

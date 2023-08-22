@@ -91,7 +91,7 @@ public:
         router_context_(factory_.stats_.symbolTable()),
         registered_dns_factory_(dns_resolver_factory_) {}
 
-  void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  virtual void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
@@ -613,8 +613,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
-                          "invalid value \"foo\"");
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException, "foo");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -649,8 +648,7 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
-                          "fake_property: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException, "fake_property");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
@@ -1226,10 +1224,27 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   factory_.tls_.shutdownThread();
 }
 
-TEST_F(ClusterManagerImplTest, ShutdownOrder) {
+class ClusterManagerLifecycleTest : public ClusterManagerImplTest,
+                                    public testing::WithParamInterface<bool> {
+protected:
+  void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override {
+    if (useDeferredCluster()) {
+      auto bootstrap_with_deferred_cluster = bootstrap;
+      bootstrap_with_deferred_cluster.mutable_cluster_manager()
+          ->set_enable_deferred_cluster_creation(true);
+      ClusterManagerImplTest::create(bootstrap_with_deferred_cluster);
+    } else {
+      ClusterManagerImplTest::create(bootstrap);
+    }
+  }
+  bool useDeferredCluster() const { return GetParam(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(ClusterManagerLifecycleTest, ClusterManagerLifecycleTest, testing::Bool());
+
+TEST_P(ClusterManagerLifecycleTest, ShutdownOrder) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("cluster_1")}));
-
   create(parseBootstrapFromV3Json(json));
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
@@ -1244,11 +1259,21 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
       cluster_manager_->getThreadLocalCluster("cluster_1")->loadBalancer().chooseHost(nullptr));
 
   // Local reference, primary reference, thread local reference, host reference
-  EXPECT_EQ(4U, cluster.info().use_count());
+  if (useDeferredCluster()) {
+    // Additional reference in Cluster Initialization Object.
+    EXPECT_EQ(5U, cluster.info().use_count());
+  } else {
+    EXPECT_EQ(4U, cluster.info().use_count());
+  }
 
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();
-  EXPECT_EQ(3U, cluster.info().use_count());
+  if (useDeferredCluster()) {
+    // Additional reference in Cluster Initialization Object.
+    EXPECT_EQ(4U, cluster.info().use_count());
+  } else {
+    EXPECT_EQ(3U, cluster.info().use_count());
+  }
 }
 
 TEST_F(ClusterManagerImplTest, TwoEqualCommonLbConfigSharedPool) {
@@ -1277,7 +1302,7 @@ TEST_F(ClusterManagerImplTest, TwoUnequalCommonLbConfigSharedPool) {
   EXPECT_NE(common_config_ptr_a, common_config_ptr_b);
 }
 
-TEST_F(ClusterManagerImplTest, InitializeOrder) {
+TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = fmt::sprintf(
@@ -1489,7 +1514,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster5.get()));
 }
 
-TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
+TEST_P(ClusterManagerLifecycleTest, DynamicRemoveWithLocalCluster) {
   InSequence s;
 
   // Setup a cluster manager with a static local cluster.
@@ -1549,7 +1574,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
-TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
+TEST_P(ClusterManagerLifecycleTest, RemoveWarmingCluster) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
   create(defaultConfig());
 
@@ -1594,7 +1619,7 @@ dynamic_warming_clusters:
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
-TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
+TEST_P(ClusterManagerLifecycleTest, TestModifyWarmingClusterDuringInitialization) {
   const std::string json = fmt::sprintf(
       R"EOF(
   {
@@ -1693,7 +1718,7 @@ TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()));
 }
 
-TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
+TEST_P(ClusterManagerLifecycleTest, ModifyWarmingCluster) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
   create(defaultConfig());
 
@@ -1777,7 +1802,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/14598.
 // Make sure the revert isn't blocked due to being the same as the active version.
-TEST_F(ClusterManagerImplTest, TestRevertWarmingCluster) {
+TEST_P(ClusterManagerLifecycleTest, TestRevertWarmingCluster) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
   create(defaultConfig());
 
@@ -1857,7 +1882,7 @@ TEST_F(ClusterManagerImplTest, TestRevertWarmingCluster) {
 }
 
 // Verify that shutting down the cluster manager destroys warming clusters.
-TEST_F(ClusterManagerImplTest, ShutdownWithWarming) {
+TEST_P(ClusterManagerLifecycleTest, ShutdownWithWarming) {
   create(defaultConfig());
 
   InSequence s;
@@ -1879,7 +1904,7 @@ TEST_F(ClusterManagerImplTest, ShutdownWithWarming) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
-TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
+TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
   create(defaultConfig());
 
   InSequence s;
@@ -1896,7 +1921,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_));
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_, _));
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
@@ -1925,7 +1950,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
         // Test inline init.
         initialize_callback();
       }));
-  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_));
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_, _));
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
@@ -1983,7 +2008,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 }
 
 // Validates that a callback can remove itself from the callbacks list.
-TEST_F(ClusterManagerImplTest, ClusterAddOrUpdateCallbackRemovalDuringIteration) {
+TEST_P(ClusterManagerLifecycleTest, ClusterAddOrUpdateCallbackRemovalDuringIteration) {
   create(defaultConfig());
 
   InSequence s;
@@ -2000,10 +2025,11 @@ TEST_F(ClusterManagerImplTest, ClusterAddOrUpdateCallbackRemovalDuringIteration)
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).WillOnce(Invoke([&cb](ThreadLocalCluster&) {
-    // This call will remove the callback from the list.
-    cb.reset();
-  }));
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_, _))
+      .WillOnce(Invoke([&cb](absl::string_view, ThreadLocalClusterCommand&) {
+        // This call will remove the callback from the list.
+        cb.reset();
+      }));
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
@@ -2031,7 +2057,7 @@ TEST_F(ClusterManagerImplTest, ClusterAddOrUpdateCallbackRemovalDuringIteration)
       }));
   // There shouldn't be a call to onClusterAddOrUpdate on the callbacks as the
   // handler was removed.
-  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(0);
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_, _)).Times(0);
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
   checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
@@ -2041,7 +2067,7 @@ TEST_F(ClusterManagerImplTest, ClusterAddOrUpdateCallbackRemovalDuringIteration)
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(callbacks.get()));
 }
 
-TEST_F(ClusterManagerImplTest, AddOrUpdateClusterStaticExists) {
+TEST_P(ClusterManagerLifecycleTest, AddOrUpdateClusterStaticExists) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
@@ -2070,7 +2096,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdateClusterStaticExists) {
 }
 
 // Verifies that we correctly propagate the host_set state to the TLS clusters.
-TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
+TEST_P(ClusterManagerLifecycleTest, HostsPostedToTlsCluster) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterRealPrioritySet> cluster1(new NiceMock<MockClusterRealPrioritySet>());
@@ -2100,7 +2126,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
 
   cluster1->priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      100);
+      true, 100);
 
   auto* tls_cluster = cluster_manager_->getThreadLocalCluster(cluster1->info_->name());
 
@@ -2110,6 +2136,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
   EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(host3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
   EXPECT_EQ(3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_TRUE(tls_cluster->prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, tls_cluster->prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   factory_.tls_.shutdownThread();
@@ -2118,7 +2145,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
 }
 
 // Test that we close all HTTP connection pool connections when there is a host health failure.
-TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
+TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
@@ -2185,7 +2212,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
 
 // Test that we drain or close all HTTP or TCP connection pool connections when there is a host
 // health failure and 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' set to true.
-TEST_F(ClusterManagerImplTest,
+TEST_P(ClusterManagerLifecycleTest,
        CloseConnectionsOnHealthFailureWithCloseConnectionsOnHostHealthFailure) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("some_cluster")}));
@@ -2241,7 +2268,7 @@ TEST_F(ClusterManagerImplTest,
 // Verify that the pool gets deleted if it is idle, and that a crash does not occur due to
 // deleting a container while iterating through it (see `do_not_delete_` in
 // `ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure()`).
-TEST_F(ClusterManagerImplTest, CloseHttpConnectionsAndDeletePoolOnHealthFailure) {
+TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsAndDeletePoolOnHealthFailure) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
@@ -2288,7 +2315,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsAndDeletePoolOnHealthFailure)
 }
 
 // Test that we close all TCP connection pool connections when there is a host health failure.
-TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
+TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
@@ -2355,7 +2382,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
 
 // Test that we close all TCP connection pool connections when there is a host health failure,
 // when configured to do so.
-TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
+TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -2433,7 +2460,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
 
 // Test that we do not close TCP connection pool connections when there is a host health failure,
 // when not configured to do so.
-TEST_F(ClusterManagerImplTest, DoNotCloseTcpConnectionsOnHealthFailure) {
+TEST_P(ClusterManagerLifecycleTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -2483,7 +2510,7 @@ TEST_F(ClusterManagerImplTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
-TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
+TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -2620,7 +2647,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   factory_.tls_.shutdownThread();
 }
 
-TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
+TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -2844,7 +2871,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 // Test that default DNS resolver with TCP lookups is used, when there are no DNS custom resolvers
 // configured per cluster and `dns_resolver_options.use_tcp_for_dns_lookups` is set in bootstrap
 // config.
-TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
+TEST_P(ClusterManagerLifecycleTest, UseTcpInDefaultDnsResolver) {
   const std::string yaml = R"EOF(
   dns_resolution_config:
     dns_resolver_options:
@@ -2872,7 +2899,7 @@ TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
 
 // Test that custom DNS resolver is used, when custom resolver is configured
 // per cluster and deprecated field `dns_resolvers` is specified.
-TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
+TEST_P(ClusterManagerLifecycleTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -2908,7 +2935,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
 
 // Test that custom DNS resolver is used, when custom resolver is configured
 // per cluster and deprecated field `dns_resolvers` is specified with multiple resolvers.
-TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMultipleResolvers) {
+TEST_P(ClusterManagerLifecycleTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMultipleResolvers) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -3586,7 +3613,7 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedOveridingDeprecate
 // ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(), where a removal at one
 // priority from the ConnPoolsContainer would delete the ConnPoolsContainer mid-iteration over the
 // pool.
-TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
+TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -3678,7 +3705,7 @@ public:
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3518. Make sure we handle a
 // drain callback during CP destroy.
-TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
+TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -3794,7 +3821,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
 // there's no hosts changes in between.
 // Also tests that if hosts are added/removed between mergeable updates, delivery will
 // happen and the scheduled update will be cancelled.
-TEST_F(ClusterManagerImplTest, MergedUpdates) {
+TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -3849,7 +3876,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -3860,12 +3887,12 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -3883,7 +3910,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -3896,21 +3923,21 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 
   (*hosts)[0]->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 
   (*hosts)[0]->weight(100);
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 
   // Updates not delivered yet.
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -3923,7 +3950,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 
   EXPECT_EQ(3, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -3931,7 +3958,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
 }
 
 // Tests that mergeable updates outside of a window get applied immediately.
-TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
+TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -3959,7 +3986,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
@@ -3967,7 +3994,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
 }
 
 // Tests that mergeable updates inside of a window are not applied immediately.
-TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
+TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
   createWithLocalClusterUpdate();
 
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
@@ -3986,7 +4013,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
@@ -3995,7 +4022,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
 
 // Tests that mergeable updates outside of a window get applied immediately when
 // merging is disabled, and that the counters are correct.
-TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindowDisabled) {
+TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindowDisabled) {
   createWithLocalClusterUpdate(false);
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -4021,14 +4048,14 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindowDisabled) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 }
 
-TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
+TEST_P(ClusterManagerLifecycleTest, MergedUpdatesDestroyedOnUpdate) {
   // We create the default cluster, although for this test we won't use it since
   // we can only update dynamic clusters.
   createWithLocalClusterUpdate();
@@ -4091,7 +4118,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -4102,12 +4129,12 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   cluster.prioritySet().updateHosts(
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -4333,7 +4360,7 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
 
 // Test that the read only cross-priority host map in the main thread is correctly synchronized to
 // the worker thread when the cluster's host set is updated.
-TEST_F(ClusterManagerImplTest, CrossPriorityHostMapSyncTest) {
+TEST_P(ClusterManagerLifecycleTest, CrossPriorityHostMapSyncTest) {
   std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -4377,7 +4404,7 @@ TEST_F(ClusterManagerImplTest, CrossPriorityHostMapSyncTest) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -4394,7 +4421,7 @@ TEST_F(ClusterManagerImplTest, CrossPriorityHostMapSyncTest) {
       0,
       updateHostsParams(hosts, hosts_per_locality,
                         std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -5462,7 +5489,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
 }
 
 // Make sure the drainConnections() with a predicate can correctly exclude a host.
-TEST_F(ClusterManagerImplTest, DrainConnectionsPredicate) {
+TEST_P(ClusterManagerLifecycleTest, DrainConnectionsPredicate) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -5485,7 +5512,7 @@ TEST_F(ClusterManagerImplTest, DrainConnectionsPredicate) {
   // Sending non-mergeable updates.
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      100);
+      absl::nullopt, 100);
 
   // Using RR LB get a pool for each host.
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
@@ -5507,7 +5534,7 @@ TEST_F(ClusterManagerImplTest, DrainConnectionsPredicate) {
   });
 }
 
-TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
+TEST_P(ClusterManagerLifecycleTest, ConnPoolsDrainedOnHostSetChange) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -5557,7 +5584,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   // Sending non-mergeable updates.
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      100);
+      absl::nullopt, 100);
 
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -5618,7 +5645,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   // This update should drain all connection pools (host1, host2).
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, {},
-      hosts_removed, 100);
+      hosts_removed, absl::nullopt, 100);
 
   // Recreate connection pool for host1.
   cp1 = HttpPoolDataPeer::getPool(
@@ -5647,10 +5674,10 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   // Adding host3 should drain connection pool for host1.
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
-      hosts_added, {}, 100);
+      hosts_added, {}, absl::nullopt, 100);
 }
 
-TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
+TEST_P(ClusterManagerLifecycleTest, ConnPoolsNotDrainedOnHostSetChange) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -5682,7 +5709,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   // Sending non-mergeable updates.
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      100);
+      absl::nullopt, 100);
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
       .Times(1)
@@ -5716,10 +5743,10 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   // No connection pools should be drained.
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
-      hosts_added, {}, 100);
+      hosts_added, {}, absl::nullopt, 100);
 }
 
-TEST_F(ClusterManagerImplTest, ConnPoolsIdleDeleted) {
+TEST_P(ClusterManagerLifecycleTest, ConnPoolsIdleDeleted) {
   TestScopedRuntime scoped_runtime;
 
   const std::string yaml = R"EOF(
@@ -5753,7 +5780,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsIdleDeleted) {
   // Sending non-mergeable updates.
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      100);
+      absl::nullopt, 100);
 
   {
     auto* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
@@ -6055,7 +6082,7 @@ public:
     // Sending non-mergeable updates.
     cluster_->prioritySet().updateHosts(
         0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts,
-        {}, 100);
+        {}, absl::nullopt, 100);
   }
 
   Cluster* cluster_{};

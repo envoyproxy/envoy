@@ -40,10 +40,6 @@ Cluster::Cluster(
       enable_sub_cluster_(config.has_sub_clusters_config()) {
 
   if (enable_sub_cluster_) {
-    if (sub_cluster_lb_policy_ ==
-        envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
-      throw EnvoyException("unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
-    }
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
     idle_timer_->enableTimer(sub_cluster_ttl_);
   }
@@ -292,7 +288,7 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
   }
   priority_state_manager.updateClusterPrioritySet(
       0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, hosts_removed,
-      absl::nullopt, absl::nullopt);
+      absl::nullopt, absl::nullopt, absl::nullopt);
 }
 
 void Cluster::onDnsHostRemove(const std::string& host) {
@@ -357,6 +353,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
   if (host.empty()) {
+    ENVOY_LOG(debug, "host empty");
     return nullptr;
   }
 
@@ -368,9 +365,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
     const auto host_it = cluster_.host_map_.find(host);
     if (host_it == cluster_.host_map_.end()) {
+      ENVOY_LOG(debug, "host {} not found", host);
       return nullptr;
     } else {
       if (host_it->second.logical_host_->coarseHealth() == Upstream::Host::Health::Unhealthy) {
+        ENVOY_LOG(debug, "host {} is unhealthy", host);
         return nullptr;
       }
       host_it->second.shared_host_info_->touch();
@@ -445,7 +444,7 @@ void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::In
       connection_info_map_[key].end());
 }
 
-std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
@@ -472,8 +471,8 @@ ClusterFactory::createClusterWithConfig(
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
 
-  auto new_cluster =
-      std::make_shared<Cluster>(cluster_config, proto_config, context, cache_manager_factory);
+  auto new_cluster = std::shared_ptr<Cluster>(
+      new Cluster(cluster_config, proto_config, context, cache_manager_factory));
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       factory_context_base);
@@ -484,10 +483,16 @@ ClusterFactory::createClusterWithConfig(
   if (!proto_config.allow_insecure_cluster_options()) {
     if (!options.has_value() ||
         (!options.value().auto_sni() || !options.value().auto_san_validation())) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true unless "
           "allow_insecure_cluster_options is set.");
     }
+  }
+  if (proto_config.has_sub_clusters_config() &&
+      proto_config.sub_clusters_config().lb_policy() ==
+          envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+    return absl::InvalidArgumentError(
+        "unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
   }
 
   auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);

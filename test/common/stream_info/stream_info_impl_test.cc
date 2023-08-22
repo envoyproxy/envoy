@@ -38,7 +38,8 @@ class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(sizeof(stream_info) == 840 || sizeof(stream_info) == 856 ||
-                sizeof(stream_info) == 888)
+                sizeof(stream_info) == 888 || sizeof(stream_info) == 776 ||
+                sizeof(stream_info) == 728 || sizeof(stream_info) == 744)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -165,7 +166,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(Http::Protocol::Http10, stream_info.protocol().value());
 
     EXPECT_FALSE(stream_info.responseCode());
-    stream_info.response_code_ = 200;
+    stream_info.setResponseCode(200);
     ASSERT_TRUE(stream_info.responseCode());
     EXPECT_EQ(200, stream_info.responseCode().value());
 

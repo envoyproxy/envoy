@@ -11,6 +11,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -40,6 +41,17 @@ namespace TcpProxy {
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
+
+class PerConnectionClusterFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return PerConnectionCluster::key(); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<PerConnectionCluster>(data);
+  }
+};
+
+REGISTER_FACTORY(PerConnectionClusterFactory, StreamInfo::FilterState::ObjectFactory);
 
 Config::SimpleRouteImpl::SimpleRouteImpl(const Config& parent, absl::string_view cluster_name)
     : parent_(parent), cluster_name_(cluster_name) {}
@@ -293,11 +305,14 @@ void Filter::readDisableDownstream(bool disable) {
     // despite the downstream connection being closed.
     return;
   }
-  read_callbacks_->connection().readDisable(disable);
 
-  if (disable) {
+  const Network::Connection::ReadDisableStatus read_disable_status =
+      read_callbacks_->connection().readDisable(disable);
+
+  if (read_disable_status == Network::Connection::ReadDisableStatus::TransitionedToReadDisabled) {
     config_->stats().downstream_flow_control_paused_reading_total_.inc();
-  } else {
+  } else if (read_disable_status ==
+             Network::Connection::ReadDisableStatus::TransitionedToReadEnabled) {
     config_->stats().downstream_flow_control_resumed_reading_total_.inc();
   }
 }
@@ -333,7 +348,8 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
-  ASSERT(!on_high_watermark_called_);
+  // TCP Tunneling may call on high/low watermark multiple times.
+  ASSERT(parent_->config_->tunnelingConfigHelper() || !on_high_watermark_called_);
   on_high_watermark_called_ = true;
 
   if (parent_ != nullptr) {
@@ -343,7 +359,8 @@ void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
-  ASSERT(on_high_watermark_called_);
+  // TCP Tunneling may call on high/low watermark multiple times.
+  ASSERT(parent_->config_->tunnelingConfigHelper() || on_high_watermark_called_);
   on_high_watermark_called_ = false;
 
   if (parent_ != nullptr) {

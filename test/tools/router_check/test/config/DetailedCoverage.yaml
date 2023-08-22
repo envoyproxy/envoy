@@ -1,0 +1,24 @@
+virtual_hosts:
+- name: localhost
+  domains:
+  - example.com
+  routes:
+  - name: new_endpoint
+    match:
+      prefix: /new_endpoint
+    route:
+      cluster: www2
+      prefix_rewrite: /api/new_endpoint
+  - name: new_endpoint2
+    match:
+      path: /new_endpoint2
+    route:
+      cluster: root_www2
+  - match:
+      prefix: /root
+    route:
+      cluster: www2
+  - match:
+      prefix: /no_name
+    route:
+      cluster: www3

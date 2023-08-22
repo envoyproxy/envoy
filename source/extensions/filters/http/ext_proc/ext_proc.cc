@@ -61,7 +61,40 @@ void ExtProcLoggingInfo::recordGrpcCall(
     ProcessorState::CallbackState callback_state,
     envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
-  grpcCalls(traffic_direction).emplace_back(latency, call_status, callback_state);
+
+  // Record the gRPC call stats for the header.
+  if (callback_state == ProcessorState::CallbackState::HeadersCallback) {
+    if (grpcCalls(traffic_direction).header_stats_ == nullptr) {
+      grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status);
+    }
+    return;
+  }
+
+  // Record the gRPC call stats for the trailer.
+  if (callback_state == ProcessorState::CallbackState::TrailersCallback) {
+    if (grpcCalls(traffic_direction).trailer_stats_ == nullptr) {
+      grpcCalls(traffic_direction).trailer_stats_ =
+          std::make_unique<GrpcCall>(latency, call_status);
+    }
+    return;
+  }
+
+  // Record the gRPC call stats for the bodies.
+  if (grpcCalls(traffic_direction).body_stats_ == nullptr) {
+    grpcCalls(traffic_direction).body_stats_ =
+        std::make_unique<GrpcCallBody>(1, call_status, latency, latency, latency);
+  } else {
+    auto& body_stats = grpcCalls(traffic_direction).body_stats_;
+    body_stats->call_count_++;
+    body_stats->total_latency_ += latency;
+    body_stats->last_call_status_ = call_status;
+    if (latency > body_stats->max_latency_) {
+      body_stats->max_latency_ = latency;
+    }
+    if (latency < body_stats->min_latency_) {
+      body_stats->min_latency_ = latency;
+    }
+  }
 }
 
 ExtProcLoggingInfo::GrpcCalls&
@@ -128,16 +161,18 @@ Filter::StreamOpenState Filter::openStream() {
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
-    stats_.streams_started_.inc();
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
+      // Asserts that `stream_` is nullptr since it is not valid to be used any further
+      // beyond this point.
+      ASSERT(stream_ == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
+    stats_.streams_started_.inc();
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
-    if (grpc_service_.has_envoy_grpc()) {
+    if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
       logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
     }
   }
   return StreamOpenState::Ok;
@@ -145,10 +180,6 @@ Filter::StreamOpenState Filter::openStream() {
 
 void Filter::closeStream() {
   if (stream_) {
-    if (grpc_service_.has_envoy_grpc()) {
-      logging_info_->setBytesSent(stream_->streamInfo().bytesSent());
-      logging_info_->setBytesReceived(stream_->streamInfo().bytesReceived());
-    }
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
@@ -185,7 +216,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, config_->headerMatchers(),
+  MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
@@ -227,18 +258,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     ENVOY_LOG(trace, "Continuing (processing complete)");
     return FilterDataStatus::Continue;
   }
-  bool just_added_trailers = false;
-  Http::HeaderMap* new_trailers = nullptr;
-  if (end_stream && state.sendTrailers()) {
-    // We're at the end of the stream, but the filter wants to process trailers.
-    // According to the filter contract, this is the only place where we can
-    // add trailers, even if we will return right after this and process them
-    // later.
-    ENVOY_LOG(trace, "Creating new, empty trailers");
-    new_trailers = state.addTrailers();
-    state.setTrailersAvailable(true);
-    just_added_trailers = true;
-  }
+
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
     ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
     // We don't know what to do with the body until the response comes back.
@@ -387,21 +407,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::Continue;
     break;
   }
-  if (just_added_trailers) {
-    // If we get here, then we need to send the trailers message now
-    switch (openStream()) {
-    case StreamOpenState::Error:
-      return FilterDataStatus::StopIterationNoBuffer;
-    case StreamOpenState::IgnoreError:
-      return FilterDataStatus::Continue;
-    case StreamOpenState::Ok:
-      // Fall through
-      break;
-    }
-    sendTrailers(state, *new_trailers);
-    state.setPaused(true);
-    return FilterDataStatus::StopIterationAndBuffer;
-  }
+
   return result;
 }
 
@@ -452,7 +458,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
-  if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
+  if (!body_delivered && state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) {
     // If no gRPC stream yet, opens it before sending data.
     switch (openStream()) {
     case StreamOpenState::Error:
@@ -466,7 +472,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
-    sendBufferedData(state, ProcessorState::CallbackState::BufferedBodyCallback, true);
+    sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback,
+                  false);
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
@@ -533,7 +540,7 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                            ProcessorState::CallbackState new_state, bool end_stream) {
-  ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
+  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
   ProcessingRequest req;
@@ -544,27 +551,30 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
-                              bool end_stream) {
-  if (state.hasBufferedData()) {
-    sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
-  } else {
-    // If there is no buffered data, sends an empty body.
-    Buffer::OwnedImpl data("");
-    sendBodyChunk(state, data, new_state, end_stream);
-  }
-}
-
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
-  MutationUtils::headersToProto(trailers, config_->headerMatchers(),
+  MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
+}
+
+void Filter::logGrpcStreamInfo() {
+  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
+    const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
+    if (upstream_meter != nullptr) {
+      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+    }
+    // Only set upstream host in logging info once.
+    if (logging_info_->upstreamHost() == nullptr) {
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+    }
+  }
 }
 
 void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout) {
@@ -643,14 +653,26 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-    // We won't be sending anything more to the stream after we
-    // receive this message.
-    ENVOY_LOG(debug, "Sending immediate response");
-    processing_complete_ = true;
-    closeStream();
-    onFinishProcessorCalls(Grpc::Status::Ok);
-    sendImmediateResponse(response->immediate_response());
-    processing_status = absl::OkStatus();
+    if (config_->disableImmediateResponse()) {
+      ENVOY_LOG(debug, "Filter has disable_immediate_response configured. "
+                       "Treat the immediate response message as spurious response.");
+      processing_status =
+          absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
+    } else {
+      // We won't be sending anything more to the stream after we
+      // receive this message.
+      ENVOY_LOG(debug, "Sending immediate response");
+      // TODO(tyxia) For immediate response case here and below, logging is needed because
+      // `onFinishProcessorCalls` is called after `closeStream` below.
+      // Investigate to see if we can switch the order of those two so that the logging here can be
+      // avoided.
+      logGrpcStreamInfo();
+      processing_complete_ = true;
+      closeStream();
+      onFinishProcessorCalls(Grpc::Status::Ok);
+      sendImmediateResponse(response->immediate_response());
+      processing_status = absl::OkStatus();
+    }
     break;
   default:
     // Any other message is considered spurious
@@ -680,6 +702,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
+    logGrpcStreamInfo();
     closeStream();
     onFinishProcessorCalls(processing_status.raw_code());
     ImmediateResponse invalid_mutation_response;
@@ -717,6 +740,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
 void Filter::onGrpcClose() {
   ENVOY_LOG(debug, "Received gRPC stream close");
+
   processing_complete_ = true;
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
@@ -727,6 +751,7 @@ void Filter::onGrpcClose() {
 
 void Filter::onMessageTimeout() {
   ENVOY_LOG(debug, "message timeout reached");
+  logGrpcStreamInfo();
   stats_.message_timeouts_.inc();
   if (config_->failureModeAllow()) {
     // The user would like a timeout to not cause message processing to fail.
@@ -781,9 +806,17 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      const auto mut_status = MutationUtils::applyHeaderMutations(
-          response.headers(), headers, false, immediateResponseChecker().checker(),
-          stats_.rejected_header_mutations_);
+      absl::Status mut_status;
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.immediate_response_use_filter_mutation_rule")) {
+        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
+                                                         config().mutationChecker(),
+                                                         stats_.rejected_header_mutations_);
+      } else {
+        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
+                                                         immediateResponseChecker().checker(),
+                                                         stats_.rejected_header_mutations_);
+      }
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());

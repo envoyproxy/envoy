@@ -128,6 +128,10 @@ extern GoUint64 envoyGoFilterOnHttpData(httpRequest* r,
                                         GoUint64 buffer,
                                         GoUint64 length); // NOLINT(readability-identifier-naming)
 
+// go:linkname envoyGoFilterOnHttpLog
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpLog
+extern void envoyGoFilterOnHttpLog(httpRequest* r);
+
 // go:linkname envoyGoFilterOnHttpDestroy
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpDestroy
 extern void envoyGoFilterOnHttpDestroy(httpRequest* r, GoUint64 reason);
@@ -149,6 +153,72 @@ extern GoInt64 envoyGoOnClusterSpecify(GoUint64 pluginPtr,  // NOLINT(readabilit
 extern GoUint64
 envoyGoClusterSpecifierNewPlugin(GoUint64 configPtr,  // NOLINT(readability-identifier-naming)
                                  GoUint64 configLen); // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnNetworkFilterConfig
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnNetworkFilterConfig
+extern GoUint64
+envoyGoFilterOnNetworkFilterConfig(GoUint64 libraryIDPtr, // NOLINT(readability-identifier-naming)
+                                   GoUint64 libraryIDLen, // NOLINT(readability-identifier-naming)
+                                   GoUint64 configPtr,    // NOLINT(readability-identifier-naming)
+                                   GoUint64 configLen);   // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnDownstreamConnection
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnDownstreamConnection
+extern GoUint64
+envoyGoFilterOnDownstreamConnection(void* f,
+                                    GoUint64 pluginNamePtr, // NOLINT(readability-identifier-naming)
+                                    GoUint64 pluginNameLen, // NOLINT(readability-identifier-naming)
+                                    GoUint64 configID);     // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnDownstreamData
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnDownstreamData
+extern GoUint64
+envoyGoFilterOnDownstreamData(void* f,
+                              GoUint64 dataSize,  // NOLINT(readability-identifier-naming)
+                              GoUint64 dataPtr,   // NOLINT(readability-identifier-naming)
+                              GoInt sliceNum,     // NOLINT(readability-identifier-naming)
+                              GoInt endOfStream); // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnDownstreamWrite
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnDownstreamWrite
+extern GoUint64
+envoyGoFilterOnDownstreamWrite(void* f,
+                               GoUint64 dataSize,  // NOLINT(readability-identifier-naming)
+                               GoUint64 dataPtr,   // NOLINT(readability-identifier-naming)
+                               GoInt sliceNum,     // NOLINT(readability-identifier-naming)
+                               GoInt endOfStream); // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnDownstreamEvent
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnDownstreamEvent
+extern void envoyGoFilterOnDownstreamEvent(void* f,
+                                           GoInt event); // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnUpstreamConnectionReady
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnUpstreamConnectionReady
+extern void
+envoyGoFilterOnUpstreamConnectionReady(void* f,
+                                       GoUint64 connID); // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnUpstreamConnectionFailure
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnUpstreamConnectionFailure
+extern void
+envoyGoFilterOnUpstreamConnectionFailure(void* f,
+                                         GoInt reason,     // NOLINT(readability-identifier-naming)
+                                         GoUint64 connID); // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnUpstreamData
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnUpstreamData
+extern GoUint64
+envoyGoFilterOnUpstreamData(void* f,
+                            GoUint64 dataSize,  // NOLINT(readability-identifier-naming)
+                            GoUint64 dataPtr,   // NOLINT(readability-identifier-naming)
+                            GoInt sliceNum,     // NOLINT(readability-identifier-naming)
+                            GoInt endOfStream); // NOLINT(readability-identifier-naming)
+
+// go:linkname envoyGoFilterOnUpstreamEvent
+// github.com/envoyproxy/envoy/contrib/golang/filters/network/source/go/pkg/network.envoyGoFilterOnUpstreamEvent
+extern void envoyGoFilterOnUpstreamEvent(void* f,
+                                         GoInt event); // NOLINT(readability-identifier-naming)
 
 #ifdef __cplusplus
 }

@@ -18,7 +18,11 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     : BaseDynamicClusterImpl(cluster, cluster_context),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           cluster_context.messageValidationVisitor(), "cluster_name"),
-      local_info_(cluster_context.serverFactoryContext().localInfo()) {
+      local_info_(cluster_context.serverFactoryContext().localInfo()),
+      eds_resources_cache_(
+          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads")
+              ? cluster_context.clusterManager().edsResourcesCache()
+              : absl::nullopt) {
   Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -33,6 +37,13 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
           resource_decoder_, {});
+}
+
+EdsClusterImpl::~EdsClusterImpl() {
+  if (using_cached_resource_) {
+    // Clear the callback as the subscription is no longer valid.
+    eds_resources_cache_->removeCallback(edsServiceName(), this);
+  }
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({edsServiceName()}); }
@@ -77,6 +88,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+  const bool weighted_priority_health =
+      cluster_load_assignment_.policy().weighted_priority_health();
 
   LocalityWeightsMap empty_locality_map;
 
@@ -88,14 +101,16 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
     }
     if (priority_state[i].first != nullptr) {
       cluster_rebuilt |= parent_.updateHostsPerLocality(
-          i, overprovisioning_factor, *priority_state[i].first, parent_.locality_weights_map_[i],
-          priority_state[i].second, priority_state_manager, *all_hosts, all_new_hosts);
+          i, weighted_priority_health, overprovisioning_factor, *priority_state[i].first,
+          parent_.locality_weights_map_[i], priority_state[i].second, priority_state_manager,
+          *all_hosts, all_new_hosts);
     } else {
       // If the new update contains a priority with no hosts, call the update function with an empty
       // set of hosts.
-      cluster_rebuilt |= parent_.updateHostsPerLocality(
-          i, overprovisioning_factor, {}, parent_.locality_weights_map_[i], empty_locality_map,
-          priority_state_manager, *all_hosts, all_new_hosts);
+      cluster_rebuilt |=
+          parent_.updateHostsPerLocality(i, weighted_priority_health, overprovisioning_factor, {},
+                                         parent_.locality_weights_map_[i], empty_locality_map,
+                                         priority_state_manager, *all_hosts, all_new_hosts);
     }
   }
 
@@ -107,8 +122,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
       parent_.locality_weights_map_.resize(i + 1);
     }
     cluster_rebuilt |= parent_.updateHostsPerLocality(
-        i, overprovisioning_factor, {}, parent_.locality_weights_map_[i], empty_locality_map,
-        priority_state_manager, *all_hosts, all_new_hosts);
+        i, weighted_priority_health, overprovisioning_factor, {}, parent_.locality_weights_map_[i],
+        empty_locality_map, priority_state_manager, *all_hosts, all_new_hosts);
   }
 
   if (!cluster_rebuilt) {
@@ -135,7 +150,7 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
 
   // When the configuration contains duplicate hosts, only the first one will be retained.
   const auto address_as_string = address->asString();
-  if (all_new_hosts.count(address_as_string) > 0) {
+  if (all_new_hosts.contains(address_as_string)) {
     return;
   }
 
@@ -172,6 +187,9 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   // Disable timer (if enabled) as we have received new assignment.
   if (assignment_timeout_->enabled()) {
     assignment_timeout_->disableTimer();
+    if (eds_resources_cache_.has_value()) {
+      eds_resources_cache_->disableExpiryTimer(edsServiceName());
+    }
   }
   // Check if endpoint_stale_after is set.
   const uint64_t stale_after_ms =
@@ -180,6 +198,10 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     // Stat to track how often we receive valid assignment_timeout in response.
     info_->configUpdateStats().assignment_timeout_received_.inc();
     assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
+    if (eds_resources_cache_.has_value()) {
+      eds_resources_cache_->setExpiryTimer(edsServiceName(),
+                                           std::chrono::milliseconds(stale_after_ms));
+    }
   }
 
   // Pause LEDS messages until the EDS config is finished processing.
@@ -189,6 +211,17 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     maybe_resume_leds = transport_factory_context_->clusterManager().adsMux()->pause(type_url);
   }
 
+  update(cluster_load_assignment);
+  // If previously used a cached version, remove the subscription from the cache's
+  // callbacks.
+  if (using_cached_resource_) {
+    eds_resources_cache_->removeCallback(edsServiceName(), this);
+    using_cached_resource_ = false;
+  }
+}
+
+void EdsClusterImpl::update(
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
   // Compare the current set of LEDS localities (localities using LEDS) to the one received in the
   // update. A LEDS locality can either be added, removed, or kept. If it is added we add a
   // subscription to it, and if it is removed we delete the subscription.
@@ -209,14 +242,14 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
   // In case LEDS is used, store the cluster load assignment as a field
   // (optimize for no-copy).
-  envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
-  if (cla_leds_configs.empty()) {
-    cluster_load_assignment_ = nullptr;
-    used_load_assignment = &cluster_load_assignment;
-  } else {
+  const envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
+  if (!cla_leds_configs.empty() || eds_resources_cache_.has_value()) {
     cluster_load_assignment_ = std::make_unique<envoy::config::endpoint::v3::ClusterLoadAssignment>(
         std::move(cluster_load_assignment));
     used_load_assignment = cluster_load_assignment_.get();
+  } else {
+    cluster_load_assignment_ = nullptr;
+    used_load_assignment = &cluster_load_assignment;
   }
 
   // Add all the LEDS localities that are new.
@@ -280,14 +313,26 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // TODO(snowp): This should probably just use xDS TTLs?
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name(edsServiceName());
-  ProtobufWkt::Any any_resource;
-  any_resource.PackFrom(resource);
-  auto decoded_resource =
-      Config::DecodedResourceImpl::fromResource(*resource_decoder_, any_resource, "");
-  std::vector<Config::DecodedResourceRef> resource_refs = {*decoded_resource};
-  onConfigUpdate(resource_refs, "");
+  update(resource);
+
+  if (eds_resources_cache_.has_value()) {
+    // Clear the resource so it won't be used, and its watchers will be notified.
+    eds_resources_cache_->removeResource(edsServiceName());
+  }
   // Stat to track how often we end up with stale assignments.
   info_->configUpdateStats().assignment_stale_.inc();
+}
+
+void EdsClusterImpl::onCachedResourceRemoved(absl::string_view resource_name) {
+  ASSERT(resource_name == edsServiceName());
+  // Disable the timer if previously started.
+  if (assignment_timeout_->enabled()) {
+    assignment_timeout_->disableTimer();
+    eds_resources_cache_->disableExpiryTimer(edsServiceName());
+  }
+  envoy::config::endpoint::v3::ClusterLoadAssignment resource;
+  resource.set_cluster_name(edsServiceName());
+  update(resource);
 }
 
 void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
@@ -325,17 +370,17 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().filter(
         {[&host_to_exclude](const Host& host) { return &host != host_to_exclude.get(); }})[0];
 
-    prioritySet().updateHosts(priority,
-                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                              host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt);
+    prioritySet().updateHosts(
+        priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+        host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt, absl::nullopt);
   }
 }
 
 bool EdsClusterImpl::updateHostsPerLocality(
-    const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,
-    LocalityWeightsMap& locality_weights_map, LocalityWeightsMap& new_locality_weights_map,
-    PriorityStateManager& priority_state_manager, const HostMap& all_hosts,
-    const absl::flat_hash_set<std::string>& all_new_hosts) {
+    const uint32_t priority, bool weighted_priority_health, const uint32_t overprovisioning_factor,
+    const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
+    LocalityWeightsMap& new_locality_weights_map, PriorityStateManager& priority_state_manager,
+    const HostMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
   const auto& host_set = priority_set_.getOrCreateHostSet(priority, overprovisioning_factor);
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
@@ -353,7 +398,8 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // about this. In the future we may need to do better here.
   const bool hosts_updated = updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added,
                                                    hosts_removed, all_hosts, all_new_hosts);
-  if (hosts_updated || host_set.overprovisioningFactor() != overprovisioning_factor ||
+  if (hosts_updated || host_set.weightedPriorityHealth() != weighted_priority_health ||
+      host_set.overprovisioningFactor() != overprovisioning_factor ||
       locality_weights_map != new_locality_weights_map) {
     ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),
                        [&](const auto& host) { return host->priority() == priority; }));
@@ -362,9 +408,9 @@ bool EdsClusterImpl::updateHostsPerLocality(
               "EDS hosts or locality weights changed for cluster: {} current hosts {} priority {}",
               info_->name(), host_set.hosts().size(), host_set.priority());
 
-    priority_state_manager.updateClusterPrioritySet(priority, std::move(current_hosts_copy),
-                                                    hosts_added, hosts_removed, absl::nullopt,
-                                                    overprovisioning_factor);
+    priority_state_manager.updateClusterPrioritySet(
+        priority, std::move(current_hosts_copy), hosts_added, hosts_removed, absl::nullopt,
+        weighted_priority_health, overprovisioning_factor);
     return true;
   }
   return false;
@@ -373,6 +419,27 @@ bool EdsClusterImpl::updateHostsPerLocality(
 void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                           const EnvoyException*) {
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
+  // Config failure may happen if Envoy times out waiting for the EDS resource.
+  // If it is a timeout, the eds resources cache is enabled,
+  // and there is a cached ClusterLoadAssignment, then the cached assignment should be used.
+  if (reason == Envoy::Config::ConfigUpdateFailureReason::FetchTimedout &&
+      eds_resources_cache_.has_value()) {
+    ENVOY_LOG(trace, "onConfigUpdateFailed due to timeout for {}, looking for cached resources",
+              edsServiceName());
+    auto cached_resource = eds_resources_cache_->getResource(edsServiceName(), this);
+    if (cached_resource.has_value()) {
+      ENVOY_LOG(
+          debug,
+          "Did not receive EDS response on time, using cached ClusterLoadAssignment for cluster {}",
+          edsServiceName());
+      envoy::config::endpoint::v3::ClusterLoadAssignment cached_load_assignment =
+          dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(*cached_resource);
+      info_->configUpdateStats().assignment_use_cached_.inc();
+      using_cached_resource_ = true;
+      update(cached_load_assignment);
+      return;
+    }
+  }
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }
@@ -380,6 +447,9 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 EdsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                      ClusterFactoryContext& context) {
+  // TODO(kbaichoo): EDS cluster should be able to support loading it's
+  // configuration from the CustomClusterType protobuf. Currently it does not.
+  // See: https://github.com/envoyproxy/envoy/issues/28752
   if (!cluster.has_eds_cluster_config()) {
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }

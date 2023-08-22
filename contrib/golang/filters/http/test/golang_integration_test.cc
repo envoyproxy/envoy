@@ -152,6 +152,15 @@ typed_config:
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
               "test-route-name");
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->set_domains(0, domain);
+
+          auto* virtual_cluster =
+              hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_virtual_clusters();
+          virtual_cluster->set_name("test_vcluster");
+          auto* headers = virtual_cluster->add_headers();
+          // use test_vcluster if presents
+          headers->set_name("existed-header");
+          headers->set_present_match(true);
+
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)
@@ -372,6 +381,9 @@ typed_config:
     // check response attempt count in encode phase
     EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));
 
+    // check virtual cluster name
+    EXPECT_EQ("test_vcluster", getHeader(response->headers(), "rsp-virtual-cluster-name"));
+
     // verify response status
     EXPECT_EQ("200", getHeader(response->headers(), "rsp-status"));
 
@@ -465,6 +477,12 @@ typed_config:
     // forbidden from go in %s\r\n
     auto body = StringUtil::toUpper(absl::StrFormat("forbidden from go in %s\r\n", phase));
     EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+
+    // verify phase
+    EXPECT_EQ(phase, getHeader(response->headers(), "test-phase"));
+
+    // verify content-type
+    EXPECT_EQ("text/html", getHeader(response->headers(), "content-type"));
 
     cleanup();
   }
@@ -581,6 +599,7 @@ typed_config:
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
   const std::string ROUTECONFIG{"routeconfig"};
+  const std::string ACCESSLOG{"access_log"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -646,6 +665,49 @@ TEST_P(GolangIntegrationTest, Passthrough) {
   // check body for pasthrough
   auto body = absl::StrFormat("%s%s", good, bye);
   EXPECT_EQ(body, response->body());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, AccessLog) {
+  initializeBasicFilter(ACCESSLOG, "test.com");
+
+  auto path = "/test";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", path},
+      {":scheme", "http"},
+      {":authority", "test.com"},
+  };
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(request_encoder, "helloworld", true);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "206"},
+  };
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("good");
+  upstream_request_->encodeData(response_data1, false);
+  Buffer::OwnedImpl response_data2("bye");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("206", getHeader(upstream_request_->headers(), "respCode"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsyncly"));
 
   cleanup();
 }

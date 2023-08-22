@@ -1,9 +1,9 @@
-FROM debian:bullseye-slim@sha256:924df86f8aad741a0134b2de7d8e70c5c6863f839caadef62609c1be1340daf5 as os-base
+FROM debian:bullseye-slim@sha256:61386e11b5256efa33823cbfafd668dd651dbce810b24a8fb7b2e32fa7f65a85 as os-base
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
     && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | tee /etc/apt/apt.conf.d/keep-cache
 
 
-FROM golang:1.20.5-bullseye@sha256:8e927ecc8ba530bde779a125b95d2d7f0c9c7ef63df3d492d2e99dd599f69ab8 as golang-base
+FROM golang:1.21.0-bullseye@sha256:02f350d8452d3f9693a450586659ecdc6e40e9be8f8dfc6d402300d87223fdfa as golang-base
 
 
 FROM golang-base as golang-control-plane-builder

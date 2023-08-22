@@ -49,7 +49,7 @@ public:
   template <typename T, auto FIELDGETTER, auto FIELDSETTER, auto REPGETTER, auto REPSETTER,
             auto FIELDADDER, auto RULEGETTER,
             auto TYPEHANDLER = &handleNumericRules<
-                T, typename std::result_of<decltype(RULEGETTER)(validate::FieldRules)>::type>>
+                T, typename std::invoke_result<decltype(RULEGETTER), validate::FieldRules>::type>>
   void handleIntrinsicTypedField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
                                  const Protobuf::Reflection* reflection,
                                  const validate::FieldRules& rules, bool force);

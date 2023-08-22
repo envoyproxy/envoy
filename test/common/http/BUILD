@@ -238,6 +238,7 @@ envoy_cc_test_library(
         "//source/common/http:context_lib",
         "//source/common/tracing:custom_tag_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
@@ -264,7 +265,6 @@ envoy_cc_test(
         "conn_manager_impl_test.cc",
         "conn_manager_impl_test_2.cc",
     ],
-    shard_count = 3,
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",
@@ -592,5 +592,44 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "hcm_router_fuzz_proto",
+    srcs = ["hcm_router_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "hcm_router_fuzz_test",
+    srcs = ["hcm_router_fuzz_test.cc"],
+    corpus = "hcm_router_fuzz_corpus",
+    deps = [
+        ":conn_manager_impl_test_base_lib",
+        ":hcm_router_fuzz_proto_cc_proto",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/router:config_lib",
+        "//source/extensions/upstreams/http/generic:config",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
     ],
 )

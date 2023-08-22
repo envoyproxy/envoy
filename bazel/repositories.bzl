@@ -191,6 +191,9 @@ def envoy_repo():
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
+    external_http_archive("com_google_protoconverter")
+    external_http_archive("com_google_protofieldextraction")
+    external_http_archive("ocp")
     native.bind(
         name = "path_matcher",
         actual = "@grpc_httpjson_transcoding//src:path_matcher",
@@ -308,6 +311,8 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("proxy_wasm_rust_sdk")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
+    _utf8_range()
+    _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
@@ -894,7 +899,7 @@ def _com_google_protobuf():
     # https://github.com/google/protobuf/blob/v3.6.1/util/python/BUILD#L6-L9
     native.bind(
         name = "python_headers",
-        actual = "@com_google_protobuf//util/python:python_headers",
+        actual = "//bazel:python_headers",
     )
 
 def _io_opencensus_cpp():
@@ -1084,6 +1089,11 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
+        name = "upb_collections_lib",
+        actual = "@upb//:collections",
+    )
+
+    native.bind(
         name = "upb_lib_descriptor",
         actual = "@upb//:descriptor_upb_proto",
     )
@@ -1122,7 +1132,11 @@ def _re2():
     )
 
 def _upb():
-    external_http_archive(name = "upb")
+    external_http_archive(
+        name = "upb",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:upb.patch"],
+    )
 
     native.bind(
         name = "upb_lib",
@@ -1338,6 +1352,12 @@ def _com_github_fdio_vpp_vcl():
         build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
+
+def _utf8_range():
+    external_http_archive("utf8_range")
+
+def _rules_ruby():
+    external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
     external_http_archive("rules_foreign_cc")

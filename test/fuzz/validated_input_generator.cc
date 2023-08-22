@@ -66,7 +66,7 @@ static void handleStringRules(std::string& str, const validate::StringRules& str
     size_t unicode_len = 0;
     int char_len = 0;
     while (byte_len > 0 && unicode_len < string_rules.max_len()) {
-      char_len = Protobuf::UTF8FirstLetterNumBytes(codepoint_ptr, byte_len);
+      char_len = pgv::UTF8FirstLetterNumBytes(codepoint_ptr, byte_len);
       codepoint_ptr += char_len;
       byte_len -= char_len;
       ++unicode_len;
@@ -389,7 +389,10 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
     break;
   case Protobuf::FieldDescriptor::CPPTYPE_STRING: {
     handleIntrinsicTypedField<
-        std::string, &Protobuf::Reflection::GetString, &Protobuf::Reflection::SetString,
+        std::string, &Protobuf::Reflection::GetString,
+        static_cast<void (Protobuf::Reflection::*)(
+            Protobuf::Message*, const Protobuf::FieldDescriptor*, std::string) const>(
+            &Protobuf::Reflection::SetString),
         &Protobuf::Reflection::GetRepeatedString, &Protobuf::Reflection::SetRepeatedString,
         &Protobuf::Reflection::AddString, &validate::FieldRules::string, &handleStringRules>(
         msg, field, reflection, rules, force_create);

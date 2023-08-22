@@ -26,7 +26,7 @@ public:
   MOCK_METHOD(bool, onSSLRequest, (), (override));
   MOCK_METHOD(bool, shouldEncryptUpstream, (), (const));
   MOCK_METHOD(void, sendUpstream, (Buffer::Instance&));
-  MOCK_METHOD(void, encryptUpstream, (bool, Buffer::Instance&));
+  MOCK_METHOD(bool, encryptUpstream, (bool, Buffer::Instance&));
 };
 
 // Define fixture class with decoder and mock callbacks.

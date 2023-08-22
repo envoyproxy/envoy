@@ -16,6 +16,7 @@
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/matcher.h"
+#include "source/extensions/matching/input_matchers/cel_matcher/config.h"
 
 #include "absl/status/statusor.h"
 
@@ -72,7 +73,6 @@ public:
     return *data_ptr_;
   }
 
-  void onComplete(const RateLimitQuotaBucketSettings&, RateLimitStatus);
   ~RateLimitQuotaFilter() override = default;
 
 private:

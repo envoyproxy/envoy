@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -38,9 +38,10 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 const (
@@ -52,8 +53,10 @@ const (
 	ValueAttemptCount            = 6
 	ValueDownstreamLocalAddress  = 7
 	ValueDownstreamRemoteAddress = 8
-	ValueUpstreamHostAddress     = 9
-	ValueUpstreamClusterName     = 10
+	ValueUpstreamLocalAddress    = 9
+	ValueUpstreamRemoteAddress   = 10
+	ValueUpstreamClusterName     = 11
+	ValueVirtualClusterName      = 12
 )
 
 type httpCApiImpl struct{}
@@ -216,7 +219,8 @@ func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key *string) {
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringValue(r *httpRequest, id int) (string, bool) {
+func (c *httpCApiImpl) HttpGetStringValue(rr unsafe.Pointer, id int) (string, bool) {
+	r := (*httpRequest)(rr)
 	var value string
 	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
 	// since there might be multiple concurrency goroutines invoking this API on the Go side.
@@ -241,6 +245,26 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return value, true
 }
 
+func (c *httpCApiImpl) HttpGetDynamicMetadata(rr unsafe.Pointer, filterName string) map[string]interface{} {
+	r := (*httpRequest)(rr)
+	var buf []byte
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req), unsafe.Pointer(&filterName), unsafe.Pointer(&buf))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+	// copy the memory from c to Go.
+	var meta structpb.Struct
+	proto.Unmarshal(buf, &meta)
+	return meta.AsMap()
+}
+
 func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{}) {
 	v, err := structpb.NewValue(value)
 	if err != nil {
@@ -255,21 +279,21 @@ func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName strin
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
-	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(&message))
 }
 
 func (c *httpCApiImpl) HttpLogLevel() api.LogType {
-	return api.LogType(C.envoyGoFilterHttpLogLevel())
+	return api.GetLogLevel()
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
-var cAPI HttpCAPI = &httpCApiImpl{}
+var cAPI api.HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
-func SetHttpCAPI(api HttpCAPI) {
+func SetHttpCAPI(api api.HttpCAPI) {
 	cAPI = api
 }
 
@@ -278,8 +302,11 @@ func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, va
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetStringFilterState(r *httpRequest, key string) string {
+func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) string {
+	r := (*httpRequest)(rr)
 	var value string
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	r.sema.Add(1)
 	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
 	if res == C.CAPIYield {

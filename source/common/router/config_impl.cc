@@ -141,7 +141,10 @@ public:
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
                                           absl::string_view type_url) override {
     static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name());
+        createReflectableMessage(
+            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
+            ->GetDescriptor()
+            ->full_name());
     if (type_url == request_header_input_name) {
       return absl::OkStatus();
     }
@@ -597,8 +600,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
-    weighted_clusters_config_ = std::make_unique<WeightedClustersConfig>(
-        weighted_clusters, total_weight, route.route().weighted_clusters().header_name());
+    weighted_clusters_config_ =
+        std::make_unique<WeightedClustersConfig>(std::move(weighted_clusters), total_weight,
+                                                 route.route().weighted_clusters().header_name());
 
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
@@ -626,7 +630,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (!route.route().rate_limits().empty()) {
     rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), validator);
+        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), factory_context);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -649,7 +653,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     if (!success) {
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
-    if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect) {
+    if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect ||
+        (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+         upgrade_config.upgrade_type() == Http::Headers::get().UpgradeValues.ConnectUdp)) {
       connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
     } else if (upgrade_config.has_connect_config()) {
       throw EnvoyException(absl::StrCat("Non-CONNECT upgrade type ", upgrade_config.upgrade_type(),
@@ -1600,7 +1606,9 @@ ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& 
 RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                    const StreamInfo::StreamInfo& stream_info,
                                                    uint64_t random_value) const {
-  if (Http::HeaderUtility::isConnect(headers) &&
+  if ((Http::HeaderUtility::isConnect(headers) ||
+       (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+        Http::HeaderUtility::isConnectUdp(headers))) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return clusterEntry(headers, random_value);
   }
@@ -1682,7 +1690,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
   if (!virtual_host.rate_limits().empty()) {
     rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), validator);
+        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), factory_context);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());

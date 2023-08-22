@@ -151,9 +151,11 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   quiche::HttpValidationPolicy http_validation_policy;
   http_validation_policy.disallow_header_continuation_lines = true;
   http_validation_policy.require_header_colon = true;
-  http_validation_policy.disallow_multiple_content_length = false;
+  http_validation_policy.disallow_multiple_content_length = true;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
   http_validation_policy.validate_transfer_encoding = false;
+  http_validation_policy.require_content_length_if_body_required = false;
+  http_validation_policy.disallow_invalid_header_characters_in_response = true;
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
@@ -329,7 +331,7 @@ void BalsaParser::OnChunkLength(size_t chunk_length) {
 
 void BalsaParser::OnChunkExtensionInput(absl::string_view /*input*/) {}
 
-void BalsaParser::OnInterimHeaders(BalsaHeaders /*headers*/) {}
+void BalsaParser::OnInterimHeaders(std::unique_ptr<BalsaHeaders> /*headers*/) {}
 
 void BalsaParser::HeaderDone() {
   if (status_ == ParserStatus::Error) {
@@ -375,6 +377,9 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
     break;
   case BalsaFrameEnums::INVALID_HEADER_CHARACTER:
     error_message_ = "header value contains invalid chars";
+    break;
+  case BalsaFrameEnums::MULTIPLE_CONTENT_LENGTH_KEYS:
+    error_message_ = "HPE_UNEXPECTED_CONTENT_LENGTH";
     break;
   default:
     error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
