@@ -94,7 +94,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
        Http::HeaderUtility::isConnectUdp(headers))) {
     useCapsuleProtocol();
     if (Http::HeaderUtility::isConnectUdp(headers)) {
-      // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so makes it
+      // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it
       // bypass the default Datagram queue.
       session()->SetForceFlushForDefaultQueue(true);
     }

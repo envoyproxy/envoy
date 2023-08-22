@@ -272,7 +272,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
       (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
        Http::HeaderUtility::isConnectUdp(*headers))) {
     useCapsuleProtocol();
-    // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so makes it bypass
+    // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it bypass
     // the default Datagram queue.
     if (Http::HeaderUtility::isConnectUdp(*headers)) {
       session()->SetForceFlushForDefaultQueue(true);
