@@ -17,8 +17,8 @@ func init() {
 }
 
 type config struct {
-	counter   api.CounterMetric
-	gauge     api.GaugeMetric
+	counter api.CounterMetric
+	gauge   api.GaugeMetric
 }
 
 type parser struct {
