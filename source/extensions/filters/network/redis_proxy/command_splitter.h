@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
@@ -86,15 +87,14 @@ public:
    * @param request supplies the split request to make (ownership transferred to call).
    * @param callbacks supplies the split request completion callbacks.
    * @param dispatcher supplies dispatcher used for delay fault timer.
+   * @param stream_info reference to the stream info used for formatting the key.
    * @return SplitRequestPtr a handle to the active request or nullptr if the request has already
    *         been satisfied (via onResponse() being called). The splitter ALWAYS calls
    *         onResponse() for a given request.
    */
   virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
-                                      SplitCallbacks& callbacks,
-                                      Event::Dispatcher& dispatcher) PURE;
-
-  virtual void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) PURE;
+                                      SplitCallbacks& callbacks, Event::Dispatcher& dispatcher,
+                                      const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 } // namespace CommandSplitter
