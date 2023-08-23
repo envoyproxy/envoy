@@ -235,7 +235,7 @@ TEST_P(ValidationServerTest1, RunWithoutCrash) {
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest1,
                          ::testing::ValuesIn(ValidationServerTest1::getAllConfigFiles()));
 
-TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
+TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoader) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime time_system;

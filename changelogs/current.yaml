@@ -54,6 +54,9 @@ removed_config_or_runtime:
 - area: dns
   change: |
     Removed ``envoy.restart_features.use_apple_api_for_dns_lookups`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
 
 new_features:
 - area: access_log

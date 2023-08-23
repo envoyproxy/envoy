@@ -89,7 +89,6 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses
 RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
-RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 
 // Begin false flags. These should come with a TODO to flip true.
