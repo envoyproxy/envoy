@@ -38,8 +38,7 @@ public:
 
   virtual absl::Status startStream(const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void closeStream() PURE;
-  virtual void
-  sendUsageReport(absl::optional<envoy::service::rate_limit_quota::v3::BucketId> bucket_id) PURE;
+  virtual void sendUsageReport(absl::optional<size_t> bucket_id) PURE;
 
   virtual void setCallback(RateLimitQuotaCallbacks* callbacks) PURE;
   virtual void resetCallback() PURE;

@@ -49,7 +49,8 @@ public:
                        Server::Configuration::FactoryContext& factory_context,
                        BucketsCache& quota_buckets, ThreadLocalClient& client)
       : config_(std::move(config)), factory_context_(factory_context),
-        quota_buckets_(quota_buckets), client_(client) {
+        quota_buckets_(quota_buckets), client_(client),
+        time_source_(factory_context.mainThreadDispatcher().timeSource()) {
     createMatcher();
   }
 
@@ -82,10 +83,12 @@ public:
 private:
   // Create the matcher factory and matcher.
   void createMatcher();
-  // Create new bucket and send the report to RLQS server.
+  // Add new bucket to quota bucket cache.
+  void addNewBucket(const BucketId& bucket_id, size_t id);
+  // Send the report to RLQS server immediately.
   Http::FilterHeadersStatus
-  createNewBucketAndSendReport(const BucketId& bucket_id,
-                               const RateLimitOnMatchAction& match_action);
+  sendImmediateReport(const size_t bucket_id,
+                      const RateLimitOnMatchAction& match_action);
 
   FilterConfigConstSharedPtr config_;
   Server::Configuration::FactoryContext& factory_context_;
@@ -97,6 +100,7 @@ private:
   // Reference to the objects that are stored in TLS.
   BucketsCache& quota_buckets_;
   ThreadLocalClient& client_;
+  TimeSource& time_source_;
 
   bool initiating_call_{};
 };

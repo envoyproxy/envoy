@@ -25,16 +25,17 @@ using BucketAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaRespo
 using BucketQuotaUsage =
     ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
 
-// Customized hash and equal struct for `BucketId` hash key.
-struct BucketIdHash {
-  size_t operator()(const BucketId& bucket_id) const { return MessageUtil::hash(bucket_id); }
-};
+// TODO(tyxia) Removed!!!
+// // Customized hash and equal struct for `BucketId` hash key.
+// struct BucketIdHash {
+//   size_t operator()(const BucketId& bucket_id) const { return MessageUtil::hash(bucket_id); }
+// };
 
-struct BucketIdEqual {
-  bool operator()(const BucketId& id1, const BucketId& id2) const {
-    return Protobuf::util::MessageDifferencer::Equals(id1, id2);
-  }
-};
+// struct BucketIdEqual {
+//   bool operator()(const BucketId& id1, const BucketId& id2) const {
+//     return Protobuf::util::MessageDifferencer::Equals(id1, id2);
+//   }
+// };
 
 struct QuotaUsage {
   // Requests allowed.
@@ -47,14 +48,18 @@ struct QuotaUsage {
 
 // This object stores the data for single bucket entry.
 struct Bucket {
+  // BucketId object that is assocaited with this bucket. It is part of the report that is sent to
+  // RLQS server.
+  BucketId bucket_id;
   // Cached action from the response that was received from the RLQS server.
   BucketAction bucket_action;
   // Cache quota usage.
   QuotaUsage quota_usage;
 };
 
-using BucketsCache =
-    absl::node_hash_map<BucketId, std::unique_ptr<Bucket>, BucketIdHash, BucketIdEqual>;
+// using BucketsCache =
+//     absl::node_hash_map<BucketId, std::unique_ptr<Bucket>, BucketIdHash, BucketIdEqual>;
+using BucketsCache = absl::node_hash_map<size_t, std::unique_ptr<Bucket>>;
 
 struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota> {
   ThreadLocalClient(Envoy::Event::Dispatcher& dispatcher) {

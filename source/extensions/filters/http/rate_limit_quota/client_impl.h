@@ -42,8 +42,6 @@ public:
         time_source_(context.mainThreadDispatcher().timeSource()) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
-  // Build the usage report (i.e., the request sent to RLQS server).
-  RateLimitQuotaUsageReports buildUsageReport(const BucketId& bucket_id);
 
   // RawAsyncStreamCallbacks methods;
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -55,15 +53,17 @@ public:
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
   void closeStream() override;
   // Send the usage report to RLQS server
-  void sendUsageReport(absl::optional<BucketId> bucket_id) override;
+  void sendUsageReport(absl::optional<size_t> bucket_id) override;
   void setCallback(RateLimitQuotaCallbacks* callbacks) override { rlqs_callback_ = callbacks; }
   // Notify the rate limit client that the filter itself has been destroyed. i.e., the filter
   // callback can not be used anymore.
   void resetCallback() override { rlqs_callback_ = nullptr; }
 
 private:
-  void addNewBucket(const BucketId& bucket_id);
-  RateLimitQuotaUsageReports getReport(bool new_bucket);
+//  // Build the usage report (i.e., the request sent to RLQS server).
+//   RateLimitQuotaUsageReports buildUsageReport(const BucketId& bucket_id);
+//   void addNewBucket(const BucketId& bucket_id);
+  RateLimitQuotaUsageReports buildReport(absl::optional<size_t> bucket_id);
 
   bool stream_closed_ = false;
   // Domain from filter configuration. The same domain name throughout the whole lifetime of client.

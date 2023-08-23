@@ -30,8 +30,7 @@ public:
 
   MOCK_METHOD(absl::Status, startStream, (const StreamInfo::StreamInfo&));
   MOCK_METHOD(void, closeStream, ());
-  MOCK_METHOD(void, sendUsageReport,
-              (absl::optional<envoy::service::rate_limit_quota::v3::BucketId>));
+  MOCK_METHOD(void, sendUsageReport, (absl::optional<size_t>));
 
   MOCK_METHOD(void, setCallback, (RateLimitQuotaCallbacks*));
   MOCK_METHOD(void, resetCallback, ());

@@ -11,52 +11,6 @@ namespace RateLimitQuota {
 
 using ::envoy::type::v3::RateLimitStrategy;
 
-Http::FilterHeadersStatus
-RateLimitQuotaFilter::createNewBucketAndSendReport(const BucketId& bucket_id,
-                                                   const RateLimitOnMatchAction& match_action) {
-  const auto& bucket_settings = match_action.bucketSettings();
-  // The first matched request doesn't have quota assignment from the RLQS server yet, so the
-  // action is performed based on pre-configured strategy from no assignment behavior config.
-  // TODO(tyxia) Check no assignment logic with the allow/deny interface. Default is allow all.
-
-  // Create the gRPC client if it has not been created.
-  if (client_.rate_limit_client == nullptr) {
-    client_.rate_limit_client = createRateLimitClient(factory_context_, config_->rlqs_server(),
-                                                      this, quota_buckets_, config_->domain());
-  } else {
-    // Callback has been reset to nullptr when filter was destroyed last time.
-    // Reset it here when new filter has been created.
-    client_.rate_limit_client->setCallback(this);
-  }
-
-  // It can not be nullptr based on current implementation.
-  ASSERT(client_.rate_limit_client != nullptr);
-
-  // Start the streaming on the first request.
-  auto status = client_.rate_limit_client->startStream(callbacks_->streamInfo());
-  if (!status.ok()) {
-    ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
-
-  initiating_call_ = true;
-
-  // Send the usage report to RLQS server immediately on the first time when the request is
-  // matched.
-  client_.rate_limit_client->sendUsageReport(bucket_id);
-
-  ASSERT(client_.send_reports_timer != nullptr);
-  // Set the reporting interval and enable the timer.
-  const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
-  client_.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
-
-  initiating_call_ = false;
-  // TODO(tyxia) Revisit later.
-  // Stop the iteration for headers as well as data and trailers for the current filter and the
-  // filters following.
-  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-}
-
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
   // First, perform the request matching.
@@ -82,10 +36,12 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  BucketId bucket_id = ret.value();
+  BucketId bucket_id_proto = ret.value();
+  const size_t bucket_id = MessageUtil::hash(bucket_id_proto);
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // The first request, create a new bucket in the cache and sent the report to RLQS server.
-    return createNewBucketAndSendReport(bucket_id, match_action);
+    addNewBucket(bucket_id_proto, bucket_id);
+    return sendImmediateReport(bucket_id, match_action);
   } else {
     // Found the cached bucket entry.
     // First, get the quota assignment (if exists) from the cached bucket action.
@@ -155,6 +111,66 @@ void RateLimitQuotaFilter::onQuotaResponse(RateLimitQuotaResponse&) {
 
 void RateLimitQuotaFilter::onDestroy() {
   // TODO(tyxia) TLS resource are not cleaned here.
+}
+
+void RateLimitQuotaFilter::addNewBucket(const BucketId& bucket_id, size_t id) {
+  QuotaUsage quota_usage;
+  quota_usage.num_requests_allowed = 1;
+  quota_usage.num_requests_denied = 0;
+  quota_usage.last_report = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      time_source_.monotonicTime().time_since_epoch());
+
+  // Create new bucket and store it into quota cache.
+  std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
+  new_bucket->bucket_id = bucket_id;
+  new_bucket->quota_usage = quota_usage;
+  quota_buckets_[id] = std::move(new_bucket);
+}
+
+Http::FilterHeadersStatus
+RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
+                                          const RateLimitOnMatchAction& match_action) {
+  const auto& bucket_settings = match_action.bucketSettings();
+  // The first matched request doesn't have quota assignment from the RLQS server yet, so the
+  // action is performed based on pre-configured strategy from no assignment behavior config.
+  // TODO(tyxia) Check no assignment logic with the allow/deny interface. Default is allow all.
+
+  // Create the gRPC client if it has not been created.
+  if (client_.rate_limit_client == nullptr) {
+    client_.rate_limit_client = createRateLimitClient(factory_context_, config_->rlqs_server(),
+                                                      this, quota_buckets_, config_->domain());
+  } else {
+    // Callback has been reset to nullptr when filter was destroyed last time.
+    // Reset it here when new filter has been created.
+    client_.rate_limit_client->setCallback(this);
+  }
+
+  // It can not be nullptr based on current implementation.
+  ASSERT(client_.rate_limit_client != nullptr);
+
+  // Start the streaming on the first request.
+  auto status = client_.rate_limit_client->startStream(callbacks_->streamInfo());
+  if (!status.ok()) {
+    ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  initiating_call_ = true;
+
+  // Send the usage report to RLQS server immediately on the first time when the request is
+  // matched.
+  client_.rate_limit_client->sendUsageReport(bucket_id);
+
+  ASSERT(client_.send_reports_timer != nullptr);
+  // Set the reporting interval and enable the timer.
+  const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
+  client_.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
+
+  initiating_call_ = false;
+  // TODO(tyxia) Revisit later.
+  // Stop the iteration for headers as well as data and trailers for the current filter and the
+  // filters following.
+  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
 } // namespace RateLimitQuota
