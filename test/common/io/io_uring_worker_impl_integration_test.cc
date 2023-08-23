@@ -220,7 +220,8 @@ TEST_F(IoUringWorkerIntegrationTest, Injection) {
 
   // Wait for server socket receive injected completion.
   while (socket.accept_result_ == -1 || socket.cancel_result_ == -1 || socket.close_result_ == -1 ||
-         socket.connect_result_ == -1 || socket.read_result_ == -1 || socket.write_result_ == -1) {
+         socket.connect_result_ == -1 || socket.read_result_ == -1 || socket.write_result_ == -1 ||
+         socket.shutdown_result_ == -1) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
