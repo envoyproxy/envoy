@@ -35,6 +35,9 @@ bug_fixes:
     :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
     :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
     values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
+- area: redis
+  change: |
+    fixed a bug where redis key formatter is using the closed stream because of life time issues.
 - area: extension_discovery_service
   change: |
     Fixed a bug causing crash if ECDS is used with upstream HTTP filters.
@@ -44,9 +47,15 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tcp
+  change: |
+    Removed runtime key ``envoy.reloadable_features.tcp_pool_idle_timeout``.
 - area: http filters
   change: |
     Removed ``envoy_reloadable_features_http_filter_avoid_reentrant_local_reply`` runtime flag and legacy code paths.
+- area: dns
+  change: |
+    Removed ``envoy.restart_features.use_apple_api_for_dns_lookups`` and legacy code paths.
 
 new_features:
 - area: access_log
@@ -84,6 +93,11 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: access_logs
+  change: |
+    added :ref:`json_format_options <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format_options>` config option to
+    support JSON output formatting and the :ref:`sort_properties <envoy_v3_api_field_config.core.v3.JsonFormatOptions.sort_properties>`
+    option to print the JSON output with sorted properties.
 - area: tap
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data

@@ -18,7 +18,7 @@ using DownstreamFilterConfigProviderManager =
                                         Server::Configuration::FactoryContext>;
 using UpstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
-                                        Server::Configuration::UpstreamHttpFactoryContext>;
+                                        Server::Configuration::UpstreamFactoryContext>;
 
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:

@@ -76,7 +76,6 @@ RUNTIME_GUARD(envoy_reloadable_features_service_sanitize_non_utf8_strings);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_stateful_session_encode_ttl_in_cookie);
 RUNTIME_GUARD(envoy_reloadable_features_successful_active_health_check_uneject_host);
-RUNTIME_GUARD(envoy_reloadable_features_tcp_pool_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
@@ -91,7 +90,6 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
-RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
