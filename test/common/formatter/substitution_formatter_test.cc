@@ -112,19 +112,19 @@ TEST(SubstitutionFormatParser, commandParser) {
   std::string token1;
 
   std::string command = "item1";
-  SubstitutionFormatParser::parseSubcommand(command, ':', token1);
+  SubstitutionFormatUtils::parseSubcommand(command, ':', token1);
   ASSERT_EQ(token1, "item1");
 
   std::string token2;
   command = "item1:item2";
-  SubstitutionFormatParser::parseSubcommand(command, ':', token1, token2);
+  SubstitutionFormatUtils::parseSubcommand(command, ':', token1, token2);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
 
   // Three tokens.
   std::string token3;
   command = "item1?item2?item3";
-  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
+  SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(token3, "item3");
@@ -132,7 +132,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // Command string has 4 tokens but 3 are expected.
   // The first 3 will be read, the fourth will be ignored.
   command = "item1?item2?item3?item4";
-  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
+  SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(token3, "item3");
@@ -141,7 +141,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // The third extracted token should be empty.
   command = "item1?item2";
   token3.erase();
-  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, token3);
+  SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_TRUE(token3.empty());
@@ -150,7 +150,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // and remaining 2 into a vector of strings.
   command = "item1?item2?item3?item4";
   std::vector<std::string> bucket;
-  SubstitutionFormatParser::parseSubcommand(command, '?', token1, token2, bucket);
+  SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, bucket);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
   ASSERT_EQ(bucket.size(), 2);
