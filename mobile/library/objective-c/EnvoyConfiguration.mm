@@ -113,9 +113,12 @@
                                       nodeSubZone:(nullable NSString *)nodeSubZone
                                  xdsServerAddress:(nullable NSString *)xdsServerAddress
                                     xdsServerPort:(UInt32)xdsServerPort
+                                    xdsAuthHeader:(nullable NSString *)xdsAuthHeader
+                                     xdsAuthToken:(nullable NSString *)xdsAuthToken
                                       xdsJwtToken:(nullable NSString *)xdsJwtToken
                        xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
+                                           xdsSni:(nullable NSString *)xdsSni
                                  rtdsResourceName:(nullable NSString *)rtdsResourceName
                                rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
                                         enableCds:(BOOL)enableCds
@@ -165,9 +168,12 @@
   self.nodeSubZone = nodeSubZone;
   self.xdsServerAddress = xdsServerAddress;
   self.xdsServerPort = xdsServerPort;
+  self.xdsAuthHeader = xdsAuthHeader;
+  self.xdsAuthToken = xdsAuthToken;
   self.xdsJwtToken = xdsJwtToken;
   self.xdsJwtTokenLifetimeSeconds = xdsJwtTokenLifetimeSeconds;
   self.xdsSslRootCerts = xdsSslRootCerts;
+  self.xdsSni = xdsSni;
   self.rtdsResourceName = rtdsResourceName;
   self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
   self.cdsResourcesLocator = cdsResourcesLocator;
@@ -260,12 +266,19 @@
 #ifdef ENVOY_GOOGLE_GRPC
   if (self.xdsServerAddress != nil) {
     Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
+    if (self.xdsAuthHeader != nil) {
+      xdsBuilder.setAuthenticationToken([self.xdsAuthHeader toCXXString],
+                                        [self.xdsAuthToken toCXXString]);
+    }
     if (self.xdsJwtToken != nil) {
       xdsBuilder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
                                            self.xdsJwtTokenLifetimeSeconds);
     }
     if (self.xdsSslRootCerts != nil) {
       xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
+    }
+    if (self.xdsSni != nil) {
+      xdsBuilder.setSni([self.xdsSni toCXXString]);
     }
     if (self.rtdsResourceName != nil) {
       xdsBuilder.addRuntimeDiscoveryService([self.rtdsResourceName toCXXString],

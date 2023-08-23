@@ -40,6 +40,8 @@ public class EnvoyConfiguration {
   public final Integer dnsCacheSaveIntervalSeconds;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
+  public final String http3ConnectionOptions;
+  public final String http3ClientConnectionOptions;
   public final Boolean enableGzipDecompression;
   public final Boolean enableBrotliDecompression;
   public final Boolean enableSocketTagging;
@@ -64,9 +66,12 @@ public class EnvoyConfiguration {
   public final Integer rtdsTimeoutSeconds;
   public final String xdsAddress;
   public final Integer xdsPort;
+  public final String xdsAuthHeader;
+  public final String xdsAuthToken;
   public final String xdsJwtToken;
   public final Integer xdsJwtTokenLifetime;
   public final String xdsRootCerts;
+  public final String xdsSni;
   public final String nodeId;
   public final String nodeRegion;
   public final String nodeZone;
@@ -102,6 +107,9 @@ public class EnvoyConfiguration {
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
    *     HTTP/3 (QUIC).
+   * @param http3ConnectionOptions                        connection options to be used in HTTP/3.
+   * @param http3ClientConnectionOptions                  client connection options to be used in
+   *     HTTP/3.
    * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
    *     compression.
@@ -133,12 +141,19 @@ public class EnvoyConfiguration {
    * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
    * @param xdsAddress                                    the address for the xDS management server.
    * @param xdsPort                                       the port for the xDS server.
+   * @param xdsAuthHeader                                 the HTTP header to use for sending the
+   *                                                      authentication token to the xDS server.
+   * @param xdsAuthToken                                  the token to send as the authentication
+   *                                                      header value to authenticate with the
+   *                                                      xDS server.
    * @param xdsJwtToken                                   the JWT token to use for authenticating
    *                                                      with the xDS server.
    * @param xdsTokenLifetime                              the lifetime of the JWT token.
    * @param xdsRootCerts                                  the root certificates to use for the TLS
    *                                                      handshake during connection establishment
    *                                                      with the xDS management server.
+   * @param xdsSni                                        the SNI (server name identification) to
+   *                                                      use for the TLS handshake.
    * @param nodeId                                        the node ID in the Node metadata.
    * @param nodeRegion                                    the node region in the Node metadata.
    * @param nodeZone                                      the node zone in the Node metadata.
@@ -153,6 +168,7 @@ public class EnvoyConfiguration {
       int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds,
       int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
       int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
+      String http3ConnectionOptions, String http3ClientConnectionOptions,
       boolean enableGzipDecompression, boolean enableBrotliDecompression,
       boolean enableSocketTagging, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
@@ -165,9 +181,10 @@ public class EnvoyConfiguration {
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, boolean enablePlatformCertificatesValidation,
       String rtdsResourceName, Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
-      String xdsJwtToken, Integer xdsJwtTokenLifetime, String xdsRootCerts, String nodeId,
-      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
-      Integer cdsTimeoutSeconds, boolean enableCds) {
+      String xdsAuthHeader, String xdsAuthToken, String xdsJwtToken, Integer xdsJwtTokenLifetime,
+      String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
+      String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
+      boolean enableCds) {
     JniLibrary.load();
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -181,6 +198,8 @@ public class EnvoyConfiguration {
     this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
+    this.http3ConnectionOptions = http3ConnectionOptions;
+    this.http3ClientConnectionOptions = http3ClientConnectionOptions;
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
     this.enableSocketTagging = enableSocketTagging;
@@ -221,9 +240,12 @@ public class EnvoyConfiguration {
     this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
     this.xdsAddress = xdsAddress;
     this.xdsPort = xdsPort;
+    this.xdsAuthHeader = xdsAuthHeader;
+    this.xdsAuthToken = xdsAuthToken;
     this.xdsJwtToken = xdsJwtToken;
     this.xdsJwtTokenLifetime = xdsJwtTokenLifetime;
     this.xdsRootCerts = xdsRootCerts;
+    this.xdsSni = xdsSni;
     this.nodeId = nodeId;
     this.nodeRegion = nodeRegion;
     this.nodeZone = nodeZone;
@@ -248,14 +270,15 @@ public class EnvoyConfiguration {
         grpcStatsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        enableGzipDecompression, enableBrotliDecompression, enableSocketTagging,
-        enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
-        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
-        enforceTrustChainVerification, filter_chain, stats_sinks,
-        enablePlatformCertificatesValidation, runtime_guards, rtdsResourceName, rtdsTimeoutSeconds,
-        xdsAddress, xdsPort, xdsJwtToken, xdsJwtTokenLifetime, xdsRootCerts, nodeId, nodeRegion,
-        nodeZone, nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        http3ConnectionOptions, http3ClientConnectionOptions, enableGzipDecompression,
+        enableBrotliDecompression, enableSocketTagging, enableInterfaceBinding,
+        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
+        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filter_chain,
+        stats_sinks, enablePlatformCertificatesValidation, runtime_guards, rtdsResourceName,
+        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsJwtToken,
+        xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId, nodeRegion, nodeZone, nodeSubZone,
+        cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

@@ -201,9 +201,17 @@ void Filter::onDestroy() {
 
 // access_log is executed before the log of the stream filter
 void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
+                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info,
                  Envoy::AccessLog::AccessLogType) {
-  // Todo log phase of stream filter
+  // `log` may be called multiple times with different log type
+  if (!stream_info.requestComplete().has_value()) {
+    return;
+  }
+
+  // TODO: support mid-request logging
+  auto& state = getProcessorState();
+  state.log();
+  dynamic_lib_->envoyGoFilterOnHttpLog(req_);
 }
 
 /*** common APIs for filter, both decode and encode ***/
@@ -994,9 +1002,18 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   case EnvoyValue::DownstreamRemoteAddress:
     req_->strValue = state.streamInfo().downstreamAddressProvider().remoteAddress()->asString();
     break;
-  case EnvoyValue::UpstreamHostAddress:
-    if (state.streamInfo().upstreamInfo() && state.streamInfo().upstreamInfo()->upstreamHost()) {
-      req_->strValue = state.streamInfo().upstreamInfo()->upstreamHost()->address()->asString();
+  case EnvoyValue::UpstreamLocalAddress:
+    if (state.streamInfo().upstreamInfo() &&
+        state.streamInfo().upstreamInfo()->upstreamLocalAddress()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamLocalAddress()->asString();
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    break;
+  case EnvoyValue::UpstreamRemoteAddress:
+    if (state.streamInfo().upstreamInfo() &&
+        state.streamInfo().upstreamInfo()->upstreamRemoteAddress()) {
+      req_->strValue = state.streamInfo().upstreamInfo()->upstreamRemoteAddress()->asString();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
@@ -1008,6 +1025,12 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
+    break;
+  case EnvoyValue::VirtualClusterName:
+    if (!state.streamInfo().virtualClusterName().has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = state.streamInfo().virtualClusterName().value();
     break;
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
@@ -1188,7 +1211,7 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
         }
         dynamic_lib_->envoyGoRequestSemaDec(req_);
       } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+        ENVOY_LOG(info, "golang filter has gone or destroyed in getStringFilterState");
       }
     });
     return CAPIStatus::CAPIYield;
@@ -1366,41 +1389,6 @@ ProcessorState& Filter::getProcessorState() {
   return enter_encoding_ ? dynamic_cast<ProcessorState&>(encoding_state_)
                          : dynamic_cast<ProcessorState&>(decoding_state_);
 };
-
-/* FilterLogger */
-void FilterLogger::log(uint32_t level, absl::string_view message) const {
-  switch (static_cast<spdlog::level::level_enum>(level)) {
-  case spdlog::level::trace:
-    ENVOY_LOG(trace, "{}", message);
-    return;
-  case spdlog::level::debug:
-    ENVOY_LOG(debug, "{}", message);
-    return;
-  case spdlog::level::info:
-    ENVOY_LOG(info, "{}", message);
-    return;
-  case spdlog::level::warn:
-    ENVOY_LOG(warn, "{}", message);
-    return;
-  case spdlog::level::err:
-    ENVOY_LOG(error, "{}", message);
-    return;
-  case spdlog::level::critical:
-    ENVOY_LOG(critical, "{}", message);
-    return;
-  case spdlog::level::off:
-    // means not logging
-    return;
-  case spdlog::level::n_levels:
-    PANIC("not implemented");
-  }
-
-  ENVOY_LOG(error, "undefined log level {} with message '{}'", level, message);
-
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
-uint32_t FilterLogger::level() const { return static_cast<uint32_t>(ENVOY_LOGGER().level()); }
 
 } // namespace Golang
 } // namespace HttpFilters

@@ -11,15 +11,7 @@ parameters:
   type: boolean
   default: true
 
-- name: checkDeps
-  displayName: "Run dependency checker"
-  type: string
-  default: false
-
 # Auth
-- name: authGithub
-  type: string
-  default: ""
 - name: authGCP
   type: string
   default: ""
@@ -33,11 +25,18 @@ parameters:
   type: string
   default: ""
 
+# Timeout/s
+- name: timeoutPrechecks
+  type: number
+  # Building the rst from protos can take a while even with RBE if there is
+  # a lot of change - eg protobuf changed, or a primitve proto changed.
+  default: 40
+
 
 jobs:
 - job: prechecks
   displayName: Precheck
-  timeoutInMinutes: 30
+  timeoutInMinutes: ${{ parameters.timeoutPrechecks }}
   pool:
     vmImage: $(agentUbuntu)
   variables:
@@ -122,9 +121,7 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
@@ -154,34 +151,14 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
 
-- job: dependencies
-  displayName: Precheck dependencies
-  timeoutInMinutes: 20
-  pool:
-    vmImage: $(agentUbuntu)
-  condition: |
-    and(not(canceled()),
-        eq(${{ parameters.checkDeps }}, 'true'))
-  steps:
-  - template: ../bazel.yml
-    parameters:
-      ciTarget: deps
-      cacheTestResults: ${{ parameters.cacheTestResults }}
-      cacheVersion: $(cacheKeyBazel)
-      publishEnvoy: false
-      publishTestResults: false
-      authGithub: ${{ parameters.authGithub }}
-
 - job: prechecked
   displayName: Prechecked
-  dependsOn: ["prechecks", "dependencies"]
+  dependsOn: ["prechecks"]
   pool: x64-nano
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
@@ -190,7 +167,6 @@ jobs:
   condition: |
     and(
       eq(variables['Build.Reason'], 'PullRequest'),
-      in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
   - checkout: none

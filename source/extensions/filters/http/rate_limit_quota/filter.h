@@ -17,6 +17,7 @@
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/matcher.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
+#include "source/extensions/matching/input_matchers/cel_matcher/config.h"
 
 #include "absl/status/statusor.h"
 

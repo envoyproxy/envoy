@@ -207,8 +207,10 @@ class EngineBuilderTest {
   @Test
   fun `specifying xDS works`() {
     var xdsBuilder = XdsBuilder("fake_test_address", 0)
+    xdsBuilder.setAuthenticationToken("x-goog-api-key", "A1B2C3")
     xdsBuilder.setJwtAuthenticationToken("my_jwt_token")
     xdsBuilder.setSslRootCerts("my_root_certs")
+    xdsBuilder.setSni("fake_test_address");
     xdsBuilder.addRuntimeDiscoveryService("some_rtds_resource")
     xdsBuilder.addClusterDiscoveryService("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")
     engineBuilder = EngineBuilder(Standard())
@@ -217,8 +219,11 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.xdsAddress).isEqualTo("fake_test_address")
+    assertThat(engine.envoyConfiguration.xdsAuthHeader).isEqualTo("x-goog-api-key")
+    assertThat(engine.envoyConfiguration.xdsAuthToken).isEqualTo("A1B2C3")
     assertThat(engine.envoyConfiguration.xdsJwtToken).isEqualTo("my_jwt_token")
     assertThat(engine.envoyConfiguration.xdsRootCerts).isEqualTo("my_root_certs")
+    assertThat(engine.envoyConfiguration.xdsSni).isEqualTo("fake_test_address")
     assertThat(engine.envoyConfiguration.rtdsResourceName).isEqualTo("some_rtds_resource")
     assertThat(engine.envoyConfiguration.cdsResourcesLocator).isEqualTo("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")
   }

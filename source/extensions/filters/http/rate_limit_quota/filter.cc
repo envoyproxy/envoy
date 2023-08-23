@@ -69,6 +69,7 @@ void RateLimitQuotaFilter::createMatcher() {
   }
 }
 
+// TODO(tyxia) Currently request matching is only performed on the request header.
 absl::StatusOr<Matcher::ActionPtr>
 RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // Initialize the data pointer on first use and reuse it for subsequent requests.
@@ -84,10 +85,12 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   if (matcher_ == nullptr) {
     return absl::InternalError("Matcher tree has not been initialized yet.");
   } else {
-    // TODO(tyxia) Update the logic with the CEL matcher and other attributes besides header.
+    // Populate the request header.
     if (!headers.empty()) {
       data_ptr_->onRequestHeaders(headers);
     }
+
+    // Perform the matching.
     auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
 
     if (match_result.match_state_ == Matcher::MatchState::MatchComplete) {

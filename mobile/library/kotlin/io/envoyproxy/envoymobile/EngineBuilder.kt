@@ -43,14 +43,35 @@ open class XdsBuilder (
     private const val DEFAULT_XDS_TIMEOUT_IN_SECONDS: Int = 5
   }
 
+  internal var authHeader: String? = null
+  internal var authToken: String? = null
   internal var jwtToken: String? = null
   internal var jwtTokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
   internal var sslRootCerts: String? = null
+  internal var sni: String? = null
   internal var rtdsResourceName: String? = null
   internal var rtdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
   internal var enableCds: Boolean = false
   internal var cdsResourcesLocator: String? = null
   internal var cdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
+
+  /**
+   * Sets the authentication HTTP header and token value for authenticating with the xDS
+   * management server.
+   *
+   * @param header The HTTP authentication header.
+   * @param token The authentication token to be sent in the header.
+   *
+   * @return this builder.
+   */
+  fun setAuthenticationToken(
+    header: String,
+    token: String
+  ): XdsBuilder {
+    this.authHeader = header
+    this.authToken = token
+    return this
+  }
 
   /**
    * Sets JWT as the authentication method to the xDS management server, using the given token.
@@ -83,6 +104,20 @@ open class XdsBuilder (
    */
   fun setSslRootCerts(rootCerts: String): XdsBuilder {
     this.sslRootCerts = rootCerts
+    return this
+  }
+
+  /**
+   * Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake
+   * and the authority HTTP header. If not set, the SNI is set by default to the xDS server address
+   * and the authority HTTP header is not set.
+   *
+   * @param sni The SNI value.
+   *
+   * @return this builder.
+   */
+  fun setSni(sni: String): XdsBuilder {
+    this.sni = sni
     return this
   }
 
@@ -165,6 +200,8 @@ open class EngineBuilder(
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
+  private var http3ConnectionOptions = ""
+  private var http3ClientConnectionOptions = ""
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -692,6 +729,8 @@ open class EngineBuilder(
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      http3ConnectionOptions,
+      http3ClientConnectionOptions,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
@@ -716,9 +755,12 @@ open class EngineBuilder(
       xdsBuilder?.rtdsTimeoutInSeconds ?: 0,
       xdsBuilder?.xdsServerAddress,
       xdsBuilder?.xdsServerPort ?: 0,
+      xdsBuilder?.authHeader,
+      xdsBuilder?.authToken,
       xdsBuilder?.jwtToken,
       xdsBuilder?.jwtTokenLifetimeInSeconds ?: 0,
       xdsBuilder?.sslRootCerts,
+      xdsBuilder?.sni,
       nodeId,
       nodeRegion,
       nodeZone,

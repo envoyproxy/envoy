@@ -40,6 +40,7 @@ public:
                                              GoUint64 p3) PURE;
   virtual GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                            GoUint64 p3) PURE;
+  virtual void envoyGoFilterOnHttpLog(httpRequest* p0) PURE;
   virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
   virtual void envoyGoRequestSemaDec(httpRequest* p0) PURE;
 };
@@ -57,6 +58,7 @@ public:
   GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                      GoUint64 p3) override;
   GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;
+  void envoyGoFilterOnHttpLog(httpRequest* p0) override;
   void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) override;
   void envoyGoRequestSemaDec(httpRequest* p0) override;
 
@@ -70,6 +72,7 @@ private:
                                               GoUint64 p3) = {nullptr};
   GoUint64 (*envoy_go_filter_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                             GoUint64 p3) = {nullptr};
+  void (*envoy_go_filter_on_http_log_)(httpRequest* p0) = {nullptr};
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
   void (*envoy_go_filter_go_request_sema_dec_)(httpRequest* p0) = {nullptr};
 };
@@ -123,11 +126,14 @@ public:
   virtual GoUint64 envoyGoFilterOnDownstreamWrite(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                                   GoInt slice_num, GoInt end_of_stream) PURE;
 
-  virtual void envoyGoFilterOnUpstreamConnectionReady(void* w) PURE;
-  virtual void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason) PURE;
+  virtual void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 connID) PURE;
+  virtual void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason,
+                                                        GoUint64 connID) PURE;
   virtual void envoyGoFilterOnUpstreamData(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                            GoInt slice_num, GoInt end_of_stream) PURE;
   virtual void envoyGoFilterOnUpstreamEvent(void* w, GoInt event) PURE;
+
+  virtual void envoyGoFilterOnSemaDec(void* w) PURE;
 };
 
 class NetworkFilterDsoImpl : public NetworkFilterDso {
@@ -146,11 +152,13 @@ public:
   GoUint64 envoyGoFilterOnDownstreamWrite(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                           GoInt slice_num, GoInt end_of_stream) override;
 
-  void envoyGoFilterOnUpstreamConnectionReady(void* w) override;
-  void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason) override;
+  void envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 connID) override;
+  void envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason, GoUint64 connID) override;
   void envoyGoFilterOnUpstreamData(void* w, GoUint64 data_size, GoUint64 data_ptr, GoInt slice_num,
                                    GoInt end_of_stream) override;
   void envoyGoFilterOnUpstreamEvent(void* w, GoInt event) override;
+
+  void envoyGoFilterOnSemaDec(void* w) override;
 
 private:
   GoUint64 (*envoy_go_filter_on_network_filter_config_)(GoUint64 library_id_ptr,
@@ -167,11 +175,14 @@ private:
                                                    GoInt slice_num,
                                                    GoInt end_of_stream) = {nullptr};
 
-  void (*envoy_go_filter_on_upstream_connection_ready_)(void* w) = {nullptr};
-  void (*envoy_go_filter_on_upstream_connection_failure_)(void* w, GoInt reason) = {nullptr};
+  void (*envoy_go_filter_on_upstream_connection_ready_)(void* w, GoUint64 connID) = {nullptr};
+  void (*envoy_go_filter_on_upstream_connection_failure_)(void* w, GoInt reason,
+                                                          GoUint64 connID) = {nullptr};
   void (*envoy_go_filter_on_upstream_data_)(void* w, GoUint64 data_size, GoUint64 data_ptr,
                                             GoInt slice_num, GoInt end_of_stream) = {nullptr};
   void (*envoy_go_filter_on_upstream_event_)(void* w, GoInt event) = {nullptr};
+
+  void (*envoy_go_filter_on_sema_dec_)(void* w) = {nullptr};
 };
 
 using NetworkFilterDsoPtr = std::shared_ptr<NetworkFilterDso>;

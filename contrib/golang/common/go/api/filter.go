@@ -19,11 +19,72 @@ package api
 
 import "google.golang.org/protobuf/types/known/anypb"
 
+type (
+	// PassThroughStreamEncoderFilter provides the no-op implementation of the StreamEncoderFilter interface.
+	PassThroughStreamEncoderFilter struct{}
+	// PassThroughStreamDecoderFilter provides the no-op implementation of the StreamDecoderFilter interface.
+	PassThroughStreamDecoderFilter struct{}
+	// PassThroughStreamFilter provides the no-op implementation of the StreamFilter interface.
+	PassThroughStreamFilter struct {
+		PassThroughStreamDecoderFilter
+		PassThroughStreamEncoderFilter
+	}
+)
+
 // request
 type StreamDecoderFilter interface {
 	DecodeHeaders(RequestHeaderMap, bool) StatusType
 	DecodeData(BufferInstance, bool) StatusType
 	DecodeTrailers(RequestTrailerMap) StatusType
+}
+
+func (*PassThroughStreamDecoderFilter) DecodeHeaders(RequestHeaderMap, bool) StatusType {
+	return Continue
+}
+
+func (*PassThroughStreamDecoderFilter) DecodeData(BufferInstance, bool) StatusType {
+	return Continue
+}
+
+func (*PassThroughStreamDecoderFilter) DecodeTrailers(RequestTrailerMap) StatusType {
+	return Continue
+}
+
+// response
+type StreamEncoderFilter interface {
+	EncodeHeaders(ResponseHeaderMap, bool) StatusType
+	EncodeData(BufferInstance, bool) StatusType
+	EncodeTrailers(ResponseTrailerMap) StatusType
+}
+
+func (*PassThroughStreamEncoderFilter) EncodeHeaders(ResponseHeaderMap, bool) StatusType {
+	return Continue
+}
+
+func (*PassThroughStreamEncoderFilter) EncodeData(BufferInstance, bool) StatusType {
+	return Continue
+}
+
+func (*PassThroughStreamEncoderFilter) EncodeTrailers(ResponseTrailerMap) StatusType {
+	return Continue
+}
+
+type StreamFilter interface {
+	// http request
+	StreamDecoderFilter
+	// response stream
+	StreamEncoderFilter
+	// log when the request is finished
+	OnLog()
+	// destroy filter
+	OnDestroy(DestroyReason)
+	// TODO add more for stream complete
+}
+
+func (*PassThroughStreamFilter) OnLog() {
+}
+
+func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 }
 
 type StreamFilterConfigParser interface {
@@ -33,23 +94,6 @@ type StreamFilterConfigParser interface {
 
 type StreamFilterConfigFactory func(config interface{}) StreamFilterFactory
 type StreamFilterFactory func(callbacks FilterCallbackHandler) StreamFilter
-
-type StreamFilter interface {
-	// http request
-	StreamDecoderFilter
-	// response stream
-	StreamEncoderFilter
-	// destroy filter
-	OnDestroy(DestroyReason)
-	// TODO add more for stream complete and log phase
-}
-
-// response
-type StreamEncoderFilter interface {
-	EncodeHeaders(ResponseHeaderMap, bool) StatusType
-	EncodeData(BufferInstance, bool) StatusType
-	EncodeTrailers(ResponseTrailerMap) StatusType
-}
 
 // stream info
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
@@ -70,12 +114,16 @@ type StreamInfo interface {
 	DownstreamLocalAddress() string
 	// DownstreamRemoteAddress return the downstream remote address.
 	DownstreamRemoteAddress() string
-	// UpstreamHostAddress return the upstream host address.
-	UpstreamHostAddress() (string, bool)
+	// UpstreamLocalAddress return the upstream local address.
+	UpstreamLocalAddress() (string, bool)
+	// UpstreamRemoteAddress return the upstream remote address.
+	UpstreamRemoteAddress() (string, bool)
 	// UpstreamClusterName return the upstream host cluster.
 	UpstreamClusterName() (string, bool)
 	// FilterState return the filter state interface.
 	FilterState() FilterState
+	// VirtualClusterName returns the name of the virtual cluster which got matched
+	VirtualClusterName() (string, bool)
 }
 
 type StreamFilterCallbacks interface {
@@ -126,10 +174,8 @@ type UpstreamFilter interface {
 }
 
 type ConnectionCallback interface {
-	// Return the local address of the connection.
-	LocalAddr() string
-	// Return the remote address of the connection.
-	RemoteAddr() string
+	// StreamInfo returns the stream info of the connection
+	StreamInfo() StreamInfo
 	// Write data to the connection.
 	Write(buffer []byte, endStream bool)
 	// Close the connection.

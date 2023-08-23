@@ -80,6 +80,8 @@ class EnvoyConfigurationTest {
     dnsCacheSaveIntervalSeconds: Int = 101,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
+    http3ConnectionOptions: String = "5RTO",
+    http3ClientConnectionOptions: String = "MPQC",
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -102,9 +104,12 @@ class EnvoyConfigurationTest {
     rtdsTimeoutSeconds: Int = 0,
     xdsAddress: String = "",
     xdsPort: Int = 0,
+    xdsAuthHeader: String = "",
+    xdsAuthToken: String = "",
     xdsJwtToken: String = "",
     xdsJwtTokenLifetimeSeconds: Int = 0,
     xdsSslRootCerts: String = "",
+    xdsSni: String = "",
     nodeId: String = "",
     nodeRegion: String = "",
     nodeZone: String = "",
@@ -127,6 +132,8 @@ class EnvoyConfigurationTest {
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      http3ConnectionOptions,
+      http3ClientConnectionOptions,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
@@ -151,9 +158,12 @@ class EnvoyConfigurationTest {
       rtdsTimeoutSeconds,
       xdsAddress,
       xdsPort,
+      xdsAuthHeader,
+      xdsAuthToken,
       xdsJwtToken,
       xdsJwtTokenLifetimeSeconds,
       xdsSslRootCerts,
+      xdsSni,
       nodeId,
       nodeRegion,
       nodeZone,
@@ -162,6 +172,10 @@ class EnvoyConfigurationTest {
       cdsTimeoutSeconds,
       enableCds
     )
+  }
+
+  fun isGoogleGrpcDisabled(): Boolean {
+    return System.getProperty("envoy_jni_google_grpc_disabled") != null;
   }
 
   @Test
@@ -193,6 +207,8 @@ class EnvoyConfigurationTest {
     // H3
     assertThat(resolvedTemplate).contains("http3_protocol_options:");
     assertThat(resolvedTemplate).contains("name: alternate_protocols_cache");
+    assertThat(resolvedTemplate).contains("connection_options: 5RTO");
+    assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
 
     // Gzip
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
@@ -312,13 +328,16 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       rtdsResourceName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
     assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
@@ -326,6 +345,10 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS and CDS`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0, enableCds = true
@@ -353,6 +376,10 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test enableCds with default string`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       enableCds = true, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
@@ -366,6 +393,10 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test RTDS default timeout`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       rtdsResourceName = "fake_rtds_layer", xdsAddress = "FAKE_ADDRESS", xdsPort = 0
@@ -390,5 +421,5 @@ class EnvoyConfigurationTest {
     // statsSinks
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
     assertThat(resolvedTemplate).contains("stats.example.com");
-  }
+ }
 }
