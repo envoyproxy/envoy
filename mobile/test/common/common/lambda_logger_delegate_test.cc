@@ -39,7 +39,7 @@ TEST_F(LambdaDelegateTest, LogCb) {
   EXPECT_THAT(actual_msg, HasSubstr(expected_msg));
 }
 
-TEST_F(LambdaDelegateTest, LogCbWihtLevels) {
+TEST_F(LambdaDelegateTest, LogCbWithLevels) {
   std::string unexpected_msg = "Hello NoLambdaDelegate";
   std::string expected_msg = "Hello LambdaDelegate";
   std::string actual_msg;
