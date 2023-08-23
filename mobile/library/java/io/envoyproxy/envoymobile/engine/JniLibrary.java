@@ -265,6 +265,13 @@ public class JniLibrary {
   protected static native int setProxySettings(long engine, String host, int port);
 
   /**
+   * Update the log level for all active logs
+   *
+   * @param log_level The Log level to change to. Must be an integer 0-6.
+   */
+  protected static native void setLogLevel(int log_level);
+
+  /**
    * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.
    * To be used for testing only.
    *

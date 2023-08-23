@@ -99,4 +99,16 @@ public interface EnvoyEngine {
    * @param port The proxy port.
    */
   void setProxySettings(String host, int port);
+
+  /*
+   * These are the available log levels for Envoy Mobile.
+   */
+  public enum LogLevel { TRACE, DEBUG, INFO, WARN, ERR, CRITICAL, OFF }
+
+  /**
+   * Set the log level for Envoy mobile
+   *
+   * @param log_level the verbosity of logging Envoy should use.
+   */
+  public void setLogLevel(LogLevel log_level);
 }

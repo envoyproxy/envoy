@@ -30,11 +30,13 @@ import org.chromium.net.UrlRequest;
 import org.chromium.net.impl.CronvoyVersionSafeCallbacks.RequestFinishedInfoListener;
 import org.chromium.net.urlconnection.CronvoyHttpURLConnection;
 import org.chromium.net.urlconnection.CronvoyURLStreamHandlerFactory;
+import org.chromium.net.impl.CronvoyLogger;
 
 /**
  * Cronvoy engine shim.
  *
- * <p>Does not support yet netlogs, transferred data measurement, bidistream, cache, or priority.
+ * <p>Does not support Cronet-compatible netlogs, transferred data measurement, bidistream, cache,
+ * or priority.
  */
 public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
 
@@ -60,6 +62,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
   private final String mUserAgent;
   private final CronvoyEngineBuilderImpl mBuilder;
   private final AtomicReference<Runnable> mInitializationCompleter = new AtomicReference<>();
+  private final CronvoyLogger mCronvoyLogger = new CronvoyLogger();
 
   /**
    * Locks operations on the list of RequestFinishedInfo.Listeners, because operations can happen
@@ -94,7 +97,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
           taskToExecuteWhenInitializationIsCompleted.run();
         }
         return null;
-      });
+      }, mCronvoyLogger);
     }
   }
 
@@ -194,13 +197,40 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
   }
 
   @Override
-  public void startNetLogToFile(String fileName, boolean logAll) {}
+  public void startNetLogToFile(String fileName, boolean logAll) {
+    mCronvoyLogger.setNetLogToFile(fileName);
+    synchronized (mLock) {
+      // Turn up logging
+      if (logAll) {
+        mEngine.setLogLevel(EnvoyEngine.LogLevel.TRACE);
+      } else {
+        mEngine.setLogLevel(EnvoyEngine.LogLevel.DEBUG);
+      }
+    }
+  }
 
   @Override
-  public void startNetLogToDisk(String dirPath, boolean logAll, int maxSize) {}
+  public void startNetLogToDisk(String dirPath, boolean logAll, int maxSize) {
+    mCronvoyLogger.setNetLogToDisk(dirPath, maxSize);
+    synchronized (mLock) {
+      // Turn up logging
+      if (logAll) {
+        mEngine.setLogLevel(EnvoyEngine.LogLevel.TRACE);
+      } else {
+        mEngine.setLogLevel(EnvoyEngine.LogLevel.DEBUG);
+      }
+    }
+  }
 
   @Override
-  public void stopNetLog() {}
+  public void stopNetLog() {
+    synchronized (mLock) {
+      if (mEngine != null) {
+        mEngine.setLogLevel(EnvoyEngine.LogLevel.OFF);
+      }
+    }
+    mCronvoyLogger.stopLogging();
+  }
 
   @Override
   public byte[] getGlobalMetricsDeltas() {

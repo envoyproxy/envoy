@@ -310,6 +310,45 @@ public class BidirectionalStreamTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
+  public void testSimpleGetWithLogging() throws Exception {
+    File file = File.createTempFile("some-prefix", "some-ext");
+    file.deleteOnExit();
+    System.out.println("Starting logging");
+    mCronetEngine.startNetLogToFile(file.getAbsolutePath(), true);
+    System.out.println("Started logging");
+
+    String url = Http2TestServer.getCombinedHeadersUrl();
+    TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
+    TestRequestFinishedListener requestFinishedListener = new TestRequestFinishedListener();
+    mCronetEngine.addRequestFinishedListener(requestFinishedListener);
+    // Create stream.
+    BidirectionalStream stream =
+        mCronetEngine.newBidirectionalStreamBuilder(url, callback, callback.getExecutor())
+            .setHttpMethod("GET")
+            .build();
+    stream.start();
+    callback.blockForDone();
+    assertTrue(stream.isDone());
+    requestFinishedListener.blockUntilDone();
+    assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
+    // Default method is 'GET'.
+    assertEquals("GET", callback.mResponseAsString);
+    assertEquals("bar", callback.mResponseInfo.getAllHeaders().get("foo").get(0));
+    assertEquals("bar2", callback.mResponseInfo.getAllHeaders().get("foo").get(1));
+    RequestFinishedInfo finishedInfo = requestFinishedListener.getRequestInfo();
+    assertTrue(finishedInfo.getAnnotations().isEmpty());
+
+    System.out.println("Stopping logging");
+    mCronetEngine.stopNetLog();
+    char[] buffer = new char[5000];
+    byte[] bytes = Files.readAllBytes(Paths.get(file.getAbsolutePath()));
+    String fileContent = new String(bytes);
+    assertTrue(fileContent.contains("request headers for stream"));
+  }
+
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
   public void testSimplePostWithFlush() throws Exception {
     String url = Http2TestServer.getEchoStreamUrl();
     TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
