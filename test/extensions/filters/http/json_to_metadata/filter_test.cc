@@ -1508,6 +1508,48 @@ response_rules:
   EXPECT_EQ(getCounterValue("json_to_metadata.rsp_invalid_json_body"), 0);
 }
 
+TEST_F(FilterTest, RequestBodyWithResponseRule) {
+  initializeFilter(R"EOF(
+response_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+)EOF");
+  const std::string request_body = R"delimiter({"version":"good version"})delimiter";
+
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, ResponseBodyWithRequestRule) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+)EOF");
+  const std::string response_body = R"delimiter({"version":"good version"})delimiter";
+
+  testResponseWithBody(response_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_invalid_json_body"), 0);
+}
+
 } // namespace JsonToMetadata
 } // namespace HttpFilters
 } // namespace Extensions
