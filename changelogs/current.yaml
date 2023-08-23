@@ -90,6 +90,11 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: access_logs
+  change: |
+    added :ref:`json_format_options <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format_options>` config option to
+    support JSON output formatting and the :ref:`sort_properties <envoy_v3_api_field_config.core.v3.JsonFormatOptions.sort_properties>`
+    option to print the JSON output with sorted properties.
 - area: tap
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data

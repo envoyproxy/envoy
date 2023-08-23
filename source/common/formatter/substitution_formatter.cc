@@ -23,6 +23,7 @@
 #include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/formatter/stream_info_formatter.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -159,12 +160,16 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
       struct_formatter_.format(request_headers, response_headers, response_trailers, stream_info,
                                local_reply_body, access_log_type);
 
+  std::string log_line = "";
 #ifdef ENVOY_ENABLE_YAML
-  const std::string log_line =
-      MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
+  if (sort_properties_) {
+    log_line = Json::Factory::loadFromProtobufStruct(output_struct)->asJsonString();
+  } else {
+    log_line = MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
+  }
 #else
+  UNREFERENCED_PARAMETER(sort_properties_);
   IS_ENVOY_BUG("Json support compiled out");
-  const std::string log_line = "";
 #endif
   return absl::StrCat(log_line, "\n");
 }
