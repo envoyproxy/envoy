@@ -39,8 +39,9 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   BucketId bucket_id_proto = ret.value();
   const size_t bucket_id = MessageUtil::hash(bucket_id_proto);
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
-    // The first request, create a new bucket in the cache and sent the report to RLQS server.
-    addNewBucket(bucket_id_proto, bucket_id);
+    // For first matched request, create a new bucket in the cache and sent the report to RLQS
+    // server immediately.
+    createNewBucket(bucket_id_proto, bucket_id);
     return sendImmediateReport(bucket_id, match_action);
   } else {
     // Found the cached bucket entry.
@@ -113,7 +114,11 @@ void RateLimitQuotaFilter::onDestroy() {
   // TODO(tyxia) TLS resource are not cleaned here.
 }
 
-void RateLimitQuotaFilter::addNewBucket(const BucketId& bucket_id, size_t id) {
+void RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id, size_t id) {
+  // The first matched request doesn't have quota assignment from the RLQS server yet, so the
+  // action is performed based on pre-configured strategy from no assignment behavior config.
+  // TODO(tyxia) Check no assignment logic for new bucket (i.e., first matched request). Default is
+  // allow all.
   QuotaUsage quota_usage;
   quota_usage.num_requests_allowed = 1;
   quota_usage.num_requests_denied = 0;
@@ -131,9 +136,6 @@ Http::FilterHeadersStatus
 RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
                                           const RateLimitOnMatchAction& match_action) {
   const auto& bucket_settings = match_action.bucketSettings();
-  // The first matched request doesn't have quota assignment from the RLQS server yet, so the
-  // action is performed based on pre-configured strategy from no assignment behavior config.
-  // TODO(tyxia) Check no assignment logic with the allow/deny interface. Default is allow all.
 
   // Create the gRPC client if it has not been created.
   if (client_.rate_limit_client == nullptr) {

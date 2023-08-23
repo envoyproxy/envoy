@@ -60,9 +60,8 @@ public:
   void resetCallback() override { rlqs_callback_ = nullptr; }
 
 private:
-//  // Build the usage report (i.e., the request sent to RLQS server).
-//   RateLimitQuotaUsageReports buildUsageReport(const BucketId& bucket_id);
-//   void addNewBucket(const BucketId& bucket_id);
+  // Build the usage report (i.e., the request sent to RLQS server) from the buckets in quota bucket
+  // cache.
   RateLimitQuotaUsageReports buildReport(absl::optional<size_t> bucket_id);
 
   bool stream_closed_ = false;
