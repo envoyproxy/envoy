@@ -336,7 +336,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     ENVOY_LOG(
         debug,
         "Apply on_missing for all rules on a valid application/json body but not a json object.");
-    handleAllOnMissing(rules, request_processing_finished_, filter_callback);
+    handleAllOnMissing(rules, processing_finished_flag, filter_callback);
     // This JSON body is valid and successfully parsed.
     success.inc();
     return;
@@ -455,7 +455,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
   if (!config_->doResponse()) {
     return Http::FilterDataStatus::Continue;
   }
-  if (request_processing_finished_) {
+  if (response_processing_finished_) {
     return Http::FilterDataStatus::Continue;
   }
 
