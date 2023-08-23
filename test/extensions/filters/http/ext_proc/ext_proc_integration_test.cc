@@ -78,7 +78,7 @@ protected:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_raw_value", header_raw_value_}});
     scoped_runtime_.mergeValues(
-        {{"envoy_reloadable_features_immediate_response_use_filter_mutation_rule",
+        {{"envoy.reloadable_features.immediate_response_use_filter_mutation_rule",
           filter_mutation_rule_}});
 
     config_helper_.addConfigModifier([this, config_option](
@@ -1339,6 +1339,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
+
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithLogging) {
   ConfigOptions config_option = {};
   config_option.add_logging_filter = true;
@@ -1580,6 +1581,28 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
   });
   verifyDownstreamResponse(*response, 401);
   EXPECT_THAT(response->headers(), HasNoHeader("x-envoy-foo"));
+}
+
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with x-envoy header mutation.
+// The deprecated default checker allows x-envoy headers to be mutated and should
+// override config-level checkers if the runtime guard is disabled.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithDefaultHeaderMutationChecker) {
+  // this is default, but setting explicitly for test clarity
+  filter_mutation_rule_ = "false";
+  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Adding x-envoy header is allowed since default overrides config.
+    hdr->mutable_header()->set_key("x-envoy-foo");
+    hdr->mutable_header()->set_value("bar");
+  });
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_FALSE(response->headers().get(LowerCaseString("x-envoy-foo")).empty());
 }
 
 // Test the filter with request body buffering enabled using
@@ -3127,9 +3150,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
   proto_config_.mutable_request_attributes()->Add("request.path");
   proto_config_.mutable_request_attributes()->Add("request.method");
   proto_config_.mutable_request_attributes()->Add("request.scheme");
-  // TODO(jbohanon) once https://github.com/envoyproxy/envoy/pull/29028 is merged we can
-  // check against the response code directly
-  // proto_config_.mutable_response_attributes()->Add("response.code");
+  proto_config_.mutable_request_attributes()->Add("connection.mtls");
+  proto_config_.mutable_response_attributes()->Add("response.code");
   proto_config_.mutable_response_attributes()->Add("response.code_details");
 
   initializeConfig();
@@ -3142,14 +3164,17 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
         EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
         EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
         EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
+        EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
+        return true;
+      });
+
+  handleUpstreamRequest();
 
   processResponseHeadersMessage(
       *grpc_upstreams_[0], false, [](const HttpHeaders& req, HeadersResponse&) {
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        // TODO(jbohanon) once https://github.com/envoyproxy/envoy/pull/29028 is merged we can
-        // check against the response code directly
-        // EXPECT_EQ(proto_struct.fields().at("response.code").string_value(), "200");
+        EXPECT_EQ(proto_struct.fields().at("response.code").string_value(), "200");
         EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(), "via_upstream");
         return true;
       });

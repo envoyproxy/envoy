@@ -28,6 +28,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -102,6 +103,11 @@ protected:
     EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(this, &HttpFilterTest::doSetDynamicMetadata));
+
+    EXPECT_CALL(decoder_callbacks_, connection())
+        .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+    EXPECT_CALL(encoder_callbacks_, connection())
+        .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
 
     // Pointing dispatcher_.time_system_ to a SimulatedTimeSystem object.
     test_time_ = new Envoy::Event::SimulatedTimeSystem();
@@ -483,7 +489,7 @@ protected:
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
   bool server_closed_stream_ = false;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::shared_ptr<Filter> filter_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -500,6 +506,7 @@ protected:
   TestScopedRuntime scoped_runtime_;
   Envoy::Event::SimulatedTimeSystem* test_time_;
   envoy::config::core::v3::Metadata dynamic_metadata_;
+  testing::NiceMock<Network::MockConnection> connection_;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -2881,6 +2888,63 @@ TEST(OverrideTest, GrpcServiceNonOverride) {
   EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
 }
 
+// When merging two configurations, ensure that the second metadata options
+// overrides the first.
+TEST(OverrideTest, MetadataOptionsOverride) {
+  ExtProcPerRoute cfg1, cfg2;
+  const std::string yaml_1 = R"EOF(
+  overrides:
+    metadata_options:
+      forwarding_namespaces:
+        untyped:
+        - untyped_ns_1
+        typed:
+        - typed_ns_1
+      enable_returned_metadata: true
+      bifurcate_returned_metadata_namespace: true
+  )EOF";
+  const std::string yaml_2 = R"EOF(
+  overrides:
+    metadata_options:
+      forwarding_namespaces:
+        untyped:
+        - untyped_ns_2
+        typed:
+        - typed_ns_2
+      enable_returned_metadata: false
+      bifurcate_returned_metadata_namespace: false
+  )EOF";
+  TestUtility::loadFromYaml(yaml_1, cfg1);
+  TestUtility::loadFromYaml(yaml_2, cfg2);
+
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+
+  ASSERT_TRUE(cfg2.has_overrides());
+  ASSERT_TRUE(cfg2.overrides().has_metadata_options());
+  auto overrides = cfg2.overrides().metadata_options();
+
+  // ensure all of our cfg2 options were set
+  ASSERT_TRUE(cfg2.overrides().metadata_options().has_forwarding_namespaces());
+  ASSERT_TRUE(route1.untypedMetadataNamespaces().has_value());
+  EXPECT_EQ(1, route1.untypedMetadataNamespaces().value().size());
+  EXPECT_EQ(overrides.forwarding_namespaces().untyped()[0],
+            route1.untypedMetadataNamespaces().value()[0]);
+
+  ASSERT_TRUE(route1.typedMetadataNamespaces().has_value());
+  EXPECT_EQ(1, route1.typedMetadataNamespaces().value().size());
+  EXPECT_EQ(overrides.forwarding_namespaces().typed()[0],
+            route1.typedMetadataNamespaces().value()[0]);
+
+  ASSERT_TRUE(route1.enableReturnedMetadata().has_value());
+  EXPECT_EQ(overrides.enable_returned_metadata(), route1.enableReturnedMetadata());
+
+  ASSERT_TRUE(route1.bifurcateReturnedMetadataNamespace().has_value());
+  EXPECT_EQ(overrides.bifurcate_returned_metadata_namespace(),
+            route1.bifurcateReturnedMetadataNamespace());
+}
+
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
@@ -3004,7 +3068,78 @@ TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
   EXPECT_EQ(1, config_->stats().rejected_header_mutations_.value());
 }
 
-// Verify that the filter sets the processing request with dynamic metadata.
+TEST_F(HttpFilterTest, MetadataOptionsOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    forwarding_namespaces:
+      untyped:
+      - untyped_ns_1
+      typed:
+      - typed_ns_1
+    enable_returned_metadata: true
+    bifurcate_returned_metadata_namespace: true
+  )EOF");
+  ExtProcPerRoute override_cfg;
+  const std::string override_yaml = R"EOF(
+  overrides:
+    metadata_options:
+      forwarding_namespaces:
+        untyped:
+        - untyped_ns_2
+        typed:
+        - typed_ns_2
+      enable_returned_metadata: false
+      bifurcate_returned_metadata_namespace: false
+  )EOF";
+  TestUtility::loadFromYaml(override_yaml, override_cfg);
+
+  FilterConfigPerRoute route_config(override_cfg);
+
+  EXPECT_CALL(decoder_callbacks_, traversePerFilterConfig(_))
+      .WillOnce(
+          testing::Invoke([&](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+            cb(route_config);
+          }));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  EXPECT_EQ(filter_->encodingState().untypedMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().untypedMetadataNamespaces()[0], "untyped_ns_2");
+  EXPECT_EQ(filter_->decodingState().untypedMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().untypedMetadataNamespaces()[0], "untyped_ns_2");
+
+  EXPECT_EQ(filter_->encodingState().typedMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().typedMetadataNamespaces()[0], "typed_ns_2");
+  EXPECT_EQ(filter_->decodingState().typedMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().typedMetadataNamespaces()[0], "typed_ns_2");
+
+  EXPECT_FALSE(filter_->encodingState().enableReturnedMetadata());
+  EXPECT_FALSE(filter_->decodingState().enableReturnedMetadata());
+
+  EXPECT_FALSE(filter_->encodingState().bifurcateReturnedMetadataNamespace());
+  EXPECT_FALSE(filter_->decodingState().bifurcateReturnedMetadataNamespace());
+
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  filter_->onDestroy();
+}
+
+// Verify that the filter sets the processing request with dynamic metadata
+// including when the metadata is on the connection stream info
 TEST_F(HttpFilterTest, SendDynamicMetadata) {
   initialize(R"EOF(
   grpc_service:
@@ -3020,25 +3155,62 @@ TEST_F(HttpFilterTest, SendDynamicMetadata) {
   metadata_options:
     forwarding_namespaces:
       untyped:
-      - test_untyped_metadata_namespace
+      - connection.and.request.have.data
+      - connection.has.data
+      - request.has.data
+      - neither.have.data
+      - untyped.and.typed.connection.data
+      - typed.connection.data
+      - untyped.connection.data
       typed:
-      - test_typed_metadata_namespace
-
+      - untyped.and.typed.connection.data
+      - typed.connection.data
+      - typed.request.data
+      - untyped.connection.data
   )EOF");
 
+  const std::string request_yaml = R"EOF(
+  filter_metadata:
+    connection.and.request.have.data:
+      data: request
+    request.has.data:
+      data: request
+  typed_filter_metadata:
+    typed.request.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: request_typed
+  )EOF";
+
+  const std::string connection_yaml = R"EOF(
+  filter_metadata:
+    connection.and.request.have.data:
+      data: connection_untyped
+    connection.has.data:
+      data: connection_untyped
+    untyped.and.typed.connection.data:
+      data: connection_untyped
+    untyped.connection.data:
+      data: connection_untyped
+    not.selected.data:
+      data: connection_untyped
+  typed_filter_metadata:
+    untyped.and.typed.connection.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+    typed.connection.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+    not.selected.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: connection_typed
+  )EOF";
+
+  envoy::config::core::v3::Metadata connection_metadata;
+  TestUtility::loadFromYaml(request_yaml, dynamic_metadata_);
+  TestUtility::loadFromYaml(connection_yaml, connection_metadata);
+  connection_.stream_info_.metadata_ = connection_metadata;
+
   Buffer::OwnedImpl empty_chunk;
-
-  Envoy::ProtobufWkt::Struct expected_untyped_metadata;
-  (*expected_untyped_metadata.mutable_fields())["scooby"].set_string_value("doo");
-  doSetDynamicMetadata("test_untyped_metadata_namespace", expected_untyped_metadata);
-
-  Envoy::ProtobufWkt::Any expected_typed_metadata;
-  Envoy::ProtobufWkt::Struct scrappy_doo;
-  (*scrappy_doo.mutable_fields())["scrappy"].set_string_value("doo");
-  (*scrappy_doo.mutable_fields())["@type"].set_string_value("type.googleapis.com/scrappydoo");
-  expected_typed_metadata.PackFrom(scrappy_doo);
-  (*dynamic_metadata_.mutable_typed_filter_metadata())["test_typed_metadata_namespace"] =
-      expected_typed_metadata;
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
@@ -3047,7 +3219,57 @@ TEST_F(HttpFilterTest, SendDynamicMetadata) {
 
   // ensure the metadata that is attached to the processing request is identical to
   // the metadata we specified above
-  EXPECT_EQ(last_request_.metadata_context().DebugString(), dynamic_metadata_.DebugString());
+  EXPECT_EQ("request", last_request_.metadata_context()
+                           .filter_metadata()
+                           .at("connection.and.request.have.data")
+                           .fields()
+                           .at("data")
+                           .string_value());
+
+  EXPECT_EQ("request", last_request_.metadata_context()
+                           .filter_metadata()
+                           .at("request.has.data")
+                           .fields()
+                           .at("data")
+                           .string_value());
+
+  EXPECT_EQ("connection_untyped", last_request_.metadata_context()
+                                      .filter_metadata()
+                                      .at("connection.has.data")
+                                      .fields()
+                                      .at("data")
+                                      .string_value());
+
+  EXPECT_EQ("connection_untyped", last_request_.metadata_context()
+                                      .filter_metadata()
+                                      .at("untyped.and.typed.connection.data")
+                                      .fields()
+                                      .at("data")
+                                      .string_value());
+
+  EXPECT_EQ(0, last_request_.metadata_context().filter_metadata().count("neither.have.data"));
+
+  EXPECT_EQ(0, last_request_.metadata_context().filter_metadata().count("not.selected.data"));
+
+  EXPECT_EQ(0, last_request_.metadata_context().filter_metadata().count("typed.connection.data"));
+
+  helloworld::HelloRequest hello;
+  last_request_.metadata_context()
+      .typed_filter_metadata()
+      .at("typed.connection.data")
+      .UnpackTo(&hello);
+  EXPECT_EQ("connection_typed", hello.name());
+
+  last_request_.metadata_context()
+      .typed_filter_metadata()
+      .at("untyped.and.typed.connection.data")
+      .UnpackTo(&hello);
+  EXPECT_EQ("connection_typed", hello.name());
+
+  EXPECT_EQ(
+      0, last_request_.metadata_context().typed_filter_metadata().count("untyped.connection.data"));
+
+  EXPECT_EQ(0, last_request_.metadata_context().typed_filter_metadata().count("not.selected.data"));
 
   processResponseHeaders(false, absl::nullopt);
 
@@ -3091,15 +3313,11 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
-  envoy::config::core::v3::Metadata expected_metadata;
-  const std::string yaml = R"EOF(
-  filter_metadata:
-    envoy.filters.http.ext_proc:
-      foo: bar
-  )EOF";
-
-  TestUtility::loadFromYaml(yaml, expected_metadata);
-  EXPECT_EQ(dynamic_metadata_.DebugString(), expected_metadata.DebugString());
+  EXPECT_EQ("bar", dynamic_metadata_.filter_metadata()
+                       .at("envoy.filters.http.ext_proc")
+                       .fields()
+                       .at("foo")
+                       .string_value());
 
   filter_->onDestroy();
 }
@@ -3144,17 +3362,16 @@ TEST_F(HttpFilterTest, EmitBifurcatedDynamicMetadata) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
-  envoy::config::core::v3::Metadata expected_metadata;
-  const std::string yaml = R"EOF(
-  filter_metadata:
-    envoy.filters.http.ext_proc.decoder:
-      request_foo: request_bar
-    envoy.filters.http.ext_proc.encoder:
-      response_foo: response_bar
-  )EOF";
-
-  TestUtility::loadFromYaml(yaml, expected_metadata);
-  EXPECT_EQ(dynamic_metadata_.DebugString(), expected_metadata.DebugString());
+  EXPECT_EQ("request_bar", dynamic_metadata_.filter_metadata()
+                               .at("envoy.filters.http.ext_proc.decoder")
+                               .fields()
+                               .at("request_foo")
+                               .string_value());
+  EXPECT_EQ("response_bar", dynamic_metadata_.filter_metadata()
+                                .at("envoy.filters.http.ext_proc.encoder")
+                                .fields()
+                                .at("response_foo")
+                                .string_value());
 
   filter_->onDestroy();
 }
@@ -3198,7 +3415,7 @@ TEST_F(HttpFilterTest, DisableEmitDynamicMetadata) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
-  EXPECT_EQ(dynamic_metadata_.DebugString(), "");
+  EXPECT_EQ(0, dynamic_metadata_.filter_metadata().size());
 
   filter_->onDestroy();
 }

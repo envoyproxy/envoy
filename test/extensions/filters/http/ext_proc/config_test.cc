@@ -21,8 +21,12 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
       target_uri: ext_proc_server
       stat_prefix: google
   failure_mode_allow: true
-  request_attributes: 'Foo, Bar, Baz'
-  response_attributes: More
+  request_attributes:
+  - 'Foo'
+  - 'Bar'
+  - 'Baz'
+  response_attributes:
+  - 'More'
   processing_mode:
     request_header_mode: send
     response_header_mode: skip
@@ -32,6 +36,14 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
     response_trailer_mode: send
   filter_metadata:
     hello: "world"
+  metadata_options:
+    enable_returned_metadata: false
+    bifurcate_returned_metadata_namespace: true
+    forwarding_namespaces:
+      typed:
+      - ns1
+      untyped:
+      - ns2
   )EOF";
 
   ExternalProcessingFilterConfig factory;
@@ -53,8 +65,12 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
       target_uri: ext_proc_server
       stat_prefix: google
   failure_mode_allow: true
-  request_attributes: 'Foo, Bar, Baz'
-  response_attributes: More
+  request_attributes:
+  - 'Foo'
+  - 'Bar'
+  - 'Baz'
+  response_attributes:
+  - 'More'
   processing_mode:
     request_header_mode: send
     response_header_mode: skip
@@ -64,6 +80,14 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
     response_trailer_mode: send
   filter_metadata:
     hello: "world"
+  metadata_options:
+    enable_returned_metadata: false
+    bifurcate_returned_metadata_namespace: true
+    forwarding_namespaces:
+      typed:
+      - ns1
+      untyped:
+      - ns2
   )EOF";
 
   ExternalProcessingFilterConfig factory;

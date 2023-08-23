@@ -191,11 +191,11 @@ public:
     return response_expr_;
   }
 
-  const std::vector<std::string>& metadataContextNamespaces() const {
+  const std::vector<std::string>& untypedMetadataNamespaces() const {
     return untyped_metadata_namespaces_;
   }
 
-  const std::vector<std::string>& typedMetadataContextNamespaces() const {
+  const std::vector<std::string>& typedMetadataNamespaces() const {
     return typed_metadata_namespaces_;
   }
 
@@ -313,9 +313,14 @@ public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client,
          const envoy::config::core::v3::GrpcService& grpc_service)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
-        decoding_state_(*this, config->processingMode()),
-        encoding_state_(*this, config->processingMode()) {}
+        grpc_service_(grpc_service),
+        config_with_hash_key_(grpc_service),
+        decoding_state_(*this, config->processingMode(), config->untypedMetadataNamespaces(),
+                        config->typedMetadataNamespaces(), config->enableReturnedMetadata(),
+                        config->bifurcateReturnedMetadataNamespace()),
+        encoding_state_(*this, config->processingMode(), config->untypedMetadataNamespaces(),
+                        config->typedMetadataNamespaces(), config->enableReturnedMetadata(),
+                        config->bifurcateReturnedMetadataNamespace()) {}
 
   const FilterConfig& config() const { return *config_; }
 
@@ -351,6 +356,9 @@ public:
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
+  const ProcessorState& encodingState() { return encoding_state_; }
+  const ProcessorState& decodingState() { return decoding_state_; }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
@@ -373,7 +381,7 @@ private:
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
   void
-  setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
+  setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                      std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);
   void setEncoderDynamicMetadata(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);

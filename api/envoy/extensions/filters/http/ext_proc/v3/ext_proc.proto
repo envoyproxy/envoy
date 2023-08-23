@@ -28,8 +28,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // **Current Implementation Status:**
 // All options and processing modes are implemented except for the following:
 //
-// * Request and response attributes are not sent and not processed.
-// * Dynamic metadata in responses from the external processor is ignored.
 // * "async mode" is not implemented.
 
 // The filter communicates with an external gRPC service called an "external processor"

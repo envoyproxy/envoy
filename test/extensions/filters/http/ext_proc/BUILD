@@ -50,6 +50,7 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
+        "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",

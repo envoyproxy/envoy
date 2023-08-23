@@ -2,6 +2,19 @@
 
 #include <cstdio>
 
+/*
+  added to appease Microsoft compiler. Was throwing
+  external/com_google_cel_cpp/internal/strings.cc(56): error C2440: 'initializing':
+  cannot convert from 'std::_String_view_iterator<_Traits>' to 'const char *'
+       with
+       [
+           _Traits=std::char_traits<char>
+       ]
+
+  for which solution was found at https://stackoverflow.com/a/34361791
+*/
+#include <algorithm>
+
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
 #include "source/common/http/utility.h"
@@ -152,10 +165,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
   if (md_opts.has_forwarding_namespaces()) {
     untyped_metadata_namespaces_ =
         std::vector<std::string>(md_opts.forwarding_namespaces().untyped().begin(),
-                                 md_opts.forwarding_namespaces().untyped().begin());
+                                 md_opts.forwarding_namespaces().untyped().end());
     typed_metadata_namespaces_ =
         std::vector<std::string>(md_opts.forwarding_namespaces().typed().begin(),
-                                 md_opts.forwarding_namespaces().typed().begin());
+                                 md_opts.forwarding_namespaces().typed().end());
   }
   enable_returned_metadata_ = md_opts.enable_returned_metadata();
   bifurcate_returned_metadata_namespace_ = md_opts.bifurcate_returned_metadata_namespace();
@@ -307,10 +320,13 @@ const absl::optional<ProtobufWkt::Struct> Filter::evaluateAttributes(
       switch (result.value().type()) {
       case google::api::expr::runtime::CelValue::Type::kBool:
         value.set_bool_value(result.value().BoolOrDie());
+        break;
       case google::api::expr::runtime::CelValue::Type::kNullType:
         value.set_null_value(ProtobufWkt::NullValue{});
+        break;
       case google::api::expr::runtime::CelValue::Type::kDouble:
         value.set_number_value(result.value().DoubleOrDie());
+        break;
       default:
         value.set_string_value(Filters::Common::Expr::print(result.value()));
       }
@@ -721,7 +737,6 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
   // get the callbacks from the ProcessorState. This will be the appropriate
   // callbacks for the current state of the filter
   auto* cb = state.callbacks();
-  auto conn = cb->connection();
   envoy::config::core::v3::Metadata forwarding_metadata;
 
   // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_proc
@@ -729,12 +744,13 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
   // will be the request metadata value. The metadata will only be searched for the callbacks
   // corresponding to the traffic direction at the time of the external processing request.
   const auto& request_metadata = cb->streamInfo().dynamicMetadata().filter_metadata();
-  for (const auto& context_key : config_->metadataContextNamespaces()) {
+  for (const auto& context_key : state.untypedMetadataNamespaces()) {
     if (const auto metadata_it = request_metadata.find(context_key);
         metadata_it != request_metadata.end()) {
       (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (conn) {
-      const auto& connection_metadata = conn->streamInfo().dynamicMetadata().filter_metadata();
+    } else if (cb->connection().has_value()) {
+      const auto& connection_metadata =
+          cb->connection().value().get().streamInfo().dynamicMetadata().filter_metadata();
       if (const auto metadata_it = connection_metadata.find(context_key);
           metadata_it != connection_metadata.end()) {
         (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
@@ -748,14 +764,14 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
   // callbacks corresponding to the traffic direction at the time of the external processing
   // request.
   const auto& request_typed_metadata = cb->streamInfo().dynamicMetadata().typed_filter_metadata();
-  for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
+  for (const auto& context_key : state.typedMetadataNamespaces()) {
     if (const auto metadata_it = request_typed_metadata.find(context_key);
         metadata_it != request_typed_metadata.end()) {
       (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
           metadata_it->second;
-    } else if (conn) {
+    } else if (cb->connection().has_value()) {
       const auto& connection_typed_metadata =
-          conn->streamInfo().dynamicMetadata().typed_filter_metadata();
+          cb->connection().value().get().streamInfo().dynamicMetadata().typed_filter_metadata();
       if (const auto metadata_it = connection_typed_metadata.find(context_key);
           metadata_it != connection_typed_metadata.end()) {
         (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
@@ -768,12 +784,13 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
 }
 
 void Filter::setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
+                                const ProcessorState& state,
                                 std::unique_ptr<ProcessingResponse>& response) {
-  if (!config_->enableReturnedMetadata() || !response->has_dynamic_metadata()) {
+  if (!state.enableReturnedMetadata() || !response->has_dynamic_metadata()) {
     return;
   }
   std::string md_ns = "envoy.filters.http.ext_proc";
-  if (config_->bifurcateReturnedMetadataNamespace()) {
+  if (state.bifurcateReturnedMetadataNamespace()) {
     auto ss = std::stringstream();
     ss << md_ns << "." << ns;
     md_ns = ss.str();
@@ -782,10 +799,10 @@ void Filter::setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
 }
 
 void Filter::setEncoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
-  setDynamicMetadata("encoder", encoder_callbacks_, response);
+  setDynamicMetadata("encoder", encoder_callbacks_, encoding_state_, response);
 }
 void Filter::setDecoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
-  setDynamicMetadata("decoder", decoder_callbacks_, response);
+  setDynamicMetadata("decoder", decoder_callbacks_, decoding_state_, response);
 }
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
@@ -1057,6 +1074,28 @@ void Filter::mergePerRouteConfig() {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *merged_config->grpcService();
     config_with_hash_key_.setConfig(*merged_config->grpcService());
+  }
+  if (merged_config->untypedMetadataNamespaces()) {
+    ENVOY_LOG(trace, "Setting new untyped metadata namespaces from per-route configuration");
+    decoding_state_.setUntypedMetadataNamespaces(*merged_config->untypedMetadataNamespaces());
+    encoding_state_.setUntypedMetadataNamespaces(*merged_config->untypedMetadataNamespaces());
+  }
+  if (merged_config->typedMetadataNamespaces()) {
+    ENVOY_LOG(trace, "Setting new typed metadata namespaces from per-route configuration");
+    decoding_state_.setTypedMetadataNamespaces(*merged_config->typedMetadataNamespaces());
+    encoding_state_.setTypedMetadataNamespaces(*merged_config->typedMetadataNamespaces());
+  }
+  if (merged_config->enableReturnedMetadata().has_value()) {
+    ENVOY_LOG(trace, "Setting enable returned metadata from per-route configuration");
+    decoding_state_.setEnableReturnedMetadata(merged_config->enableReturnedMetadata().value());
+    encoding_state_.setEnableReturnedMetadata(merged_config->enableReturnedMetadata().value());
+  }
+  if (merged_config->bifurcateReturnedMetadataNamespace().has_value()) {
+    ENVOY_LOG(trace, "Setting bifurcate returned metadata namespace from per-route configuration");
+    decoding_state_.setBifurcateReturnedMetadataNamespace(
+        merged_config->bifurcateReturnedMetadataNamespace().value());
+    encoding_state_.setBifurcateReturnedMetadataNamespace(
+        merged_config->bifurcateReturnedMetadataNamespace().value());
   }
 }
 
