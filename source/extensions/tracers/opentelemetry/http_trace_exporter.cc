@@ -39,7 +39,6 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
     message->headers().setPath(http_config_.traces_path());
   }
 
-  // TODO: Can we get the hostname that is configured in the cluster "socker_address" field?
   message->headers().setHost(http_config_.hostname());
 
   // add all custom headers to the request

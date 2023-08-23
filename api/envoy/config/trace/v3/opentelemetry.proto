@@ -23,8 +23,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message OpenTelemetryConfig {
   // Configuration for sending traces to the collector over HTTP. Note that
   // this will only be used if the grpc_service is not set above.
+  // [#next-free-field: 6]
   message HttpConfig {
-
     // The upstream cluster that will receive OTLP traces over HTTP.
     string cluster_name = 1;
 
@@ -39,7 +39,7 @@ message OpenTelemetryConfig {
     }];
 
     // Custom header values to be added to the OTLP HTTP request.
-    repeated config.core.v3.HeaderValue headers = 4;
+    repeated core.v3.HeaderValue headers = 4;
 
     // The hostname to include in the Host header of the OTLP HTTP request.
     string hostname = 5;
