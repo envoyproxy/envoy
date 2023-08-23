@@ -117,7 +117,11 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
-  quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
+  if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
+    if (non_dispatched_udp_packet_handler_.has_value()) {
+      non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
+    }
+  }
 
   if (quic_dispatcher_->HasChlosBuffered()) {
     // If there are any buffered CHLOs, activate a read event for the next event loop to process
@@ -165,7 +169,9 @@ void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewCo
 
 void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
 
-void ActiveQuicListener::shutdownListener() {
+void ActiveQuicListener::shutdownListener(const Network::ExtraShutdownListenerOptions& options) {
+  non_dispatched_udp_packet_handler_ = options.non_dispatched_udp_packet_handler_;
+
   // Same as pauseListening() because all we want is to stop accepting new
   // connections.
   quic_dispatcher_->StopAcceptingNewConnections();
@@ -310,7 +316,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
     Runtime::Loader& runtime, uint32_t worker_index, Network::UdpConnectionHandler& parent,
-    Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& disptacher,
+    Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& dispatcher,
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
   if (server_preferred_address_config_ != nullptr) {
@@ -334,7 +340,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
   }
 
   return createActiveQuicListener(
-      runtime, worker_index, concurrency_, disptacher, parent, std::move(listen_socket_ptr), config,
+      runtime, worker_index, concurrency_, dispatcher, parent, std::move(listen_socket_ptr), config,
       quic_config_, kernel_worker_routing_, enabled_, quic_stat_names_,
       packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
       proof_source_factory_.value(),
