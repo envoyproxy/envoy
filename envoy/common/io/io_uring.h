@@ -19,7 +19,7 @@ public:
   /**
    * io_uring request type.
    */
-  enum RequestType {
+  enum class RequestType : uint8_t {
     Accept = 0x1,
     Connect = 0x2,
     Read = 0x4,
@@ -29,13 +29,13 @@ public:
     Shutdown = 0x40,
   };
 
-  Request(uint32_t type, IoUringSocket& socket) : type_(type), socket_(socket) {}
+  Request(RequestType type, IoUringSocket& socket) : type_(type), socket_(socket) {}
   virtual ~Request() = default;
 
   /**
    * Return the request type.
    */
-  uint32_t type() const { return type_; }
+  RequestType type() const { return type_; }
 
   /**
    * Returns the io_uring socket the request belongs to.
@@ -43,7 +43,7 @@ public:
   IoUringSocket& socket() const { return socket_; }
 
 private:
-  uint32_t type_;
+  RequestType type_;
   IoUringSocket& socket_;
 };
 
@@ -250,7 +250,7 @@ public:
    * Inject a request completion to the io uring instance.
    * @param type the request type of injected completion.
    */
-  virtual void injectCompletion(uint32_t type) PURE;
+  virtual void injectCompletion(Request::RequestType type) PURE;
 };
 
 using IoUringSocketPtr = std::unique_ptr<IoUringSocket>;

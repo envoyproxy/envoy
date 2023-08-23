@@ -11,16 +11,16 @@ void IoUringSocketEntry::cleanup() {
   parent_.dispatcher().deferredDelete(std::move(socket));
 }
 
-void IoUringSocketEntry::injectCompletion(uint32_t type) {
+void IoUringSocketEntry::injectCompletion(Request::RequestType type) {
   // Avoid injecting the same completion type multiple times.
-  if (injected_completions_ & type) {
+  if (injected_completions_ & static_cast<uint8_t>(type)) {
     ENVOY_LOG(trace,
               "ignore injected completion since there already has one, injected_completions_: {}, "
               "type: {}",
-              injected_completions_, type);
+              injected_completions_, static_cast<uint8_t>(type));
     return;
   }
-  injected_completions_ |= type;
+  injected_completions_ |= static_cast<uint8_t>(type);
   parent_.injectCompletion(*this, type, -EAGAIN);
 }
 
@@ -58,7 +58,8 @@ IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket
   return socket.removeFromList(sockets_);
 }
 
-void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result) {
+void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, Request::RequestType type,
+                                         int32_t result) {
   Request* req = new Request(type, socket);
   io_uring_->injectCompletion(socket.fd(), req, result);
   file_event_->activate(Event::FileReadyType::Read);
@@ -68,7 +69,8 @@ void IoUringWorkerImpl::onFileEvent() {
   ENVOY_LOG(trace, "io uring worker, on file event");
   delay_submit_ = true;
   io_uring_->forEveryCompletion([](Request* req, int32_t result, bool injected) {
-    ENVOY_LOG(trace, "receive request completion, type = {}, req = {}", req->type(), fmt::ptr(req));
+    ENVOY_LOG(trace, "receive request completion, type = {}, req = {}",
+              static_cast<uint8_t>(req->type()), fmt::ptr(req));
     ASSERT(req != nullptr);
 
     switch (req->type()) {

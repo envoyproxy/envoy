@@ -94,7 +94,7 @@ public:
 };
 
 class IoUringWorkerIntegrationTest : public testing::Test {
-public:
+protected:
   IoUringWorkerIntegrationTest() : should_skip_(!isIoUringSupported()) {}
 
   void SetUp() override {
@@ -109,12 +109,14 @@ public:
     io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
         std::make_unique<IoUringImpl>(20, false), *dispatcher_);
   }
-  void initializeSockets() {
+
+  void createServerListenerAndClientSocket() {
     socket(true, true);
     listen();
     connect();
     accept();
   }
+
   void cleanup() {
     Api::OsSysCallsSingleton::get().close(client_socket_);
     Api::OsSysCallsSingleton::get().close(server_socket_);
@@ -190,7 +192,7 @@ public:
     } while (fcntl(fd, F_GETFD) == 0);
   }
 
-  bool should_skip_{false};
+  const bool should_skip_{false};
   os_fd_t listen_socket_{INVALID_SOCKET};
   os_fd_t server_socket_{INVALID_SOCKET};
   os_fd_t client_socket_{INVALID_SOCKET};
@@ -202,7 +204,7 @@ public:
 
 TEST_F(IoUringWorkerIntegrationTest, Injection) {
   initialize();
-  initializeSockets();
+  createServerListenerAndClientSocket();
 
   auto& socket =
       dynamic_cast<IoUringSocketTestImpl&>(io_uring_worker_->addTestSocket(server_socket_));
@@ -244,7 +246,7 @@ TEST_F(IoUringWorkerIntegrationTest, Injection) {
 
 TEST_F(IoUringWorkerIntegrationTest, MergeInjection) {
   initialize();
-  initializeSockets();
+  createServerListenerAndClientSocket();
 
   auto& socket =
       dynamic_cast<IoUringSocketTestImpl&>(io_uring_worker_->addTestSocket(server_socket_));

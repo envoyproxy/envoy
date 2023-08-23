@@ -42,7 +42,7 @@ public:
   MOCK_METHOD(void, onClose, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onCancel, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onShutdown, (Request * req, int32_t result, bool injected));
-  MOCK_METHOD(void, injectCompletion, (uint32_t type));
+  MOCK_METHOD(void, injectCompletion, (Request::RequestType type));
 };
 
 } // namespace Io

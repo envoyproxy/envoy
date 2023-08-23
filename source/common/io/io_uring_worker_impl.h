@@ -25,10 +25,10 @@ public:
   IoUringSocketEntryPtr removeSocket(IoUringSocketEntry& socket);
 
   // Inject a request completion into the iouring instance for a specific socket.
-  void injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result);
+  void injectCompletion(IoUringSocket& socket, Request::RequestType type, int32_t result);
 
   // Return the number of sockets in this worker.
-  uint32_t getNumOfSockets() const { return sockets_.size(); }
+  size_t getNumOfSockets() const { return sockets_.size(); }
 
 protected:
   // Add a socket to the worker.
@@ -61,41 +61,42 @@ public:
   IoUringWorker& getIoUringWorker() const override { return parent_; }
   os_fd_t fd() const override { return fd_; }
   void onAccept(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & Request::RequestType::Accept)) {
-      injected_completions_ &= ~Request::RequestType::Accept;
+    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Accept))) {
+      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Accept);
     }
   }
   void onConnect(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & Request::RequestType::Connect)) {
-      injected_completions_ &= ~Request::RequestType::Connect;
+    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Connect))) {
+      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Connect);
     }
   }
   void onRead(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & Request::RequestType::Read)) {
-      injected_completions_ &= ~Request::RequestType::Read;
+    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Read))) {
+      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Read);
     }
   }
   void onWrite(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & Request::RequestType::Write)) {
-      injected_completions_ &= ~Request::RequestType::Write;
+    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Write))) {
+      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Write);
     }
   }
   void onClose(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & Request::RequestType::Close)) {
-      injected_completions_ &= ~Request::RequestType::Close;
+    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Close))) {
+      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Close);
     }
   }
   void onCancel(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & Request::RequestType::Cancel)) {
-      injected_completions_ &= ~Request::RequestType::Cancel;
+    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Cancel))) {
+      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Cancel);
     }
   }
   void onShutdown(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & Request::RequestType::Shutdown)) {
-      injected_completions_ &= ~Request::RequestType::Shutdown;
+    if (injected &&
+        (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Shutdown))) {
+      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Shutdown);
     }
   }
-  void injectCompletion(uint32_t type) override;
+  void injectCompletion(Request::RequestType type) override;
 
 protected:
   /**
@@ -107,7 +108,7 @@ protected:
   IoUringWorkerImpl& parent_;
   // This records already injected completion request type to
   // avoid duplicated injections.
-  uint32_t injected_completions_{0};
+  uint8_t injected_completions_{0};
 };
 
 } // namespace Io
