@@ -23,22 +23,6 @@ import org.chromium.net.impl.Annotations.HttpCacheType;
 /** Implementation of {@link ICronetEngineBuilder} that builds Envoy-Mobile based Cronet engine. */
 public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
 
-  /** A hint that a host supports QUIC. */
-  final static class QuicHint {
-    // The host.
-    final String mHost;
-    // Port of the server that supports QUIC.
-    final int mPort;
-    // Alternate protocol port.
-    final int mAlternatePort;
-
-    QuicHint(String host, int port, int alternatePort) {
-      mHost = host;
-      mPort = port;
-      mAlternatePort = alternatePort;
-    }
-  }
-
   /** A public key pin. */
   final static class Pkp {
     // Host to pin for.
@@ -65,7 +49,7 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   // Private fields are simply storage of configuration for the resulting CronetEngine.
   // See setters below for verbose descriptions.
   private final Context mApplicationContext;
-  private final List<QuicHint> mQuicHints = new LinkedList<>();
+  private final Map<String, Integer> mQuicHints = new HashMap<>();
   private final List<Pkp> mPkps = new LinkedList<>();
   private boolean mPublicKeyPinningBypassForLocalTrustAnchorsEnabled;
   private String mUserAgent;
@@ -238,11 +222,11 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
     if (host.contains("/")) {
       throw new IllegalArgumentException("Illegal QUIC Hint Host: " + host);
     }
-    mQuicHints.add(new QuicHint(host, port, alternatePort));
+    mQuicHints.put(host, port);
     return this;
   }
 
-  List<QuicHint> quicHints() { return mQuicHints; }
+  Map<String, Integer> quicHints() { return mQuicHints; }
 
   @Override
   public CronvoyEngineBuilderImpl addPublicKeyPins(String hostName, Set<byte[]> pinsSha256,

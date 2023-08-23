@@ -82,6 +82,7 @@ class EnvoyConfigurationTest {
     enableHttp3: Boolean = true,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
+    quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -134,6 +135,7 @@ class EnvoyConfigurationTest {
       enableHttp3,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
+      quicHints,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
@@ -207,6 +209,9 @@ class EnvoyConfigurationTest {
     // H3
     assertThat(resolvedTemplate).contains("http3_protocol_options:");
     assertThat(resolvedTemplate).contains("name: alternate_protocols_cache");
+    assertThat(resolvedTemplate).contains("hostname: www.abc.com");
+    assertThat(resolvedTemplate).contains("hostname: www.def.com");
+    assertThat(resolvedTemplate).contains("port: 443");
     assertThat(resolvedTemplate).contains("connection_options: 5RTO");
     assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
 

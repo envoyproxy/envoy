@@ -202,6 +202,7 @@ open class EngineBuilder(
   internal var enableHttp3 = true
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
+  private var quicHints = mutableMapOf<String, Int>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -731,6 +732,7 @@ open class EngineBuilder(
       enableHttp3,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
+      quicHints,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,

@@ -304,7 +304,7 @@ public class JniLibrary {
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
       boolean enableHttp3, String http3ConnectionOptions, String http3ClientConnectionOptions,
-      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      byte[][] quicHints, boolean enableGzipDecompression, boolean enableBrotliDecompression,
       boolean enableSocketTagging, boolean enableInterfaceBinding,
       long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
       long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,

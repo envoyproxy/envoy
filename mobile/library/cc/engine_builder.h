@@ -172,6 +172,7 @@ public:
   EngineBuilder& enableHttp3(bool http3_on);
   EngineBuilder& setHttp3ConnectionOptions(std::string options);
   EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
+  EngineBuilder& addQuicHint(std::string host, int port);
 #endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
@@ -254,6 +255,7 @@ private:
   bool enable_http3_ = true;
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
+  std::vector<std::pair<std::string, int>> quic_hints_;
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;

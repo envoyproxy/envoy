@@ -302,6 +302,11 @@ EngineBuilder& EngineBuilder::setHttp3ClientConnectionOptions(std::string option
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addQuicHint(std::string host, int port) {
+  quic_hints_.emplace_back(std::move(host), port);
+  return *this;
+}
+
 #endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
@@ -445,6 +450,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
     cache_config.mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
+    for (const auto& [host, port] : quic_hints_) {
+      auto* entry =
+          cache_config.mutable_alternate_protocols_cache_options()->add_prepopulated_entries();
+      entry->set_hostname(host);
+      entry->set_port(port);
+    }
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
@@ -806,6 +817,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->set_client_connection_options(http3_client_connection_options_);
     alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
+    for (const auto& [host, port] : quic_hints_) {
+      auto* entry = alpn_options.mutable_auto_config()
+                        ->mutable_alternate_protocols_cache_options()
+                        ->add_prepopulated_entries();
+      entry->set_hostname(host);
+      entry->set_port(port);
+    }
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
