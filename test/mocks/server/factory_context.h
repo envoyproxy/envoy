@@ -84,9 +84,9 @@ public:
   testing::NiceMock<Api::MockApi> api_;
 };
 
-class MockUpstreamHttpFactoryContext : public UpstreamHttpFactoryContext {
+class MockUpstreamFactoryContext : public UpstreamFactoryContext {
 public:
-  MockUpstreamHttpFactoryContext();
+  MockUpstreamFactoryContext();
 
   MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());

@@ -80,7 +80,8 @@ using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
  */
 class ProxyFilter : public Network::ReadFilter,
                     public Common::Redis::DecoderCallbacks,
-                    public Network::ConnectionCallbacks {
+                    public Network::ConnectionCallbacks,
+                    public Logger::Loggable<Logger::Id::redis> {
 public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
               CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config);
