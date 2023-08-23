@@ -686,7 +686,7 @@ void ConnectionImpl::onReadReady() {
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.detect_and_raise_rst_tcp_connection")) {
-      ENVOY_CONN_LOG(debug, "read: rst close from peer.", *this);
+      ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
       setDetectedCloseType(DetectedCloseType::RemoteReset);
       closeSocket(ConnectionEvent::RemoteClose);
       return;

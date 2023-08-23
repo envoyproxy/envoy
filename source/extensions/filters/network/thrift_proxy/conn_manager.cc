@@ -192,8 +192,8 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::Connected ||
-      event == Network::ConnectionEvent::ConnectedZeroRtt) {
+  if (event != Network::ConnectionEvent::LocalClose &&
+      event != Network::ConnectionEvent::RemoteClose) {
     return;
   }
   resetAllRpcs(event == Network::ConnectionEvent::LocalClose);
