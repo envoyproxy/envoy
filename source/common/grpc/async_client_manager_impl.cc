@@ -5,6 +5,7 @@
 
 #include "source/common/common/base64.h"
 #include "source/common/grpc/async_client_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
 
@@ -47,6 +48,11 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   }
   cm_.checkActiveStaticCluster(config.envoy_grpc().cluster_name());
 }
+
+GrpcServiceHashKeyWrapper::GrpcServiceHashKeyWrapper(
+    const envoy::config::core::v3::GrpcService& config)
+    : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)),
+      serialized_config_(config.SerializeAsString()) {}
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                ThreadLocal::Instance& tls, TimeSource& time_source,
@@ -136,12 +142,26 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
 RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
     const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
     bool skip_cluster_check) {
-  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(config);
+  const GrpcServiceHashKeyWrapper& key_wrapper = GrpcServiceHashKeyWrapper(config);
+  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(key_wrapper);
   if (client != nullptr) {
     return client;
   }
-  client = factoryForGrpcService(config, scope, skip_cluster_check)->createUncachedRawAsyncClient();
-  raw_async_client_cache_->setCache(config, client);
+  client = factoryForGrpcService(key_wrapper.config(), scope, skip_cluster_check)
+               ->createUncachedRawAsyncClient();
+  raw_async_client_cache_->setCache(key_wrapper, client);
+  return client;
+}
+
+RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClientWithWrapper(
+    const GrpcServiceHashKeyWrapper& key_wrapper, Stats::Scope& scope, bool skip_cluster_check) {
+  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(key_wrapper);
+  if (client != nullptr) {
+    return client;
+  }
+  client = factoryForGrpcService(key_wrapper.config(), scope, skip_cluster_check)
+               ->createUncachedRawAsyncClient();
+  raw_async_client_cache_->setCache(key_wrapper, client);
   return client;
 }
 
@@ -151,11 +171,11 @@ AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(Event::Dispatch
 }
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
-    const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  ASSERT(lru_map_.find(config) == lru_map_.end());
+    const GrpcServiceHashKeyWrapper& key_wrapper, const RawAsyncClientSharedPtr& client) {
+  ASSERT(lru_map_wrapper_.find(key_wrapper) == lru_map_wrapper_.end());
   // Create a new cache entry at the beginning of the list.
-  lru_list_.emplace_front(config, client, dispatcher_.timeSource().monotonicTime());
-  lru_map_[config] = lru_list_.begin();
+  lru_list_.emplace_front(key_wrapper.config(), client, dispatcher_.timeSource().monotonicTime());
+  lru_map_wrapper_[key_wrapper] = lru_list_.begin();
   // If inserting to an empty cache, enable eviction timer.
   if (lru_list_.size() == 1) {
     evictEntriesAndResetEvictionTimer();
@@ -163,9 +183,9 @@ void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
 }
 
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
-    const envoy::config::core::v3::GrpcService& config) {
-  auto it = lru_map_.find(config);
-  if (it == lru_map_.end()) {
+    const GrpcServiceHashKeyWrapper& key_wrapper) {
+  auto it = lru_map_wrapper_.find(key_wrapper);
+  if (it == lru_map_wrapper_.end()) {
     return nullptr;
   }
   const auto cache_entry = it->second;
@@ -189,7 +209,7 @@ void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTi
     MonotonicTime next_expire = lru_list_.back().accessed_time_ + EntryTimeoutInterval;
     if (now >= next_expire) {
       // Erase the expired entry.
-      lru_map_.erase(lru_list_.back().config_);
+      lru_map_wrapper_.erase(lru_list_.back().key_wrapper_);
       lru_list_.pop_back();
     } else {
       cache_eviction_timer_->enableTimer(

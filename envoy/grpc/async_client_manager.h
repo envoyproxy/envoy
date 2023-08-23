@@ -32,6 +32,28 @@ private:
 
 using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
+class GrpcServiceHashKeyWrapper {
+public:
+  GrpcServiceHashKeyWrapper(const envoy::config::core::v3::GrpcService& config);
+
+  template <typename H> friend H AbslHashValue(H h, const GrpcServiceHashKeyWrapper& wrapper) {
+    return H::combine(std::move(h), wrapper.pre_computed_hash_);
+  }
+
+  friend bool operator==(const GrpcServiceHashKeyWrapper& lhs,
+                         const GrpcServiceHashKeyWrapper& rhs) {
+    return lhs.config_.GetTypeName() == rhs.config_.GetTypeName() &&
+           lhs.serialized_config_ == rhs.serialized_config_;
+  }
+
+  const envoy::config::core::v3::GrpcService& config() const { return config_; }
+
+private:
+  const envoy::config::core::v3::GrpcService config_;
+  const std::size_t pre_computed_hash_;
+  const std::string serialized_config_;
+};
+
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
 // Grpc::AsyncClientFactory instances. All manufactured Grpc::AsyncClients must
 // be destroyed before the AsyncClientManager can be safely destructed.
@@ -53,6 +75,10 @@ public:
   virtual RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
                             Stats::Scope& scope, bool skip_cluster_check) PURE;
+
+  virtual RawAsyncClientSharedPtr
+  getOrCreateRawAsyncClientWithWrapper(const GrpcServiceHashKeyWrapper& grpc_service,
+                                       Stats::Scope& scope, bool skip_cluster_check) PURE;
 
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and

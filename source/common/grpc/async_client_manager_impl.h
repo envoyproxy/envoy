@@ -9,6 +9,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/grpc/stat_names.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -51,32 +52,34 @@ public:
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
                             bool skip_cluster_check) override;
 
+  RawAsyncClientSharedPtr
+  getOrCreateRawAsyncClientWithWrapper(const GrpcServiceHashKeyWrapper& key_wrapper,
+                                       Stats::Scope& scope, bool skip_cluster_check) override;
+
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope,
                                               bool skip_cluster_check) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher);
-    void setCache(const envoy::config::core::v3::GrpcService& config,
+    void setCache(const GrpcServiceHashKeyWrapper& key_wrapper,
                   const RawAsyncClientSharedPtr& client);
 
-    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
+    RawAsyncClientSharedPtr getCache(const GrpcServiceHashKeyWrapper& key_wrapper);
 
   private:
     void evictEntriesAndResetEvictionTimer();
     struct CacheEntry {
       CacheEntry(const envoy::config::core::v3::GrpcService& config,
                  RawAsyncClientSharedPtr const& client, MonotonicTime create_time)
-          : config_(config), client_(client), accessed_time_(create_time) {}
-      envoy::config::core::v3::GrpcService config_;
+          : key_wrapper_(config), client_(client), accessed_time_(create_time) {}
+      GrpcServiceHashKeyWrapper key_wrapper_;
       RawAsyncClientSharedPtr client_;
       MonotonicTime accessed_time_;
     };
     using LruList = std::list<CacheEntry>;
-    absl::flat_hash_map<envoy::config::core::v3::GrpcService, LruList::iterator, MessageUtil,
-                        MessageUtil>
-        lru_map_;
     LruList lru_list_;
+    absl::flat_hash_map<GrpcServiceHashKeyWrapper, LruList::iterator> lru_map_wrapper_;
     Event::Dispatcher& dispatcher_;
     Envoy::Event::TimerPtr cache_eviction_timer_;
     static constexpr std::chrono::seconds EntryTimeoutInterval{50};
