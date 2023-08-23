@@ -112,7 +112,7 @@ TEST_F(UpstreamConnTest, WriteAndClose) {
   EXPECT_CALL(upstream_connection_, write(_, false));
   upConn_->write(someData, false);
 
-  EXPECT_CALL(upstream_connection_, close(_));
+  EXPECT_CALL(upstream_connection_, close(_, "go_upstream_close"));
   EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamEvent(_, _));
   upConn_->close(Network::ConnectionCloseType::NoFlush);
   upConn_->onEvent(Network::ConnectionEvent::RemoteClose);
