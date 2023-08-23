@@ -87,6 +87,8 @@ public:
                                 absl::optional<size_t> max_length);
 };
 
+enum class FilterStateFormat { String, Proto, Field };
+
 /**
  * StreamInfoFormatterProvider for FilterState from StreamInfo.
  */
@@ -96,7 +98,8 @@ public:
   create(const std::string& format, const absl::optional<size_t>& max_length, bool is_upstream);
 
   FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
-                       bool serialize_as_string, bool is_upstream = false);
+                       bool serialize_as_string, bool is_upstream = false,
+                       const std::string& field_name = "");
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
@@ -109,8 +112,10 @@ private:
   std::string key_;
   absl::optional<size_t> max_length_;
 
-  bool serialize_as_string_;
   const bool is_upstream_;
+  FilterStateFormat format_;
+  std::string field_name_;
+  StreamInfo::FilterState::ObjectFactory* factory_;
 };
 
 /**

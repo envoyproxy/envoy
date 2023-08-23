@@ -880,7 +880,7 @@ UDP
 
 .. _config_access_log_format_filter_state:
 
-%FILTER_STATE(KEY:F):Z%
+%FILTER_STATE(KEY:F:FIELD?):Z%
   HTTP
     :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
     look up the filter state object. The serialized proto will be logged as JSON string if possible.
@@ -889,6 +889,7 @@ UDP
     F is an optional parameter used to indicate which method FilterState uses for serialization.
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
 
   TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
@@ -911,6 +912,7 @@ UDP
     F is an optional parameter used to indicate which method FilterState uses for serialization.
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
 
   TCP/UDP
     Not implemented.
