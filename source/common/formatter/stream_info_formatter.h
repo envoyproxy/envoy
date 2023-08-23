@@ -11,7 +11,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
-#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/formatter/substitution_format_utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
