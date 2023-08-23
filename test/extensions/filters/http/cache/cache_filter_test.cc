@@ -1155,15 +1155,15 @@ TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndInitialIsBug)
       "Unexpected filter state in requestCacheStatus");
 }
 
-TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDecodeServingFromCacheIsBug) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
-                                                    FilterState::DecodeServingFromCache),
-                   "Unexpected filter state in requestCacheStatus");
-}
-
 TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDestroyedIsBug) {
   EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
                                                     FilterState::Destroyed),
+                   "Unexpected filter state in requestCacheStatus");
+}
+
+TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDecodeServingFromCacheIsBug) {
+  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                                    FilterState::DecodeServingFromCache),
                    "Unexpected filter state in requestCacheStatus");
 }
 
