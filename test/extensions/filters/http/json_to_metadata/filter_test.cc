@@ -942,6 +942,20 @@ TEST_F(FilterTest, EmptyPayloadValue) {
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
+TEST_F(FilterTest, ResponseEmptyPayloadValue) {
+  initializeFilter(request_config_yaml_);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+
+  testResponseWithBody("");
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_no_body"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rsp_invalid_json_body"), 0);
+}
+
 TEST_F(FilterTest, InvalidJsonPayload) {
   initializeFilter(request_config_yaml_);
   // missing right-most curly brace
