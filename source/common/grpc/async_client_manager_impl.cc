@@ -52,7 +52,7 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 GrpcServiceHashKeyWrapper::GrpcServiceHashKeyWrapper(
     const envoy::config::core::v3::GrpcService& config)
     : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)),
-      serialized_config_(config.SerializeAsString()) {}
+      config_as_string_(Envoy::MessageUtil::getYamlStringFromMessage(config)) {}
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                ThreadLocal::Instance& tls, TimeSource& time_source,

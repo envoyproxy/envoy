@@ -43,7 +43,7 @@ public:
   friend bool operator==(const GrpcServiceHashKeyWrapper& lhs,
                          const GrpcServiceHashKeyWrapper& rhs) {
     return lhs.config_.GetTypeName() == rhs.config_.GetTypeName() &&
-           lhs.serialized_config_ == rhs.serialized_config_;
+           lhs.config_as_string_ == rhs.config_as_string_;
   }
 
   const envoy::config::core::v3::GrpcService& config() const { return config_; }
@@ -51,7 +51,7 @@ public:
 private:
   const envoy::config::core::v3::GrpcService config_;
   const std::size_t pre_computed_hash_;
-  const std::string serialized_config_;
+  const std::string config_as_string_;
 };
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
