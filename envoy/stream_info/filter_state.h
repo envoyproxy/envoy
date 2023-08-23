@@ -105,7 +105,7 @@ public:
   };
 
   /**
-   * Generic reflection support for the fitler state objects.
+   * Generic reflection support for the filter state objects.
    */
   class ObjectReflection {
   public:
