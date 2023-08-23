@@ -176,8 +176,7 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::RemoteReset) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   }

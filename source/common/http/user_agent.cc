@@ -62,9 +62,7 @@ void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::St
 }
 
 void UserAgent::onConnectionDestroy(Network::ConnectionEvent event, bool active_streams) {
-  if (stats_ != nullptr && active_streams &&
-      (event == Network::ConnectionEvent::RemoteClose ||
-       event == Network::ConnectionEvent::RemoteReset)) {
+  if (stats_ != nullptr && active_streams && event == Network::ConnectionEvent::RemoteClose) {
     stats_->downstream_cx_destroy_remote_active_rq_.inc();
   }
 }

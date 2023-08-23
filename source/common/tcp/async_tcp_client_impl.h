@@ -32,6 +32,14 @@ public:
 
   void close(Network::ConnectionCloseType type) override;
 
+  Network::DetectedCloseType detectedCloseType() const override {
+    if (connection_) {
+      return connection_->detectedCloseType();
+    }
+    ENVOY_LOG_MISC(debug, "Boteng: No Connection Object");
+    return Network::DetectedCloseType::Normal;
+  }
+
   /**
    * @return true means a host is successfully picked from a Cluster.
    * This doesn't mean the connection is established.

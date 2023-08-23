@@ -101,9 +101,7 @@ void AsyncTcpClientImpl::reportConnectionDestroy(Network::ConnectionEvent event)
 
 void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::LocalReset ||
-      event == Network::ConnectionEvent::RemoteReset) {
+      event == Network::ConnectionEvent::LocalClose) {
     if (disconnected_) {
       cluster_info_->trafficStats()->upstream_cx_connect_fail_.inc();
     }
@@ -116,12 +114,11 @@ void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
     disableConnectTimeout();
     reportConnectionDestroy(event);
     disconnected_ = true;
-
-    dispatcher_.deferredDelete(std::move(connection_));
     if (callbacks_) {
       callbacks_->onEvent(event);
       callbacks_ = nullptr;
     }
+    dispatcher_.deferredDelete(std::move(connection_));
   } else {
     disconnected_ = false;
     conn_connect_ms_->complete();

@@ -59,8 +59,7 @@ Ssl::ConnectionInfoConstSharedPtr TcpUpstream::getUpstreamConnectionSslInfo() {
 Tcp::ConnectionPool::ConnectionData*
 TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   // TODO(botengyao): propagate RST back to upstream connection if RST is received from downstream.
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::RemoteReset) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     // The close call may result in this object being deleted. Latch the
     // connection locally so it can be returned for potential draining.
     auto* conn_data = upstream_conn_data_.release();
@@ -68,8 +67,7 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
         Network::ConnectionCloseType::FlushWrite,
         StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose);
     return conn_data;
-  } else if (event == Network::ConnectionEvent::LocalClose ||
-             event == Network::ConnectionEvent::LocalReset) {
+  } else if (event == Network::ConnectionEvent::LocalClose) {
     upstream_conn_data_->connection().close(
         Network::ConnectionCloseType::NoFlush,
         StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose);
@@ -113,9 +111,7 @@ void HttpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb) {
 Tcp::ConnectionPool::ConnectionData*
 HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalReset ||
-      event == Network::ConnectionEvent::RemoteReset) {
+      event == Network::ConnectionEvent::RemoteClose) {
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
   }
   return nullptr;

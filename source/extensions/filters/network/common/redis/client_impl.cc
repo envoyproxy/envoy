@@ -178,9 +178,7 @@ void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
 
 void ClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::RemoteReset ||
-      event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::LocalReset) {
+      event == Network::ConnectionEvent::LocalClose) {
 
     Upstream::reportUpstreamCxDestroy(host_, event);
     if (!pending_requests_.empty()) {
@@ -207,9 +205,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  if ((event == Network::ConnectionEvent::RemoteClose ||
-       event == Network::ConnectionEvent::RemoteReset) &&
-      !connected_) {
+  if (event == Network::ConnectionEvent::RemoteClose && !connected_) {
     host_->cluster().trafficStats()->upstream_cx_connect_fail_.inc();
     host_->stats().cx_connect_fail_.inc();
   }

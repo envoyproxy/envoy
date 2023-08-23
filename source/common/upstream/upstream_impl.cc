@@ -2278,8 +2278,7 @@ void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host
                              Network::ConnectionEvent event) {
   Upstream::ClusterTrafficStats& stats = *host->cluster().trafficStats();
   stats.upstream_cx_destroy_.inc();
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::RemoteReset) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     stats.upstream_cx_destroy_remote_.inc();
   } else {
     stats.upstream_cx_destroy_local_.inc();
@@ -2290,8 +2289,7 @@ void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSh
                                           Network::ConnectionEvent event) {
   Upstream::ClusterTrafficStats& stats = *host->cluster().trafficStats();
   stats.upstream_cx_destroy_with_active_rq_.inc();
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::RemoteReset) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     stats.upstream_cx_destroy_remote_with_active_rq_.inc();
   } else {
     stats.upstream_cx_destroy_local_with_active_rq_.inc();

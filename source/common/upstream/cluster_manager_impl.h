@@ -532,9 +532,7 @@ private:
       // Network::ConnectionCallbacks
       void onEvent(Network::ConnectionEvent event) override {
         if (event == Network::ConnectionEvent::LocalClose ||
-            event == Network::ConnectionEvent::LocalReset ||
-            event == Network::ConnectionEvent::RemoteClose ||
-            event == Network::ConnectionEvent::RemoteReset) {
+            event == Network::ConnectionEvent::RemoteClose) {
           parent_.removeTcpConn(host_, connection_);
         }
       }

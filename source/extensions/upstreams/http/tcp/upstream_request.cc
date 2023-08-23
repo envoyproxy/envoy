@@ -100,9 +100,7 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
 void TcpUpstream::onEvent(Network::ConnectionEvent event) {
   if ((event == Network::ConnectionEvent::LocalClose ||
-       event == Network::ConnectionEvent::LocalReset ||
-       event == Network::ConnectionEvent::RemoteClose ||
-       event == Network::ConnectionEvent::RemoteReset) &&
+       event == Network::ConnectionEvent::RemoteClose) &&
       upstream_request_) {
     upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
   }

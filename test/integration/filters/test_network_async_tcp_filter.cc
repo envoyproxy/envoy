@@ -84,9 +84,17 @@ private:
     void onEvent(Network::ConnectionEvent event) override {
       ENVOY_LOG_MISC(debug, "tcp client test filter downstream callback onEvent: {}",
                      static_cast<int>(event));
-      if (event == Network::ConnectionEvent::RemoteReset) {
+      if (event != Network::ConnectionEvent::RemoteClose) {
+        return;
+      }
+
+      ENVOY_LOG_MISC(debug, "tcp client test filter downstream detected close type: {}.",
+                     static_cast<int>(parent_.read_callbacks_->connection().detectedCloseType()));
+
+      if (parent_.read_callbacks_->connection().detectedCloseType() ==
+          Network::DetectedCloseType::RemoteReset) {
         parent_.client_->close(Network::ConnectionCloseType::AbortReset);
-      } else if (event == Network::ConnectionEvent::RemoteClose) {
+      } else {
         parent_.client_->close(Network::ConnectionCloseType::NoFlush);
       }
     };
@@ -114,9 +122,16 @@ private:
     void onEvent(Network::ConnectionEvent event) override {
       ENVOY_LOG_MISC(debug, "tcp client test filter upstream callback onEvent: {}",
                      static_cast<int>(event));
-      if (event == Network::ConnectionEvent::RemoteReset) {
+      if (event != Network::ConnectionEvent::RemoteClose) {
+        return;
+      }
+
+      ENVOY_LOG_MISC(debug, "tcp client test filter upstream detected close type: {}.",
+                     static_cast<int>(parent_.client_->detectedCloseType()));
+
+      if (parent_.client_->detectedCloseType() == Network::DetectedCloseType::RemoteReset) {
         parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
-      } else if (event == Network::ConnectionEvent::RemoteClose) {
+      } else {
         parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       }
     };

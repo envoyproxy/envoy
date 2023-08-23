@@ -51,8 +51,7 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
-  resetAllMessages(event == Network::ConnectionEvent::LocalClose ||
-                   event == Network::ConnectionEvent::LocalReset);
+  resetAllMessages(event == Network::ConnectionEvent::LocalClose);
 }
 
 void ConnectionManager::onAboveWriteBufferHighWatermark() {

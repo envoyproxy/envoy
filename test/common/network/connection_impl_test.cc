@@ -656,7 +656,10 @@ TEST_P(ConnectionImplTest, ClientAbortResetDuringCallback) {
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         client_connection_->close(ConnectionCloseType::AbortReset);
       }));
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalReset));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+      }));
 
   read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
 
@@ -676,10 +679,14 @@ TEST_P(ConnectionImplTest, ClientAbortResetDuringCallback) {
       }));
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
-  EXPECT_CALL(upstream_callbacks_, onEvent(ConnectionEvent::LocalReset));
-
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteReset))
+  EXPECT_CALL(upstream_callbacks_, onEvent(ConnectionEvent::LocalClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(upstream_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+      }));
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::RemoteReset);
         upstream_connection_->close(ConnectionCloseType::AbortReset);
         dispatcher_->exit();
       }));
@@ -724,12 +731,20 @@ TEST_P(ConnectionImplTest, ClientAbortResetAfterCallback) {
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalReset));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+      }));
   client_connection_->close(ConnectionCloseType::AbortReset);
 
-  EXPECT_CALL(upstream_callbacks_, onEvent(ConnectionEvent::LocalReset));
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteReset))
+  EXPECT_CALL(upstream_callbacks_, onEvent(ConnectionEvent::LocalClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(upstream_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+      }));
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::RemoteReset);
         upstream_connection_->close(ConnectionCloseType::AbortReset);
         dispatcher_->exit();
       }));
@@ -743,9 +758,16 @@ TEST_P(ConnectionImplTest, ServerResetClose) {
   setUpBasicConnection();
   connect(true);
 
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalReset));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::RemoteReset);
+        dispatcher_->exit();
+      }));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+      }));
+
   server_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -759,8 +781,14 @@ TEST_P(ConnectionImplTest, ServerResetCloseRuntimeDisabled) {
   connect(true);
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::Normal);
+        dispatcher_->exit();
+      }));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::Normal);
+      }));
 
   // Originally it should close the connection by RST.
   server_connection_->close(ConnectionCloseType::AbortReset);
@@ -773,8 +801,15 @@ TEST_P(ConnectionImplTest, ServerResetCloseFlagDisabled) {
   connect(false);
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::Normal);
+        dispatcher_->exit();
+      }));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::Normal);
+        dispatcher_->exit();
+      }));
 
   // Originally it should close the connection by RST.
   server_connection_->close(ConnectionCloseType::AbortReset);
@@ -1111,10 +1146,16 @@ TEST_P(ConnectionImplTest, RstCloseOnNotReadDisabledConnection) {
   connect(true);
 
   // Connection is not readDisabled, and detect_early_close_ is true.
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::RemoteReset);
+        dispatcher_->exit();
+      }));
 
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalReset));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+      }));
   server_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -1128,14 +1169,20 @@ TEST_P(ConnectionImplTest, RstCloseOnReadDisabledConnectionThenWrite) {
   EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
             client_connection_->readDisable(true));
 
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset)).Times(0);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalReset));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+      }));
   server_connection_->close(ConnectionCloseType::AbortReset);
 
   // The reset error is triggered by write event.
   // write error: Connection reset by peer, code: 9
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::RemoteReset);
+        dispatcher_->exit();
+      }));
   Buffer::OwnedImpl buffer("data");
   client_connection_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1152,14 +1199,20 @@ TEST_P(ConnectionImplTest, RstCloseOnReadEarlyCloseDisabledThenWrite) {
   EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
             client_connection_->readDisable(true));
 
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset)).Times(0);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalReset));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+      }));
   server_connection_->close(ConnectionCloseType::AbortReset);
 
   // The reset error is triggered by write event.
   // write error: Connection reset by peer, code: 9
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteReset))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::RemoteReset);
+        dispatcher_->exit();
+      }));
   Buffer::OwnedImpl buffer("data");
   client_connection_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1212,10 +1265,17 @@ TEST_P(ConnectionImplTest, HalfCloseResetClose) {
   connect(true);
 
   server_connection_->enableHalfClose(true);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteReset));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::RemoteReset);
+        dispatcher_->exit();
+      }));
   EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalReset))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+        dispatcher_->exit();
+      }));
   client_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -1255,7 +1315,6 @@ TEST_P(ConnectionImplTest, HalfCloseThenNormallClose) {
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
   // After the half closed from one way, no event will be propagate back to server connection.
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteReset)).Times(0);
   // Then client is going to normally close the connection.
   client_connection_->close(ConnectionCloseType::NoFlush);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1297,11 +1356,13 @@ TEST_P(ConnectionImplTest, HalfCloseThenResetClose) {
       }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalReset))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+        dispatcher_->exit();
+      }));
   // After the half closed from one way, no event will be propagate back to server connection.
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteReset)).Times(0);
   // Then client is going to reset the connection.
   client_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1346,18 +1407,23 @@ TEST_P(ConnectionImplTest, HalfCloseThenResetCloseThenWriteData) {
       }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalReset))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::LocalReset);
+        dispatcher_->exit();
+      }));
   // After the half closed from one way, no event will be propagate back to server connection.
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteReset)).Times(0);
   // Then client is going to reset the connection.
   client_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Write error: Broken pipe, code: 12 rather than the reset error.
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::Normal);
+        dispatcher_->exit();
+      }));
   // Tring to write data to the closed connection.
   Buffer::OwnedImpl server_buffer("data");
   server_connection_->write(server_buffer, false);
@@ -3325,6 +3391,7 @@ TEST_F(PostCloseConnectionImplTest, AbortReset) {
   InSequence s;
   initialize();
   writeSomeData();
+  connection_->enableTcpRstDetectAndSend(true);
 
   // Connection abort. We have data written above in writeSomeData(),
   // it won't be written and flushed due to ``ConnectionCloseType::AbortReset``.

@@ -29,8 +29,6 @@ namespace Network {
 enum class ConnectionEvent {
   RemoteClose,
   LocalClose,
-  RemoteReset,
-  LocalReset,
   Connected,
   ConnectedZeroRtt,
 };
@@ -76,7 +74,16 @@ enum class ConnectionCloseType {
                       // until the delayed_close_timeout expires
   Abort, // Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
   AbortReset // Do not write/flush any pending data and immediately raise
-             // ConnectionEvent::LocalReset Envoy will try close the connection with RST flag.
+             // ConnectionEvent::LocalClose. Envoy will try close the connection with RST flag.
+};
+
+/**
+ * Type of connection close which is detected from the socket.
+ */
+enum class DetectedCloseType {
+  Normal,      // The normal socket close from Envoy's connection perspective.
+  LocalReset,  // The local reset initiated from Envoy.
+  RemoteReset, // The peer reset detected by the connection.
 };
 
 /**
@@ -156,6 +163,11 @@ public:
    * @param details the reason the connection is being closed.
    */
   virtual void close(ConnectionCloseType type, absl::string_view details) PURE;
+
+  /**
+   * @return the detected close type from socket.
+   */
+  virtual DetectedCloseType detectedCloseType() const PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.

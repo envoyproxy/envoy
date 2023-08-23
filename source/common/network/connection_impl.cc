@@ -151,8 +151,11 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   // The connection is closed by Envoy by sending RST, and the connection is closed immediately.
   if (type == ConnectionCloseType::AbortReset) {
-    ENVOY_CONN_LOG(debug, "connection closing type=AbortReset, rasing LocalReset event.", *this);
-    closeSocket(ConnectionEvent::LocalReset);
+    ENVOY_CONN_LOG(
+        debug, "connection closing type=AbortReset, setting LocalReset to the detected close type.",
+        *this);
+    setDetectedCloseType(DetectedCloseType::LocalReset);
+    closeSocket(ConnectionEvent::LocalClose);
     return;
   }
 
@@ -255,6 +258,10 @@ bool ConnectionImpl::filterChainWantsData() {
          (read_disable_count_ == 1 && read_buffer_->highWatermarkTriggered());
 }
 
+void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
+  detected_close_type_ = close_type;
+}
+
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (!ConnectionImpl::ioHandle().isOpen()) {
     return;
@@ -281,7 +288,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (close_type == ConnectionEvent::LocalReset || close_type == ConnectionEvent::RemoteReset) {
+  if (detected_close_type_ == DetectedCloseType::RemoteReset ||
+      detected_close_type_ == DetectedCloseType::LocalReset) {
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
         envoy::config::core::v3::SocketOption::STATE_LISTENING);
@@ -679,7 +687,8 @@ void ConnectionImpl::onReadReady() {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.detect_and_raise_rst_tcp_connection")) {
       ENVOY_CONN_LOG(debug, "read: rst close from peer.", *this);
-      closeSocket(ConnectionEvent::RemoteReset);
+      setDetectedCloseType(DetectedCloseType::RemoteReset);
+      closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
   }
@@ -763,7 +772,8 @@ void ConnectionImpl::onWriteReady() {
             "envoy.reloadable_features.detect_and_raise_rst_tcp_connection")) {
       // Discard anything in the buffer.
       ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);
-      closeSocket(ConnectionEvent::RemoteReset);
+      setDetectedCloseType(DetectedCloseType::RemoteReset);
+      closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
   }
@@ -903,8 +913,6 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
   case ConnectionEvent::Connected:
   case ConnectionEvent::RemoteClose:
   case ConnectionEvent::LocalClose:
-  case ConnectionEvent::LocalReset:
-  case ConnectionEvent::RemoteReset:
     transport_connect_pending_ = false;
     transport_socket_connect_timer_.reset();
   }

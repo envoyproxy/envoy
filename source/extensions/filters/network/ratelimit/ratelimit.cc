@@ -97,9 +97,7 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   // Make sure that any pending request in the client is cancelled. This will be NOP if the
   // request already completed.
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::RemoteReset ||
-      event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::LocalReset) {
+      event == Network::ConnectionEvent::LocalClose) {
     if (status_ == Status::Calling) {
       client_->cancel();
       config_->stats().active_.dec();

@@ -169,7 +169,7 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
 
   ASSERT_TRUE(fake_upstream_connection->close(Network::ConnectionCloseType::AbortReset));
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy_local", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy_remote", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);

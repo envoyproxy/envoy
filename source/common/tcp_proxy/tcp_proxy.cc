@@ -730,9 +730,7 @@ bool Filter::startUpstreamSecureTransport() {
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   const bool connection_closed = event == Network::ConnectionEvent::LocalClose ||
-                                 event == Network::ConnectionEvent::RemoteClose ||
-                                 event == Network::ConnectionEvent::LocalReset ||
-                                 event == Network::ConnectionEvent::RemoteReset;
+                                 event == Network::ConnectionEvent::RemoteClose;
   if (connection_closed) {
     downstream_closed_ = true;
     // Cancel the potential odcds callback.
@@ -784,15 +782,12 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
   connecting_ = false;
 
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::LocalReset ||
-      event == Network::ConnectionEvent::RemoteReset) {
+      event == Network::ConnectionEvent::LocalClose) {
     upstream_.reset();
     disableIdleTimer();
 
     if (connecting) {
-      if (event == Network::ConnectionEvent::RemoteClose ||
-          event == Network::ConnectionEvent::RemoteReset) {
+      if (event == Network::ConnectionEvent::RemoteClose) {
         getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
             Upstream::Outlier::Result::LocalOriginConnectFailed);
@@ -965,9 +960,7 @@ Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedP
 
 void Drainer::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteReset ||
-      event == Network::ConnectionEvent::LocalReset) {
+      event == Network::ConnectionEvent::LocalClose) {
     if (timer_ != nullptr) {
       timer_->disableTimer();
     }

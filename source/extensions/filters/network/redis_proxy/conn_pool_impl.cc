@@ -410,9 +410,7 @@ void InstanceImpl::ThreadLocalPool::onRequestCompleted() {
 
 void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::RemoteReset ||
-      event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::LocalReset) {
+      event == Network::ConnectionEvent::LocalClose) {
     auto client_to_delete = parent_.client_map_.find(host_);
     if (client_to_delete != parent_.client_map_.end()) {
       parent_.dispatcher_.deferredDelete(std::move(redis_client_));

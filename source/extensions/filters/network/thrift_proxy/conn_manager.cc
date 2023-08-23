@@ -196,8 +196,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
       event == Network::ConnectionEvent::ConnectedZeroRtt) {
     return;
   }
-  resetAllRpcs(event == Network::ConnectionEvent::LocalClose ||
-               event == Network::ConnectionEvent::LocalReset);
+  resetAllRpcs(event == Network::ConnectionEvent::LocalClose);
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {

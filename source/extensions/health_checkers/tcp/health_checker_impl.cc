@@ -92,9 +92,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::RemoteReset ||
-      event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::LocalReset) {
+      event == Network::ConnectionEvent::LocalClose) {
     if (!expect_close_) {
       ENVOY_CONN_LOG(debug, "hc tcp connection unexpected closed, health_check_address={}",
                      *client_, host_->healthCheckAddress()->asString());

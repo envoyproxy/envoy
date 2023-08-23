@@ -358,6 +358,10 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view 
   connections_[0]->close(type, details);
 }
 
+DetectedCloseType MultiConnectionBaseImpl::detectedCloseType() const {
+  return connections_[0]->detectedCloseType();
+};
+
 Event::Dispatcher& MultiConnectionBaseImpl::dispatcher() const {
   ASSERT(&dispatcher_ == &connections_[0]->dispatcher());
   return connections_[0]->dispatcher();
@@ -457,9 +461,7 @@ void MultiConnectionBaseImpl::onEvent(ConnectionEvent event, ConnectionCallbacks
     break;
   }
   case ConnectionEvent::LocalClose:
-  case ConnectionEvent::RemoteClose:
-  case ConnectionEvent::LocalReset:
-  case ConnectionEvent::RemoteReset: {
+  case ConnectionEvent::RemoteClose: {
     ENVOY_CONN_LOG_EVENT(debug, "multi_connection_cx_attempt_failed", "connection={}", *this,
                          connection_provider_->nextConnection());
     // This connection attempt has failed. If possible, start another connection attempt

@@ -218,12 +218,10 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
   bool end_downstream = true;
 
   switch (event) {
-  case Network::ConnectionEvent::RemoteReset:
   case Network::ConnectionEvent::RemoteClose:
     ENVOY_LOG(debug, "upstream remote close");
     end_downstream = onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
-  case Network::ConnectionEvent::LocalReset:
   case Network::ConnectionEvent::LocalClose:
     ENVOY_LOG(debug, "upstream local close");
     end_downstream = onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);

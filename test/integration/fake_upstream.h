@@ -299,11 +299,9 @@ public:
     // locked scope.
     absl::MutexLock lock(&lock_);
     if (event == Network::ConnectionEvent::RemoteClose ||
-        event == Network::ConnectionEvent::LocalClose ||
-        event == Network::ConnectionEvent::LocalReset ||
-        event == Network::ConnectionEvent::RemoteReset) {
-      if (event == Network::ConnectionEvent::LocalReset ||
-          event == Network::ConnectionEvent::RemoteReset) {
+        event == Network::ConnectionEvent::LocalClose) {
+      if (connection_.detectedCloseType() == Network::DetectedCloseType::RemoteReset ||
+          connection_.detectedCloseType() == Network::DetectedCloseType::LocalReset) {
         rst_disconnected_ = true;
       }
       disconnected_ = true;

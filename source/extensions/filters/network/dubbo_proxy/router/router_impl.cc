@@ -197,8 +197,6 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 void Router::onEvent(Network::ConnectionEvent event) {
   if (!upstream_request_ || upstream_request_->response_complete_) {
     ENVOY_BUG(event == Network::ConnectionEvent::RemoteClose ||
-                  event == Network::ConnectionEvent::RemoteReset ||
-                  event == Network::ConnectionEvent::LocalReset ||
                   event == Network::ConnectionEvent::LocalClose,
               "Unexpected event");
     // Client closed connection after completing response.
@@ -206,20 +204,17 @@ void Router::onEvent(Network::ConnectionEvent event) {
     return;
   }
 
-  if (upstream_request_->stream_reset_ && (event == Network::ConnectionEvent::LocalClose ||
-                                           event == Network::ConnectionEvent::LocalReset)) {
+  if (upstream_request_->stream_reset_ && event == Network::ConnectionEvent::LocalClose) {
     ENVOY_LOG(debug, "dubbo upstream request: the stream reset");
     return;
   }
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
-  case Network::ConnectionEvent::RemoteReset:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     upstream_request_->upstream_host_->outlierDetector().putResult(
         Upstream::Outlier::Result::LocalOriginConnectFailed);
     break;
-  case Network::ConnectionEvent::LocalReset:
   case Network::ConnectionEvent::LocalClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;

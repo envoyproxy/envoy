@@ -16,9 +16,7 @@ uint64_t MockConnectionBase::next_id_;
 
 void MockConnectionBase::raiseEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteReset ||
-      event == Network::ConnectionEvent::LocalReset) {
+      event == Network::ConnectionEvent::LocalClose) {
     if (state_ == Connection::State::Closed) {
       return;
     }
@@ -87,10 +85,9 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, close(_))
       .WillByDefault(Invoke([&connection](ConnectionCloseType type) -> void {
         if (connection.enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) {
-          connection.raiseEvent(Network::ConnectionEvent::LocalReset);
-        } else {
-          connection.raiseEvent(Network::ConnectionEvent::LocalClose);
+          connection.detected_close_type_ = DetectedCloseType::LocalReset;
         }
+        connection.raiseEvent(Network::ConnectionEvent::LocalClose);
       }));
   ON_CALL(connection, close(_, _))
       .WillByDefault(Invoke([&connection](ConnectionCloseType, absl::string_view details) -> void {
