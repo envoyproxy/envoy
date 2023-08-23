@@ -4,16 +4,47 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+#include "envoy/thread_local/thread_local.h"
 
 namespace Envoy {
 namespace Io {
+
+class IoUringSocket;
 
 /**
  * Abstract for io_uring I/O Request.
  */
 class Request {
 public:
+  /**
+   * io_uring request type.
+   */
+  enum class RequestType : uint8_t {
+    Accept = 0x1,
+    Connect = 0x2,
+    Read = 0x4,
+    Write = 0x8,
+    Close = 0x10,
+    Cancel = 0x20,
+    Shutdown = 0x40,
+  };
+
+  Request(RequestType type, IoUringSocket& socket) : type_(type), socket_(socket) {}
   virtual ~Request() = default;
+
+  /**
+   * Return the request type.
+   */
+  RequestType type() const { return type_; }
+
+  /**
+   * Returns the io_uring socket the request belongs to.
+   */
+  IoUringSocket& socket() const { return socket_; }
+
+private:
+  RequestType type_;
+  IoUringSocket& socket_;
 };
 
 /**
@@ -133,6 +164,109 @@ public:
 };
 
 using IoUringPtr = std::unique_ptr<IoUring>;
+class IoUringWorker;
+
+/**
+ * Abstract for each socket.
+ */
+class IoUringSocket {
+public:
+  virtual ~IoUringSocket() = default;
+
+  /**
+   * Get the IoUringWorker this socket bind to.
+   */
+  virtual IoUringWorker& getIoUringWorker() const PURE;
+
+  /**
+   * Return the raw fd.
+   */
+  virtual os_fd_t fd() const PURE;
+
+  /**
+   * On accept request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the AcceptRequest object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onAccept(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On connect request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the request object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onConnect(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On read request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the ReadRequest object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onRead(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On write request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the WriteRequest object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onWrite(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On close request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the request object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onClose(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On cancel request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the request object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onCancel(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On shutdown request completed.
+   * TODO (soulxu): wrap the raw result into a type. It can be `IoCallUint64Result`.
+   * @param req the request object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onShutdown(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * Inject a request completion to the io uring instance.
+   * @param type the request type of injected completion.
+   */
+  virtual void injectCompletion(Request::RequestType type) PURE;
+};
+
+using IoUringSocketPtr = std::unique_ptr<IoUringSocket>;
+
+/**
+ * Abstract for per-thread worker.
+ */
+class IoUringWorker : public ThreadLocal::ThreadLocalObject {
+public:
+  virtual ~IoUringWorker() = default;
+
+  /**
+   * Return the current thread's dispatcher.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+};
 
 /**
  * Abstract factory for IoUring wrappers.
