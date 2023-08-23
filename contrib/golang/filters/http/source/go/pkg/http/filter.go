@@ -243,9 +243,17 @@ type httpConfig struct {
 	config *C.httpConfig
 }
 
-func (c *httpConfig) DefineMetric(metricType api.MetricType, name string) api.Metric {
-	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), metricType, name)
-	return &metric{
+func (c *httpConfig) DefineCounterMetric(name string) api.CounterMetric {
+	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), api.Counter, name)
+	return &counterMetric{
+		config:   c,
+		metricId: id,
+	}
+}
+
+func (c *httpConfig) DefineGaugeMetric(name string) api.GaugeMetric {
+	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), api.Gauge, name)
+	return &gaugeMetric{
 		config:   c,
 		metricId: id,
 	}
@@ -255,15 +263,28 @@ func (c *httpConfig) Finalize() {
 	cAPI.HttpConfigFinalize(unsafe.Pointer(c.config))
 }
 
-type metric struct {
+type counterMetric struct {
 	config   *httpConfig
 	metricId uint32
 }
 
-func (m *metric) Increment(offset int64) {
+func (m *counterMetric) Increment(offset int64) {
 	cAPI.HttpIncrementMetric(unsafe.Pointer(m.config), m.metricId, offset)
 }
 
-func (m *metric) Get() uint64 {
+func (m *counterMetric) Get() uint64 {
+	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
+}
+
+type gaugeMetric struct {
+	config   *httpConfig
+	metricId uint32
+}
+
+func (m *gaugeMetric) Increment(offset int64) {
+	cAPI.HttpIncrementMetric(unsafe.Pointer(m.config), m.metricId, offset)
+}
+
+func (m *gaugeMetric) Get() uint64 {
 	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
 }

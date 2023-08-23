@@ -64,7 +64,7 @@ private:
   GoUint64 (*envoy_go_filter_new_http_plugin_config_)(httpConfig* p0) = {nullptr};
   GoUint64 (*envoy_go_filter_merge_http_plugin_config_)(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                                         GoUint64 p3) = {nullptr};
-  void (*envoy_go_filter_destroy_http_plugin_config_)(GoUint64 p1) = {nullptr};
+  void (*envoy_go_filter_destroy_http_plugin_config_)(GoUint64 p0) = {nullptr};
   GoUint64 (*envoy_go_filter_on_http_header_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
                                               GoUint64 p3) = {nullptr};
   GoUint64 (*envoy_go_filter_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,

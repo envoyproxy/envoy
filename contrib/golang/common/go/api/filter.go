@@ -222,14 +222,25 @@ const (
 type ConfigCallbacks interface {
 	// Define a metric, for different MetricType, name must be different,
 	// for same MetricType, the same name will share a metric.
-	DefineMetric(metricType MetricType, name string) Metric
+	DefineCounterMetric(name string) CounterMetric
+	DefineGaugeMetric(name string) GaugeMetric
+	// TODO Histogram
 }
 
 type ConfigCallbackHandler interface {
 	ConfigCallbacks
 }
 
-type Metric interface {
+type CounterMetric interface {
 	Increment(offset int64)
 	Get() uint64
+}
+
+type GaugeMetric interface {
+	Increment(offset int64)
+	Get() uint64
+}
+
+// TODO
+type HistogramMetric interface {
 }
