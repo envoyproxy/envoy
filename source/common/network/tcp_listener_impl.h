@@ -51,7 +51,7 @@ private:
   const uint32_t max_connections_to_accept_per_socket_event_;
   Server::LoadShedPoint* listener_accept_{nullptr};
   Server::ThreadLocalOverloadStateOptRef overload_state_;
-  bool track_global_cx_limit_in_overload_manager_;
+  const bool track_global_cx_limit_in_overload_manager_;
 };
 
 } // namespace Network
