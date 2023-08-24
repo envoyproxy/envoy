@@ -118,11 +118,13 @@ public:
 private:
   using StructMap = absl::flat_hash_map<std::string, ProtobufWkt::Struct>;
   // Handle on_missing case of the `rule` and store in `struct_map`.
-  void handleOnMissing(const Rule& rule, StructMap& struct_map);
+  void handleOnMissing(const Rule& rule, StructMap& struct_map,
+                       Http::StreamFilterCallbacks& filter_callback);
   // Handle on_present case of the `rule` and store in `struct_map`, which depends on
   // the value of `parent_node->key`.
   absl::Status handleOnPresent(Json::ObjectSharedPtr parent_node, const std::string& key,
-                               const Rule& rule, StructMap& struct_map);
+                               const Rule& rule, StructMap& struct_map,
+                               Http::StreamFilterCallbacks& filter_callback);
 
   // Process the case without body, i.e., on_missing is applied for all rules.
   void handleAllOnMissing(const Rules& rules, bool& processing_finished_flag,
@@ -140,10 +142,13 @@ private:
   const std::string& decideNamespace(const std::string& nspace) const;
   bool addMetadata(const std::string& meta_namespace, const std::string& key,
                    ProtobufWkt::Value val, const bool preserve_existing_metadata_value,
-                   StructMap& struct_map);
-  void applyKeyValue(const std::string& value, const KeyValuePair& keyval, StructMap& struct_map);
-  void applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map);
-  void applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval, StructMap& struct_map);
+                   StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback);
+  void applyKeyValue(const std::string& value, const KeyValuePair& keyval, StructMap& struct_map,
+                     Http::StreamFilterCallbacks& filter_callback);
+  void applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map,
+                     Http::StreamFilterCallbacks& filter_callback);
+  void applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval, StructMap& struct_map,
+                     Http::StreamFilterCallbacks& filter_callback);
   void finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
                                const StructMap& struct_map, bool& processing_finished_flag);
 

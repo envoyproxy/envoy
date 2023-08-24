@@ -161,25 +161,26 @@ bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) co
 }
 
 void Filter::applyKeyValue(const std::string& value, const KeyValuePair& keyval,
-                           StructMap& struct_map) {
+                           StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
   ASSERT(!value.empty());
 
   ProtobufWkt::Value val;
   val.set_string_value(value);
-  applyKeyValue(std::move(val), keyval, struct_map);
+  applyKeyValue(std::move(val), keyval, struct_map, filter_callback);
 }
 
-void Filter::applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map) {
+void Filter::applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map,
+                           Http::StreamFilterCallbacks& filter_callback) {
   ProtobufWkt::Value val;
   val.set_number_value(value);
-  applyKeyValue(std::move(val), keyval, struct_map);
+  applyKeyValue(std::move(val), keyval, struct_map, filter_callback);
 }
 
 void Filter::applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval,
-                           StructMap& struct_map) {
+                           StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
   const auto& nspace = decideNamespace(keyval.metadata_namespace());
   addMetadata(nspace, keyval.key(), std::move(value), keyval.preserve_existing_metadata_value(),
-              struct_map);
+              struct_map, filter_callback);
 }
 
 const std::string& Filter::decideNamespace(const std::string& nspace) const {
@@ -189,11 +190,10 @@ const std::string& Filter::decideNamespace(const std::string& nspace) const {
 
 bool Filter::addMetadata(const std::string& meta_namespace, const std::string& key,
                          ProtobufWkt::Value val, const bool preserve_existing_metadata_value,
-                         StructMap& struct_map) {
+                         StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
 
   if (preserve_existing_metadata_value) {
-    // TODO(kuochunghsu): support encoding
-    auto& filter_metadata = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    auto& filter_metadata = filter_callback.streamInfo().dynamicMetadata().filter_metadata();
     const auto entry_it = filter_metadata.find(meta_namespace);
 
     if (entry_it != filter_metadata.end()) {
@@ -229,16 +229,19 @@ void Filter::handleAllOnMissing(const Rules& rules, bool& processing_finished_fl
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_missing()) {
-      applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map);
+      applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map,
+                    filter_callback);
     }
   }
 
   finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag);
 }
 
-void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map) {
+void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map,
+                             Http::StreamFilterCallbacks& filter_callback) {
   if (rule.rule_.has_on_missing()) {
-    applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map);
+    applyKeyValue(rule.rule_.on_missing().value(), rule.rule_.on_missing(), struct_map,
+                  filter_callback);
   }
 }
 
@@ -247,21 +250,23 @@ void Filter::handleAllOnError(const Rules& rules, bool& processing_finished_flag
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_error()) {
-      applyKeyValue(rule.rule_.on_error().value(), rule.rule_.on_error(), struct_map);
+      applyKeyValue(rule.rule_.on_error().value(), rule.rule_.on_error(), struct_map,
+                    filter_callback);
     }
   }
   finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag);
 }
 
 absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const std::string& key,
-                                     const Rule& rule, StructMap& struct_map) {
+                                     const Rule& rule, StructMap& struct_map,
+                                     Http::StreamFilterCallbacks& filter_callback) {
   if (!rule.rule_.has_on_present()) {
     return absl::OkStatus();
   }
 
   auto& on_present_keyval = rule.rule_.on_present();
   if (on_present_keyval.has_value()) {
-    applyKeyValue(on_present_keyval.value(), on_present_keyval, struct_map);
+    applyKeyValue(on_present_keyval.value(), on_present_keyval, struct_map, filter_callback);
     return absl::OkStatus();
   }
 
@@ -276,7 +281,7 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
     if (auto value_result =
             absl::visit(JsonValueToProtobufValueConverter(), std::move(result.value()));
         value_result.ok()) {
-      applyKeyValue(value_result.value(), on_present_keyval, struct_map);
+      applyKeyValue(value_result.value(), on_present_keyval, struct_map, filter_callback);
     } else {
       return value_result.status();
     }
@@ -284,7 +289,7 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
   case envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::NUMBER:
     if (auto double_result = absl::visit(JsonValueToDoubleConverter(), std::move(result.value()));
         double_result.ok()) {
-      applyKeyValue(double_result.value(), on_present_keyval, struct_map);
+      applyKeyValue(double_result.value(), on_present_keyval, struct_map, filter_callback);
     } else {
       return double_result.status();
     }
@@ -302,7 +307,7 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
       return absl::OkStatus();
     }
 
-    applyKeyValue(std::move(str), on_present_keyval, struct_map);
+    applyKeyValue(std::move(str), on_present_keyval, struct_map, filter_callback);
     break;
   }
   return absl::OkStatus();
@@ -351,7 +356,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
       absl::StatusOr<Json::ObjectSharedPtr> next_node_result = node->getObjectNoThrow(keys[i]);
       if (!next_node_result.ok()) {
         ENVOY_LOG(warn, result.status().message());
-        handleOnMissing(rule, struct_map);
+        handleOnMissing(rule, struct_map, filter_callback);
         on_missing = true;
         break;
       }
@@ -360,10 +365,10 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     if (on_missing) {
       continue;
     }
-    absl::Status result = handleOnPresent(std::move(node), keys.back(), rule, struct_map);
+    absl::Status result = handleOnPresent(std::move(node), keys.back(), rule, struct_map, filter_callback);
     if (!result.ok()) {
       ENVOY_LOG(warn, fmt::format("{} key: {}", result.message(), keys.back()));
-      handleOnMissing(rule, struct_map);
+      handleOnMissing(rule, struct_map, filter_callback);
     }
   }
   success.inc();
