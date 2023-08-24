@@ -88,7 +88,7 @@ func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 }
 
 type StreamFilterConfigParser interface {
-	Parse(any *anypb.Any) (interface{}, error)
+	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
@@ -209,4 +209,38 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+type MetricType uint32
+
+const (
+	Counter   MetricType = 0
+	Gauge     MetricType = 1
+	Histogram MetricType = 2
+)
+
+type ConfigCallbacks interface {
+	// Define a metric, for different MetricType, name must be different,
+	// for same MetricType, the same name will share a metric.
+	DefineCounterMetric(name string) CounterMetric
+	DefineGaugeMetric(name string) GaugeMetric
+	// TODO Histogram
+}
+
+type ConfigCallbackHandler interface {
+	ConfigCallbacks
+}
+
+type CounterMetric interface {
+	Increment(offset int64)
+	Get() uint64
+}
+
+type GaugeMetric interface {
+	Increment(offset int64)
+	Get() uint64
+}
+
+// TODO
+type HistogramMetric interface {
 }
