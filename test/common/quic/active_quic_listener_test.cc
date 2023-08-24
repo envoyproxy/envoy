@@ -185,7 +185,7 @@ protected:
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
     return std::make_unique<TestActiveQuicListenerFactory>(
-        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, absl::nullopt);
+        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, absl::nullopt, server_);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -339,6 +339,7 @@ protected:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  NiceMock<Server::MockInstance> server_;
 
   std::list<std::unique_ptr<Network::SocketImpl>> client_sockets_;
   std::list<std::shared_ptr<Network::MockReadFilter>> read_filters_;

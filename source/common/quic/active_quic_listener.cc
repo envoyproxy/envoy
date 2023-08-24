@@ -6,6 +6,7 @@
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/server/instance.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
@@ -209,8 +210,9 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
-    ProcessContextOptRef context)
-    : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
+    ProcessContextOptRef context, Server::Instance& server)
+    : server_(server), concurrency_(concurrency), enabled_(config.enabled()),
+      quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
@@ -351,11 +353,15 @@ ActiveQuicListenerFactory::createActiveQuicListener(
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator) {
-  return std::make_unique<ActiveQuicListener>(
+  Network::Address::InstanceConstSharedPtr addr =
+      listen_socket->connectionInfoProvider().localAddress();
+  auto listener = std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
       std::move(cid_generator), worker_selector_);
+  server_.hotRestart().registerUdpForwardingListener(std::move(addr), worker_index, *listener);
+  return listener;
 }
 
 } // namespace Quic
