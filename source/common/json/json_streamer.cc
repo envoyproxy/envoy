@@ -7,6 +7,14 @@
 namespace Envoy {
 namespace Json {
 
+#ifdef NDEBUG
+#define ASSERT_THIS_IS_TOP_LEVEL                                                                   \
+  do {                                                                                             \
+  } while (0)
+#else
+#define ASSERT_THIS_IS_TOP_LEVEL ASSERT(streamer_.topLevel() == this)
+#endif
+
 Streamer::Level::Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
     : streamer_(streamer), closer_(closer) {
   streamer_.addConstantString(opener);
@@ -21,7 +29,7 @@ Streamer::Level::~Level() {
 
 void Streamer::Level::close() {
   if (!is_closed_) {
-    ASSERT(streamer_.topLevel() == this);
+    ASSERT_THIS_IS_TOP_LEVEL;
     is_closed_ = true;
     streamer_.addConstantString(closer_);
     streamer_.pop(this);
@@ -34,25 +42,25 @@ Streamer::MapPtr Streamer::makeRootMap() {
 }
 
 Streamer::MapPtr Streamer::Level::addMap() {
-  ASSERT(streamer_.topLevel() == this);
+  ASSERT_THIS_IS_TOP_LEVEL;
   newEntry();
   return std::make_unique<Map>(streamer_);
 }
 
 Streamer::ArrayPtr Streamer::Level::addArray() {
-  ASSERT(streamer_.topLevel() == this);
+  ASSERT_THIS_IS_TOP_LEVEL;
   newEntry();
   return std::make_unique<Array>(streamer_);
 }
 
 void Streamer::Level::addNumber(double number) {
-  ASSERT(streamer_.topLevel() == this);
+  ASSERT_THIS_IS_TOP_LEVEL;
   newEntry();
   streamer_.addNumber(number);
 }
 
 void Streamer::Level::addString(absl::string_view str) {
-  ASSERT(streamer_.topLevel() == this);
+  ASSERT_THIS_IS_TOP_LEVEL;
   newEntry();
   streamer_.addSanitized(str);
   streamer_.flush();
@@ -82,7 +90,7 @@ void Streamer::Map::newEntry() {
 }
 
 void Streamer::Map::newKey(absl::string_view name) {
-  ASSERT(topLevel() == this);
+  ASSERT_THIS_IS_TOP_LEVEL;
   ASSERT(!expecting_value_);
   newEntry();
   streamer_.addSanitized(name, "\":");

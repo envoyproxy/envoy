@@ -60,13 +60,6 @@ public:
     void addNumber(double d);
     void addString(absl::string_view str);
 
-#ifndef NDEBUG
-    /**
-     * @return the top Level*. This is used for asserts.
-     */
-    Level* topLevel() const { return streamer_.topLevel(); }
-#endif
-
   protected:
     /**
      * Initiates a new entry, serializing a comma separator if this is not the
