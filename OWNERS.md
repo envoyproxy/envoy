@@ -46,6 +46,8 @@ routing PRs, questions, etc. to the right place.
   * Listeners, RBAC, CEL, matching, Istio.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
   * Caches, file filters, and file I/O.
+* Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
+  * Listeners, iouring, data plane.
 
 # Envoy mobile maintainers
 

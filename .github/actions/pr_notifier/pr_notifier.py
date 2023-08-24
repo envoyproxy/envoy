@@ -40,6 +40,7 @@ MAINTAINERS = {
     'kyessenov': 'U7KTRAA8M',
     'keith': 'UGS5P90CF',
     'abeyad': 'U03CVM7GPM1',
+    'soulxu': 'U01GNQ3B8AY',
 }
 
 # First pass reviewers who are not maintainers should get
