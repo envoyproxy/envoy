@@ -73,6 +73,7 @@ stages:
 # Presubmit/default
 - ${{ if eq(variables.pipelineDefault, true) }}:
   - template: stages.yml
+    parameters:
       buildStageDeps:
       - env
       checkStageDeps:
