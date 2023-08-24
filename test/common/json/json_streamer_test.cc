@@ -56,7 +56,7 @@ TEST_F(JsonStreamerTest, MapOneString) {
 
 TEST_F(JsonStreamerTest, MapOneSanitized) {
   Streamer::MapPtr map = streamer_.makeRootMap();
-  map->newKey("a");
+  map->addKey("a");
   map->addString("\b\001");
   streamer_.clear();
   EXPECT_EQ(R"EOF({"a":"\b\u0001"})EOF", buffer_.toString());
@@ -64,9 +64,9 @@ TEST_F(JsonStreamerTest, MapOneSanitized) {
 
 TEST_F(JsonStreamerTest, MapTwoSanitized) {
   Streamer::MapPtr map = streamer_.makeRootMap();
-  map->newKey("a");
+  map->addKey("a");
   map->addString("\b\001");
-  map->newKey("b");
+  map->addKey("b");
   map->addString("\r\002");
   streamer_.clear();
   EXPECT_EQ(R"EOF({"a":"\b\u0001","b":"\r\u0002"})EOF", buffer_.toString());
@@ -74,7 +74,7 @@ TEST_F(JsonStreamerTest, MapTwoSanitized) {
 
 TEST_F(JsonStreamerTest, SubArray) {
   Streamer::MapPtr map = streamer_.makeRootMap();
-  map->newKey("a");
+  map->addKey("a");
   Streamer::ArrayPtr array = map->addArray();
   array->addEntries({1.0, "two", 3.5, std::nan("")});
   array.reset();
@@ -86,7 +86,7 @@ TEST_F(JsonStreamerTest, SubArray) {
 
 TEST_F(JsonStreamerTest, SubMap) {
   Streamer::MapPtr map = streamer_.makeRootMap();
-  map->newKey("a");
+  map->addKey("a");
   Streamer::MapPtr sub_map = map->addMap();
   sub_map->addEntries({{"one", 1.0}, {"three.5", 3.5}});
   sub_map.reset();

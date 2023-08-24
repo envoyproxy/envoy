@@ -60,14 +60,15 @@ void Streamer::Level::addNumber(double number) {
 }
 
 void Streamer::Level::addString(absl::string_view str) {
-  addStringNoFlush(str);
-  streamer_.flush();
+  ASSERT_THIS_IS_TOP_LEVEL;
+  if (addStringNoFlush(str)) {
+    streamer_.flush();
+  }
 }
 
-void Streamer::Level::addStringNoFlush(absl::string_view str) {
-  ASSERT_THIS_IS_TOP_LEVEL;
+bool Streamer::Level::addStringNoFlush(absl::string_view str) {
   newEntry();
-  streamer_.addSanitized(str);
+  return streamer_.addSanitized(str);
 }
 
 void Streamer::pop(Level* level) {
@@ -93,11 +94,13 @@ void Streamer::Map::newEntry() {
   }
 }
 
-void Streamer::Map::newKey(absl::string_view name) {
+void Streamer::Map::addKey(absl::string_view key) {
   ASSERT_THIS_IS_TOP_LEVEL;
   ASSERT(!expecting_value_);
   newEntry();
-  streamer_.addSanitized(name, "\":");
+  if (streamer_.addSanitized(key, "\":")) {
+    streamer_.flush();
+  }
   expecting_value_ = true;
 }
 
@@ -106,7 +109,7 @@ void Streamer::Map::addEntries(const Entries& entries) {
   bool needs_flush = false;
   for (const NameValue& entry : entries) {
     newEntry();
-    streamer_.addSanitized(entry.first, "\":");
+    needs_flush |= streamer_.addSanitized(entry.first, "\":");
     expecting_value_ = true;
     needs_flush |= renderValueNoFlush(entry.second);
   }
@@ -118,8 +121,7 @@ void Streamer::Map::addEntries(const Entries& entries) {
 bool Streamer::Level::renderValueNoFlush(const Value& value) {
   switch (value.index()) {
   case 0:
-    addStringNoFlush(absl::get<absl::string_view>(value));
-    return true;
+    return addStringNoFlush(absl::get<absl::string_view>(value));
   case 1:
     addNumber(absl::get<double>(value));
     break;
@@ -168,14 +170,23 @@ void Streamer::clear() {
   response_.add("");
 }
 
-void Streamer::addSanitized(absl::string_view token, absl::string_view suffix) {
+bool Streamer::addSanitized(absl::string_view str, absl::string_view suffix) {
   std::string& buffer = buffers_[buffers_index_];
-  absl::string_view sanitized = Json::sanitize(buffer, token);
+  absl::string_view sanitized = Json::sanitize(buffer, str);
   absl::string_view fragments[] = {"\"", sanitized, suffix};
   fragments_.insert(fragments_.end(), fragments, fragments + ABSL_ARRAYSIZE(fragments));
-  if (sanitized.data() != token.data()) {
+
+  // When 'str' is sanitized, the vast majority of the time, no special
+  // characters are found, and the input data is returned without consuming a
+  // buffer. In that case, we must let the caller know that we have added an a
+  // user-controlled string to fragments_, and thus must call flush() before
+  // returning control to the user.
+  if (sanitized.data() != str.data()) {
+    // A buffer is consumed; move to the next buffer and flush if full.
     nextBuffer();
+    return false; // no flush() needed due to retaining a pointer to user memory.
   }
+  return true; // indicates that flush() must be called prior to returning control.
 }
 
 void Streamer::nextBuffer() {

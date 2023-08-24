@@ -89,6 +89,16 @@ private:
   void renderHistogramStart();
   void populateSupportedPercentiles(Json::Streamer::Map& map);
   void populatePercentiles(const Stats::ParentHistogram& histogram, Json::Streamer::Map& map);
+
+  // This function irons out an API mistake made when defining the StatsRender
+  // interface. The issue is that callers can provide a response buffer when
+  // constructing a StatsRender instance, but can switch to a different response
+  // buffer when rendering specific values.
+  //
+  // The problem comes with JSON histograms where each histogram is nested in a
+  // structure with other histograms, so if you switch buffers you need to
+  // ensure the pending bytes in the previous buffer is fully
+  // drained. Unfortunately this buffer-switching is used in practice.
   void drainIfNeeded(Buffer::Instance& response);
 
   const Utility::HistogramBucketsMode histogram_buckets_mode_;

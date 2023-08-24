@@ -105,7 +105,7 @@ StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
   // We don't create a JSON data model for the stats output, as that makes
   // streaming difficult. Instead we emit the preamble in the constructor here,
   // and create json models for each stats entry.
-  json_stats_map_->newKey("stats");
+  json_stats_map_->addKey("stats");
   json_stats_array_ = json_stats_map_->addArray();
 }
 
@@ -153,7 +153,7 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
   case Utility::HistogramBucketsMode::NoBuckets: {
     Json::Streamer::MapPtr map = json_histogram_array_->addMap();
     map->addEntries({{"name", name}});
-    map->newKey("values");
+    map->addKey("values");
     populatePercentiles(histogram, *map);
     break;
   }
@@ -209,20 +209,20 @@ void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogra
 void StatsJsonRender::renderHistogramStart() {
   histograms_initialized_ = true;
   json_histogram_map1_ = json_stats_array_->addMap();
-  json_histogram_map1_->newKey("histograms");
+  json_histogram_map1_->addKey("histograms");
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Detailed:
     json_histogram_map2_ = json_histogram_map1_->addMap();
-    json_histogram_map2_->newKey("supported_percentiles");
+    json_histogram_map2_->addKey("supported_percentiles");
     populateSupportedPercentiles(*json_histogram_map2_);
-    json_histogram_map2_->newKey("details");
+    json_histogram_map2_->addKey("details");
     json_histogram_array_ = json_histogram_map2_->addArray();
     break;
   case Utility::HistogramBucketsMode::NoBuckets:
     json_histogram_map2_ = json_histogram_map1_->addMap();
-    json_histogram_map2_->newKey("supported_quantiles");
+    json_histogram_map2_->addKey("supported_quantiles");
     populateSupportedPercentiles(*json_histogram_map2_);
-    json_histogram_map2_->newKey("computed_quantiles");
+    json_histogram_map2_->addKey("computed_quantiles");
     json_histogram_array_ = json_histogram_map2_->addArray();
     break;
   case Utility::HistogramBucketsMode::Cumulative:
@@ -238,11 +238,11 @@ void StatsJsonRender::generateHistogramDetail(const std::string& name,
   // representation or serializer.
   Json::Streamer::MapPtr map = json_histogram_array_->addMap();
   map->addEntries({{"name", name}});
-  map->newKey("totals");
+  map->addKey("totals");
   populateBucketsVerbose(histogram.detailedTotalBuckets(), *map);
-  map->newKey("intervals");
+  map->addKey("intervals");
   populateBucketsVerbose(histogram.detailedIntervalBuckets(), *map);
-  map->newKey("percentiles");
+  map->addKey("percentiles");
   populatePercentiles(histogram, *map);
 }
 
@@ -280,7 +280,7 @@ void StatsJsonRender::collectBuckets(const std::string& name,
 
   Json::Streamer::MapPtr map = json_histogram_array_->addMap();
   map->addEntries({{"name", name}});
-  map->newKey("buckets");
+  map->addKey("buckets");
   Json::Streamer::ArrayPtr buckets = map->addArray();
   for (uint32_t i = 0; i < min_size; ++i) {
     Json::Streamer::MapPtr bucket_map = buckets->addMap();

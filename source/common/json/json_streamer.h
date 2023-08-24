@@ -48,18 +48,42 @@ public:
     virtual ~Level();
 
     /**
-     * @return a newly created subordinate map.
+     * This must be called on the top level map or array. It's a programming
+     * error to call this method on a map that's not the top level.
+     * It's also a programming error to call this on map that isn't expecting
+     * a value. You must call Map::addKey prior to calling this.
+     *
+     * @return a newly created subordinate map, which becomes the new top level until destroyed.
      */
     MapPtr addMap();
 
     /**
-     * @return a newly created subordinate array.
+     * This must be called on the top level map or array. It's a programming
+     * error to call this method on a map or array that's not the top level.
+     * It's also a programming error to call this on map that isn't expecting
+     * a value. You must call Map::addKey prior to calling this.
+     *
+     * @return a newly created subordinate array, which becomes the new top level until destroyed.
      */
     ArrayPtr addArray();
 
+    /**
+     * Adds a numeric value to the current array or map. It's a programming
+     * error to call this method on a map or array that's not the top level.
+     * It's also a programming error to call this on map that isn't expecting
+     * a value. You must call Map::addKey prior to calling this.
+     */
     void addNumber(double d);
+
+    /**
+     * Adds a string constant value to the current array or map. The string
+     * will be sanitized per JSON rules.
+     *
+     * It's a programming error to call this method on a map or array that's not
+     * the top level. It's also a programming error to call this on map that
+     * isn't expecting a value. You must call Map::addKey prior to calling this.
+     */
     void addString(absl::string_view str);
-    void addStringNoFlush(absl::string_view str);
 
   protected:
     /**
@@ -79,6 +103,8 @@ public:
      *              the string.
      */
     bool renderValueNoFlush(const Value& value);
+
+    bool addStringNoFlush(absl::string_view str);
 
   private:
     friend Streamer;
@@ -118,17 +144,20 @@ public:
 
     /**
      * Initiates a new map key. This must be followed by rendering a value,
-     * sub-array, or sub-map. It is a programming error to delete a map that
-     * has rendered a key without a matching value.
+     * sub-array, or sub-map. It is a programming error to delete a map that has
+     * rendered a key without a matching value. It's also a programming error to
+     * call this method on a map that's not the current top level.
      *
      * See also addEntries, which directly populates a list of name/value
      * pairs in a single call.
      */
-    void newKey(absl::string_view name);
+    void addKey(absl::string_view key);
 
     /**
      * Populates a list of name/value pairs in a single call. This function
-     * makes it easy to populate structures with scalar values.
+     * makes it easy to populate structures with scalar values. It's a
+     * programming error to call this method on a map that's not the current top
+     * level.
      */
     void addEntries(const Entries& entries);
 
@@ -149,19 +178,20 @@ public:
     using Entries = absl::Span<const Value>;
 
     /**
-     * Renders an array of entry strings as strings. The strings
-     * are rendered directly; quotes are not added by this function.
-     * So if you want a JSON string you must add quotes yourself
-     * prior to calling this.
+     * Adds values to an array. The values may be numeric or strings; strings
+     * will be escaped if needed. It's a programming error to call this method
+     * on an array that's not the current top level.
      *
-     * @param entries the array of string entries.
+     * @param entries the array of numeric or string values.
      */
     void addEntries(const Entries& entries);
   };
 
   /**
-   * Unwinds the stack of levels, properlying closing all of them
-   * using the appropriate delimiters.
+   * Unwinds the stack of levels, properlying closing all of them using the
+   * appropriate delimiters. A limited amount of buffering in the Streamer class
+   * may occur for performance, and you must call clear() before the response
+   * buffer can be considered complete.
    */
   void clear();
 
@@ -169,6 +199,9 @@ public:
    * Makes a root map for the streamer. A similar function can be added
    * easily if this class is to be used for a JSON structure with a
    * top-level array.
+   *
+   * You must create a root map before any of the JSON population functions
+   * can be called, as those are only available on Map and Array objects.
    */
   MapPtr makeRootMap();
 
@@ -191,10 +224,9 @@ private:
    * Takes a raw string, sanitizes it using JSON syntax, adds quotes,
    * and streams it out.
    *
-   * After calling this, and before returning control to the streamer's client,
-   * Streamer::flush() must be called.
+   * @return true if a flush is needed prior to returning control to user.
    */
-  void addSanitized(absl::string_view token, absl::string_view suffix = "\"");
+  bool addSanitized(absl::string_view token, absl::string_view suffix = "\"");
 
   /**
    * Serializes a number.
@@ -207,8 +239,8 @@ private:
   void flush();
 
   /**
-   * After calling this, and before returning control to the streamer's client,
-   * Streamer::flush() must be called.
+   * Adds a constant string to the output stream. The string must outlive the
+   * Streamer object, and is intended for literal strings such as punctuation.
    */
   void addConstantString(absl::string_view str) { fragments_.push_back(str); }
 
@@ -225,10 +257,34 @@ private:
 #endif
 
   Buffer::Instance& response_;
+
+  // When data is added to a Buffer::Instance, some byte allocation, buffer
+  // sizing, and string moving must occur, as well as checking for high-water
+  // marks. A limited amount of simple buffering is done in the Streamer class
+  // to reduce the overhead in the Buffer class.
+  //
+  // The strategy here is to keep up to 10 string buffers and an array of
+  // fragments. The fragments may point to the string buffers, to punctuation
+  // defined in this class from these chars: []{},:\". During a single public
+  // operation we may rely on a string_view passed into the API. However,
+  // references to API-provided strings must be flushed to response_ prior to
+  // returning from a public call.
+  //
+  // So the flush() is used to clear out the pending fragments before returning
+  // control from an API that received a user-defined string, and is also called
+  // when 10 buffers are consumed. One way to consume 10 buffers is to serialize
+  // an array of 10 numbers, which all most be converted to strings.
   std::vector<absl::string_view> fragments_;
   static constexpr uint32_t NumBuffers = 10;
   std::string buffers_[NumBuffers];
   uint32_t buffers_index_{0};
+
+  // Keeps a stack of Maps or Arrays (subclasses of Level). This stack serves
+  // two functions:
+  //   1. facilitates assertions that only the top-level map/array can be
+  //      written.
+  //   2. enables clear() to fully unwind the stack of maps and // arrays,
+  //      properly closing them using JSON syntax.
   std::stack<Level*> levels_;
 };
 

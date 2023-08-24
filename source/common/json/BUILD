@@ -54,6 +54,5 @@ envoy_cc_library(
         ":json_sanitizer_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:thread_lib",
     ],
 )
