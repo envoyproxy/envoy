@@ -22,6 +22,7 @@
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -1138,6 +1139,21 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
+    filter_chain_info->filter_chain_name_ = "mock_filter_chain_name";
+
+    stream_info.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
+
+    StreamInfoFormatter upstream_format("FILTER_CHAIN_NAME");
+
+    EXPECT_EQ("mock_filter_chain_name",
+              upstream_format.format(request_headers, response_headers, response_trailers,
+                                     stream_info, body, AccessLog::AccessLogType::NotSet));
+  }
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;

@@ -309,11 +309,6 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
-  void setFilterChainName(absl::string_view filter_chain_name) override {
-    filter_chain_name_ = std::string(filter_chain_name);
-  }
-
-  const std::string& filterChainName() const override { return filter_chain_name_; }
   void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
@@ -386,7 +381,6 @@ struct StreamInfoImpl : public StreamInfo {
       stream_id_provider_ = std::make_shared<StreamIdProviderImpl>(std::move(id));
     }
     trace_reason_ = info.traceReason();
-    filter_chain_name_ = info.filterChainName();
     attempt_count_ = info.attemptCount();
     upstream_bytes_meter_ = info.getUpstreamBytesMeter();
     bytes_sent_ = info.bytesSent();
@@ -457,7 +451,6 @@ private:
   StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
-  std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};

@@ -58,6 +58,7 @@ envoy_cc_test(
         "//source/common/stream_info:stream_id_provider_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_info_mocks",

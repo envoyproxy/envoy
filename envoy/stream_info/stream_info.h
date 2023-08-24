@@ -842,16 +842,6 @@ public:
   virtual Tracing::Reason traceReason() const PURE;
 
   /**
-   * @param filter_chain_name Network filter chain name of the downstream connection.
-   */
-  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
-
-  /**
-   * @return Network filter chain name of the downstream connection.
-   */
-  virtual const std::string& filterChainName() const PURE;
-
-  /**
    * @param attempt_count, the number of times the request was attempted upstream.
    */
   virtual void setAttemptCount(uint32_t attempt_count) PURE;

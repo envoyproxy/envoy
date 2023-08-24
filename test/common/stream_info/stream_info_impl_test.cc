@@ -302,7 +302,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setStreamIdProvider(
       std::make_shared<StreamIdProviderImpl>("a121e9e1-feae-4136-9e0e-6fac343d56c9"));
   s1.setTraceReason(Tracing::Reason::ClientForced);
-  s1.setFilterChainName("foobar");
   s1.setAttemptCount(5);
   s1.setDownstreamTransportFailureReason("error");
   s1.addBytesSent(1);
@@ -358,7 +357,6 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.getStreamIdProvider().value().get().toStringView().value(),
             s2.getStreamIdProvider().value().get().toStringView().value());
   EXPECT_EQ(s1.traceReason(), s2.traceReason());
-  EXPECT_EQ(s1.filterChainName(), s2.filterChainName());
   EXPECT_EQ(s1.attemptCount(), s2.attemptCount());
   EXPECT_EQ(s1.getUpstreamBytesMeter(), s2.getUpstreamBytesMeter());
   EXPECT_EQ(s1.bytesSent(), s2.bytesSent());
