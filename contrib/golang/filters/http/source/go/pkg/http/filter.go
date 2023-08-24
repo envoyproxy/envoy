@@ -276,6 +276,10 @@ func (m *counterMetric) Get() uint64 {
 	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
 }
 
+func (m *counterMetric) Record(value uint64) {
+	cAPI.HttpRecordMetric(unsafe.Pointer(m.config), m.metricId, value)
+}
+
 type gaugeMetric struct {
 	config   *httpConfig
 	metricId uint32
@@ -287,4 +291,8 @@ func (m *gaugeMetric) Increment(offset int64) {
 
 func (m *gaugeMetric) Get() uint64 {
 	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
+}
+
+func (m *gaugeMetric) Record(value uint64) {
+	cAPI.HttpRecordMetric(unsafe.Pointer(m.config), m.metricId, value)
 }

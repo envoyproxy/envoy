@@ -77,6 +77,7 @@ public:
   CAPIStatus defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id);
   CAPIStatus incrementMetric(uint32_t metric_id, int64_t offset);
   CAPIStatus getMetric(uint32_t metric_id, uint64_t* value);
+  CAPIStatus recordMetric(uint32_t metric_id, uint64_t value);
 
 private:
   const std::string plugin_name_;

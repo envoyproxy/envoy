@@ -345,3 +345,9 @@ func (c *httpCApiImpl) HttpGetMetric(cc unsafe.Pointer, metricId uint32) uint64 
 	handleCApiStatus(res)
 	return value
 }
+
+func (c *httpCApiImpl) HttpRecordMetric(cc unsafe.Pointer, metricId uint32, value uint64) {
+	cfg := (*httpConfig)(cc)
+	res := C.envoyGoFilterHttpRecordMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.uint64_t(value))
+	handleCApiStatus(res)
+}

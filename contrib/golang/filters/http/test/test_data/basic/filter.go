@@ -162,9 +162,17 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	value := f.config.counter.Get()
 	header.Add("go-metric-counter-test-header-key", strconv.FormatUint(value, 10))
 
+	f.config.counter.Record(1)
+	value = f.config.counter.Get()
+	header.Add("go-metric-counter-record-test-header-key", strconv.FormatUint(value, 10))
+
 	f.config.gauge.Increment(3)
 	value = f.config.gauge.Get()
 	header.Add("go-metric-gauge-test-header-key", strconv.FormatUint(value, 10))
+
+	f.config.gauge.Record(1)
+	value = f.config.gauge.Get()
+	header.Add("go-metric-gauge-record-test-header-key", strconv.FormatUint(value, 10))
 
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")

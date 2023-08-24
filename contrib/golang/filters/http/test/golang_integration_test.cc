@@ -264,6 +264,12 @@ typed_config:
 
     EXPECT_EQ("3", getHeader(upstream_request_->headers(), "go-metric-gauge-test-header-key"));
 
+    EXPECT_EQ("3",
+              getHeader(upstream_request_->headers(), "go-metric-counter-record-test-header-key"));
+
+    EXPECT_EQ("1",
+              getHeader(upstream_request_->headers(), "go-metric-gauge-record-test-header-key"));
+
     // original header: x-test-header-0
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-test-header-0"));
 

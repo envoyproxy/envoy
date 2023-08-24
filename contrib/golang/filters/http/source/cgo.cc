@@ -294,6 +294,13 @@ CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value) 
       });
 }
 
+CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        return filter_config->recordMetric(metric_id, value);
+      });
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -87,6 +87,7 @@ CAPIStatus envoyGoFilterHttpDefineMetric(void* r, uint32_t metric_type, void* na
                                          void* metric_id);
 CAPIStatus envoyGoFilterHttpIncrementMetric(void* r, uint32_t metric_id, int64_t offset);
 CAPIStatus envoyGoFilterHttpGetMetric(void* r, uint32_t metric_id, void* value);
+CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value);
 
 // downstream
 CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int closeType);
