@@ -12,10 +12,11 @@ namespace Formatter {
 
 FormatterPtr
 SubstitutionFormatStringUtils::createJsonFormatter(const ProtobufWkt::Struct& struct_format,
-                                                   bool preserve_types, bool omit_empty_values) {
+                                                   bool preserve_types, bool omit_empty_values,
+                                                   bool sort_properties) {
   std::vector<CommandParserPtr> commands;
   return std::make_unique<JsonFormatterImpl>(struct_format, preserve_types, omit_empty_values,
-                                             commands);
+                                             sort_properties, commands);
 }
 
 FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
@@ -42,8 +43,10 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     return std::make_unique<FormatterImpl>(config.text_format(), config.omit_empty_values(),
                                            commands);
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat:
-    return std::make_unique<JsonFormatterImpl>(config.json_format(), true,
-                                               config.omit_empty_values(), commands);
+    return std::make_unique<JsonFormatterImpl>(
+        config.json_format(), true, config.omit_empty_values(),
+        config.has_json_format_options() ? config.json_format_options().sort_properties() : false,
+        commands);
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
     return std::make_unique<FormatterImpl>(
         Config::DataSource::read(config.text_format_source(), true, context.api()), false,

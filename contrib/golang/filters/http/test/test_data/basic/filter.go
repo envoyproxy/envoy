@@ -33,6 +33,7 @@ type filter struct {
 	databuffer  string // return api.Stop
 	panic       string // hit panic in which phase
 	badapi      bool   // bad api call
+	config      *config
 }
 
 func parseQuery(path string) url.Values {
@@ -156,6 +157,14 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 
 	val := fs.GetString("go_state_test_key")
 	header.Add("go-state-test-header-key", val)
+
+	f.config.counter.Increment(2)
+	value := f.config.counter.Get()
+	header.Add("go-metric-counter-test-header-key", strconv.FormatUint(value, 10))
+
+	f.config.gauge.Increment(3)
+	value = f.config.gauge.Get()
+	header.Add("go-metric-gauge-test-header-key", strconv.FormatUint(value, 10))
 
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
