@@ -147,10 +147,10 @@ public:
 
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::CommonFactoryContext& context) override {
+                               Server::Configuration::UpstreamFactoryContext& context) override {
     const auto& config = MessageUtil::downcastAndValidate<
         const test::integration::filters::TestDrainerUpstreamNetworkFilterConfig&>(
-        proto_config, context.messageValidationVisitor());
+        proto_config, context.getServerFactoryContext().messageValidationVisitor());
     return [config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addWriteFilter(std::make_shared<TestDrainerUpstreamNetworkFilter>(config));
     };

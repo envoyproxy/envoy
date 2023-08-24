@@ -29,14 +29,6 @@ public:
     skip_tag_extraction_rule_check_ = true;
   }
 
-  void addFilterChain() {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      listener->set_stat_prefix("listener_stat");
-      listener->add_filter_chains();
-    });
-  }
-
   void addStaticFilter(const std::string& name, uint32_t bytes_to_drain) {
     config_helper_.addConfigModifier(
         [name, bytes_to_drain](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -84,7 +76,7 @@ public:
     // Add a tcp_proxy network filter.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter_chain = listener->mutable_filter_chains(0);
+      auto* filter_chain = listener->add_filter_chains();
       auto* filter = filter_chain->add_filters();
       filter->set_name("envoy.filters.network.tcp_proxy");
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
@@ -103,7 +95,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, StaticUpstreamNetworkFilterIntegr
                          TestUtility::ipTestParamsToString);
 
 TEST_P(StaticUpstreamNetworkFilterIntegrationTest, BasicSuccess) {
-  addFilterChain();
   addStaticFilter(filter_name_, 5);
   initialize();
 
@@ -111,7 +102,6 @@ TEST_P(StaticUpstreamNetworkFilterIntegrationTest, BasicSuccess) {
 }
 
 TEST_P(StaticUpstreamNetworkFilterIntegrationTest, TwoStaticFilters) {
-  addFilterChain();
   addStaticFilter(filter_name_, 5);
   addStaticFilter(filter_name_, 3);
   initialize();
@@ -188,7 +178,7 @@ public:
     // Add a tcp_proxy network filter.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter_chain = listener->mutable_filter_chains(0);
+      auto* filter_chain = listener->add_filter_chains();
       auto* filter = filter_chain->add_filters();
       filter->set_name("envoy.filters.network.tcp_proxy");
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
@@ -229,6 +219,8 @@ public:
     });
 
     BaseIntegrationTest::initialize();
+    test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+    EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
     registerTestServerPorts({port_name_});
   }
 
@@ -376,13 +368,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, UpstreamNetworkExtensionDiscovery
 
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false);
+  addDynamicFilter(filter_name_, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   // Send 1st config update to have filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
@@ -399,13 +386,8 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccess) {
 
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false, false);
+  addDynamicFilter(filter_name_, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   // Send 1st config update with TTL 1s, and have network filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5, true);
@@ -418,7 +400,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   // The upstream network filter will be skipped.
   test_server_->waitForCounterGe(
       "extension_config_discovery.upstream_network_filter." + filter_name_ + ".config_reload", 2);
-  sendDataVerifyResults(0);
+  sendDataVerifyResults(2);
 
   // Reinstate the configuration.
   sendXdsResponse(filter_name_, "1", 3);
@@ -427,38 +409,10 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   sendDataVerifyResults(3);
 }
 
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
+TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicWithConfigFail) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false);
+  addDynamicFilter(filter_name_, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
-
-  // Send 1st config update with TTL 1s, and have network filter drain 5 bytes of data.
-  sendXdsResponse(filter_name_, "1", 5, true);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.upstream_network_filter." + filter_name_ + ".config_reload", 1);
-  sendDataVerifyResults(5);
-
-  // Wait for configuration expired. The default filter will be installed.
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.upstream_network_filter." + filter_name_ + ".config_reload", 2);
-  // Start a TCP connection. The default filter drains 2 bytes.
-  sendDataVerifyResults(2);
-}
-
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
-  on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false, true);
-  initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   // Send config update with invalid config (bytes_to_drain needs to be >=2).
   sendXdsResponse(filter_name_, "1", 1);
@@ -468,74 +422,11 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   sendDataVerifyResults(2);
 }
 
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
-  on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false, false);
-  initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
-
-  // Send config update with invalid config (drain_bytes has to >=2).
-  sendXdsResponse(filter_name_, "1", 1);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.upstream_network_filter." + filter_name_ + ".config_fail", 1);
-
-  // If there is no valid configuration for the upstream network filter, the filter is skipped.
-  // Therefore it's expected that no bytes will be drained in this case.
-  sendDataVerifyResults(0);
-}
-
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
-  on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, true);
-  initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  registerTestServerPorts({port_name_});
-
-  // Send data without send config update, the default config will be applied.
-  sendDataVerifyResults(default_bytes_to_drain_);
-
-  // Send update should cause a different response.
-  sendXdsResponse(filter_name_, "1", 3);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.upstream_network_filter." + filter_name_ + ".config_reload", 1);
-  sendDataVerifyResults(3);
-}
-
-TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicWithoutWarmingConfigFail) {
-  on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, true);
-  initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  registerTestServerPorts({port_name_});
-
-  // Send data without send config update, the default config will be applied.
-  sendDataVerifyResults(default_bytes_to_drain_);
-
-  // Send config update with invalid config (drain_bytes has to >=2).
-  sendXdsResponse(filter_name_, "1", 1);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.upstream_network_filter." + filter_name_ + ".config_fail", 1);
-  sendDataVerifyResults(default_bytes_to_drain_);
-}
-
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
   addDynamicFilter(filter_name_, true);
-  addDynamicFilter(filter_name_, false);
+  addDynamicFilter(filter_name_, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   sendXdsResponse(filter_name_, "1", 3);
   test_server_->waitForCounterGe(
@@ -548,14 +439,9 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameNam
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName) {
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
   addDynamicFilter("foo", true);
-  addDynamicFilter("bar", false, true, false, true);
+  addDynamicFilter("bar", true, true, false, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   // Send 1st config update.
   sendXdsResponse("foo", "1", 3);
@@ -581,16 +467,11 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsDiffere
 // Testing it works with mixed static/dynamic network filter configuration.
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false);
+  addDynamicFilter(filter_name_, true);
   addStaticFilter("bar", 2);
   addDynamicFilter(filter_name_, true);
   addStaticFilter("foobar", 2);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   sendXdsResponse(filter_name_, "1", 3);
   test_server_->waitForCounterGe(
@@ -601,16 +482,11 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilt
 
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedDifferentOrder) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
   addStaticFilter("bar", 2);
   addStaticFilter("baz", 2);
   addDynamicFilter(filter_name_, true);
-  addDynamicFilter(filter_name_, false);
+  addDynamicFilter(filter_name_, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   sendXdsResponse(filter_name_, "1", 2);
   test_server_->waitForCounterGe(
@@ -623,13 +499,8 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixe
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false);
+  addDynamicFilter(filter_name_, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   // Send 1st config update to have network filter drain 5 bytes of data.
   sendXdsResponse(filter_name_, "1", 5);
@@ -668,13 +539,8 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigD
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRemovedByTtl) {
   DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false, false);
+  addDynamicFilter(filter_name_, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   // Send config update with TTL 1s.
   sendXdsResponse(filter_name_, "1", 5, true);
@@ -705,14 +571,9 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
   addDynamicFilter("foo", true);
-  addDynamicFilter("bar", false, true, false, true);
+  addDynamicFilter("bar", true, true, false, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
@@ -757,14 +618,9 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
   addDynamicFilter("foo", true);
-  addDynamicFilter("bar", false, true, false, true);
+  addDynamicFilter("bar", true, true, false, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
@@ -793,13 +649,8 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
 TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
        ConfigUpdateDoesNotApplyToExistingConnection) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addFilterChain();
-  addDynamicFilter(filter_name_, false);
+  addDynamicFilter(filter_name_, true);
   initialize();
-
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({port_name_});
 
   // Send config update to have filter drain 5 bytes of data.
   uint32_t bytes_to_drain = 5;

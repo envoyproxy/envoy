@@ -73,7 +73,7 @@ namespace Upstream {
 
 using UpstreamNetworkFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
-                                        Server::Configuration::CommonFactoryContext>;
+                                        Server::Configuration::UpstreamFactoryContext>;
 
 /**
  * An implementation of UpstreamLocalAddressSelector.
@@ -1055,7 +1055,8 @@ protected:
 
 private:
   std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
-  createSingletonUpstreamNetworkFilterConfigProviderManager(Server::Configuration::ServerFactoryContext& context);
+  createSingletonUpstreamNetworkFilterConfigProviderManager(
+      Server::Configuration::ServerFactoryContext& context);
 
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
@@ -1119,13 +1120,14 @@ private:
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
       common_lb_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
-  // TODO(ohadvano): http_filter_config_provider_manager_ should be maintained in the ClusterManager
-  // object as a singleton. This is currently not possible due to circular dependency (filter config
-  // provider manager depends on the ClusterManager object).
-  // The circular dependency can be resolved when the following issue is resolved:
-  // https://github.com/envoyproxy/envoy/issues/26653.
+  // TODO(ohadvano): http_filter_config_provider_manager_ and
+  // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as a
+  // singleton. This is currently not possible due to circular dependency (filter config provider
+  // manager depends on the ClusterManager object). The circular dependency can be resolved when the
+  // following issue is resolved: https://github.com/envoyproxy/envoy/issues/26653.
   std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
-  std::shared_ptr<UpstreamNetworkFilterConfigProviderManager> network_filter_config_provider_manager_;
+  std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+      network_filter_config_provider_manager_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   Filter::NetworkFilterFactoriesList filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
