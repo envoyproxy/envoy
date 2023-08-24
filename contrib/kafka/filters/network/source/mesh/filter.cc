@@ -48,8 +48,8 @@ Network::FilterStatus KafkaMeshFilter::onData(Buffer::Instance& data, bool) {
 }
 
 void KafkaMeshFilter::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::LocalClose ||
-      event == Network::ConnectionEvent::RemoteClose) {
+  if (Network::ConnectionEvent::RemoteClose == event ||
+      Network::ConnectionEvent::LocalClose == event) {
     // Connection is being closed but there might be some requests in flight, abandon them.
     abandonAllInFlightRequests();
   }

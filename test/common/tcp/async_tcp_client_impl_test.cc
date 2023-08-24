@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -41,6 +42,7 @@ public:
     EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, addReadFilter(_));
+    EXPECT_CALL(*connection_, enableTcpRstDetectAndSend(_));
     if (trigger_connected) {
       EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::Connected));
     }
@@ -80,7 +82,10 @@ TEST_F(AsyncTcpClientImplTest, RstClose) {
   setUpClient(true);
   expectCreateConnection();
 
-  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalReset));
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::LocalReset);
+      }));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   client_->close(Network::ConnectionCloseType::AbortReset);
   ASSERT_FALSE(client_->connected());
@@ -127,7 +132,10 @@ TEST_F(AsyncTcpClientImplTest, TestReadDisable) {
 TEST_F(AsyncTcpClientImplTest, TestCloseType) {
   setUpClient();
   expectCreateConnection();
-  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
+      }));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   client_->close(Network::ConnectionCloseType::Abort);

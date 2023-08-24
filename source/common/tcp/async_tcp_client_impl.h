@@ -36,7 +36,6 @@ public:
     if (connection_) {
       return connection_->detectedCloseType();
     }
-    ENVOY_LOG_MISC(debug, "Boteng: No Connection Object");
     return Network::DetectedCloseType::Normal;
   }
 

@@ -89,6 +89,9 @@ template <class T> static void initializeMockConnection(T& connection) {
         }
         connection.raiseEvent(Network::ConnectionEvent::LocalClose);
       }));
+  ON_CALL(connection, detectedCloseType()).WillByDefault(Invoke([&connection]() {
+    return connection.detected_close_type_;
+  }));
   ON_CALL(connection, close(_, _))
       .WillByDefault(Invoke([&connection](ConnectionCloseType, absl::string_view details) -> void {
         connection.local_close_reason_ = std::string(details);

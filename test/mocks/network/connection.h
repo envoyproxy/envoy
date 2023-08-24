@@ -44,7 +44,7 @@ public:
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::string local_close_reason_{"unset_local_close_reason"};
   Connection::State state_{Connection::State::Open};
-  DetectedCloseType detected_close_type_;
+  DetectedCloseType detected_close_type_{DetectedCloseType::Normal};
 };
 
 #define DEFINE_MOCK_CONNECTION_MOCK_METHODS                                                        \

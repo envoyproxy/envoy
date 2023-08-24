@@ -211,6 +211,7 @@ TEST_P(TcpAsyncClientIntegrationTest, TestDownstremHalfClosedThenRST) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
+
   // As a basic half close process, the connection is already half closed in Envoy before.
   // The normal close in Envoy will not trigger the remote close event for the upstream connection.
   // This is the same behavior as the normal half close process without detection of RST.
