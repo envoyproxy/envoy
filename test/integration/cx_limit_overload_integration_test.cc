@@ -123,8 +123,7 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOve
   // Third connection should fail because we have hit the configured limit in overload manager.
   tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
   FakeRawConnectionPtr conn1;
-  ASSERT_FALSE(
-      fake_upstreams_[0]->waitForRawConnection(conn1, std::chrono::milliseconds(500)));
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(conn1, std::chrono::milliseconds(500)));
   tcp_clients.back()->waitForDisconnect();
   test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 1);
   for (auto& tcp_client : tcp_clients) {
@@ -170,8 +169,7 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInO
   // Third connection should fail because we have hit the configured limit per listener.
   tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
   FakeRawConnectionPtr conn1;
-  ASSERT_FALSE(
-      fake_upstreams_[0]->waitForRawConnection(conn1, std::chrono::milliseconds(500)));
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(conn1, std::chrono::milliseconds(500)));
   tcp_clients.back()->waitForDisconnect();
   test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_overflow", 1);
   test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_global_cx_overflow", 0);

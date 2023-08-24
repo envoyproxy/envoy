@@ -148,7 +148,7 @@ TEST_P(ConnectionLimitIntegrationTest, TestDeprecationWarningForGlobalCxRuntimeL
   EXPECT_LOG_CONTAINS("warn", log_line, { init_func(); });
 }
 
-// todo (nezdolik) move this test to overload manager test suite, once runtime key is fully
+// TODO (nezdolik) move this test to overload manager test suite, once runtime key is fully
 // deprecated.
 TEST_P(ConnectionLimitIntegrationTest, TestEmptyGlobalCxRuntimeLimit) {
   const std::string log_line =
