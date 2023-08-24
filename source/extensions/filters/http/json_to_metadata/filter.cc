@@ -92,10 +92,10 @@ FilterConfig::FilterConfig(
       response_allow_content_types_(generateResponseAllowContentTypes(proto_config)),
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()),
       response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()) {
-      if (request_rules_.empty() && response_rules_.empty()) {
-        throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
+  if (request_rules_.empty() && response_rules_.empty()) {
+    throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
                          "either request or response rules");
-      }
+  }
 }
 
 Rules FilterConfig::generateRequestRules(

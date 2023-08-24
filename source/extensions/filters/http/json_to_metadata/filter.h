@@ -28,9 +28,9 @@ namespace JsonToMetadata {
   COUNTER(rq_mismatched_content_type)                                                              \
   COUNTER(rq_no_body)                                                                              \
   COUNTER(rq_invalid_json_body)                                                                    \
-  COUNTER(resp_success)                                                                             \
-  COUNTER(resp_mismatched_content_type)                                                             \
-  COUNTER(resp_no_body)                                                                             \
+  COUNTER(resp_success)                                                                            \
+  COUNTER(resp_mismatched_content_type)                                                            \
+  COUNTER(resp_no_body)                                                                            \
   COUNTER(resp_invalid_json_body)
 
 /**
