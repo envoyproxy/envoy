@@ -92,6 +92,10 @@ FilterConfig::FilterConfig(
       response_allow_content_types_(generateResponseAllowContentTypes(proto_config)),
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()),
       response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()) {
+      if (request_rules_.empty() && response_rules_.empty()) {
+        throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
+                         "either request or response rules");
+      }
 }
 
 Rules FilterConfig::generateRequestRules(
@@ -386,13 +390,12 @@ void Filter::processRequestBody() {
 
 void Filter::processResponseBody() {
   processBody(encoder_callbacks_->encodingBuffer(), config_->responseRules(),
-              response_processing_finished_, config_->stats().rsp_success_,
-              config_->stats().rsp_no_body_, config_->stats().rsp_invalid_json_body_,
+              response_processing_finished_, config_->stats().resp_success_,
+              config_->stats().resp_no_body_, config_->stats().resp_invalid_json_body_,
               *encoder_callbacks_);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  ASSERT(config_->doRequest() || config_->doResponse());
   if (!config_->doRequest()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -411,27 +414,25 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
-  ASSERT(config_->doRequest() || config_->doResponse());
   if (!config_->doResponse()) {
     return Http::FilterHeadersStatus::Continue;
   }
   if (!config_->responseContentTypeAllowed(headers.getContentTypeValue())) {
     response_processing_finished_ = true;
-    config_->stats().rsp_mismatched_content_type_.inc();
+    config_->stats().resp_mismatched_content_type_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (end_stream) {
     handleAllOnMissing(config_->responseRules(), response_processing_finished_,
                        *encoder_callbacks_);
-    config_->stats().rsp_no_body_.inc();
+    config_->stats().resp_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
   return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(config_->doRequest() || config_->doResponse());
   if (!config_->doRequest()) {
     return Http::FilterDataStatus::Continue;
   }
@@ -457,7 +458,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(config_->doRequest() || config_->doResponse());
   if (!config_->doResponse()) {
     return Http::FilterDataStatus::Continue;
   }
@@ -472,7 +472,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
         encoder_callbacks_->encodingBuffer()->length() == 0) {
       handleAllOnMissing(config_->responseRules(), response_processing_finished_,
                          *encoder_callbacks_);
-      config_->stats().rsp_no_body_.inc();
+      config_->stats().resp_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
     processResponseBody();
@@ -483,7 +483,6 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
-  ASSERT(config_->doRequest() || config_->doResponse());
   if (!config_->doRequest()) {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -494,7 +493,6 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
-  ASSERT(config_->doRequest() || config_->doResponse());
   if (!config_->doResponse()) {
     return Http::FilterTrailersStatus::Continue;
   }
