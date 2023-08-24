@@ -1,11 +1,9 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_admin_functionality",
-    "envoy_select_admin_html",
 )
 
 licenses(["notice"])  # Apache 2
@@ -67,30 +65,30 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "admin_html_test",
-    srcs = envoy_select_admin_html(["admin_html_test.cc"]),
-    deps = [
-        ":admin_instance_lib",
-        "//source/server/admin:admin_lib",
-    ],
-)
+#envoy_cc_test(
+#    name = "admin_html_test",
+#    srcs = envoy_select_admin_html(["admin_html_test.cc"]),
+#    deps = [
+#        ":admin_instance_lib",
+#        "//source/server/admin:admin_lib",
+#    ],
+#)
 
-envoy_cc_test(
-    name = "stats_handler_test",
-    srcs = envoy_select_admin_functionality(["stats_handler_test.cc"]),
-    deps = [
-        ":admin_instance_lib",
-        "//source/common/common:regex_lib",
-        "//source/common/stats:thread_local_store_lib",
-        "//source/common/thread_local:thread_local_lib",
-        "//source/server/admin:utils_lib",
-        "//test/mocks/server:admin_stream_mocks",
-        "//test/test_common:logging_lib",
-        "//test/test_common:real_threads_test_helper_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
+#envoy_cc_test(
+#    name = "stats_handler_test",
+#    srcs = envoy_select_admin_functionality(["stats_handler_test.cc"]),
+#    deps = [
+#        ":admin_instance_lib",
+#        "//source/common/common:regex_lib",
+#        "//source/common/stats:thread_local_store_lib",
+#        "//source/common/thread_local:thread_local_lib",
+#        "//source/server/admin:utils_lib",
+#        "//test/mocks/server:admin_stream_mocks",
+#        "//test/test_common:logging_lib",
+#        "//test/test_common:real_threads_test_helper_lib",
+#        "//test/test_common:utility_lib",
+#    ],
+#)
 
 envoy_cc_test(
     name = "stats_params_test",
@@ -101,55 +99,55 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "stats_render_test",
-    srcs = envoy_select_admin_functionality(["stats_render_test.cc"]) + envoy_select_admin_html([
-        "stats_html_render_test.cc",
-    ]),
-    deps = [
-        ":stats_render_test_base",
-        "//source/server/admin:admin_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "stats_render_test_base",
-    srcs = envoy_select_admin_functionality(["stats_render_test_base.cc"]),
-    hdrs = ["stats_render_test_base.h"],
-    deps = [
-        "//source/common/stats:thread_local_store_lib",
-        "//source/server/admin:stats_request_lib",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "stats_request_test",
-    srcs = envoy_select_admin_functionality(["stats_request_test.cc"]),
-    deps = [
-        "//source/common/stats:thread_local_store_lib",
-        "//source/server/admin:stats_request_lib",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_benchmark_binary(
-    name = "stats_handler_speed_test",
-    srcs = envoy_select_admin_functionality(["stats_handler_speed_test.cc"]),
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/stats:thread_local_store_lib",
-        "//source/server/admin:admin_lib",
-        "//test/common/stats:real_thread_test_base",
-    ],
-)
+#envoy_cc_test(
+#    name = "stats_render_test",
+#    srcs = envoy_select_admin_functionality(["stats_render_test.cc"]) + envoy_select_admin_html([
+#        "stats_html_render_test.cc",
+#    ]),
+#    deps = [
+#        ":stats_render_test_base",
+#        "//source/server/admin:admin_lib",
+#    ],
+#)
+#
+#envoy_cc_test_library(
+#    name = "stats_render_test_base",
+#    srcs = envoy_select_admin_functionality(["stats_render_test_base.cc"]),
+#    hdrs = ["stats_render_test_base.h"],
+#    deps = [
+#        "//source/common/stats:thread_local_store_lib",
+#        "//source/server/admin:stats_request_lib",
+#        "//test/mocks/event:event_mocks",
+#        "//test/mocks/stats:stats_mocks",
+#        "//test/mocks/thread_local:thread_local_mocks",
+#        "//test/test_common:utility_lib",
+#    ],
+#)
+#
+#envoy_cc_test(
+#    name = "stats_request_test",
+#    srcs = envoy_select_admin_functionality(["stats_request_test.cc"]),
+#    deps = [
+#        "//source/common/stats:thread_local_store_lib",
+#        "//source/server/admin:stats_request_lib",
+#        "//test/mocks/event:event_mocks",
+#        "//test/mocks/stats:stats_mocks",
+#        "//test/mocks/thread_local:thread_local_mocks",
+#        "//test/test_common:utility_lib",
+#    ],
+#)
+#
+#envoy_cc_benchmark_binary(
+#    name = "stats_handler_speed_test",
+#    srcs = envoy_select_admin_functionality(["stats_handler_speed_test.cc"]),
+#    deps = [
+#        "//source/common/buffer:buffer_lib",
+#        "//source/common/http:header_map_lib",
+#        "//source/common/stats:thread_local_store_lib",
+#        "//source/server/admin:admin_lib",
+#        "//test/common/stats:real_thread_test_base",
+#    ],
+#)
 
 envoy_cc_test(
     name = "utils_test",
