@@ -1245,10 +1245,11 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return std::make_unique<StreamInfoStringFormatterProvider>(
                   [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                    if (auto filter_chain_info =
-                            stream_info.downstreamAddressProvider().filterChainInfo();
-                        filter_chain_info.has_value()) {
-                      return std::string(filter_chain_info->name());
+                    if (const auto info = stream_info.downstreamAddressProvider().filterChainInfo();
+                        info.has_value()) {
+                      if (!info->name().empty()) {
+                        return std::string(info->name());
+                      }
                     }
                     return absl::nullopt;
                   });
