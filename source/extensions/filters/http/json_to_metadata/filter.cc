@@ -365,7 +365,8 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     if (on_missing) {
       continue;
     }
-    absl::Status result = handleOnPresent(std::move(node), keys.back(), rule, struct_map, filter_callback);
+    absl::Status result =
+        handleOnPresent(std::move(node), keys.back(), rule, struct_map, filter_callback);
     if (!result.ok()) {
       ENVOY_LOG(warn, fmt::format("{} key: {}", result.message(), keys.back()));
       handleOnMissing(rule, struct_map, filter_callback);
