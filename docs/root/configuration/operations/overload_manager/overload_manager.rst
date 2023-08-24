@@ -214,7 +214,7 @@ Limiting Active Connections
 ---------------------------
 
 To limit the total number of active downstream connections allowed across all
-listeners configure :ref:`downstream connections monitor <envoy_v3_api_msg_config.resource_monitor.downstream_connections.v3.DownstreamConnectionsConfig>` in Overload Manager:
+listeners configure :ref:`downstream connections monitor <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` in Overload Manager:
 
 .. code-block:: yaml
 
