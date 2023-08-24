@@ -531,6 +531,27 @@ protected:
   const double slow_start_min_weight_percent_;
 };
 
+class TypedRoundRobinLbConfig : public LoadBalancerConfig {
+public:
+  TypedRoundRobinLbConfig(
+      const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin& config);
+
+  const absl::optional<envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig>&
+  slowStartConfig() const {
+    return slow_start_config_;
+  }
+  const absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>&
+  localityLbConfig() const {
+    return locality_lb_config_;
+  }
+
+private:
+  absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
+      locality_lb_config_;
+  absl::optional<envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig>
+      slow_start_config_;
+};
+
 /**
  * A round robin load balancer. When in weighted mode, EDF scheduling is used. When in not
  * weighted mode, simple RR index selection is used.
@@ -555,16 +576,16 @@ public:
     initialize();
   }
 
-  RoundRobinLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-      const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin&
-          round_robin_config,
-      TimeSource& time_source)
+  RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                         ClusterLbStats& stats, Runtime::Loader& runtime,
+                         Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+                         OptRef<const TypedRoundRobinLbConfig> round_robin_config,
+                         TimeSource& time_source)
       : EdfLoadBalancerBase(
             priority_set, local_priority_set, stats, runtime, random, healthy_panic_threshold,
-            LoadBalancerConfigHelper::localityLbConfigFromProto(round_robin_config),
-            LoadBalancerConfigHelper::slowStartConfigFromProto(round_robin_config), time_source) {
+            round_robin_config.has_value() ? round_robin_config->localityLbConfig() : absl::nullopt,
+            round_robin_config.has_value() ? round_robin_config->slowStartConfig() : absl::nullopt,
+            time_source) {
     initialize();
   }
 

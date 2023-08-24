@@ -1006,6 +1006,11 @@ double applyAggressionFactor(double time_factor, double aggression) {
 }
 } // namespace
 
+TypedRoundRobinLbConfig::TypedRoundRobinLbConfig(
+    const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin& config)
+    : locality_lb_config_(LoadBalancerConfigHelper::localityLbConfigFromProto(config)),
+      slow_start_config_(LoadBalancerConfigHelper::slowStartConfigFromProto(config)) {}
+
 double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) const {
   // We can reliably apply slow start weight only if `last_hc_pass_time` in host has been populated
   // either by active HC or by `member_update_cb_` in `EdfLoadBalancerBase`.

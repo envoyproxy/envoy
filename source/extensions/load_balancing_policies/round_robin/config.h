@@ -5,6 +5,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
 
 namespace Envoy {
@@ -15,15 +16,23 @@ namespace RoundRobin {
 using RoundRobinLbProto = envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
 
 struct RoundRobinCreator : public Logger::Loggable<Logger::Id::upstream> {
-  Upstream::LoadBalancerPtr
-  operator()(Upstream::LoadBalancerParams params, OptRef<const RoundRobinLbProto> lb_config,
-             const Upstream::ClusterInfo& cluster_info, const Upstream::PrioritySet& priority_set,
-             Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source);
+  Upstream::LoadBalancerPtr operator()(Upstream::LoadBalancerParams params,
+                                       OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                       const Upstream::ClusterInfo& cluster_info,
+                                       const Upstream::PrioritySet& priority_set,
+                                       Runtime::Loader& runtime, Random::RandomGenerator& random,
+                                       TimeSource& time_source);
 };
 
 class Factory : public Common::FactoryBase<RoundRobinLbProto, RoundRobinCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.round_robin") {}
+
+  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+                                             ProtobufMessage::ValidationVisitor& visitor) override {
+    return std::make_unique<Envoy::Upstream::TypedRoundRobinLbConfig>(
+        MessageUtil::downcastAndValidate<RoundRobinLbProto>(*config, visitor));
+  }
 };
 
 } // namespace RoundRobin

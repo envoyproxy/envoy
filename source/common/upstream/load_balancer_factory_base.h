@@ -14,6 +14,15 @@ public:
     return makeOptRefFromPtr<const ProtoType>(typed_config);
   }
 
+  template <typename ProtoType>
+  static OptRef<ProtoType>
+  getTypedProtoConfig(OptRef<const Upstream::LoadBalancerConfig> lb_config) {
+    const auto* typed_lb_config =
+        dynamic_cast<const Upstream::LoadBalancerConfigWrapper*>(lb_config.ptr());
+    return typed_lb_config == nullptr ? OptRef<const ProtoType>{}
+                                      : typed_lb_config->typedProtoConfig<ProtoType>();
+  }
+
 private:
   ProtobufTypes::MessagePtr config_;
 };
