@@ -9,6 +9,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Json {
@@ -22,7 +23,9 @@ namespace Json {
  */
 class Streamer {
 public:
-  /**
+  using Value = absl::variant<absl::string_view, double>;
+
+  /*
    * @param response The buffer in which to stream output. Note: this buffer can
    *                 be flushed during population; it is not necessary to hold
    *                 the entire json structure in memory before streaming it to
@@ -54,21 +57,32 @@ public:
      */
     ArrayPtr newArray();
 
+    void addNumber(double d);
+    void addString(absl::string_view str);
+
+#ifndef NDEBUG
+    /**
+     * @return the top Level*. This is used for asserts.
+     */
     Level* topLevel() const { return streamer_.topLevel(); }
+#endif
 
   protected:
     /**
-     * Initiates a new entry, serializing a comma separator if this is not
-     * the first one.
+     * Initiates a new entry, serializing a comma separator if this is not the
+     * first one. After calling this, and before returning control to the
+     * streamer's client, Streamer::flush() must be called.
      */
     virtual void newEntry();
+
+    void renderValue(const Value& value);
 
   private:
     friend Streamer;
 
     /**
      * An aggregate can be closed in two ways. In either case, we need each
-     *     aggregate to admit its closing delimiter ("}" or "]").
+     *     aggregate to emit its closing delimiter ("}" or "]").
      *
      *  1. The unique_ptr in which it is allocated is destructed or reset.
      *     This is the normal mode of operation during serialization of a
@@ -93,10 +107,10 @@ public:
    * in the structure; just enough state to be able emit delimiters properly.
    */
   class Map : public Level {
-    using NameValue = std::pair<const absl::string_view, const absl::string_view>;
+  public:
+    using NameValue = std::pair<const absl::string_view, Value>;
     using Entries = absl::Span<const NameValue>;
 
-  public:
     /**
      * Represents a map value which will be closed at a later point. This is
      * needed for event-driven serialization, where we cannot close out a map
@@ -107,6 +121,7 @@ public:
      * Map to be destroyed prior to the Value, which can occur during
      * Streamer::close().
      */
+#if 0
     class DeferredValue {
     public:
       explicit DeferredValue(Map& map);
@@ -126,6 +141,7 @@ public:
       bool managed_{true};
     };
     using DeferredValuePtr = std::unique_ptr<DeferredValue>;
+#endif
 
     Map(Streamer& streamer) : Level(streamer, "{", "}") {}
     ~Map() override;
@@ -144,12 +160,13 @@ public:
      * See also newEntries, which directly populates a list of name/value
      * pairs in a single call.
      */
-    void newKey(absl::string_view name, std::function<void()>);
+    //void newKey(absl::string_view name, std::function<void()>);
+    void newKey(absl::string_view name);
 
     /**
      * @return a structure to represent the deferred value; to be filled later.
      */
-    DeferredValuePtr deferValue();
+    //DeferredValuePtr deferValue();
 
     /**
      * Populates a list of name/value pairs in a single call. This function
@@ -162,20 +179,22 @@ public:
      * it as the current map value. This routine must only be called from the
      * lambda passed to newKey().
      */
-    void addSanitized(absl::string_view value);
+    //void addSanitized(absl::string_view value);
 
   protected:
     virtual void newEntry() override;
 
   private:
+    /*
     void clearDeferredValue() {
       deferred_value_.reset();
       expecting_value_ = false;
     }
+    */
 
-    friend DeferredValue;
+    //friend DeferredValue;
     bool expecting_value_{false};
-    OptRef<DeferredValue> deferred_value_;
+    //OptRef<DeferredValue> deferred_value_;
   };
 
   /**
@@ -185,7 +204,7 @@ public:
   class Array : public Level {
   public:
     Array(Streamer& streamer) : Level(streamer, "[", "]") {}
-    using Strings = absl::Span<const absl::string_view>;
+    using Values = absl::Span<Value>;
 
     /**
      * Renders an array of entry strings as strings. The strings
@@ -195,7 +214,7 @@ public:
      *
      * @param entries the array of string entries.
      */
-    void newEntries(const Strings& entries);
+    void newEntries(const Values& entries);
   };
 
   /**
@@ -239,28 +258,33 @@ private:
   /**
    * Takes a raw string, sanitizes it using JSON syntax, adds quotes,
    * and streams it out.
+   *
+   * After calling this, and before returning control to the streamer's client,
+   * Streamer::flush() must be called.
    */
-  void addSanitized(absl::string_view token);
+  void addSanitized(absl::string_view token, absl::string_view suffix = "\"");
 
   /**
    * Serializes a string without adding quotes, copying the bytes.
    */
-  void addCopy(absl::string_view token);
+  //void addCopy(absl::string_view token);
+
+  void addNumber(double d);
 
   /**
    * Serializes a number.
    */
-  void addDouble(double number);
+  //void addDouble(double number);
 
   /**
    * Serializes a string, without copying the bytes.
    */
-  void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
+  //void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
 
   /**
-   * Adds an array of string fragments.
+   * Adds an array of values.
    */
-  void addFragments(const Array::Strings& src);
+  //void addFragments(const Array::Values& src);
 
   /**
    * Flushes out any pending fragments.
@@ -268,13 +292,26 @@ private:
   void flush();
 
   /**
+   * After calling this, and before returning control to the streamer's client,
+   * Streamer::flush() must be called.
+   */
+  void addConstantString(absl::string_view str) { fragments_.push_back(str); }
+
+  void nextBuffer();
+
+#ifndef NDEBUG
+  /**
    * @return the top Level*. This is used for asserts.
    */
   Level* topLevel() const { return levels_.top(); }
+#endif
 
   Buffer::Instance& response_;
   std::vector<absl::string_view> fragments_;
-  std::string buffer_;
+  static constexpr uint32_t NumBuffers = 10;
+  std::string buffers_[NumBuffers];
+  uint32_t buffers_index_{0};
+  //std::string buffer_;
   std::stack<Level*> levels_;
 };
 

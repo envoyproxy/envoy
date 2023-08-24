@@ -90,6 +90,8 @@ TEST_F(JsonStreamerTest, MapTwoDeferred) {
   EXPECT_EQ(R"EOF({"a":[],"b":{}})EOF", buffer_.toString());
 }
 
+// https://storage.googleapis.com/envoy-pr/1a4c83a/coverage/source/common/json/json_streamer.cc.gcov.html
+
 } // namespace
 } // namespace Json
 } // namespace Envoy

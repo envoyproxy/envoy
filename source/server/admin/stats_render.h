@@ -97,7 +97,7 @@ private:
   bool histograms_initialized_{false};
   Json::Streamer json_streamer_;
   Json::Streamer::MapPtr json_stats_map_;
-  Json::Streamer::Map::DeferredValuePtr stats_value_context_;
+  //Json::Streamer::Map::DeferredValuePtr stats_value_context_;
   Json::Streamer::ArrayPtr json_stats_array_;
   Json::Streamer::MapPtr json_histogram_map1_;
   Json::Streamer::MapPtr json_histogram_map2_;

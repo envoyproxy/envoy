@@ -9,7 +9,7 @@ namespace Json {
 
 Streamer::Level::Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
     : streamer_(streamer), closer_(closer) {
-  streamer_.addNoCopy(opener);
+  streamer_.addConstantString(opener);
   streamer_.push(this);
 }
 
@@ -23,7 +23,7 @@ void Streamer::Level::close() {
   if (!is_closed_) {
     ASSERT(streamer_.topLevel() == this);
     is_closed_ = true;
-    streamer_.addNoCopy(closer_);
+    streamer_.addConstantString(closer_);
     streamer_.pop(this);
   }
 }
@@ -45,11 +45,17 @@ Streamer::ArrayPtr Streamer::Level::newArray() {
   return std::make_unique<Array>(streamer_);
 }
 
-void Streamer::Map::addSanitized(absl::string_view value) {
+void  Streamer::Level::addNumber(double number) {
   ASSERT(streamer_.topLevel() == this);
-  ASSERT(expecting_value_);
-  streamer_.addSanitized(value);
-  expecting_value_ = false;
+  newEntry();
+  streamer_.addNumber(number);
+}
+
+void Streamer::Level::addString(absl::string_view str) {
+  ASSERT(streamer_.topLevel() == this);
+  newEntry();
+  streamer_.addSanitized(str);
+  streamer_.flush();
 }
 
 void Streamer::pop(Level* level) {
@@ -63,7 +69,7 @@ void Streamer::Level::newEntry() {
   if (is_first_) {
     is_first_ = false;
   } else {
-    streamer_.addNoCopy(",");
+    streamer_.addConstantString(",");
   }
 }
 
@@ -75,6 +81,7 @@ void Streamer::Map::newEntry() {
   }
 }
 
+#if 0
 void Streamer::Map::newKey(absl::string_view name, std::function<void()> emit_value) {
   ASSERT(!deferred_value_);
   newEntry();
@@ -83,7 +90,17 @@ void Streamer::Map::newKey(absl::string_view name, std::function<void()> emit_va
   expecting_value_ = true;
   emit_value();
 }
+#else
+void Streamer::Map::newKey(absl::string_view name) {
+  ASSERT(topLevel() == this);
+  ASSERT(!expecting_value_);
+  newEntry();
+  streamer_.addSanitized(name, "\":");
+  expecting_value_ = true;
+}
+#endif
 
+#if 0
 Streamer::Map::DeferredValuePtr Streamer::Map::deferValue() {
   auto ret = std::make_unique<DeferredValue>(*this);
   deferred_value_ = *ret;
@@ -105,48 +122,67 @@ Streamer::Map::~Map() {
     deferred_value_->close();
   }
 }
+#else
+Streamer::Map::~Map() = default;
+#endif
 
-void Streamer::Map::DeferredValue::close() {
+/*void Streamer::Map::DeferredValue::close() {
   map_.expecting_value_ = false;
   managed_ = false;
-}
+  }*/
 
 void Streamer::Map::newEntries(const Entries& entries) {
   for (const NameValue& entry : entries) {
     newEntry();
-    streamer_.addFragments({"\"", entry.first, "\":", entry.second});
+    streamer_.addSanitized(entry.first, "\":");
+    expecting_value_ = true;
+    renderValue(entry.second);
   }
 }
 
-void Streamer::Array::newEntries(const Strings& entries) {
-  for (absl::string_view str : entries) {
-    newEntry();
-    streamer_.addCopy(str);
+void Streamer::Level::renderValue(const Value& value) {
+  switch (value.index()) {
+    case 0:
+      addString(absl::get<absl::string_view>(value));
+      break;
+    case 1:
+      addNumber(absl::get<double>(value));
+      break;
   }
 }
 
-void Streamer::addCopy(absl::string_view str) {
+void Streamer::Array::newEntries(const Values& values) {
+  for (const Value& value : values) {
+    //newEntry();
+    renderValue(value);
+  }
+}
+
+/*void Streamer::addCopy(absl::string_view str) {
   addNoCopy(str);
   flush();
-}
+  }*/
 
-void Streamer::addDouble(double number) {
+void Streamer::addNumber(double number) {
   if (std::isnan(number)) {
-    addNoCopy("null");
+    fragments_.push_back("null");
   } else {
-    addCopy(absl::StrFormat("%g", number));
+    std::string& buffer = buffers_[buffers_index_];
+    buffer = absl::StrFormat("%g", number);
+    fragments_.push_back(buffer);
+    nextBuffer();
   }
 }
 
-std::string Streamer::number(double number) {
+/*std::string Streamer::number(double number) {
   if (std::isnan(number)) {
     return "null";
   } else {
     return absl::StrFormat("%g", number);
   }
-}
+  }*/
 
-std::string Streamer::quote(absl::string_view str) { return absl::StrCat("\"", str, "\""); }
+//std::string Streamer::quote(absl::string_view str) { return absl::StrCat("\"", str, "\""); }
 
 void Streamer::flush() {
   if (fragments_.empty()) {
@@ -154,26 +190,46 @@ void Streamer::flush() {
   }
   response_.addFragments(fragments_);
   fragments_.clear();
+  buffers_index_ = 0;
 }
+
+/*void Streamer::flushIfNecessary() {
+  if (buffers_index == NumBuffers] {
+    flush();
+  }
+  }*/
 
 void Streamer::clear() {
   while (!levels_.empty()) {
     levels_.top()->close();
   }
   flush();
+  response_.add("");
 }
 
-void Streamer::addFragments(const Array::Strings& src) {
+/*void Streamer::addFragments(const Array::Strings& src) {
   if (fragments_.empty()) {
     response_.addFragments(src);
   } else {
     fragments_.insert(fragments_.end(), src.begin(), src.end());
     flush();
   }
+  }*/
+
+void Streamer::addSanitized(absl::string_view token, absl::string_view suffix) {
+  std::string& buffer = buffers_[buffers_index_];
+  absl::string_view sanitized = Json::sanitize(buffer, token);
+  absl::string_view fragments[] = {"\"", sanitized, suffix};
+  fragments_.insert(fragments_.end(), fragments, fragments + ABSL_ARRAYSIZE(fragments));
+  if (sanitized.data() != token.data()) {
+    nextBuffer();
+  }
 }
 
-void Streamer::addSanitized(absl::string_view token) {
-  addFragments({"\"", Json::sanitize(buffer_, token), "\""});
+void Streamer::nextBuffer() {
+  if (++buffers_index_ == NumBuffers) {
+    flush();
+  }
 }
 
 } // namespace Json

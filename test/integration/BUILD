@@ -817,32 +817,32 @@ envoy_cc_test(
     ],
 )
 
-#envoy_cc_test(
-#    name = "integration_admin_test",
-#    size = "large",
-#    srcs = envoy_select_admin_functionality(
-#        [
-#            "integration_admin_test.cc",
-#            "integration_admin_test.h",
-#        ],
-#    ),
-#    tags = [
-#        "cpu:3",
-#    ],
-#    deps = [
-#        ":http_protocol_integration_lib",
-#        "//envoy/http:header_map_interface",
-#        "//source/common/stats:histogram_lib",
-#        "//source/common/stats:stats_matcher_lib",
-#        "//source/extensions/filters/http/buffer:config",
-#        "//test/common/stats:stat_test_utility_lib",
-#        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-#        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-#        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-#        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
-#        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
-#    ],
-#)
+envoy_cc_test(
+    name = "integration_admin_test",
+    size = "large",
+    srcs = envoy_select_admin_functionality(
+        [
+            "integration_admin_test.cc",
+            "integration_admin_test.h",
+        ],
+    ),
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//envoy/http:header_map_interface",
+        "//source/common/stats:histogram_lib",
+        "//source/common/stats:stats_matcher_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//test/common/stats:stat_test_utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
 
 envoy_proto_library(
     name = "test_host_predicate_proto",
