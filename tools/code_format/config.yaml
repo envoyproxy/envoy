@@ -119,6 +119,7 @@ paths:
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.cc
+    - source/common/formatter/substitution_format_utility.cc
     - source/common/formatter/substitution_format_string.cc
     - source/common/stats/tag_extractor_impl.cc
     - source/common/stats/tag_producer_impl.cc

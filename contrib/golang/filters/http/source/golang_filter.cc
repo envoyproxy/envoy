@@ -1,6 +1,8 @@
 #include "contrib/golang/filters/http/source/golang_filter.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -1250,27 +1252,112 @@ FilterConfig::FilterConfig(
     Server::Configuration::FactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
-      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib) {
-  ENVOY_LOG(debug, "initializing golang filter config");
+      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
+      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))){};
 
+void FilterConfig::newGoPluginConfig() {
+  ENVOY_LOG(debug, "initializing golang filter config");
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
   ASSERT(res, "SerializeToString should always successful");
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
-  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
-                                                          buf.length());
+
+  config_ = new httpConfigInternal(weak_from_this());
+  config_->plugin_name_ptr = name_ptr;
+  config_->plugin_name_len = plugin_name_.length();
+  config_->config_ptr = buf_ptr;
+  config_->config_len = buf.length();
+  config_->is_route_config = 0;
+
+  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
+
   if (config_id_ == 0) {
-    throw EnvoyException(fmt::format("golang filter failed to parse plugin config: {} {}",
-                                     proto_config.library_id(), proto_config.library_path()));
+    throw EnvoyException(
+        fmt::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
   }
+
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
-};
+}
 
 FilterConfig::~FilterConfig() {
   if (config_id_ > 0) {
     dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
   }
+}
+
+CAPIStatus FilterConfig::defineMetric(uint32_t metric_type, absl::string_view name,
+                                      uint32_t* metric_id) {
+  Thread::LockGuard lock(mutex_);
+  if (metric_type > static_cast<uint32_t>(MetricType::Max)) {
+    return CAPIStatus::CAPIValueNotFound;
+  }
+
+  auto type = static_cast<MetricType>(metric_type);
+
+  Stats::StatNameManagedStorage storage(name, metric_store_->scope_->symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  if (type == MetricType::Counter) {
+    auto id = metric_store_->nextCounterMetricId();
+    auto c = &metric_store_->scope_->counterFromStatName(stat_name);
+    metric_store_->counters_.emplace(id, c);
+    *metric_id = id;
+  } else if (type == MetricType::Gauge) {
+    auto id = metric_store_->nextGaugeMetricId();
+    auto g =
+        &metric_store_->scope_->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::Accumulate);
+    metric_store_->gauges_.emplace(id, g);
+    *metric_id = id;
+  } else { // (type == MetricType::Histogram)
+    ASSERT(type == MetricType::Histogram);
+    auto id = metric_store_->nextHistogramMetricId();
+    auto h = &metric_store_->scope_->histogramFromStatName(stat_name,
+                                                           Stats::Histogram::Unit::Unspecified);
+    metric_store_->histograms_.emplace(id, h);
+    *metric_id = id;
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus FilterConfig::incrementMetric(uint32_t metric_id, int64_t offset) {
+  Thread::LockGuard lock(mutex_);
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = metric_store_->counters_.find(metric_id);
+    if (it != metric_store_->counters_.end()) {
+      if (offset > 0) {
+        it->second->add(offset);
+      }
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = metric_store_->gauges_.find(metric_id);
+    if (it != metric_store_->gauges_.end()) {
+      if (offset > 0) {
+        it->second->add(offset);
+      } else {
+        it->second->sub(-offset);
+      }
+    }
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus FilterConfig::getMetric(uint32_t metric_id, uint64_t* value) {
+  Thread::LockGuard lock(mutex_);
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = metric_store_->counters_.find(metric_id);
+    if (it != metric_store_->counters_.end()) {
+      *value = it->second->value();
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = metric_store_->gauges_.find(metric_id);
+    if (it != metric_store_->gauges_.end()) {
+      *value = it->second->value();
+    }
+  }
+  return CAPIStatus::CAPIOK;
 }
 
 uint64_t FilterConfig::getConfigId() { return config_id_; }
@@ -1347,8 +1434,14 @@ uint64_t RoutePluginConfig::getConfigId() {
   ASSERT(res, "SerializeToString is always successful");
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
-  return dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
-                                                    buf.length());
+
+  config_ = new httpConfig();
+  config_->plugin_name_ptr = name_ptr;
+  config_->plugin_name_len = plugin_name_.length();
+  config_->config_ptr = buf_ptr;
+  config_->config_len = buf.length();
+  config_->is_route_config = 1;
+  return dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 };
 
 uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
