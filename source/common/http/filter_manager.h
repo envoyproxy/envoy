@@ -587,6 +587,9 @@ public:
   const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
   }
+  OptRef<const Network::FilterChainInfo> filterChainInfo() const override {
+    return StreamInfoImpl::downstreamAddressProvider().filterChainInfo();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
