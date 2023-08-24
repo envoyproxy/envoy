@@ -18,7 +18,8 @@ HEALTHCHECK \
     --timeout=1s \
     --start-period=1s \
     --retries=3 \
-    CMD /bin/bash -c "test $(curl -s localhost:8001/stats?filter=server.state | cut -d ':' -f2 | sed 's/ //') == 0 && test $(curl -s localhost:8001/stats?filter=listener_manager.workers_started | cut -d ':' -f2 | sed -s 's/ //') == 1"
+    CMD curl -s localhost:8001/stats?filter=server.state | grep 0 \
+             && curl -s localhost:8001/stats?filter=listener_manager.workers_started | grep 1
 CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml"]
 
 
