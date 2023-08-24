@@ -43,6 +43,18 @@ envoy_extension_cc_test(
     ],
 )
 
+# envoy_extension_cc_test(
+#     name = "extractor_runtime_guard_test",
+#     srcs = ["extractor_runtime_guard_test.cc"],
+#     extension_names = ["envoy.filters.http.jwt_authn"],
+#     args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.token_passed_entirely"],
+#     deps = [
+#         ":extractor_test",
+#         "//source/common/runtime:runtime_features_lib",
+#         "//source/common/runtime:runtime_lib",
+#     ],
+# )
+
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
