@@ -72,7 +72,44 @@ TEST_F(JsonStreamerTest, MapTwoSanitized) {
   EXPECT_EQ(R"EOF({"a":"\b\u0001","b":"\r\u0002"})EOF", buffer_.toString());
 }
 
-// https://storage.googleapis.com/envoy-pr/1a4c83a/coverage/source/common/json/json_streamer.cc.gcov.html
+TEST_F(JsonStreamerTest, SubArray) {
+  Streamer::MapPtr map = streamer_.makeRootMap();
+  map->newKey("a");
+  Streamer::ArrayPtr array = map->addArray();
+  array->addEntries({1.0, "two", 3.5, std::nan("")});
+  array.reset();
+  map->addEntries({{"embedded\"quote", "value"}});
+  map.reset();
+  streamer_.clear();
+  EXPECT_EQ(R"EOF({"a":[1,"two",3.5,null],"embedded\"quote":"value"})EOF", buffer_.toString());
+}
+
+TEST_F(JsonStreamerTest, SubMap) {
+  Streamer::MapPtr map = streamer_.makeRootMap();
+  map->newKey("a");
+  Streamer::MapPtr sub_map = map->addMap();
+  sub_map->addEntries({{"one", 1.0}, {"three.5", 3.5}});
+  sub_map.reset();
+  map.reset();
+  streamer_.clear();
+  EXPECT_EQ(R"EOF({"a":{"one":1,"three.5":3.5}})EOF", buffer_.toString());
+}
+
+TEST_F(JsonStreamerTest, ExhaustBuffers) {
+  Streamer::MapPtr map = streamer_.makeRootMap();
+  map->addEntries({{"\001", "\002"},
+                   {"\003", "\004"},
+                   {"\005", "\006"},
+                   {"\007", "\010"},
+                   {"\011", "\012"},
+                   {"\013", "\014"}});
+  streamer_.clear();
+  EXPECT_EQ(
+      R"EOF({"\u0001":"\u0002","\u0003":"\u0004","\u0005":"\u0006","\u0007":"\b","\t":"\n","\u000b":"\f"})EOF",
+      buffer_.toString());
+}
+
+// https://storage.googleapis.com/envoy-pr/1659efc/coverage/source/common/json/index.html
 
 } // namespace
 } // namespace Json

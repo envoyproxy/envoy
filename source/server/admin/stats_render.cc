@@ -190,7 +190,7 @@ void StatsJsonRender::populateSupportedPercentiles(Json::Streamer::Map& map) {
     views[i] = quantile * 100;
     ++i;
   }
-  map.addArray()->addEntries(Json::Streamer::Array::Values(views.data(), views.size()));
+  map.addArray()->addEntries(views);
 }
 
 void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogram,

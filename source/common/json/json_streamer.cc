@@ -60,10 +60,14 @@ void Streamer::Level::addNumber(double number) {
 }
 
 void Streamer::Level::addString(absl::string_view str) {
+  addStringNoFlush(str);
+  streamer_.flush();
+}
+
+void Streamer::Level::addStringNoFlush(absl::string_view str) {
   ASSERT_THIS_IS_TOP_LEVEL;
   newEntry();
   streamer_.addSanitized(str);
-  streamer_.flush();
 }
 
 void Streamer::pop(Level* level) {
@@ -98,37 +102,38 @@ void Streamer::Map::newKey(absl::string_view name) {
 }
 
 void Streamer::Map::addEntries(const Entries& entries) {
+  ASSERT_THIS_IS_TOP_LEVEL;
   bool needs_flush = false;
   for (const NameValue& entry : entries) {
     newEntry();
     streamer_.addSanitized(entry.first, "\":");
     expecting_value_ = true;
-    needs_flush |= renderValue(entry.second);
+    needs_flush |= renderValueNoFlush(entry.second);
   }
   if (needs_flush) {
     streamer_.flush();
   }
 }
 
-bool Streamer::Level::renderValue(const Value& value) {
+bool Streamer::Level::renderValueNoFlush(const Value& value) {
   switch (value.index()) {
   case 0:
-    addString(absl::get<absl::string_view>(value));
+    addStringNoFlush(absl::get<absl::string_view>(value));
     return true;
   case 1:
     addNumber(absl::get<double>(value));
     break;
   default:
-    IS_ENVOY_BUG(absl::StrCat("renderValue invalid index: ", value.index()));
+    IS_ENVOY_BUG(absl::StrCat("renderValueNoFlush invalid index: ", value.index()));
     break;
   }
   return false;
 }
 
-void Streamer::Array::addEntries(const Values& values) {
+void Streamer::Array::addEntries(const Entries& values) {
   bool needs_flush = false;
   for (const Value& value : values) {
-    needs_flush |= renderValue(value);
+    needs_flush |= renderValueNoFlush(value);
   }
   if (needs_flush) {
     streamer_.flush();

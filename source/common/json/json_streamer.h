@@ -59,6 +59,7 @@ public:
 
     void addNumber(double d);
     void addString(absl::string_view str);
+    void addStringNoFlush(absl::string_view str);
 
   protected:
     /**
@@ -77,7 +78,7 @@ public:
      *              returning control to the streamer client, which may mutate
      *              the string.
      */
-    bool renderValue(const Value& value);
+    bool renderValueNoFlush(const Value& value);
 
   private:
     friend Streamer;
@@ -145,7 +146,7 @@ public:
   class Array : public Level {
   public:
     Array(Streamer& streamer) : Level(streamer, "[", "]") {}
-    using Values = absl::Span<Value>;
+    using Entries = absl::Span<const Value>;
 
     /**
      * Renders an array of entry strings as strings. The strings
@@ -155,7 +156,7 @@ public:
      *
      * @param entries the array of string entries.
      */
-    void addEntries(const Values& entries);
+    void addEntries(const Entries& entries);
   };
 
   /**
