@@ -429,6 +429,8 @@ FormatterProviderPtr HttpBuiltInCommandParser::parse(const std::string& command,
   return (*it).second.second(subcommand, max_length);
 }
 
+REGISTER_BUILT_IN_COMMAND_PARSER(HttpFormatterContext, HttpBuiltInCommandParser);
+
 static const std::string DEFAULT_FORMAT =
     "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
     "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "

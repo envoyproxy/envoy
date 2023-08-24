@@ -209,39 +209,17 @@ public:
 using FormatterProvider = FormatterProviderBase<HttpFormatterContext>;
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
 
-/**
- * Interface for command parser.
- * CommandParser returns a FormatterProviderPtr after successfully parsing an access log format
- * token, nullptr otherwise.
- */
-class CommandParser {
-public:
-  virtual ~CommandParser() = default;
-
-  /**
-   * Return a FormatterProviderPtr if subcommand and max_length
-   * are correct for the formatter provider associated
-   * with command.
-   * @param command - name of the FormatterProvider
-   * @param subcommand - command specific data. (optional)
-   * @param max_length - length to which the output produced by FormatterProvider
-   *   should be truncated to (optional)
-   *
-   * @return FormattterProviderPtr substitution provider for the parsed command
-   */
-  virtual FormatterProviderPtr parse(const std::string& command, const std::string& subcommand,
-                                     absl::optional<size_t>& max_length) const PURE;
-};
-
+using CommandParser = CommandParserBase<HttpFormatterContext>;
 using CommandParserPtr = std::unique_ptr<CommandParser>;
 
 /**
  * Implemented by each custom CommandParser and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
+ * Specialization of CommandParserFactoryBase for HTTP and backwards compatibliity.
  */
-class CommandParserFactory : public Config::TypedFactory {
+template <> class CommandParserFactoryBase<HttpFormatterContext> : public Config::TypedFactory {
 public:
-  ~CommandParserFactory() override = default;
+  ~CommandParserFactoryBase() override = default;
 
   /**
    * Creates a particular CommandParser implementation.
@@ -257,6 +235,8 @@ public:
 
   std::string category() const override { return "envoy.formatter"; }
 };
+
+using CommandParserFactory = CommandParserFactoryBase<HttpFormatterContext>;
 
 } // namespace Formatter
 } // namespace Envoy
