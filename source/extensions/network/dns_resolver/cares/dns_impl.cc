@@ -205,7 +205,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
           (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
 
       int min_ttl = INT_MAX;
-      // Loop through cnames and get min_ttl
+      // Loop through cname and get min_ttl
       for (const ares_addrinfo_cname* cname = addrinfo->cnames; cname != nullptr;
            cname = cname->next) {
         min_ttl = std::min(min_ttl, cname->ttl);
