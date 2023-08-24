@@ -33,11 +33,18 @@ pyreadline
 pyyaml
 setuptools
 slackclient
-sphinx>=7
+sphinx>=7.2.3
 thrift
 verboselogs
 yapf
 yarl>=1.7.2
+
+# https://github.com/sphinx-doc/sphinx/issues/11567
+sphinxcontrib-applehelp<1.0.5
+sphinxcontrib-devhelp<1.0.3
+sphinxcontrib-htmlhelp<2.0.2
+sphinxcontrib-qthelp<1.0.4
+# sphinxcontrib-serializinghtml<1.1.6
 
 # This has packaging issues, so use the github tarball until resolved (https://github.com/sphinx-contrib/jquery/issues/15)
 https://github.com/sphinx-contrib/jquery/archive/refs/tags/v3.0.0.zip
