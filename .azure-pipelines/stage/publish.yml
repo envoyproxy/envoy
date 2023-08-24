@@ -212,7 +212,7 @@ jobs:
       rbe: false
       artifactSuffix: ".arm64"
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
-      packageTestResults: false
+      publishTestResults: false
       tmpfsDockerDisabled: true
       stepsPre:
       - template: ../gpg.yml
