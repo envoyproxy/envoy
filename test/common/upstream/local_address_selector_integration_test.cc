@@ -17,8 +17,8 @@ TEST_P(HttpProtocolIntegrationTest, Basic) {
 
   // Specify both IPv4 and IPv6 source addresses, so the right one is picked
   // based on IP version of upstream.
-  auto const port_value = 1234;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    uint32_t const port_value = 1234;
     auto bind_config = bootstrap.mutable_cluster_manager()->mutable_upstream_bind_config();
     bind_config->mutable_source_address()->set_address("127.0.0.1");
     bind_config->mutable_source_address()->set_port_value(port_value);
@@ -51,9 +51,9 @@ TEST_P(HttpProtocolIntegrationTest, CustomUpstreamLocalAddressSelector) {
   TestUpstreamLocalAddressSelectorFactory factory(num_calls, true);
   Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> registration(factory);
 
-  auto const port_value = 1234;
   // Create a config that is invalid for the ``DefaultLocalAddressSelector``.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    uint32_t const port_value = 1234;
     auto bind_config = bootstrap.mutable_cluster_manager()->mutable_upstream_bind_config();
     auto local_address_selector_config = bind_config->mutable_local_address_selector();
     ProtobufWkt::Empty empty;
