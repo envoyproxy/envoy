@@ -1,0 +1,15 @@
+diff --git a/src/google/protobuf/util/converter/port_def.inc b/src/google/protobuf/util/converter/port_def.inc
+index 41af5b7..28ad7af 100644
+--- a/src/google/protobuf/util/converter/port_def.inc
++++ b/src/google/protobuf/util/converter/port_def.inc
+@@ -413,10 +413,6 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
+ #define PROTOBUF_ATTRIBUTE_REINITIALIZES
+ #endif
+ 
+-// The minimum library version which works with the current version of the
+-// headers.
+-#define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 4023000
+-
+ #ifdef PROTOBUF_RTTI
+ #error PROTOBUF_RTTI was previously defined
+ #endif
