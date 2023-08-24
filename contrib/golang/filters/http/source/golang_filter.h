@@ -106,7 +106,8 @@ enum class EnvoyValue {
   AttemptCount,
   DownstreamLocalAddress,
   DownstreamRemoteAddress,
-  UpstreamHostAddress,
+  UpstreamLocalAddress,
+  UpstreamRemoteAddress,
   UpstreamClusterName,
   VirtualClusterName,
 };
@@ -274,14 +275,6 @@ struct httpRequestInternal : httpRequest {
   std::string strValue;
   httpRequestInternal(std::weak_ptr<Filter> f) { filter_ = f; }
   std::weak_ptr<Filter> weakFilter() { return filter_; }
-};
-
-class FilterLogger : Logger::Loggable<Logger::Id::http> {
-public:
-  FilterLogger() = default;
-
-  void log(uint32_t level, absl::string_view message) const;
-  uint32_t level() const;
 };
 
 class GoStringFilterState : public StreamInfo::FilterState::Object {

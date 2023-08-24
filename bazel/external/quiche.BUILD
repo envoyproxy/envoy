@@ -198,6 +198,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:variant",
     ],
 )
 
@@ -5149,6 +5151,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -5471,7 +5474,10 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     tags = ["nofips"],
-    deps = [":quiche_common_platform_export"],
+    deps = [
+        ":quiche_common_platform_export",
+        "@com_google_absl//absl/hash",
+    ],
 )
 
 envoy_cc_library(

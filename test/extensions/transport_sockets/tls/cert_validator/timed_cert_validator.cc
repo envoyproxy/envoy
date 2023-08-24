@@ -14,13 +14,20 @@ namespace Tls {
 ValidationResults TimedCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
-    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
+    const CertValidator::ExtraValidationContext& validation_context, bool is_server,
     absl::string_view host_name) {
   ASSERT(callback != nullptr);
   ASSERT(callback_ == nullptr);
   callback_ = std::move(callback);
   if (expected_host_name_.has_value()) {
     EXPECT_EQ(expected_host_name_.value(), host_name);
+  }
+  if (expected_local_address_.has_value()) {
+    ASSERT(validation_context.callbacks != nullptr);
+    EXPECT_EQ(expected_local_address_.value(), validation_context.callbacks->connection()
+                                                   .connectionInfoProvider()
+                                                   .localAddress()
+                                                   ->asString());
   }
   // Store cert chain for the delayed validation.
   for (size_t i = 0; i < sk_X509_num(&cert_chain); i++) {

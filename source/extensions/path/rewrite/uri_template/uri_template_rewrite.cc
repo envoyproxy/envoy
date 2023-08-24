@@ -62,7 +62,7 @@ absl::StatusOr<std::string> UriTemplateRewriter::rewritePath(absl::string_view p
 
   // First capture is the whole matched regex pattern.
   int capture_num = regex.NumberOfCapturingGroups() + 1;
-  std::vector<re2::StringPiece> captures(capture_num);
+  std::vector<absl::string_view> captures(capture_num);
   if (!regex.Match(pattern, /*startpos=*/0,
                    /*endpos=*/pattern.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
     return absl::InvalidArgumentError("Pattern not match");
@@ -75,7 +75,7 @@ absl::StatusOr<std::string> UriTemplateRewriter::rewritePath(absl::string_view p
     if (literal != nullptr) {
       absl::StrAppend(&new_path, *literal);
     } else if (capture_index != nullptr) {
-      absl::StrAppend(&new_path, absl::string_view(captures[*capture_index].as_string()));
+      absl::StrAppend(&new_path, captures[*capture_index]);
     }
   }
 

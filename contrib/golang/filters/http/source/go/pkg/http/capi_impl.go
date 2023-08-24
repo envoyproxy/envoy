@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -54,9 +54,10 @@ const (
 	ValueAttemptCount            = 6
 	ValueDownstreamLocalAddress  = 7
 	ValueDownstreamRemoteAddress = 8
-	ValueUpstreamHostAddress     = 9
-	ValueUpstreamClusterName     = 10
-	ValueVirtualClusterName      = 11
+	ValueUpstreamLocalAddress    = 9
+	ValueUpstreamRemoteAddress   = 10
+	ValueUpstreamClusterName     = 11
+	ValueVirtualClusterName      = 12
 )
 
 type httpCApiImpl struct{}
@@ -295,11 +296,11 @@ func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName strin
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
-	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(&message))
 }
 
 func (c *httpCApiImpl) HttpLogLevel() api.LogType {
-	return api.LogType(C.envoyGoFilterHttpLogLevel())
+	return api.GetLogLevel()
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {

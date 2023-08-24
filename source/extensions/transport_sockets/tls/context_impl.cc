@@ -514,13 +514,19 @@ ValidationResults ContextImpl::customVerifyCertChain(
   }
   ASSERT(cert_validator_);
   const char* host_name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+
+  CertValidator::ExtraValidationContext validation_ctx;
+  validation_ctx.callbacks =
+      static_cast<Network::TransportSocketCallbacks*>(SSL_get_ex_data(ssl, sslSocketIndex()));
+
   ValidationResults result = cert_validator_->doVerifyCertChain(
       *cert_chain, extended_socket_info->createValidateResultCallback(), transport_socket_options,
-      *SSL_get_SSL_CTX(ssl), {}, SSL_is_server(ssl), absl::NullSafeStringView(host_name));
+      *SSL_get_SSL_CTX(ssl), validation_ctx, SSL_is_server(ssl),
+      absl::NullSafeStringView(host_name));
   if (result.status != ValidationResults::ValidationStatus::Pending) {
     extended_socket_info->setCertificateValidationStatus(result.detailed_status);
     extended_socket_info->onCertificateValidationCompleted(
-        result.status == ValidationResults::ValidationStatus::Successful);
+        result.status == ValidationResults::ValidationStatus::Successful, false);
   }
   return result;
 }
@@ -559,14 +565,18 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
-#ifndef BORINGSSL_FIPS
+#if defined(BORINGSSL_FIPS) && BORINGSSL_API_VERSION >= 18
+#error "Delete preprocessor check below; no longer needed"
+#endif
+
+#if BORINGSSL_API_VERSION >= 18
   // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
   // error but is allowed because the enforcement that rsa key usage and tls usage need to be
   // matched has been disabled.
   if (SSL_was_key_usage_invalid(ssl)) {
     stats_.was_key_usage_invalid_.inc();
   }
-#endif
+#endif // BORINGSSL_API_VERSION
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {

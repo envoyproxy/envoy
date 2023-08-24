@@ -1089,6 +1089,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())
                         : nullptr),
+      http_filter_config_provider_manager_(
+          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+              server_context)),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
@@ -1230,7 +1233,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, *factory_context_);
+        factory.createFilterFactoryFromProto(*message, upstream_context_);
     filter_factories_.push_back(network_config_provider_manager_.createStaticFilterConfigProvider(
         callback, proto_config.name()));
   }
@@ -1248,15 +1251,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       throw EnvoyException(
           fmt::format("The codec filter is the only valid terminal upstream filter"));
     }
-    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
-        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-            upstream_context_.getServerFactoryContext());
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
-    Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+    Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
-               upstream_context_, prefix);
+        helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
+               factory_context.clusterManager(), upstream_context_, prefix);
     helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
   }
 }

@@ -123,7 +123,11 @@ runs:
   - id: context
     name: 'CI context'
     run: |
-      VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+      if grep dev VERSION.txt; then
+          VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+      else
+          VERSION_DEV=""
+      fi
       VERSION_PATCH="$(cat VERSION.txt | cut -d- -f1 | rev | cut -d. -f1 | rev)"
       # TODO: strip merge from pr names
       REF_NAME=${{ inputs.repo_ref_name || github.ref_name }}

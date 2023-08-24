@@ -42,7 +42,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
-#include "source/common/upstream/upstream_http_factory_context_impl.h"
+#include "source/common/upstream/upstream_factory_context_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -262,11 +262,12 @@ public:
           Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
               server_factory_ctx);
       std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
-      upstream_ctx_ = std::make_unique<Upstream::UpstreamHttpFactoryContextImpl>(
+      upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
           server_factory_ctx, context.initManager(), context.scope());
-      Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+      Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
-          helper(*filter_config_provider_manager, server_factory_ctx, *upstream_ctx_, prefix);
+          helper(*filter_config_provider_manager, server_factory_ctx, context.clusterManager(),
+                 *upstream_ctx_, prefix);
       helper.processFilters(upstream_http_filters, "router upstream http", "router upstream http",
                             upstream_http_filter_factories_);
     }
@@ -319,7 +320,7 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
-  std::unique_ptr<Server::Configuration::UpstreamHttpFactoryContext> upstream_ctx_;
+  std::unique_ptr<Server::Configuration::UpstreamFactoryContext> upstream_ctx_;
   Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
 
 private:
@@ -565,7 +566,7 @@ public:
   const FilterStats& stats() { return stats_; }
 
 protected:
-  void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
+  void setRetryShadowBufferLimit(uint32_t retry_shadow_buffer_limit) {
     ASSERT(retry_shadow_buffer_limit_ > retry_shadow_buffer_limit);
     retry_shadow_buffer_limit_ = retry_shadow_buffer_limit;
   }

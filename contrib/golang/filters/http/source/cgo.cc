@@ -58,8 +58,6 @@ std::vector<std::string> stringsFromGoSlice(void* slice) {
   return list;
 }
 
-const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -198,11 +196,6 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
-void envoyGoFilterHttpLog(uint32_t level, void* message) {
-  auto mesg = referGoString(message);
-  getFilterLogger().log(level, mesg);
-}
-
 CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name, void* buf) {
   return envoyGoFilterHandlerWrapper(r, [name, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
     auto name_str = copyGoString(name);
@@ -210,7 +203,6 @@ CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name, void* buf) {
     return filter->getDynamicMetadata(name_str, buf_slice);
   });
 }
-uint32_t envoyGoFilterHttpLogLevel() { return getFilterLogger().level(); }
 
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
   return envoyGoFilterHandlerWrapper(

@@ -19,6 +19,18 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
 
+FETCH_TARGETS=(
+    //contrib/...
+    //distribution/...
+    //docs/...
+    //source/...
+    //test/...
+    //tools/...
+    @nodejs//...
+    @envoy_api//...
+    @envoy_build_tools//...)
+
+
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
 elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
@@ -29,12 +41,14 @@ else
 fi
 
 function collect_build_profile() {
-  declare -g build_profile_count=${build_profile_count:-1}
-  mv -f \
-     "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)/command.profile.gz" \
-     "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
-      || :
-  ((build_profile_count++))
+    local output_base
+    declare -g build_profile_count=${build_profile_count:-1}
+    output_base="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+    mv -f \
+       "${output_base}/command.profile.gz" \
+       "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
+        || :
+    ((build_profile_count++))
 }
 
 function bazel_with_collection() {
@@ -325,26 +339,16 @@ case $CI_TARGET in
         }
         ;;
 
+    clean|expunge)
+        setup_clang_toolchain
+        if [[ "$CI_TARGET" == "expunge" ]]; then
+            CLEAN_ARGS+=(--expunge)
+        fi
+        bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
+        ;;
+
     compile_time_options)
-        # Right now, none of the available compile-time options conflict with each other. If this
-        # changes, this build type may need to be broken up.
-        COMPILE_TIME_OPTIONS=(
-            "--define" "admin_html=disabled"
-            "--define" "signal_trace=disabled"
-            "--define" "hot_restart=disabled"
-            "--define" "google_grpc=disabled"
-            "--define" "boringssl=fips"
-            "--define" "log_debug_assert_in_release=enabled"
-            "--define" "path_normalization_by_default=true"
-            "--define" "deprecated_features=disabled"
-            "--define" "tcmalloc=gperftools"
-            "--define" "zlib=ng"
-            "--define" "uhv=enabled"
-            "--@envoy//bazel:http3=False"
-            "--@envoy//source/extensions/filters/http/kill_request:enabled"
-            "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true"
-            "--remote_download_minimal"
-            "--config=libc++20")
+        # See `compile-time-options` in `.bazelrc`
         setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
@@ -354,8 +358,8 @@ case $CI_TARGET in
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wamr \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
@@ -363,10 +367,9 @@ case $CI_TARGET in
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wasmtime \
-            --define admin_html=disabled \
             --define admin_functionality=disabled \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
@@ -374,8 +377,8 @@ case $CI_TARGET in
         echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wavm \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
@@ -384,28 +387,28 @@ case $CI_TARGET in
         # these tests under "-c opt" to save time in CI.
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wavm \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c opt \
             @envoy//test/common/common:assert_test \
             @envoy//test/server:server_test
         # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
             --define wasm=wavm \
-            "${COMPILE_TIME_OPTIONS[@]}" \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
             --define log_debug_assert_in_release=disabled
         echo "Building binary with wasm=wavm... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-              --define wasm=wavm \
-              --define enable_logging=disabled \
-              "${COMPILE_TIME_OPTIONS[@]}" \
-              -c fastbuild \
-              @envoy//source/exe:envoy-static \
-              --build_tag_filters=-nofips
+            --config=compile-time-options \
+            --define wasm=wavm \
+            --define enable_logging=disabled \
+            -c fastbuild \
+            @envoy//source/exe:envoy-static \
+            --build_tag_filters=-nofips
         collect_build_profile build
         ;;
 
@@ -415,9 +418,8 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
             export FUZZ_COVERAGE=true
         fi
-        # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-        BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" \
-            "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
+        export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
+        "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
         ;;
@@ -560,8 +562,33 @@ case $CI_TARGET in
     dockerhub-readme)
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              --remote_download_toplevel \
               //distribution/dockerhub:readme
         cat bazel-bin/distribution/dockerhub/readme.md
+        ;;
+
+    fetch)
+        setup_clang_toolchain
+        echo "Fetching ${FETCH_TARGETS[*]} ..."
+        FETCH_ARGS=(
+            --noshow_progress
+            --noshow_loading_progress)
+        # TODO(phlax): separate out retry logic
+        n=0
+        until [ "$n" -ge 10 ]; do
+            bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" \
+                  "${FETCH_ARGS[@]}" \
+                  "${FETCH_TARGETS[@]}" \
+                && break
+            n=$((n+1))
+            if [[ "$n" -lt 10 ]]; then
+                sleep 15
+                echo "Retrying fetch ..."
+            else
+                echo "Fetch failed"
+                exit 1
+            fi
+        done
         ;;
 
     fix_proto_format)
@@ -598,6 +625,11 @@ case $CI_TARGET in
             -- "${TEST_TARGETS[@]}"
         echo "bazel release build with gcc..."
         bazel_envoy_binary_build fastbuild
+        ;;
+
+    info)
+        setup_clang_toolchain
+        bazel info "${BAZEL_GLOBAL_OPTIONS[@]}"
         ;;
 
     msan)
@@ -662,7 +694,9 @@ case $CI_TARGET in
             "${BAZEL_RELEASE_OPTIONS[@]}" \
             "${TEST_TARGETS[@]}"
         # Build release binaries
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_outputs=toplevel \
               //distribution/binary:release
         # Copy release binaries to binary export directory
         cp -a \
@@ -737,6 +771,8 @@ case $CI_TARGET in
         ;;
 
     verify_distro)
+        # this can be required if any python deps require compilation
+        setup_clang_toolchain
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
             PACKAGE_BUILD=/build/bazel.distribution/x64/packages.x64.tar.gz
         else

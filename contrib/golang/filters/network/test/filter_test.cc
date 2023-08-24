@@ -85,6 +85,19 @@ TEST_F(FilterTest, InvokeDsoOnEventOrData) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(someData, false));
 }
 
+TEST_F(FilterTest, FilterState) {
+  initialize();
+  EXPECT_CALL(*dso_.get(), envoyGoFilterOnDownstreamConnection(_, _, _, _));
+  filter_->onNewConnection();
+  filter_->setFilterState("filterStateKey", "filterStateValue",
+                          static_cast<int>(StreamInfo::FilterState::StateType::Mutable),
+                          static_cast<int>(StreamInfo::FilterState::LifeSpan::Connection),
+                          static_cast<int>(StreamInfo::StreamSharingMayImpactPooling::None));
+  GoString str;
+  filter_->getFilterState("filterStateKey", &str);
+  EXPECT_EQ("filterStateValue", std::string(str.p, str.n));
+}
+
 TEST_F(FilterTest, WriteAndClose) {
   initialize();
 
@@ -92,7 +105,7 @@ TEST_F(FilterTest, WriteAndClose) {
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false));
   filter_->write(someData, false);
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, "go_downstream_close"));
   EXPECT_CALL(*dso_.get(), envoyGoFilterOnDownstreamEvent(_, _));
   filter_->close(Network::ConnectionCloseType::NoFlush);
 

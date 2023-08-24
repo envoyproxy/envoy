@@ -640,6 +640,7 @@ typed_config:
   const std::string PASSTHROUGH{"passthrough"};
   const std::string ROUTECONFIG{"routeconfig"};
   const std::string PROPERTY{"property"};
+  const std::string ACCESSLOG{"access_log"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -727,6 +728,7 @@ TEST_P(GolangIntegrationTest, Property) {
   codec_client_->sendData(request_encoder, "helloworld", true);
 
   waitForNextUpstreamRequest();
+
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data("goodbye");
@@ -734,6 +736,48 @@ TEST_P(GolangIntegrationTest, Property) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, AccessLog) {
+  initializeBasicFilter(ACCESSLOG, "test.com");
+
+  auto path = "/test";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", path},
+      {":scheme", "http"},
+      {":authority", "test.com"},
+  };
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(request_encoder, "helloworld", true);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "206"},
+  };
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("good");
+  upstream_request_->encodeData(response_data1, false);
+  Buffer::OwnedImpl response_data2("bye");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("206", getHeader(upstream_request_->headers(), "respCode"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsyncly"));
 
   cleanup();
 }

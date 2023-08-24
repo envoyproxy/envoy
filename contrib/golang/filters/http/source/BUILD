@@ -78,6 +78,7 @@ envoy_cc_library(
     ],
     deps = [
         "//contrib/golang/common/dso:dso_lib",
+        "//contrib/golang/common/log:log_lib",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//source/common/buffer:watermark_buffer_lib",

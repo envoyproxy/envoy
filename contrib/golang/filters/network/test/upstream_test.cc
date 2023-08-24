@@ -2,6 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/common/network/filter_state_dst_address.h"
+
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -40,7 +42,7 @@ public:
     ON_CALL(context_.api_, threadFactory()).WillByDefault(ReturnRef(thread_factory_));
     UpstreamConn::initThreadLocalStorage(context_, slot_allocator_);
     dso_ = std::make_shared<Dso::MockNetworkFilterDsoImpl>();
-    upConn_ = std::make_shared<UpstreamConn>(addr_, dso_, &dispatcher_);
+    upConn_ = std::make_shared<UpstreamConn>(addr_, dso_, 0, &dispatcher_);
   }
 
   ThreadLocal::MockInstance slot_allocator_;
@@ -57,6 +59,11 @@ public:
 TEST_F(UpstreamConnTest, ConnectUpstream) {
   initialize();
 
+  const auto* dst_addr =
+      upConn_->requestStreamInfo()->filterState().getDataReadOnly<Network::DestinationAddress>(
+          Network::DestinationAddress::key());
+  EXPECT_EQ(dst_addr->address()->asString(), addr_);
+
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
       .WillOnce(
           Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
@@ -65,7 +72,7 @@ TEST_F(UpstreamConnTest, ConnectUpstream) {
                 upstream_connection_);
             return nullptr;
           }));
-  EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamConnectionReady(_));
+  EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamConnectionReady(_, _));
   upConn_->connect();
 
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
@@ -78,7 +85,7 @@ TEST_F(UpstreamConnTest, ConnectUpstream) {
           }));
   EXPECT_CALL(*dso_.get(),
               envoyGoFilterOnUpstreamConnectionFailure(
-                  _, GoInt(ConnectionPool::PoolFailureReason::RemoteConnectionFailure)));
+                  _, GoInt(ConnectionPool::PoolFailureReason::RemoteConnectionFailure), _));
   upConn_->connect();
 }
 
@@ -96,7 +103,7 @@ TEST_F(UpstreamConnTest, InvokeDsoOnEventOrData) {
 TEST_F(UpstreamConnTest, WriteAndClose) {
   initialize();
 
-  EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamConnectionReady(_));
+  EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamConnectionReady(_, _));
   auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
   EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(upstream_connection_));
   upConn_->onPoolReady(std::move(data), nullptr);
@@ -105,7 +112,7 @@ TEST_F(UpstreamConnTest, WriteAndClose) {
   EXPECT_CALL(upstream_connection_, write(_, false));
   upConn_->write(someData, false);
 
-  EXPECT_CALL(upstream_connection_, close(_));
+  EXPECT_CALL(upstream_connection_, close(_, "go_upstream_close"));
   EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamEvent(_, _));
   upConn_->close(Network::ConnectionCloseType::NoFlush);
   upConn_->onEvent(Network::ConnectionEvent::RemoteClose);
