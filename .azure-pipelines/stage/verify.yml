@@ -54,7 +54,8 @@ jobs:
 - job: verified
   displayName: Verification complete
   dependsOn: ["packages_x64", "packages_arm64"]
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:

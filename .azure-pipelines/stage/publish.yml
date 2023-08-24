@@ -338,7 +338,8 @@ jobs:
 - job: success
   dependsOn: ["docker", "docs", "signed_release"]
   displayName: Success (linux artefacts)
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:
