@@ -137,26 +137,27 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
 RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
     const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
     bool skip_cluster_check) {
-  const GrpcServiceHashKeyWrapper& key_wrapper = GrpcServiceHashKeyWrapper(config);
-  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(key_wrapper);
+  const GrpcServiceConfigWithHashKey config_with_hash_key = GrpcServiceConfigWithHashKey(config);
+  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(config_with_hash_key);
   if (client != nullptr) {
     return client;
   }
-  client = factoryForGrpcService(key_wrapper.config(), scope, skip_cluster_check)
+  client = factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check)
                ->createUncachedRawAsyncClient();
-  raw_async_client_cache_->setCache(key_wrapper, client);
+  raw_async_client_cache_->setCache(config_with_hash_key, client);
   return client;
 }
 
-RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClientWithWrapper(
-    const GrpcServiceHashKeyWrapper& key_wrapper, Stats::Scope& scope, bool skip_cluster_check) {
-  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(key_wrapper);
+RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClientWithHashKey(
+    const GrpcServiceConfigWithHashKey& config_with_hash_key, Stats::Scope& scope,
+    bool skip_cluster_check) {
+  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(config_with_hash_key);
   if (client != nullptr) {
     return client;
   }
-  client = factoryForGrpcService(key_wrapper.config(), scope, skip_cluster_check)
+  client = factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check)
                ->createUncachedRawAsyncClient();
-  raw_async_client_cache_->setCache(key_wrapper, client);
+  raw_async_client_cache_->setCache(config_with_hash_key, client);
   return client;
 }
 
@@ -166,11 +167,12 @@ AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(Event::Dispatch
 }
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
-    const GrpcServiceHashKeyWrapper& key_wrapper, const RawAsyncClientSharedPtr& client) {
-  ASSERT(lru_map_wrapper_.find(key_wrapper) == lru_map_wrapper_.end());
+    const GrpcServiceConfigWithHashKey& config_with_hash_key,
+    const RawAsyncClientSharedPtr& client) {
+  ASSERT(lru_map_.find(config_with_hash_key) == lru_map_.end());
   // Create a new cache entry at the beginning of the list.
-  lru_list_.emplace_front(key_wrapper.config(), client, dispatcher_.timeSource().monotonicTime());
-  lru_map_wrapper_[key_wrapper] = lru_list_.begin();
+  lru_list_.emplace_front(config_with_hash_key, client, dispatcher_.timeSource().monotonicTime());
+  lru_map_[config_with_hash_key] = lru_list_.begin();
   // If inserting to an empty cache, enable eviction timer.
   if (lru_list_.size() == 1) {
     evictEntriesAndResetEvictionTimer();
@@ -178,9 +180,9 @@ void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
 }
 
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
-    const GrpcServiceHashKeyWrapper& key_wrapper) {
-  auto it = lru_map_wrapper_.find(key_wrapper);
-  if (it == lru_map_wrapper_.end()) {
+    const GrpcServiceConfigWithHashKey& config_with_hash_key) {
+  auto it = lru_map_.find(config_with_hash_key);
+  if (it == lru_map_.end()) {
     return nullptr;
   }
   const auto cache_entry = it->second;
@@ -204,7 +206,7 @@ void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTi
     MonotonicTime next_expire = lru_list_.back().accessed_time_ + EntryTimeoutInterval;
     if (now >= next_expire) {
       // Erase the expired entry.
-      lru_map_wrapper_.erase(lru_list_.back().key_wrapper_);
+      lru_map_.erase(lru_list_.back().config_with_hash_key_);
       lru_list_.pop_back();
     } else {
       cache_eviction_timer_->enableTimer(

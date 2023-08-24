@@ -49,13 +49,13 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
 
     Config::Utility::checkTransportVersion(proto_config);
-    Envoy::Grpc::GrpcServiceHashKeyWrapper wrapper =
-        Envoy::Grpc::GrpcServiceHashKeyWrapper(proto_config.grpc_service());
+    Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+        Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
     callback = [&context, filter_config, timeout_ms,
-                wrapper](Http::FilterChainFactoryCallbacks& callbacks) {
+                config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithWrapper(
-              wrapper, context.scope(), true),
+          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
+              config_with_hash_key, context.scope(), true),
           std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };

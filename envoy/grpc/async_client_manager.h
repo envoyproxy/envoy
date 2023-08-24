@@ -32,18 +32,21 @@ private:
 
 using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
-class GrpcServiceHashKeyWrapper {
+class GrpcServiceConfigWithHashKey {
 public:
-  GrpcServiceHashKeyWrapper(const envoy::config::core::v3::GrpcService& config)
+  GrpcServiceConfigWithHashKey(const envoy::config::core::v3::GrpcService& config)
       : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)){};
 
-  template <typename H> friend H AbslHashValue(H h, const GrpcServiceHashKeyWrapper& wrapper) {
+  template <typename H> friend H AbslHashValue(H h, const GrpcServiceConfigWithHashKey& wrapper) {
     return H::combine(std::move(h), wrapper.pre_computed_hash_);
   }
 
-  friend bool operator==(const GrpcServiceHashKeyWrapper& lhs,
-                         const GrpcServiceHashKeyWrapper& rhs) {
-    return Protobuf::util::MessageDifferencer::Equivalent(lhs.config_, rhs.config_);
+  friend bool operator==(const GrpcServiceConfigWithHashKey& lhs,
+                         const GrpcServiceConfigWithHashKey& rhs) {
+    if (lhs.pre_computed_hash_ == rhs.pre_computed_hash_) {
+      return Protobuf::util::MessageDifferencer::Equivalent(lhs.config_, rhs.config_);
+    }
+    return false;
   }
 
   const envoy::config::core::v3::GrpcService& config() const { return config_; }
@@ -75,8 +78,9 @@ public:
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
                             Stats::Scope& scope, bool skip_cluster_check) PURE;
 
+  // TODO(diazalan) deprecate old getOrCreateRawAsyncClient once all filters have been transitioned
   virtual RawAsyncClientSharedPtr
-  getOrCreateRawAsyncClientWithWrapper(const GrpcServiceHashKeyWrapper& grpc_service,
+  getOrCreateRawAsyncClientWithHashKey(const GrpcServiceConfigWithHashKey& grpc_service,
                                        Stats::Scope& scope, bool skip_cluster_check) PURE;
 
   /**

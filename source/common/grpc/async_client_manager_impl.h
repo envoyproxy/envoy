@@ -53,7 +53,7 @@ public:
                             bool skip_cluster_check) override;
 
   RawAsyncClientSharedPtr
-  getOrCreateRawAsyncClientWithWrapper(const GrpcServiceHashKeyWrapper& key_wrapper,
+  getOrCreateRawAsyncClientWithHashKey(const GrpcServiceConfigWithHashKey& config_with_hash_key,
                                        Stats::Scope& scope, bool skip_cluster_check) override;
 
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
@@ -62,24 +62,25 @@ public:
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher);
-    void setCache(const GrpcServiceHashKeyWrapper& key_wrapper,
+    void setCache(const GrpcServiceConfigWithHashKey& config_with_hash_key,
                   const RawAsyncClientSharedPtr& client);
 
-    RawAsyncClientSharedPtr getCache(const GrpcServiceHashKeyWrapper& key_wrapper);
+    RawAsyncClientSharedPtr getCache(const GrpcServiceConfigWithHashKey& config_with_hash_key);
 
   private:
     void evictEntriesAndResetEvictionTimer();
     struct CacheEntry {
-      CacheEntry(const envoy::config::core::v3::GrpcService& config,
+      CacheEntry(const GrpcServiceConfigWithHashKey& config_with_hash_key,
                  RawAsyncClientSharedPtr const& client, MonotonicTime create_time)
-          : key_wrapper_(config), client_(client), accessed_time_(create_time) {}
-      GrpcServiceHashKeyWrapper key_wrapper_;
+          : config_with_hash_key_(config_with_hash_key), client_(client),
+            accessed_time_(create_time) {}
+      GrpcServiceConfigWithHashKey config_with_hash_key_;
       RawAsyncClientSharedPtr client_;
       MonotonicTime accessed_time_;
     };
     using LruList = std::list<CacheEntry>;
     LruList lru_list_;
-    absl::flat_hash_map<GrpcServiceHashKeyWrapper, LruList::iterator> lru_map_wrapper_;
+    absl::flat_hash_map<GrpcServiceConfigWithHashKey, LruList::iterator> lru_map_;
     Event::Dispatcher& dispatcher_;
     Envoy::Event::TimerPtr cache_eviction_timer_;
     static constexpr std::chrono::seconds EntryTimeoutInterval{50};
