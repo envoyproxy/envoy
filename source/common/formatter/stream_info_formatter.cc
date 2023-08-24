@@ -137,7 +137,7 @@ FilterStateFormatter::create(const std::string& format, const absl::optional<siz
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
 
-  SubstitutionFormatParser::parseSubcommand(format, ':', key, serialize_type);
+  SubstitutionFormatUtils::parseSubcommand(format, ':', key, serialize_type);
   if (key.empty()) {
     throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
   }
@@ -1303,7 +1303,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               std::string filter_namespace;
               std::vector<std::string> path;
 
-              SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
+              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
               return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
             }}},
 
@@ -1313,7 +1313,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               std::string filter_namespace;
               std::vector<std::string> path;
 
-              SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
+              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
               return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
             }}},
           {"UPSTREAM_METADATA",
@@ -1322,7 +1322,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               std::string filter_namespace;
               std::vector<std::string> path;
 
-              SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
+              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
               return std::make_unique<UpstreamHostMetadataFormatter>(filter_namespace, path,
                                                                      max_length);
             }}},

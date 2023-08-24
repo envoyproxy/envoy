@@ -851,7 +851,11 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
   }
   autonomous_upstream_ = true;
 
-  initializeTest(false);
+  initializeTest(false, [](envoy::config::cluster::v3::Cluster& cluster) {
+    // Make the cluster a maglev cluster which relies on the load balancer
+    // factory that is created when the cluster is first added.
+    cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::MAGLEV);
+  });
   EndpointSettingOptions options;
   options.total_endpoints = 1;
   options.healthy_endpoints = 1;
