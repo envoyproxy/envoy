@@ -395,6 +395,28 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   readFromClientSockets();
 }
 
+class MockNonDispatchedUdpPacketHandler : public Network::NonDispatchedUdpPacketHandler {
+public:
+  MOCK_METHOD(void, handle, (uint32_t worker_index, const Network::UdpRecvData& packet));
+};
+
+TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
+  initialize();
+  MockNonDispatchedUdpPacketHandler mock_packet_forwarding;
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = mock_packet_forwarding;
+  quic_listener_->shutdownListener(options);
+  quic::QuicBufferedPacketStore* const buffered_packets =
+      quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
+  maybeConfigureMocks(/* connection_count = */ 0);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  EXPECT_CALL(mock_packet_forwarding, handle(_, _));
+  sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_EQ(0u, quic_dispatcher_->NumSessions());
+}
+
 TEST_P(ActiveQuicListenerTest, NormalizeTimeouts) {
   idle_timeout_ = 0.0005;      // 0.5ms
   handshake_timeout_ = 0.0009; // 0.9ms
