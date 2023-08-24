@@ -117,7 +117,9 @@ paths:
     - source/common/network/socket_impl.cc
     - source/common/ssl/tls_certificate_config_impl.cc
     - source/common/formatter/http_specific_formatter.cc
+    - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
+    - source/common/formatter/substitution_formatter.h
     - source/common/formatter/substitution_formatter.cc
     - source/common/formatter/substitution_format_utility.cc
     - source/common/formatter/substitution_format_string.cc
