@@ -175,6 +175,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: bazel.distribution
+      publishTestResults: false
       stepsPre:
       - template: ../gpg.yml
         parameters:
@@ -211,6 +212,7 @@ jobs:
       rbe: false
       artifactSuffix: ".arm64"
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      packageTestResults: false
       tmpfsDockerDisabled: true
       stepsPre:
       - template: ../gpg.yml
@@ -325,6 +327,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: release.signed
+      publishTestResults: false
       env:
         GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       stepsPre:
