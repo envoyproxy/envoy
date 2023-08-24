@@ -97,9 +97,6 @@ public:
     return count;
   }
 
-  /*Stats::SymbolTableImpl symbol_table_;
-  Stats::AllocatorImpl alloc_;
-  Stats::ThreadLocalStoreImpl store_;*/
   std::vector<Stats::ScopeSharedPtr> scopes_;
   Envoy::Stats::CustomStatNamespacesImpl custom_namespaces_;
 };
@@ -249,7 +246,8 @@ static void BM_HistogramsJson(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT
     uint64_t count = test_context.handlerStats(params);
-    RELEASE_ASSERT(count > 1750000, "expected count > 1.7M"); // actual = 1782900
+    RELEASE_ASSERT(count > 1750000 && count < 2000000,
+                   absl::StrCat("count=", count, ", expected > 1.7M"));
   }
 }
 BENCHMARK(BM_HistogramsJson)->Unit(benchmark::kMillisecond);

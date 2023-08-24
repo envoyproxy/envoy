@@ -145,7 +145,7 @@ void Streamer::addNumber(double number) {
     fragments_.push_back("null");
   } else {
     std::string& buffer = buffers_[buffers_index_];
-    buffer = absl::StrFormat("%g", number);
+    buffer = absl::StrCat(number); // Significantly faster than absl::StrFormat("%g", number).
     fragments_.push_back(buffer);
     nextBuffer();
   }
