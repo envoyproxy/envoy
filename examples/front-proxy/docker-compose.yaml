@@ -6,9 +6,9 @@ services:
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service-envoy-1:
-        condition: service_started
+        condition: service_healthy
       service-envoy-2:
-        condition: service_started
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-8080}:8080"
     - "${PORT_HTTPS:-8443}:8443"

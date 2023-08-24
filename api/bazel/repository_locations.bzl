@@ -99,7 +99,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/prometheus/client_model/archive/v{version}.tar.gz"],
         use_category = ["api"],
         license = "Apache-2.0",
-        license_url = "https://github.com/prometheus/client_model/blob/{version}/LICENSE",
+        license_url = "https://github.com/prometheus/client_model/blob/v{version}/LICENSE",
     ),
     rules_proto = dict(
         project_name = "Protobuf Rules for Bazel",
