@@ -114,8 +114,7 @@ void HotRestartImpl::drainParentListeners() {
   shmem_->flags_ &= ~SHMEM_FLAGS_INITIALIZING;
 }
 
-int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
-                                                Network::ListenerConfig&) {
+int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint32_t worker_index) {
   return as_child_.duplicateParentListenSocket(address, worker_index);
 }
 

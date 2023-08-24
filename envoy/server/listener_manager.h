@@ -72,15 +72,12 @@ public:
    * @param bind_type supplies the bind type of the listen socket.
    * @param creation_options additional options for how to create the socket.
    * @param worker_index supplies the socket/worker index of the new socket.
-   * @param listener is the listener to which the new socket belongs.
    * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
-  virtual Network::SocketSharedPtr
-  createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                     Network::Socket::Type socket_type,
-                     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-                     const Network::SocketCreationOptions& creation_options, uint32_t worker_index,
-                     Network::ListenerConfig& listener) PURE;
+  virtual Network::SocketSharedPtr createListenSocket(
+      Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+      const Network::SocketCreationOptions& creation_options, uint32_t worker_index) PURE;
 
   /**
    * Creates a list of filter factories.

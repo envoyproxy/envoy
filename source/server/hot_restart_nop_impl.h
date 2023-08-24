@@ -17,9 +17,7 @@ class HotRestartNopImpl : public Server::HotRestart {
 public:
   // Server::HotRestart
   void drainParentListeners() override {}
-  int duplicateParentListenSocket(const std::string&, uint32_t, Network::ListenerConfig&) override {
-    return -1;
-  }
+  int duplicateParentListenSocket(const std::string&, uint32_t) override { return -1; }
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
   absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override {
     return absl::nullopt;

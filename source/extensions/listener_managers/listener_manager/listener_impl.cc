@@ -77,8 +77,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
     const std::string& listener_name, uint32_t tcp_backlog_size,
     ListenerComponentFactory::BindType bind_type,
-    const Network::SocketCreationOptions& creation_options, uint32_t num_sockets,
-    Network::ListenerConfig& listener)
+    const Network::SocketCreationOptions& creation_options, uint32_t num_sockets)
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
       listener_name_(listener_name), tcp_backlog_size_(tcp_backlog_size), bind_type_(bind_type),
       socket_creation_options_(creation_options) {
@@ -101,7 +100,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     }
   }
 
-  sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, 0, listener));
+  sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, 0));
 
   if (sockets_[0] != nullptr && local_address_->ip() && local_address_->ip()->port() == 0) {
     local_address_ = sockets_[0]->connectionInfoProvider().localAddress();
@@ -114,7 +113,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     if (bind_type_ != ListenerComponentFactory::BindType::ReusePort && sockets_[0] != nullptr) {
       sockets_.push_back(sockets_[0]->duplicate());
     } else {
-      sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, i, listener));
+      sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, i));
     }
   }
   ASSERT(sockets_.size() == num_sockets);
@@ -145,14 +144,12 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& 
 }
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOptions(
-    ListenerComponentFactory& factory, Network::Socket::Type socket_type, uint32_t worker_index,
-    Network::ListenerConfig& listener) {
+    ListenerComponentFactory& factory, Network::Socket::Type socket_type, uint32_t worker_index) {
   // Socket might be nullptr when doing server validation.
   // TODO(mattklein123): See the comment in the validation code. Make that code not return nullptr
   // so this code can be simpler.
-  Network::SocketSharedPtr socket =
-      factory.createListenSocket(local_address_, socket_type, options_, bind_type_,
-                                 socket_creation_options_, worker_index, listener);
+  Network::SocketSharedPtr socket = factory.createListenSocket(
+      local_address_, socket_type, options_, bind_type_, socket_creation_options_, worker_index);
 
   // Binding is done by now.
   ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
