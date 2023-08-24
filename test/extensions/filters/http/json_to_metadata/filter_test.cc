@@ -1444,7 +1444,7 @@ response_rules:
 )EOF");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
-  testRequestWithBody("{}");
+  testResponseWithBody("{}");
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rsp_success"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.rsp_mismatched_content_type"), 1);
