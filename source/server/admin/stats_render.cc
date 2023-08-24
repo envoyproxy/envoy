@@ -106,8 +106,7 @@ StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
   // streaming difficult. Instead we emit the preamble in the constructor here,
   // and create json models for each stats entry.
   json_stats_map_->newKey("stats");
-  //[this]() { stats_value_context_ = json_stats_map_->deferValue(); });
-  json_stats_array_ = json_stats_map_->newArray();
+  json_stats_array_ = json_stats_map_->addArray();
 }
 
 void StatsJsonRender::drainIfNeeded(Buffer::Instance& response) {
@@ -121,9 +120,7 @@ void StatsJsonRender::drainIfNeeded(Buffer::Instance& response) {
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
   ASSERT(!histograms_initialized_);
-  json_stats_array_->newMap()->newEntries(
-      {{"name", name},
-       {"value", static_cast<double>(value)}});
+  json_stats_array_->addMap()->addEntries({{"name", name}, {"value", static_cast<double>(value)}});
   drainIfNeeded(response);
 }
 
@@ -132,9 +129,7 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
   ASSERT(!histograms_initialized_);
-  json_stats_array_->newMap()->newEntries(
-      {{"name", name},
-       {"value", value}});
+  json_stats_array_->addMap()->addEntries({{"name", name}, {"value", value}});
   drainIfNeeded(response);
 }
 
@@ -156,10 +151,10 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::NoBuckets: {
-    Json::Streamer::MapPtr map = json_histogram_array_->newMap();
-    map->newEntries({{"name", name}});
-    map->newKey("values"); //[this, &histogram, &map]() {
-    populatePercentiles(histogram, *map); // });
+    Json::Streamer::MapPtr map = json_histogram_array_->addMap();
+    map->addEntries({{"name", name}});
+    map->newKey("values");
+    populatePercentiles(histogram, *map);
     break;
   }
   case Utility::HistogramBucketsMode::Cumulative: {
@@ -195,79 +190,69 @@ void StatsJsonRender::populateSupportedPercentiles(Json::Streamer::Map& map) {
     views[i] = quantile * 100;
     ++i;
   }
-  map.newArray()->newEntries(Json::Streamer::Array::Values(views.data(), views.size()));
+  map.addArray()->addEntries(Json::Streamer::Array::Values(views.data(), views.size()));
 }
 
 void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogram,
                                           Json::Streamer::Map& map) {
-  Json::Streamer::ArrayPtr array = map.newArray();
+  Json::Streamer::ArrayPtr array = map.addArray();
   std::vector<double> totals = histogram.cumulativeStatistics().computedQuantiles(),
                       intervals = histogram.intervalStatistics().computedQuantiles();
   uint32_t min_size = std::min(totals.size(), intervals.size());
   ASSERT(totals.size() == min_size);
   ASSERT(intervals.size() == min_size);
   for (uint32_t i = 0; i < min_size; ++i) {
-    array->newMap()->newEntries({{"cumulative", totals[i]},
-                                 {"interval", intervals[i]}});
+    array->addMap()->addEntries({{"cumulative", totals[i]}, {"interval", intervals[i]}});
   }
 };
 
 void StatsJsonRender::renderHistogramStart() {
   histograms_initialized_ = true;
-  json_histogram_map1_ = json_stats_array_->newMap();
-  json_histogram_map1_->newKey("histograms"); //, [this]() {
+  json_histogram_map1_ = json_stats_array_->addMap();
+  json_histogram_map1_->newKey("histograms");
   switch (histogram_buckets_mode_) {
-    case Utility::HistogramBucketsMode::Detailed:
-      json_histogram_map2_ = json_histogram_map1_->newMap();
-      json_histogram_map2_->newKey("supported_percentiles"); //, [this]() {
-      populateSupportedPercentiles(*json_histogram_map2_);
-      //});
-      json_histogram_map2_->newKey("details"); // , [this]() {
-      json_histogram_array_ = json_histogram_map2_->newArray();
-      //});
-      break;
-    case Utility::HistogramBucketsMode::NoBuckets:
-      json_histogram_map2_ = json_histogram_map1_->newMap();
-      json_histogram_map2_->newKey("supported_quantiles"); // [this]() {
-      populateSupportedPercentiles(*json_histogram_map2_); //});
-      json_histogram_map2_->newKey("computed_quantiles"); //, [this]() {
-      json_histogram_array_ = json_histogram_map2_->newArray();
-      //});
-      break;
-    case Utility::HistogramBucketsMode::Cumulative:
-    case Utility::HistogramBucketsMode::Disjoint:
-      json_histogram_array_ = json_histogram_map1_->newArray();
-      break;
+  case Utility::HistogramBucketsMode::Detailed:
+    json_histogram_map2_ = json_histogram_map1_->addMap();
+    json_histogram_map2_->newKey("supported_percentiles");
+    populateSupportedPercentiles(*json_histogram_map2_);
+    json_histogram_map2_->newKey("details");
+    json_histogram_array_ = json_histogram_map2_->addArray();
+    break;
+  case Utility::HistogramBucketsMode::NoBuckets:
+    json_histogram_map2_ = json_histogram_map1_->addMap();
+    json_histogram_map2_->newKey("supported_quantiles");
+    populateSupportedPercentiles(*json_histogram_map2_);
+    json_histogram_map2_->newKey("computed_quantiles");
+    json_histogram_array_ = json_histogram_map2_->addArray();
+    break;
+  case Utility::HistogramBucketsMode::Cumulative:
+  case Utility::HistogramBucketsMode::Disjoint:
+    json_histogram_array_ = json_histogram_map1_->addArray();
+    break;
   }
-  // });
 }
 
 void StatsJsonRender::generateHistogramDetail(const std::string& name,
                                               const Stats::ParentHistogram& histogram) {
   // Now we produce the stream-able histogram records, without using the json intermediate
   // representation or serializer.
-  Json::Streamer::MapPtr map = json_histogram_array_->newMap();
-  map->newEntries({{"name", name}});
-
-  map->newKey("totals"); //, [&map, &histogram, this]() {
+  Json::Streamer::MapPtr map = json_histogram_array_->addMap();
+  map->addEntries({{"name", name}});
+  map->newKey("totals");
   populateBucketsVerbose(histogram.detailedTotalBuckets(), *map);
-  //});
-  map->newKey("intervals"); //, [&map, &histogram, this]() {
+  map->newKey("intervals");
   populateBucketsVerbose(histogram.detailedIntervalBuckets(), *map);
-  //});
-  map->newKey("percentiles"); //, [&map, &histogram, this]() {
+  map->newKey("percentiles");
   populatePercentiles(histogram, *map);
-  //});
 }
 
 void StatsJsonRender::populateBucketsVerbose(
     const std::vector<Stats::ParentHistogram::Bucket>& buckets, Json::Streamer::Map& map) {
-  Json::Streamer::ArrayPtr buckets_array = map.newArray();
+  Json::Streamer::ArrayPtr buckets_array = map.addArray();
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
-    buckets_array->newMap()->newEntries(
-        {{"lower_bound", bucket.lower_bound_},
-         {"width", bucket.width_},
-         {"count", static_cast<double>(bucket.count_)}});
+    buckets_array->addMap()->addEntries({{"lower_bound", bucket.lower_bound_},
+                                         {"width", bucket.width_},
+                                         {"count", static_cast<double>(bucket.count_)}});
   }
 }
 
@@ -293,20 +278,16 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   size_t min_size =
       std::min({interval_buckets.size(), cumulative_buckets.size(), supported_buckets.size()});
 
-  Json::Streamer::MapPtr map = json_histogram_array_->newMap();
-  map->newKey("name"); //, [&map, &name]() {
-  map->addString(name);
-  //});
-  map->newKey(
-      "buckets"); //, [&map, &supported_buckets, &interval_buckets, &cumulative_buckets, min_size]() {
-  Json::Streamer::ArrayPtr buckets = map->newArray();
+  Json::Streamer::MapPtr map = json_histogram_array_->addMap();
+  map->addEntries({{"name", name}});
+  map->newKey("buckets");
+  Json::Streamer::ArrayPtr buckets = map->addArray();
   for (uint32_t i = 0; i < min_size; ++i) {
-    Json::Streamer::MapPtr bucket_map = buckets->newMap();
-    bucket_map->newEntries({{"upper_bound", supported_buckets[i]},
+    Json::Streamer::MapPtr bucket_map = buckets->addMap();
+    bucket_map->addEntries({{"upper_bound", supported_buckets[i]},
                             {"interval", static_cast<double>(interval_buckets[i])},
                             {"cumulative", static_cast<double>(cumulative_buckets[i])}});
   }
-  //});
 }
 
 } // namespace Server

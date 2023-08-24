@@ -50,12 +50,12 @@ public:
     /**
      * @return a newly created subordinate map.
      */
-    MapPtr newMap();
+    MapPtr addMap();
 
     /**
      * @return a newly created subordinate array.
      */
-    ArrayPtr newArray();
+    ArrayPtr addArray();
 
     void addNumber(double d);
     void addString(absl::string_view str);
@@ -70,12 +70,21 @@ public:
   protected:
     /**
      * Initiates a new entry, serializing a comma separator if this is not the
-     * first one. After calling this, and before returning control to the
-     * streamer's client, Streamer::flush() must be called.
+     * first one.
      */
     virtual void newEntry();
 
-    void renderValue(const Value& value);
+    /**
+     * Renders a string or a double in json format. Doubles that are NaN are
+     * rendered as 'null'. Strings are json-sanitized if needed, and surrounded
+     * by quotes.
+     *
+     * @param Value the value to render.
+     * @return true if the value was a string, thus requiring a flush() before
+     *              returning control to the streamer client, which may mutate
+     *              the string.
+     */
+    bool renderValue(const Value& value);
 
   private:
     friend Streamer;
@@ -111,90 +120,29 @@ public:
     using NameValue = std::pair<const absl::string_view, Value>;
     using Entries = absl::Span<const NameValue>;
 
-    /**
-     * Represents a map value which will be closed at a later point. This is
-     * needed for event-driven serialization, where we cannot close out a map
-     * value prior to returning from the function that emitted the map key.
-     *
-     * All this structure really needs to do is clear Map::expecting_value_
-     * after it is destructed, but there's some complexity required to allow the
-     * Map to be destroyed prior to the Value, which can occur during
-     * Streamer::close().
-     */
-#if 0
-    class DeferredValue {
-    public:
-      explicit DeferredValue(Map& map);
-      ~DeferredValue();
-
-    private:
-      friend Map;
-
-      /**
-       * Called from Map's destructor to ensure that a DeferredValue object
-       * does not outlast the Map in which it was instantiated. This is needed
-       * when the Map is closed before destruction due to Streamer::close().
-       */
-      void close();
-
-      Map& map_;
-      bool managed_{true};
-    };
-    using DeferredValuePtr = std::unique_ptr<DeferredValue>;
-#endif
-
     Map(Streamer& streamer) : Level(streamer, "{", "}") {}
-    ~Map() override;
 
     /**
-     * Initiates a new map key, and runs a supplied function to then
-     * emit the value. The supplied function may emit the value in
-     * one of three ways:
-     *   1. Instantiating and populating a subordinate map or array.
-     *   2. Call addSanitized() with a value to be json-sanitized,
-     *      quoted, and emitted.
-     *   3. Call deferValue() which returns a structure that can be saved
-     *      and and resolved at a later time. This makes it possible to
-     *      incrementally stream map contents.
+     * Initiates a new map key. This must be followed by rendering a value,
+     * sub-array, or sub-map. It is a programming error to delete a map that
+     * has rendered a key without a matching value.
      *
-     * See also newEntries, which directly populates a list of name/value
+     * See also addEntries, which directly populates a list of name/value
      * pairs in a single call.
      */
-    //void newKey(absl::string_view name, std::function<void()>);
     void newKey(absl::string_view name);
-
-    /**
-     * @return a structure to represent the deferred value; to be filled later.
-     */
-    //DeferredValuePtr deferValue();
 
     /**
      * Populates a list of name/value pairs in a single call. This function
      * makes it easy to populate structures with scalar values.
      */
-    void newEntries(const Entries& entries);
-
-    /**
-     * Sanitizes a value using the JSON sanitizer, adds double-quotes, and sets
-     * it as the current map value. This routine must only be called from the
-     * lambda passed to newKey().
-     */
-    //void addSanitized(absl::string_view value);
+    void addEntries(const Entries& entries);
 
   protected:
     virtual void newEntry() override;
 
   private:
-    /*
-    void clearDeferredValue() {
-      deferred_value_.reset();
-      expecting_value_ = false;
-    }
-    */
-
-    //friend DeferredValue;
     bool expecting_value_{false};
-    //OptRef<DeferredValue> deferred_value_;
   };
 
   /**
@@ -214,18 +162,8 @@ public:
      *
      * @param entries the array of string entries.
      */
-    void newEntries(const Values& entries);
+    void addEntries(const Values& entries);
   };
-
-  /**
-   * Converts a number to a string.
-   */
-  static std::string number(double d);
-
-  /**
-   * Adds quotes around a string so it renders as a JSON string.
-   */
-  static std::string quote(absl::string_view str);
 
   /**
    * Unwinds the stack of levels, properlying closing all of them
@@ -265,26 +203,9 @@ private:
   void addSanitized(absl::string_view token, absl::string_view suffix = "\"");
 
   /**
-   * Serializes a string without adding quotes, copying the bytes.
-   */
-  //void addCopy(absl::string_view token);
-
-  void addNumber(double d);
-
-  /**
    * Serializes a number.
    */
-  //void addDouble(double number);
-
-  /**
-   * Serializes a string, without copying the bytes.
-   */
-  //void addNoCopy(absl::string_view token) { fragments_.push_back(token); }
-
-  /**
-   * Adds an array of values.
-   */
-  //void addFragments(const Array::Values& src);
+  void addNumber(double d);
 
   /**
    * Flushes out any pending fragments.
@@ -297,6 +218,9 @@ private:
    */
   void addConstantString(absl::string_view str) { fragments_.push_back(str); }
 
+  /**
+   * Advance to the next buffer, flushing to response_ when we run out of buffers.
+   */
   void nextBuffer();
 
 #ifndef NDEBUG
@@ -311,7 +235,6 @@ private:
   static constexpr uint32_t NumBuffers = 10;
   std::string buffers_[NumBuffers];
   uint32_t buffers_index_{0};
-  //std::string buffer_;
   std::stack<Level*> levels_;
 };
 
