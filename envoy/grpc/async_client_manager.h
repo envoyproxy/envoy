@@ -34,7 +34,8 @@ using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
 class GrpcServiceHashKeyWrapper {
 public:
-  GrpcServiceHashKeyWrapper(const envoy::config::core::v3::GrpcService& config);
+  GrpcServiceHashKeyWrapper(const envoy::config::core::v3::GrpcService& config)
+      : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)){};
 
   template <typename H> friend H AbslHashValue(H h, const GrpcServiceHashKeyWrapper& wrapper) {
     return H::combine(std::move(h), wrapper.pre_computed_hash_);
@@ -42,8 +43,7 @@ public:
 
   friend bool operator==(const GrpcServiceHashKeyWrapper& lhs,
                          const GrpcServiceHashKeyWrapper& rhs) {
-    return lhs.config_.GetTypeName() == rhs.config_.GetTypeName() &&
-           lhs.config_as_string_ == rhs.config_as_string_;
+    return Protobuf::util::MessageDifferencer::Equivalent(lhs.config_, rhs.config_);
   }
 
   const envoy::config::core::v3::GrpcService& config() const { return config_; }
@@ -51,7 +51,6 @@ public:
 private:
   const envoy::config::core::v3::GrpcService config_;
   const std::size_t pre_computed_hash_;
-  const std::string config_as_string_;
 };
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
