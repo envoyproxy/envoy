@@ -1523,6 +1523,9 @@ response_rules:
 
   testRequestWithBody(request_body);
 
+  Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
@@ -1543,6 +1546,9 @@ request_rules:
   const std::string response_body = R"delimiter({"version":"good version"})delimiter";
 
   testResponseWithBody(response_body);
+
+  Http::TestResponseTrailerMapImpl trailers{{"some", "trailer"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
 
   EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
