@@ -709,6 +709,37 @@ TEST_F(FilterTest, DecodeTwoDataStreams) {
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
+TEST_F(FilterTest, EncodeTwoDataStreams) {
+  initializeFilter(request_config_yaml_);
+
+  const std::string response_body1 =
+      R"delimiter(
+        {"version":"1.0.0",
+        "messages":[
+          {"role":"user","content":"content A"},
+          {"role":"assis)delimiter";
+  const std::string response_body2 =
+      R"delimiter(tant","content":"content B"},
+          {"role":"user","content":"content C"},
+          {"role":"assistant","content":"content D"},
+          {"role":"user","content":"content E"}],
+        "stream":true})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "1.0.0"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testResponseWithBody(response_body1, false, Http::FilterDataStatus::StopIterationAndBuffer);
+  testResponseWithBody(response_body2);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp_success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp_no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp_invalid_json_body"), 0);
+}
+
 TEST_F(FilterTest, SecondLayerMatch) {
   initializeFilter(R"EOF(
 request_rules:
@@ -1519,6 +1550,8 @@ response_rules:
       key: version
       type: STRING
 )EOF");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers_, false));
+
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
 
   testRequestWithBody(request_body);
@@ -1543,6 +1576,8 @@ request_rules:
       key: version
       type: STRING
 )EOF");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
   const std::string response_body = R"delimiter({"version":"good version"})delimiter";
 
   testResponseWithBody(response_body);
