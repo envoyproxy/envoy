@@ -28,6 +28,7 @@ namespace Server {
 class HotRestartingBase : public Logger::Loggable<Logger::Id::main> {
 protected:
   HotRestartingBase(uint64_t base_id) : main_rpc_stream_(base_id) {}
+  virtual ~HotRestartingBase();
 
   enum class Blocking { Yes, No };
 
@@ -68,8 +69,6 @@ protected:
     std::unique_ptr<envoy::HotRestartMessage> receiveHotRestartMessage(Blocking block);
     bool replyIsExpectedType(const envoy::HotRestartMessage* proto,
                              envoy::HotRestartMessage::Reply::ReplyCase oneof_type) const;
-
-    int domain_socket_{-1};
 
   private:
     void getPassedFdIfPresent(envoy::HotRestartMessage* out, msghdr* message);

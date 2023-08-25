@@ -11,7 +11,7 @@ namespace Server {
  * This outer class only handles evented socket I/O. The actual hot restart logic lives in
  * HotRestartingParent::Internal.
  */
-class HotRestartingParent : HotRestartingBase {
+class HotRestartingParent : public HotRestartingBase {
 public:
   HotRestartingParent(int base_id, int restart_epoch, const std::string& socket_path,
                       mode_t socket_mode);
@@ -43,6 +43,7 @@ private:
 
   const int restart_epoch_;
   sockaddr_un child_address_;
+  sockaddr_un child_address_udp_forwarding_;
   Event::FileEventPtr socket_event_;
   std::unique_ptr<Internal> internal_;
 };

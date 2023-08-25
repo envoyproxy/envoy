@@ -22,6 +22,11 @@ HotRestartingBase::RpcStream::~RpcStream() {
     Api::SysCallIntResult result = os_sys_calls.close(domain_socket_);
     ASSERT(result.return_value_ == 0);
   }
+  if (my_domain_socket_udp_forwarding_ != -1) {
+    Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+    Api::SysCallIntResult result = os_sys_calls.close(my_domain_socket_udp_forwarding_);
+    ASSERT(result.return_value_ == 0);
+  }
 }
 
 void HotRestartingBase::RpcStream::initDomainSocketAddress(sockaddr_un* address) {
@@ -62,6 +67,26 @@ void HotRestartingBase::RpcStream::bindDomainSocket(uint64_t id, const std::stri
     const auto msg = fmt::format(
         "unable to bind domain socket with base_id={}, id={}, errno={} (see --base-id option)",
         base_id_, id, result.errno_);
+    if (result.errno_ == SOCKET_ERROR_ADDR_IN_USE) {
+      throw HotRestartDomainSocketInUseException(msg);
+    }
+    throw EnvoyException(msg);
+  }
+}
+
+void HotRestartingBase::bindDomainSocketUdpForwarding(uint64_t id, const std::string& role,
+                                                      const std::string& socket_path,
+                                                      mode_t socket_mode) {
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  my_domain_socket_udp_forwarding_ = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+  sockaddr_un address = createDomainSocketAddress(id, role, socket_path, socket_mode);
+  unlink(address.sun_path);
+  Api::SysCallIntResult result = os_sys_calls.bind(
+      my_domain_socket_udp_forwarding_, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+  if (result.return_value_ != 0) {
+    const auto msg = fmt::format("unable to bind udp forwarding domain socket with base_id={}, "
+                                 "id={}, errno={} (see --base-id option)",
+                                 base_id_, id, result.errno_);
     if (result.errno_ == SOCKET_ERROR_ADDR_IN_USE) {
       throw HotRestartDomainSocketInUseException(msg);
     }

@@ -16,9 +16,14 @@ using HotRestartMessage = envoy::HotRestartMessage;
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
                                          const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
+  std::string socket_path_udp = socket_path + "_udp";
   child_address_ = main_rpc_stream_.createDomainSocketAddress(restart_epoch_ + 1, "child",
                                                               socket_path, socket_mode);
+  child_address_udp_forwarding_ = udp_forwarding_rpc_stream_.createDomainSocketAddress(
+      restart_epoch_ + 1, "child", socket_path_udp, socket_mode);
   main_rpc_stream_.bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
+  udp_forwarding_rpc_stream_.bindDomainSocket(restart_epoch_, "parent", socket_path_udp,
+                                              socket_mode);
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
