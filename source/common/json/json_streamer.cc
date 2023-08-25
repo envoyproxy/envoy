@@ -7,6 +7,15 @@
 namespace Envoy {
 namespace Json {
 
+// To ensure the streamer is being used correctly, we use assertions to enforce
+// that only the topmost map/array in the stack is being written to. To make
+// this easier to do from the Level classes, we provider Streamer::topLevel() as
+// a member function, but this is only needed when compiled for debug.
+//
+// We only compile Streamer::topLevel in debug to avoid having it be a coverage
+// gap. However, assertions fail to compile in release mode if they reference
+// non-existent functions or member variables, so we only compile the assertions
+// in debug mode.
 #ifdef NDEBUG
 #define ASSERT_THIS_IS_TOP_LEVEL                                                                   \
   do {                                                                                             \
@@ -43,25 +52,25 @@ Streamer::MapPtr Streamer::makeRootMap() {
 
 Streamer::MapPtr Streamer::Level::addMap() {
   ASSERT_THIS_IS_TOP_LEVEL;
-  newEntry();
+  addEntry();
   return std::make_unique<Map>(streamer_);
 }
 
 Streamer::ArrayPtr Streamer::Level::addArray() {
   ASSERT_THIS_IS_TOP_LEVEL;
-  newEntry();
+  addEntry();
   return std::make_unique<Array>(streamer_);
 }
 
 void Streamer::Level::addNumber(double number) {
   ASSERT_THIS_IS_TOP_LEVEL;
-  newEntry();
+  addEntry();
   streamer_.addNumber(number);
 }
 
 void Streamer::Level::addString(absl::string_view str) {
   ASSERT_THIS_IS_TOP_LEVEL;
-  newEntry();
+  addEntry();
   streamer_.addSanitized(str);
 }
 
@@ -72,7 +81,7 @@ void Streamer::pop(Level* level) {
 
 void Streamer::push(Level* level) { levels_.push(level); }
 
-void Streamer::Level::newEntry() {
+void Streamer::Level::addEntry() {
   if (is_first_) {
     is_first_ = false;
   } else {
@@ -80,18 +89,18 @@ void Streamer::Level::newEntry() {
   }
 }
 
-void Streamer::Map::newEntry() {
+void Streamer::Map::addEntry() {
   if (expecting_value_) {
     expecting_value_ = false;
   } else {
-    Level::newEntry();
+    Level::addEntry();
   }
 }
 
 void Streamer::Map::addKey(absl::string_view key) {
   ASSERT_THIS_IS_TOP_LEVEL;
   ASSERT(!expecting_value_);
-  newEntry();
+  addEntry();
   streamer_.addSanitized(key, "\":");
   expecting_value_ = true;
 }
@@ -99,14 +108,14 @@ void Streamer::Map::addKey(absl::string_view key) {
 void Streamer::Map::addEntries(const Entries& entries) {
   ASSERT_THIS_IS_TOP_LEVEL;
   for (const NameValue& entry : entries) {
-    newEntry();
+    addEntry();
     streamer_.addSanitized(entry.first, "\":");
     expecting_value_ = true;
-    renderValue(entry.second);
+    addValue(entry.second);
   }
 }
 
-void Streamer::Level::renderValue(const Value& value) {
+void Streamer::Level::addValue(const Value& value) {
   switch (value.index()) {
   case 0:
     addString(absl::get<absl::string_view>(value));
@@ -115,14 +124,14 @@ void Streamer::Level::renderValue(const Value& value) {
     addNumber(absl::get<double>(value));
     break;
   default:
-    IS_ENVOY_BUG(absl::StrCat("renderValue invalid index: ", value.index()));
+    IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
     break;
   }
 }
 
 void Streamer::Array::addEntries(const Entries& values) {
   for (const Value& value : values) {
-    renderValue(value);
+    addValue(value);
   }
 }
 

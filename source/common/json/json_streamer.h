@@ -90,7 +90,7 @@ public:
      * Initiates a new entry, serializing a comma separator if this is not the
      * first one.
      */
-    virtual void newEntry();
+    virtual void addEntry();
 
     /**
      * Renders a string or a double in json format. Doubles that are NaN are
@@ -102,7 +102,7 @@ public:
      *              returning control to the streamer client, which may mutate
      *              the string.
      */
-    void renderValue(const Value& value);
+    void addValue(const Value& value);
 
   private:
     friend Streamer;
@@ -160,7 +160,7 @@ public:
     void addEntries(const Entries& entries);
 
   protected:
-    virtual void newEntry() override;
+    virtual void addEntry() override;
 
   private:
     bool expecting_value_{false};
