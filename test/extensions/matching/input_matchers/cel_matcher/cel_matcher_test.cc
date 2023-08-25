@@ -134,6 +134,13 @@ public:
     EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::ReturnPointee(&route_));
   }
 
+  void setDynamicMetadata(const std::string& namespace_str, const std::string& metadata_key,
+                          const std::string& metadata_value) {
+    Envoy::Config::Metadata::mutableMetadataValue(stream_info_.metadata_, namespace_str,
+                                                  metadata_key)
+        .set_string_value(metadata_value);
+  }
+
   Matcher::StringActionFactory action_factory_;
   Registry::InjectFactory<Matcher::ActionFactory<absl::string_view>> inject_action_;
   std::shared_ptr<testing::NiceMock<Upstream::MockClusterInfo>> cluster_info_;
@@ -237,6 +244,33 @@ TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
+
+  const auto result = matcher_tree->match(data_);
+  // The match was completed, no match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_, absl::nullopt);
+}
+
+TEST_F(CelMatcherTest, CelMatcherDynamicMetadataMatched) {
+  setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
+                     std::string(kMetadataValue));
+  Envoy::Http::Matching::HttpMatchingDataImpl data =
+      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
+  auto matcher_tree = buildMatcherTree(
+      absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
+  const auto result = matcher_tree->match(data_);
+  // The match was complete, match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
+TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
+  setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey), "wrong_service");
+  Envoy::Http::Matching::HttpMatchingDataImpl data =
+      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
+  auto matcher_tree = buildMatcherTree(
+      absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
   const auto result = matcher_tree->match(data_);
   // The match was completed, no match found.
