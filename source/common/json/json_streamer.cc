@@ -144,22 +144,32 @@ void Streamer::Array::addEntries(const Entries& values) {
 
 void Streamer::addNumber(double number) {
   if (std::isnan(number)) {
+#if BUFFER_FRAGMENTS
     fragments_.push_back("null");
+#else
+    response_.addFragments({"null"});
+#endif
   } else {
+#if BUFFER_FRAGMENTS
     std::string& buffer = buffers_[buffers_index_];
     buffer = absl::StrCat(number); // Significantly faster than absl::StrFormat("%g", number).
     fragments_.push_back(buffer);
     nextBuffer();
+#else
+    response_.addFragments({absl::StrCat(number)});
+#endif
   }
 }
 
 void Streamer::flush() {
+#if BUFFER_FRAGMENTS
   if (fragments_.empty()) {
     return;
   }
   response_.addFragments(fragments_);
   fragments_.clear();
   buffers_index_ = 0;
+#endif
 }
 
 void Streamer::clear() {
@@ -171,9 +181,14 @@ void Streamer::clear() {
 }
 
 bool Streamer::addSanitized(absl::string_view str, absl::string_view suffix) {
+#if BUFFER_FRAGMENTS
   std::string& buffer = buffers_[buffers_index_];
+#else
+  std::string& buffer = buffer_;
+#endif
   absl::string_view sanitized = Json::sanitize(buffer, str);
   absl::string_view fragments[] = {"\"", sanitized, suffix};
+#if BUFFER_FRAGMENTS
   fragments_.insert(fragments_.end(), fragments, fragments + ABSL_ARRAYSIZE(fragments));
 
   // When 'str' is sanitized, the vast majority of the time, no special
@@ -187,13 +202,19 @@ bool Streamer::addSanitized(absl::string_view str, absl::string_view suffix) {
     return false; // no flush() needed due to retaining a pointer to user memory.
   }
   return true; // indicates that flush() must be called prior to returning control.
+#else
+  response_.addFragments(fragments);
+  return false;
+#endif
 }
 
+#if BUFFER_FRAGMENTS
 void Streamer::nextBuffer() {
   if (++buffers_index_ == NumBuffers) {
     flush();
   }
 }
+#endif
 
 } // namespace Json
 } // namespace Envoy

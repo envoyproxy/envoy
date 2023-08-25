@@ -242,7 +242,14 @@ private:
    * Adds a constant string to the output stream. The string must outlive the
    * Streamer object, and is intended for literal strings such as punctuation.
    */
-  void addConstantString(absl::string_view str) { fragments_.push_back(str); }
+  void addConstantString(absl::string_view str) {
+#define BUFFER_FRAGMENTS 0
+#if BUFFER_FRAGMENTS
+    fragments_.push_back(str);
+#else
+    response_.addFragments({str});
+#endif
+  }
 
   /**
    * Advance to the next buffer, flushing to response_ when we run out of buffers.
@@ -274,10 +281,14 @@ private:
   // control from an API that received a user-defined string, and is also called
   // when 10 buffers are consumed. One way to consume 10 buffers is to serialize
   // an array of 10 numbers, which all most be converted to strings.
+#if BUFFER_FRAGMENTS
   std::vector<absl::string_view> fragments_;
   static constexpr uint32_t NumBuffers = 10;
   std::string buffers_[NumBuffers];
   uint32_t buffers_index_{0};
+#else
+  std::string buffer_;
+#endif
 
   // Keeps a stack of Maps or Arrays (subclasses of Level). This stack serves
   // two functions:
