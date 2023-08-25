@@ -6,9 +6,9 @@ services:
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service-envoy-1:
-        condition: service_started
+        condition: service_healthy
       service-envoy-2:
-        condition: service_started
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-8080}:8080"
     - "${PORT_HTTPS:-8443}:8443"
@@ -18,8 +18,10 @@ services:
     build:
       context: .
       dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-admin
       args:
         ENVOY_CONFIG: ./service-envoy.yaml
+        ENVOY_ADMIN_PORT: 8001
     depends_on:
       service1:
         condition: service_healthy
@@ -35,8 +37,11 @@ services:
     build:
       context: .
       dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-admin
       args:
+        ENVOY_ADMIN_PORT: 8001
         ENVOY_CONFIG: ./service-envoy-2.yaml
+
     depends_on:
       service2:
         condition: service_healthy
