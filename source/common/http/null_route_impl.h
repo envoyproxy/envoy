@@ -230,12 +230,11 @@ struct NullRouteImpl : public Router::Route {
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   bool filterDisabled(absl::string_view) const override { return false; }
-  const std::string& routeName() const override { return route_name_; }
+  const std::string& routeName() const override { return EMPTY_STRING; }
 
   RouteEntryImpl route_entry_;
   const envoy::config::core::v3::Metadata metadata_;
   const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory> typed_metadata_;
-  const std::string route_name_;
 };
 
 } // namespace Http
