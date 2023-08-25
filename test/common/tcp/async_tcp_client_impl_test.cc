@@ -11,7 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 
@@ -83,10 +83,12 @@ TEST_F(AsyncTcpClientImplTest, RstClose) {
   expectCreateConnection();
 
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
         EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::LocalReset);
       }));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
+  }));
   client_->close(Network::ConnectionCloseType::AbortReset);
   ASSERT_FALSE(client_->connected());
 }
@@ -133,12 +135,24 @@ TEST_F(AsyncTcpClientImplTest, TestCloseType) {
   setUpClient();
   expectCreateConnection();
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
         EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
       }));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
+  }));
   client_->close(Network::ConnectionCloseType::Abort);
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestGetDispatcher) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(&dispatcher_, &client_->dispatcher());
+  client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_FALSE(client_->connected());
 }
 
