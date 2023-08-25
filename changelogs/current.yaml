@@ -60,6 +60,10 @@ removed_config_or_runtime:
   change: |
     Removed ``envoy.restart_features.use_apple_api_for_dns_lookups`` and legacy code paths.
 
+- area: quic
+  change: |
+    Removed ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` and legacy code paths.
+
 new_features:
 - area: access_log
   change: |
