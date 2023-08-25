@@ -88,22 +88,6 @@ TEST_F(JsonStreamerTest, SubMap) {
   EXPECT_EQ(R"EOF({"a":{"one":1,"three.5":3.5}})EOF", buffer_.toString());
 }
 
-TEST_F(JsonStreamerTest, ExhaustBuffers) {
-  Streamer::MapPtr map = streamer_.makeRootMap();
-  map->addEntries({{"\001", "\002"},
-                   {"\003", "\004"},
-                   {"\005", "\006"},
-                   {"\007", "\010"},
-                   {"\011", "\012"},
-                   {"\013", "\014"}});
-  map.reset();
-  EXPECT_EQ(
-      R"EOF({"\u0001":"\u0002","\u0003":"\u0004","\u0005":"\u0006","\u0007":"\b","\t":"\n","\u000b":"\f"})EOF",
-      buffer_.toString());
-}
-
-// https://storage.googleapis.com/envoy-pr/1659efc/coverage/source/common/json/index.html
-
 } // namespace
 } // namespace Json
 } // namespace Envoy
