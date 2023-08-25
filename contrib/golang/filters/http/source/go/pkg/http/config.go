@@ -33,6 +33,7 @@ import "C"
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -48,23 +49,44 @@ var (
 	configCache        = &sync.Map{} // uint64 -> *anypb.Any
 )
 
+func configFinalize(c *httpConfig) {
+	c.Finalize()
+}
+
+func createConfig(c *C.httpConfig) *httpConfig {
+	config := &httpConfig{
+		config: c,
+	}
+	// NP: make sure httpConfig will be deleted.
+	runtime.SetFinalizer(config, configFinalize)
+
+	return config
+}
+
 //export envoyGoFilterNewHttpPluginConfig
-func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uint64) uint64 {
+func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 	if !api.CgoCheckDisabled() {
 		cAPI.HttpLog(api.Error, "The Envoy Golang filter requires the `GODEBUG=cgocheck=0` environment variable set.")
 		return 0
 	}
 
-	buf := utils.BytesToSlice(configPtr, configLen)
+	buf := utils.BytesToSlice(uint64(c.config_ptr), uint64(c.config_len))
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
 
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
 
-	name := utils.BytesToString(namePtr, nameLen)
+	name := utils.BytesToString(uint64(c.plugin_name_ptr), uint64(c.plugin_name_len))
 	configParser := getHttpFilterConfigParser(name)
 	if configParser != nil {
-		parsedConfig, err := configParser.Parse(&any)
+		var parsedConfig interface{}
+		var err error
+		if c.is_route_config == 1 {
+			parsedConfig, err = configParser.Parse(&any, nil)
+		} else {
+			http_config := createConfig(c)
+			parsedConfig, err = configParser.Parse(&any, http_config)
+		}
 		if err != nil {
 			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
 			return 0

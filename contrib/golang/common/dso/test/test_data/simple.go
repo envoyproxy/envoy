@@ -4,6 +4,14 @@ package main
 typedef struct {
   int foo;
 } httpRequest;
+
+typedef struct {
+  unsigned long long int plugin_name_ptr;
+  unsigned long long int plugin_name_len;
+  unsigned long long int config_ptr;
+  unsigned long long int config_len;
+  int is_route_config;
+} httpConfig;
 */
 import "C"
 import (
@@ -14,14 +22,14 @@ import (
 var configCache = &sync.Map{}
 
 //export envoyGoFilterNewHttpPluginConfig
-func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uint64) uint64 {
+func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 	// already existing return 0, just for testing the destroy api.
-	if _, ok := configCache.Load(configLen); ok {
+	if _, ok := configCache.Load(uint64(c.config_len)); ok {
 		return 0
 	}
 	// mark this configLen already existing
-	configCache.Store(configLen, configLen)
-	return configLen
+	configCache.Store(uint64(c.config_len), uint64(c.config_len))
+	return uint64(c.config_len)
 }
 
 //export envoyGoFilterDestroyHttpPluginConfig

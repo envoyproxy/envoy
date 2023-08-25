@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["command_splitter.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
     ],
@@ -48,7 +49,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
-    deps = [":conn_pool_interface"],
+    deps = [
+        ":conn_pool_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -149,6 +153,7 @@ envoy_cc_library(
     deps = [
         ":conn_pool_lib",
         ":router_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",

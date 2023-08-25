@@ -10,7 +10,7 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 MockRouter::MockRouter(RouteSharedPtr route) : route_(std::move(route)) {
-  ON_CALL(*this, upstreamPool(_)).WillByDefault(Return(route_));
+  ON_CALL(*this, upstreamPool(_, _)).WillByDefault(Return(route_));
 }
 MockRouter::~MockRouter() = default;
 
