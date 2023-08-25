@@ -15,7 +15,7 @@ public:
   }
 
   template <typename ProtoType>
-  static OptRef<ProtoType>
+  static OptRef<const ProtoType>
   getTypedProtoConfig(OptRef<const Upstream::LoadBalancerConfig> lb_config) {
     const auto* typed_lb_config =
         dynamic_cast<const Upstream::LoadBalancerConfigWrapper*>(lb_config.ptr());
