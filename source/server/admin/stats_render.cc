@@ -1,6 +1,5 @@
 #include "source/server/admin/stats_render.h"
 
-#include "source/common/json/json_sanitizer.h"
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_format.h"
@@ -183,12 +182,9 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 void StatsJsonRender::populateSupportedPercentiles(Json::Streamer::Map& map) {
   Stats::HistogramStatisticsImpl empty_statistics;
   std::vector<double> supported = empty_statistics.supportedQuantiles();
-  std::vector<std::string> supported_strings(supported.size());
   std::vector<Json::Streamer::Value> views(supported.size());
-  uint32_t i = 0;
-  for (double quantile : supported) {
-    views[i] = quantile * 100;
-    ++i;
+  for (uint32_t i = 0, n = supported.size(); i < n; ++i) {
+    views[i] = supported[i] * 100;
   }
   map.addArray()->addEntries(views);
 }

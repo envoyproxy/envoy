@@ -103,7 +103,6 @@ int main(int argc, char** argv) {
         critical,
         "Expensive benchmarks are being skipped; see test/README.md for more information");
   }
-  // startup_hook();
   ::benchmark::RunSpecifiedBenchmarks();
   cleanup_hook();
 }
