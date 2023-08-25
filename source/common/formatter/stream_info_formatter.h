@@ -201,63 +201,178 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
  * FormatterProvider for string literals. It ignores headers and stream info and returns string by
  * which it was initialized.
  */
-class PlainStringFormatter : public FormatterProvider {
+template <class FormatterContext>
+class CommonPlainStringFormatterBase : public FormatterProviderBase<FormatterContext> {
 public:
-  PlainStringFormatter(const std::string& str);
+  CommonPlainStringFormatterBase(const std::string& str) { str_.set_string_value(str); }
 
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  // FormatterProviderBase
+  absl::optional<std::string> formatWithContext(const FormatterContext&,
+                                                const StreamInfo::StreamInfo&) const override {
+    return str_.string_value();
+  }
+  ProtobufWkt::Value formatValueWithContext(const FormatterContext&,
+                                            const StreamInfo::StreamInfo&) const override {
+    return str_;
+  }
 
 private:
   ProtobufWkt::Value str_;
 };
 
+template <class FormatterContext>
+class PlainStringFormatterBase : public CommonPlainStringFormatterBase<FormatterContext> {
+public:
+  using CommonPlainStringFormatterBase<FormatterContext>::CommonPlainStringFormatterBase;
+};
+
 /**
  * FormatterProvider for numbers.
  */
-class PlainNumberFormatter : public FormatterProvider {
+template <class FormatterContext>
+class CommonPlainNumberFormatterBase : public FormatterProviderBase<FormatterContext> {
 public:
-  PlainNumberFormatter(double num);
+  CommonPlainNumberFormatterBase(double num) { num_.set_number_value(num); }
 
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  // FormatterProviderBase
+  absl::optional<std::string> formatWithContext(const FormatterContext&,
+                                                const StreamInfo::StreamInfo&) const override {
+    std::string str = absl::StrFormat("%g", num_.number_value());
+    return str;
+  }
+  ProtobufWkt::Value formatValueWithContext(const FormatterContext&,
+                                            const StreamInfo::StreamInfo&) const override {
+    return num_;
+  }
 
 private:
   ProtobufWkt::Value num_;
 };
 
+template <class FormatterContext>
+class PlainNumberFormatterBase : public CommonPlainNumberFormatterBase<FormatterContext> {
+public:
+  using CommonPlainNumberFormatterBase<FormatterContext>::CommonPlainNumberFormatterBase;
+};
+
 /**
  * FormatterProvider based on StreamInfo fields.
  */
-class StreamInfoFormatter : public FormatterProvider {
+template <class FormatterContext>
+class CommonStreamInfoFormatterBase : public FormatterProviderBase<FormatterContext> {
 public:
-  StreamInfoFormatter(const std::string&, const std::string& = "",
-                      absl::optional<size_t> = absl::nullopt);
+  CommonStreamInfoFormatterBase(const std::string& command, const std::string& sub_command = "",
+                                absl::optional<size_t> max_length = absl::nullopt) {
 
-  StreamInfoFormatter(StreamInfoFormatterProviderPtr formatter)
+    const auto& formatters = getKnownStreamInfoFormatterProviders();
+
+    auto it = formatters.find(command);
+
+    if (it == formatters.end()) {
+      throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", command));
+    }
+
+    // Check flags for the command.
+    CommandSyntaxChecker::verifySyntax((*it).second.first, command, sub_command, max_length);
+
+    // Create a pointer to the formatter by calling a function
+    // associated with formatter's name.
+    formatter_ = (*it).second.second(sub_command, max_length);
+  }
+
+  CommonStreamInfoFormatterBase(StreamInfoFormatterProviderPtr formatter)
       : formatter_(std::move(formatter)) {}
 
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view, AccessLog::AccessLogType) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view, AccessLog::AccessLogType) const override;
+  absl::optional<std::string>
+  formatWithContext(const FormatterContext&,
+                    const StreamInfo::StreamInfo& stream_info) const override {
+    return formatter_->format(stream_info);
+  }
+  ProtobufWkt::Value
+  formatValueWithContext(const FormatterContext&,
+                         const StreamInfo::StreamInfo& stream_info) const override {
+    return formatter_->formatValue(stream_info);
+  }
 
 private:
   StreamInfoFormatterProviderPtr formatter_;
 };
+
+template <class FormatterContext>
+class StreamInfoFormatterBase : public CommonStreamInfoFormatterBase<FormatterContext> {
+public:
+  using CommonStreamInfoFormatterBase<FormatterContext>::CommonStreamInfoFormatterBase;
+};
+
+template <class Base> class HttpFormatterProviderSpecializationHelper : public Base {
+public:
+  using Base::Base;
+
+  // FormatterProviderBase for HttpFormatterContext
+  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
+                                     const Http::ResponseHeaderMap& response_headers,
+                                     const Http::ResponseTrailerMap& response_trailers,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     absl::string_view local_reply_body,
+                                     AccessLog::AccessLogType access_log_type) const override {
+    HttpFormatterContext context(&request_headers, &response_headers, &response_trailers,
+                                 local_reply_body, access_log_type);
+    return Base::formatWithContext(context, stream_info);
+  }
+
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 absl::string_view local_reply_body,
+                                 AccessLog::AccessLogType access_log_type) const override {
+    HttpFormatterContext context(&request_headers, &response_headers, &response_trailers,
+                                 local_reply_body, access_log_type);
+    return Base::formatValueWithContext(context, stream_info);
+  }
+};
+
+/**
+ * Specialization of PlainStringFormatterBase for HttpFormatterContext. This will implement
+ * additional format() and formatValue() methods for backward compatibility.
+ */
+template <>
+class PlainStringFormatterBase<HttpFormatterContext>
+    : public HttpFormatterProviderSpecializationHelper<
+          CommonPlainStringFormatterBase<HttpFormatterContext>> {
+public:
+  using HttpFormatterProviderSpecializationHelper::HttpFormatterProviderSpecializationHelper;
+};
+
+/**
+ * Specialization of PlainNumberFormatterBase for HttpFormatterContext. This will implement
+ * additional format() and formatValue() methods for backward compatibility.
+ */
+template <>
+class PlainNumberFormatterBase<HttpFormatterContext>
+    : public HttpFormatterProviderSpecializationHelper<
+          CommonPlainNumberFormatterBase<HttpFormatterContext>> {
+public:
+  using HttpFormatterProviderSpecializationHelper::HttpFormatterProviderSpecializationHelper;
+};
+
+/**
+ * Specialization of StreamInfoFormatterBase for HttpFormatterContext. This will implement
+ * additional format() and formatValue() methods for backward compatibility.
+ */
+template <>
+class StreamInfoFormatterBase<HttpFormatterContext>
+    : public HttpFormatterProviderSpecializationHelper<
+          CommonStreamInfoFormatterBase<HttpFormatterContext>> {
+public:
+  using HttpFormatterProviderSpecializationHelper::HttpFormatterProviderSpecializationHelper;
+};
+
+// Aliases for backward compatibility.
+using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
+using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
+using StreamInfoFormatter = StreamInfoFormatterBase<HttpFormatterContext>;
 
 } // namespace Formatter
 } // namespace Envoy

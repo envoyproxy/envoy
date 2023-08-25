@@ -20,7 +20,7 @@ ProtobufTypes::MessagePtr ReqWithoutQueryFactory::createEmptyConfigProto() {
 
 std::string ReqWithoutQueryFactory::name() const { return "envoy.formatter.req_without_query"; }
 
-REGISTER_FACTORY(ReqWithoutQueryFactory, ReqWithoutQueryFactory::CommandParserFactory);
+REGISTER_FACTORY(ReqWithoutQueryFactory, ::Envoy::Formatter::CommandParserFactory);
 
 } // namespace Formatter
 } // namespace Extensions
