@@ -14,9 +14,9 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
-#include "source/common/common/empty_string.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
