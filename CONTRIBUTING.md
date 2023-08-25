@@ -144,7 +144,7 @@ versioning guidelines:
   git checkout main
   git pull
   git checkout "$branch"
-  git pull
+  git merge main
   ```
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no

@@ -1395,6 +1395,11 @@ public:
    * @return optionally returns the host for the connection pool.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
+
+  /**
+   * @return returns if the connection pool was iniitalized successfully.
+   */
+  virtual bool valid() const PURE;
 };
 
 /**

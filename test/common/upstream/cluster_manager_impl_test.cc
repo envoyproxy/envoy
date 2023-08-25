@@ -4444,7 +4444,7 @@ class TestUpstreamNetworkFilterConfigFactory
 public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::CommonFactoryContext&) override {
+                               Server::Configuration::UpstreamFactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
       filter_manager.addWriteFilter(std::make_shared<TestUpstreamNetworkFilter>());
     };
