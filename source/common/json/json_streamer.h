@@ -217,10 +217,10 @@ private:
   void pop(Level* level);
 
   /**
-   * Takes a raw string, sanitizes it using JSON syntax, adds quotes,
-   * and streams it out.
+   * Takes a raw string, sanitizes it using JSON syntax, surrounds it
+   * with a prefix and suffix, and streams it out.
    */
-  void addSanitized(absl::string_view token, absl::string_view suffix = "\"");
+  void addSanitized(absl::string_view prefix, absl::string_view token, absl::string_view suffix);
 
   /**
    * Serializes a number.

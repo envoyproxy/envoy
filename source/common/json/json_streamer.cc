@@ -71,7 +71,7 @@ void Streamer::Level::addNumber(double number) {
 void Streamer::Level::addString(absl::string_view str) {
   ASSERT_THIS_IS_TOP_LEVEL;
   addEntry();
-  streamer_.addSanitized(str);
+  streamer_.addSanitized("\"", str, "\"");
 }
 
 void Streamer::pop(Level* level) {
@@ -101,16 +101,13 @@ void Streamer::Map::addKey(absl::string_view key) {
   ASSERT_THIS_IS_TOP_LEVEL;
   ASSERT(!expecting_value_);
   addEntry();
-  streamer_.addSanitized(key, "\":");
+  streamer_.addSanitized("\"", key, "\":");
   expecting_value_ = true;
 }
 
 void Streamer::Map::addEntries(const Entries& entries) {
-  ASSERT_THIS_IS_TOP_LEVEL;
   for (const NameValue& entry : entries) {
-    addEntry();
-    streamer_.addSanitized(entry.first, "\":");
-    expecting_value_ = true;
+    addKey(entry.first);
     addValue(entry.second);
   }
 }
@@ -149,9 +146,10 @@ void Streamer::clear() {
   }
 }
 
-void Streamer::addSanitized(absl::string_view str, absl::string_view suffix) {
+void Streamer::addSanitized(absl::string_view prefix, absl::string_view str,
+                            absl::string_view suffix) {
   absl::string_view sanitized = Json::sanitize(sanitize_buffer_, str);
-  response_.addFragments({"\"", sanitized, suffix});
+  response_.addFragments({prefix, sanitized, suffix});
 }
 
 } // namespace Json
