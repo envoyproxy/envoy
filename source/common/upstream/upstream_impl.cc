@@ -1799,14 +1799,9 @@ SINGLETON_MANAGER_REGISTRATION(upstream_network_filter_config_provider_manager);
 std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
 ClusterInfoImpl::createSingletonUpstreamNetworkFilterConfigProviderManager(
     Server::Configuration::ServerFactoryContext& context) {
-  std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
-      upstream_network_filter_config_provider_manager =
-          context.singletonManager().getTyped<UpstreamNetworkFilterConfigProviderManager>(
-              SINGLETON_MANAGER_REGISTERED_NAME(upstream_network_filter_config_provider_manager),
-              [] {
-                return std::make_shared<Filter::UpstreamNetworkFilterConfigProviderManagerImpl>();
-              });
-  return upstream_network_filter_config_provider_manager;
+  return context.singletonManager().getTyped<UpstreamNetworkFilterConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(upstream_network_filter_config_provider_manager),
+      [] { return std::make_shared<Filter::UpstreamNetworkFilterConfigProviderManagerImpl>(); });
 }
 
 ResourceManagerImplPtr
