@@ -110,6 +110,11 @@ public:
   // explore these violations via MutateAction and SwapAction at the connection
   // buffer level.
   enum class StreamState : int { PendingHeaders, PendingDataOrTrailers, Closed };
+  static absl::string_view streamStateToString(StreamState state) {
+    static std::array<std::string, 3> stream_state_strings = {"PendingHeaders",
+                                                              "PendingDataOrTrailers", "Closed"};
+    return stream_state_strings[static_cast<int>(state)];
+  }
 
   struct DirectionalState {
     // TODO(mattklein123): Split this more clearly into request and response directional state.
@@ -333,6 +338,12 @@ public:
         }
         encoder->getStream().resetStream(
             static_cast<Http::StreamResetReason>(directional_action.reset_stream()));
+        if (http_protocol_ < Protocol::Http2 && response) {
+          // Invoke the stream reset callback in case the HTTP response has been
+          // encoded and then the fuzzer does a reset stream call which for
+          // HTTP/1 should lead to the connection being closed.
+          stream_reset_callback_();
+        }
         request_.stream_state_ = response_.stream_state_ = StreamState::Closed;
       }
       break;
@@ -390,16 +401,16 @@ public:
   void streamAction(const test::common::http::StreamAction& stream_action) {
     switch (stream_action.stream_action_selector_case()) {
     case test::common::http::StreamAction::kRequest: {
-      ENVOY_LOG_MISC(debug, "Request stream action on {} in state {} {}", stream_index_,
-                     static_cast<int>(request_.stream_state_),
-                     static_cast<int>(response_.stream_state_));
+      ENVOY_LOG_MISC(debug, "Request stream action on {} in state request({}) response({})",
+                     stream_index_, streamStateToString(request_.stream_state_),
+                     streamStateToString(response_.stream_state_));
       stream_action_active_ = true;
       if (stream_action.has_dispatching_action()) {
         // Simulate some response action while dispatching request headers, data, or trailers. This
         // may happen as a result of a filter sending a direct response.
-        ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state {} {}", stream_index_,
-                       static_cast<int>(request_.stream_state_),
-                       static_cast<int>(response_.stream_state_));
+        ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state request({}) response({})",
+                       stream_index_, streamStateToString(request_.stream_state_),
+                       streamStateToString(response_.stream_state_));
         auto request_action = stream_action.dispatching_action().directional_action_selector_case();
         if (request_action == test::common::http::DirectionalAction::kHeaders) {
           EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _))
@@ -438,9 +449,9 @@ public:
       break;
     }
     case test::common::http::StreamAction::kResponse: {
-      ENVOY_LOG_MISC(debug, "Response stream action on {} in state {} {}", stream_index_,
-                     static_cast<int>(request_.stream_state_),
-                     static_cast<int>(response_.stream_state_));
+      ENVOY_LOG_MISC(debug, "Response stream action on {} in state request({}) response({})",
+                     stream_index_, streamStateToString(request_.stream_state_),
+                     streamStateToString(response_.stream_state_));
       directionalAction(response_, stream_action.response());
       break;
     }

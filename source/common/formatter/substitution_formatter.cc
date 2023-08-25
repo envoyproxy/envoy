@@ -23,6 +23,7 @@
 #include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/formatter/stream_info_formatter.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -35,90 +36,6 @@ namespace Envoy {
 namespace Formatter {
 
 static const std::string DefaultUnspecifiedValueString = "-";
-
-const std::string SubstitutionFormatUtils::DEFAULT_FORMAT =
-    "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
-    "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
-    "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
-    "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
-    "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
-
-void CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags, const std::string& command,
-                                        const std::string& subcommand,
-                                        const absl::optional<size_t>& length) {
-  if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {
-    throw EnvoyException(fmt::format("{} does not take any parameters or length", command));
-  }
-
-  if ((flags & PARAMS_REQUIRED).any() && (subcommand.length() == 0)) {
-    throw EnvoyException(fmt::format("{} requires parameters", command));
-  }
-
-  if ((flags & LENGTH_ALLOWED).none() && length.has_value()) {
-    throw EnvoyException(fmt::format("{} does not allow length to be specified.", command));
-  }
-}
-
-FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
-  return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
-}
-
-const absl::optional<std::reference_wrapper<const std::string>>
-SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
-  if (protocol) {
-    return Http::Utility::getProtocolString(protocol.value());
-  }
-  return absl::nullopt;
-}
-
-const std::string&
-SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol) {
-  if (protocol) {
-    return Http::Utility::getProtocolString(protocol.value());
-  }
-  return DefaultUnspecifiedValueString;
-}
-
-const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
-#ifdef HOST_NAME_MAX
-  const size_t len = HOST_NAME_MAX;
-#else
-  // This is notably the case in OSX.
-  const size_t len = 255;
-#endif
-  char name[len];
-  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
-
-  absl::optional<std::string> hostname;
-  if (result.return_value_ == 0) {
-    hostname = name;
-  }
-
-  return hostname;
-}
-
-const std::string SubstitutionFormatUtils::getHostnameOrDefault() {
-  absl::optional<std::string> hostname = getHostname();
-  if (hostname.has_value()) {
-    return hostname.value();
-  }
-  return DefaultUnspecifiedValueString;
-}
-
-const ProtobufWkt::Value& SubstitutionFormatUtils::unspecifiedValue() {
-  return ValueUtil::nullValue();
-}
-
-void SubstitutionFormatUtils::truncate(std::string& str, absl::optional<size_t> max_length) {
-  if (!max_length) {
-    return;
-  }
-
-  if (str.length() > max_length.value()) {
-    str.resize(max_length.value());
-  }
-}
 
 FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values)
     : empty_value_string_(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueString) {
@@ -159,12 +76,16 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
       struct_formatter_.format(request_headers, response_headers, response_trailers, stream_info,
                                local_reply_body, access_log_type);
 
+  std::string log_line = "";
 #ifdef ENVOY_ENABLE_YAML
-  const std::string log_line =
-      MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
+  if (sort_properties_) {
+    log_line = Json::Factory::loadFromProtobufStruct(output_struct)->asJsonString();
+  } else {
+    log_line = MessageUtil::getJsonStringFromMessageOrError(output_struct, false, true);
+  }
 #else
+  UNREFERENCED_PARAMETER(sort_properties_);
   IS_ENVOY_BUG("Json support compiled out");
-  const std::string log_line = "";
 #endif
   return absl::StrCat(log_line, "\n");
 }
@@ -337,27 +258,6 @@ ProtobufWkt::Struct StructFormatter::format(const Http::RequestHeaderMap& reques
       },
   };
   return structFormatMapCallback(struct_output_format_, visitor).struct_value();
-}
-
-void SubstitutionFormatParser::parseSubcommandHeaders(const std::string& subcommand,
-                                                      std::string& main_header,
-                                                      std::string& alternative_header) {
-  // subs is used only to check if there are more than 2 headers separated by '?'.
-  std::vector<std::string> subs;
-  alternative_header = "";
-  parseSubcommand(subcommand, '?', main_header, alternative_header, subs);
-  if (!subs.empty()) {
-    throw EnvoyException(
-        // Header format rules support only one alternative header.
-        // docs/root/configuration/observability/access_log/access_log.rst#format-rules
-        absl::StrCat("More than 1 alternative header specified in token: ", subcommand));
-  }
-
-  // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
-  if (!Envoy::Http::validHeaderString(main_header) ||
-      !Envoy::Http::validHeaderString(alternative_header)) {
-    throw EnvoyException("Invalid header configuration. Format string contains null or newline.");
-  }
 }
 
 std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::string& format) {
