@@ -257,6 +257,8 @@ bool TestPrivateKeyMethodProvider::checkFips() {
   return true;
 }
 
+bool TestPrivateKeyMethodProvider::initialized() { return true; }
+
 TestPrivateKeyConnection::TestPrivateKeyConnection(
     Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
     bssl::UniquePtr<EVP_PKEY> pkey, TestPrivateKeyConnectionTestOptions& test_options)

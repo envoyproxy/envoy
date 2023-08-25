@@ -102,6 +102,11 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: tls
+  change: |
+    added fallback :ref:`fallback
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider.fallback>`
+    to support private key provider to fallback to boringssl tls handshake.
 
 deprecated:
 - area: tracing

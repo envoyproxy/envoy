@@ -51,6 +51,12 @@ public:
    */
   virtual bool checkFips() PURE;
 
+  /**
+   * Check whether the private key method initialized successfully.
+   * @return true if the private key method initialized successfully, false if not.
+   */
+  virtual bool initialized() PURE;
+
 #ifdef OPENSSL_IS_BORINGSSL
   /**
    * Get the private key methods from the provider.
