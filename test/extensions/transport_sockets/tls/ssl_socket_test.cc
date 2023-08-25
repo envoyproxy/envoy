@@ -573,8 +573,10 @@ public:
   TestUtilOptionsV2(
       const envoy::config::listener::v3::Listener& listener,
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx_proto,
-      bool expect_success, Network::Address::IpVersion version)
-      : TestUtilOptionsBase(expect_success, version), listener_(listener),
+      bool expect_success, Network::Address::IpVersion version,
+      bool skip_server_failure_reason_check = false)
+      : TestUtilOptionsBase(expect_success, version),
+        skip_server_failure_reason_check_(skip_server_failure_reason_check), listener_(listener),
         client_ctx_proto_(client_ctx_proto), transport_socket_options_(nullptr) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake").setExpectedClientStats("ssl.handshake");
@@ -584,6 +586,7 @@ public:
     }
   }
 
+  bool skipServerFailureReasonCheck() const { return skip_server_failure_reason_check_; }
   const envoy::config::listener::v3::Listener& listener() const { return listener_; }
   const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& clientCtxProto() const {
     return client_ctx_proto_;
@@ -675,6 +678,7 @@ public:
   }
 
 private:
+  bool skip_server_failure_reason_check_;
   const envoy::config::listener::v3::Listener& listener_;
   const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx_proto_;
   std::string expected_client_stats_;
@@ -879,7 +883,9 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   } else {
     EXPECT_THAT(std::string(client_connection->transportFailureReason()),
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
-    EXPECT_NE("", server_connection->transportFailureReason());
+    if (!options.skipServerFailureReasonCheck()) {
+      EXPECT_NE("", server_connection->transportFailureReason());
+    }
   }
 }
 
@@ -7187,11 +7193,12 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 
   // Enable the rsa_key_usage enforcement.
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
-  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_);
-  // Client connection is failed with key_usage_mismatch, which is expected.
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
+                                 /*skip_server_failure_reason_check=*/true);
+  // Client connection is failed with key_usage_mismatch.
   test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
-  // Server connection failed with connection error.
-  test_options.setExpectedServerStats("ssl.connection_error");
+  // Server connection error was not populated in this case.
+  test_options.setExpectedServerStats("");
   testUtilV2(test_options);
 }
 
