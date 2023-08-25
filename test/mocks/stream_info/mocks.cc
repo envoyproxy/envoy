@@ -154,9 +154,6 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(Const(*this), filterState()).WillByDefault(Invoke([this]() -> const FilterState& {
     return *filter_state_;
   }));
-  ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
-    route_name_ = std::string(route_name);
-  }));
   ON_CALL(*this, setVirtualClusterName(_))
       .WillByDefault(Invoke([this](const absl::optional<std::string>& virtual_cluster_name) {
         virtual_cluster_name_ = virtual_cluster_name;

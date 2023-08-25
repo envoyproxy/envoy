@@ -140,7 +140,7 @@ RouteCoverage& Coverage::coveredRoute(const Envoy::Router::Route& route) {
   std::string route_name;
   if (route.routeEntry() != nullptr) {
     const Envoy::Router::RouteEntry* route_entry = route.routeEntry();
-    route_name = route.routeEntry()->routeName();
+    route_name = route.routeName();
     for (auto& route_coverage : covered_routes_) {
       if (route_coverage->covers(route_entry)) {
         return *route_coverage;
@@ -152,7 +152,7 @@ RouteCoverage& Coverage::coveredRoute(const Envoy::Router::Route& route) {
     return coveredRoute(route);
   } else if (route.directResponseEntry() != nullptr) {
     const Envoy::Router::DirectResponseEntry* direct_response_entry = route.directResponseEntry();
-    route_name = route.directResponseEntry()->routeName();
+    route_name = route.routeName();
     for (auto& route_coverage : covered_routes_) {
       if (route_coverage->covers(direct_response_entry)) {
         return *route_coverage;

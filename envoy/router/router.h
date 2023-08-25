@@ -110,11 +110,6 @@ public:
    */
   virtual void rewritePathHeader(Http::RequestHeaderMap& headers,
                                  bool insert_envoy_original_path) const PURE;
-
-  /**
-   * @return std::string& the name of the route.
-   */
-  virtual const std::string& routeName() const PURE;
 };
 
 /**
@@ -1094,11 +1089,6 @@ public:
   virtual const ConnectConfigOptRef connectConfig() const PURE;
 
   /**
-   * @return std::string& the name of the route.
-   */
-  virtual const std::string& routeName() const PURE;
-
-  /**
    * @return RouteStatsContextOptRef the config needed to generate route level stats.
    */
   virtual const RouteStatsContextOptRef routeStatsContext() const PURE;
@@ -1235,6 +1225,11 @@ public:
    * for this route.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return std::string& the name of the route.
+   */
+  virtual const std::string& routeName() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

@@ -1220,8 +1220,7 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                     delegating_route_foo->routeEntry()->connectConfig()->allow_post());
         }
 
-        EXPECT_EQ(default_route->routeEntry()->routeName(),
-                  delegating_route_foo->routeEntry()->routeName());
+        EXPECT_EQ(default_route->routeName(), delegating_route_foo->routeName());
 
         // Coverage for finalizeRequestHeaders
         NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
