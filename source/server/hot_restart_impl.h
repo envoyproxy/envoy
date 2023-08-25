@@ -103,6 +103,9 @@ public:
   // Server::HotRestart
   void drainParentListeners() override;
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) override;
+  void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
+                                     uint32_t worker_index,
+                                     Network::UdpListenerCallbacks& listener) override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
   void sendParentTerminateRequest() override;

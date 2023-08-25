@@ -104,7 +104,7 @@ public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                            ProcessContextOptRef context);
+                            ProcessContextOptRef context, Server::Instance& server);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -130,6 +130,8 @@ protected:
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
       QuicConnectionIdGeneratorPtr&& cid_generator);
+
+  Server::Instance& server_;
 
 private:
   friend class ActiveQuicListenerFactoryPeer;

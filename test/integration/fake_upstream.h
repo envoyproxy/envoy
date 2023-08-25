@@ -837,7 +837,7 @@ private:
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
             parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
-            absl::nullopt);
+            absl::nullopt, server_);
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
 #else
@@ -850,6 +850,7 @@ private:
     }
 
     UdpListenerConfigImpl udp_listener_config_;
+    testing::NiceMock<Server::MockInstance> server_;
 
   private:
     // Network::ListenerConfig
