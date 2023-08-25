@@ -102,9 +102,7 @@ public:
      *              returning control to the streamer client, which may mutate
      *              the string.
      */
-    bool renderValueNoFlush(const Value& value);
-
-    bool addStringNoFlush(absl::string_view str);
+    void renderValue(const Value& value);
 
   private:
     friend Streamer;
@@ -189,9 +187,7 @@ public:
 
   /**
    * Unwinds the stack of levels, properlying closing all of them using the
-   * appropriate delimiters. A limited amount of buffering in the Streamer class
-   * may occur for performance, and you must call clear() before the response
-   * buffer can be considered complete.
+   * appropriate delimiters.
    */
   void clear();
 
@@ -223,10 +219,8 @@ private:
   /**
    * Takes a raw string, sanitizes it using JSON syntax, adds quotes,
    * and streams it out.
-   *
-   * @return true if a flush is needed prior to returning control to user.
    */
-  bool addSanitized(absl::string_view token, absl::string_view suffix = "\"");
+  void addSanitized(absl::string_view token, absl::string_view suffix = "\"");
 
   /**
    * Serializes a number.
@@ -242,19 +236,7 @@ private:
    * Adds a constant string to the output stream. The string must outlive the
    * Streamer object, and is intended for literal strings such as punctuation.
    */
-  void addConstantString(absl::string_view str) {
-#define BUFFER_FRAGMENTS 0
-#if BUFFER_FRAGMENTS
-    fragments_.push_back(str);
-#else
-    response_.addFragments({str});
-#endif
-  }
-
-  /**
-   * Advance to the next buffer, flushing to response_ when we run out of buffers.
-   */
-  void nextBuffer();
+  void addConstantString(absl::string_view str) { response_.addFragments({str}); }
 
 #ifndef NDEBUG
   /**
@@ -264,31 +246,7 @@ private:
 #endif
 
   Buffer::Instance& response_;
-
-  // When data is added to a Buffer::Instance, some byte allocation, buffer
-  // sizing, and string moving must occur, as well as checking for high-water
-  // marks. A limited amount of simple buffering is done in the Streamer class
-  // to reduce the overhead in the Buffer class.
-  //
-  // The strategy here is to keep up to 10 string buffers and an array of
-  // fragments. The fragments may point to the string buffers, to punctuation
-  // defined in this class from these chars: []{},:\". During a single public
-  // operation we may rely on a string_view passed into the API. However,
-  // references to API-provided strings must be flushed to response_ prior to
-  // returning from a public call.
-  //
-  // So the flush() is used to clear out the pending fragments before returning
-  // control from an API that received a user-defined string, and is also called
-  // when 10 buffers are consumed. One way to consume 10 buffers is to serialize
-  // an array of 10 numbers, which all most be converted to strings.
-#if BUFFER_FRAGMENTS
-  std::vector<absl::string_view> fragments_;
-  static constexpr uint32_t NumBuffers = 10;
-  std::string buffers_[NumBuffers];
-  uint32_t buffers_index_{0};
-#else
-  std::string buffer_;
-#endif
+  std::string sanitize_buffer_;
 
   // Keeps a stack of Maps or Arrays (subclasses of Level). This stack serves
   // two functions:
