@@ -876,6 +876,41 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   cleanup();
 }
 
+TEST_P(ExtAuthzGrpcIntegrationTest, Shadow) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_hosts = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        auto* request_mirror_policies =
+            virtual_hosts->mutable_routes(0)->mutable_route()->add_request_mirror_policies();
+        request_mirror_policies->set_cluster(virtual_hosts->routes(0).route().cluster());
+      });
+
+  // Set up ext_authz filter.
+  initializeConfig();
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and start request.
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
+
+  waitForSuccessfulUpstreamResponse("200");
+
+  const std::string expected_body(response_size_, 'a');
+  verifyResponse(std::move(response_), "200", Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                 expected_body);
+
+  cleanup();
+}
+
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   // Set up ext_authz filter.
   initializeConfig();

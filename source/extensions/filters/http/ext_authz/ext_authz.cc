@@ -110,7 +110,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     if (config_->denyAtDisable()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.",
                        *decoder_callbacks_);
-      // When used as an upstream filter, response flags will persist across retries.
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(
@@ -255,8 +254,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   switch (response->status) {
   case CheckStatus::OK: {
     // Any changes to request headers or query parameters can affect how the request is going to be
-    // routed. If we are changing the headers we also need to clear the route
-    // cache.
+    // routed. If we are changing the headers we also need to clear the route cache.
+    //
+    // clearRouteCache() should only be true if decoder_callbacks_->downstreamCallbacks() is also
+    // true, i.e. the filter is a downstream filter.
     if (config_->clearRouteCache() &&
         (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
          !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||
@@ -433,7 +434,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter rejected the request with an error. Response status code: {}",
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
-      // When used as an upstream filter, response flags will persist across retries.
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(

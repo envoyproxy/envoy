@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -23,6 +24,9 @@ Http::FilterFactoryCb ExtAuthzFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
+  if (proto_config.clear_route_cache() && dual_info.is_upstream_filter) {
+    ExceptionUtil::throwEnvoyException("clear_route_cache cannot be enabled on upstream filters.");
+  }
   const auto filter_config =
       std::make_shared<FilterConfig>(proto_config, dual_info.scope, context.runtime(),
                                      context.httpContext(), stats_prefix, context.bootstrap());
