@@ -64,6 +64,8 @@ without further review.
 
 * Michael Warres ([mpwarres] (https://github.com/mpwarres)) (mpw@google.com)
   * Wasm
+* doujiang24 ([doujiang24] https://github.com/doujiang24) (doujiang24@gmail.com)
+  * Golang
 
 # Envoy security team
 
