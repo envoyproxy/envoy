@@ -57,7 +57,7 @@ public:
     // actually correct. It's possible this will have to change in the future.
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
-    cluster_ = std::make_shared<Cluster>(cluster_config, config, factory_context, *this);
+    cluster_.reset(new Cluster(cluster_config, config, factory_context, *this));
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
@@ -228,22 +228,6 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   sub_cluster_pair = cluster_->createSubClusterConfig(cluster_name, host, port);
   EXPECT_EQ(true, sub_cluster_pair.first);
   EXPECT_EQ(false, sub_cluster_pair.second.has_value());
-}
-
-TEST_F(ClusterTest, InvalidSubClusterConfig) {
-  const std::string bad_sub_cluster_yaml_config = R"EOF(
-name: name
-connect_timeout: 0.25s
-cluster_type:
-  name: dynamic_forward_proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-    sub_clusters_config:
-      max_sub_clusters: 1024
-      lb_policy: CLUSTER_PROVIDED
-)EOF";
-
-  EXPECT_THROW(initialize(bad_sub_cluster_yaml_config, false), EnvoyException);
 }
 
 // Basic flow of the cluster including adding hosts and removing them.
@@ -720,6 +704,22 @@ upstream_http_protocol_options: {}
 )EOF");
 
   createCluster(yaml_config);
+}
+
+TEST_F(ClusterFactoryTest, InvalidSubprotocolOptions) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+      lb_policy: CLUSTER_PROVIDED
+)EOF";
+
+  EXPECT_THROW(createCluster(yaml_config), EnvoyException);
 }
 
 } // namespace DynamicForwardProxy

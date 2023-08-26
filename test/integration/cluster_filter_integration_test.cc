@@ -79,7 +79,7 @@ public:
 
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::CommonFactoryContext&) override {
+                               Server::Configuration::UpstreamFactoryContext&) override {
     auto config = dynamic_cast<const ProtobufWkt::StringValue&>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));

@@ -6,8 +6,10 @@
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/metadata.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/status.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -16,6 +18,31 @@
 
 namespace Envoy {
 namespace Formatter {
+
+HttpFormatterContext::HttpFormatterContext(const Http::RequestHeaderMap* request_headers,
+                                           const Http::ResponseHeaderMap* response_headers,
+                                           const Http::ResponseTrailerMap* response_trailers,
+                                           absl::string_view local_reply_body,
+                                           AccessLog::AccessLogType log_type)
+    : request_headers_(request_headers), response_headers_(response_headers),
+      response_trailers_(response_trailers), local_reply_body_(local_reply_body),
+      log_type_(log_type) {}
+
+const Http::RequestHeaderMap& HttpFormatterContext::requestHeaders() const {
+  return request_headers_ != nullptr ? *request_headers_
+                                     : *Http::StaticEmptyHeaders::get().request_headers;
+}
+const Http::ResponseHeaderMap& HttpFormatterContext::responseHeaders() const {
+  return response_headers_ != nullptr ? *response_headers_
+                                      : *Http::StaticEmptyHeaders::get().response_headers;
+}
+const Http::ResponseTrailerMap& HttpFormatterContext::responseTrailers() const {
+  return response_trailers_ != nullptr ? *response_trailers_
+                                       : *Http::StaticEmptyHeaders::get().response_trailers;
+}
+
+absl::string_view HttpFormatterContext::localReplyBody() const { return local_reply_body_; }
+AccessLog::AccessLogType HttpFormatterContext::accessLogType() const { return log_type_; }
 
 absl::optional<std::string> LocalReplyBodyFormatter::format(const Http::RequestHeaderMap&,
                                                             const Http::ResponseHeaderMap&,
@@ -307,8 +334,7 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
-                                                            alternative_header);
+           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);
@@ -318,8 +344,7 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
-                                                            alternative_header);
+           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
 
            return std::make_unique<ResponseHeaderFormatter>(main_header, alternative_header,
                                                             max_length);
@@ -329,8 +354,7 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
-                                                            alternative_header);
+           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
 
            return std::make_unique<ResponseTrailerFormatter>(main_header, alternative_header,
                                                              max_length);
@@ -379,8 +403,7 @@ HttpBuiltInCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
-           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
-                                                            alternative_header);
+           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);
@@ -404,6 +427,19 @@ FormatterProviderPtr HttpBuiltInCommandParser::parse(const std::string& command,
   // Create a pointer to the formatter by calling a function
   // associated with formatter's name.
   return (*it).second.second(subcommand, max_length);
+}
+
+REGISTER_BUILT_IN_COMMAND_PARSER(HttpFormatterContext, HttpBuiltInCommandParser);
+
+static const std::string DEFAULT_FORMAT =
+    "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
+    "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
+    "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
+    "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
+    "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
+
+FormatterPtr HttpSubstitutionFormatUtils::defaultSubstitutionFormatter() {
+  return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
 }
 
 } // namespace Formatter

@@ -453,7 +453,7 @@ envoy_cc_library(
     deps = [
         ":load_balancer_lib",
         ":resource_manager_lib",
-        ":upstream_http_factory_context_lib",
+        ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",
@@ -557,8 +557,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "upstream_http_factory_context_lib",
-    hdrs = ["upstream_http_factory_context_impl.h"],
+    name = "upstream_factory_context_lib",
+    hdrs = ["upstream_factory_context_impl.h"],
     deps = [
         "//envoy/init:manager_interface",
         "//envoy/server:factory_context_interface",

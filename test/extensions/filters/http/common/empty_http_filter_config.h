@@ -50,9 +50,9 @@ public:
   createDualFilter(const std::string& stat_prefix,
                    Server::Configuration::ServerFactoryContext& context) PURE;
 
-  Http::FilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message&, const std::string& stat_prefix,
-      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
     return createDualFilter(stat_prefix, context.getServerFactoryContext());
   }
 };

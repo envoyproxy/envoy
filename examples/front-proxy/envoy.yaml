@@ -21,11 +21,11 @@ static_resources:
               - match:
                   prefix: "/service/1"
                 route:
-                  cluster: service1
+                  cluster: service1-envoy
               - match:
                   prefix: "/service/2"
                 route:
-                  cluster: service2
+                  cluster: service2-envoy
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
@@ -52,11 +52,11 @@ static_resources:
               - match:
                   prefix: "/service/1"
                 route:
-                  cluster: service1
+                  cluster: service1-envoy
               - match:
                   prefix: "/service/2"
                 route:
-                  cluster: service2
+                  cluster: service2-envoy
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
@@ -127,30 +127,30 @@ static_resources:
                   -----END PRIVATE KEY-----
 
   clusters:
-  - name: service1
+  - name: service1-envoy
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: service1
+      cluster_name: service1-envoy
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: service1
-                port_value: 8080
-  - name: service2
+                address: service-envoy-1
+                port_value: 8000
+  - name: service2-envoy
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: service2
+      cluster_name: service2-envoy
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: service2
-                port_value: 8080
+                address: service-envoy-2
+                port_value: 8000
 admin:
   address:
     socket_address:

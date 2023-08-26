@@ -116,7 +116,9 @@ func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers 
 func (r *httpRequest) Log(level api.LogType, message string) {
 	// TODO performance optimization points:
 	// Add a new goroutine to write logs asynchronously and avoid frequent cgo calls
-	cAPI.HttpLog(level, fmt.Sprintf("[go_plugin_http][%v] %v", r.pluginName(), message))
+	cAPI.HttpLog(level, fmt.Sprintf("[http][%v] %v", r.pluginName(), message))
+	// The default log format is:
+	// [2023-08-09 03:04:16.179][1390][error][golang] [contrib/golang/common/log/cgo.cc:24] [http][plugin_name] msg
 }
 
 func (r *httpRequest) LogLevel() api.LogType {
@@ -235,4 +237,54 @@ func (f *filterState) SetString(key, value string, stateType api.StateType, life
 
 func (f *filterState) GetString(key string) string {
 	return cAPI.HttpGetStringFilterState(unsafe.Pointer(f.request), key)
+}
+
+type httpConfig struct {
+	config *C.httpConfig
+}
+
+func (c *httpConfig) DefineCounterMetric(name string) api.CounterMetric {
+	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), api.Counter, name)
+	return &counterMetric{
+		config:   c,
+		metricId: id,
+	}
+}
+
+func (c *httpConfig) DefineGaugeMetric(name string) api.GaugeMetric {
+	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), api.Gauge, name)
+	return &gaugeMetric{
+		config:   c,
+		metricId: id,
+	}
+}
+
+func (c *httpConfig) Finalize() {
+	cAPI.HttpConfigFinalize(unsafe.Pointer(c.config))
+}
+
+type counterMetric struct {
+	config   *httpConfig
+	metricId uint32
+}
+
+func (m *counterMetric) Increment(offset int64) {
+	cAPI.HttpIncrementMetric(unsafe.Pointer(m.config), m.metricId, offset)
+}
+
+func (m *counterMetric) Get() uint64 {
+	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
+}
+
+type gaugeMetric struct {
+	config   *httpConfig
+	metricId uint32
+}
+
+func (m *gaugeMetric) Increment(offset int64) {
+	cAPI.HttpIncrementMetric(unsafe.Pointer(m.config), m.metricId, offset)
+}
+
+func (m *gaugeMetric) Get() uint64 {
+	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
 }

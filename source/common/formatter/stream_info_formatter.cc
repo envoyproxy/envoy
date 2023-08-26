@@ -137,7 +137,7 @@ FilterStateFormatter::create(const std::string& format, const absl::optional<siz
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
 
-  SubstitutionFormatParser::parseSubcommand(format, ':', key, serialize_type);
+  SubstitutionFormatUtils::parseSubcommand(format, ':', key, serialize_type);
   if (key.empty()) {
     throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
   }
@@ -1303,7 +1303,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               std::string filter_namespace;
               std::vector<std::string> path;
 
-              SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
+              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
               return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
             }}},
 
@@ -1313,7 +1313,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               std::string filter_namespace;
               std::vector<std::string> path;
 
-              SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
+              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
               return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
             }}},
           {"UPSTREAM_METADATA",
@@ -1322,7 +1322,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               std::string filter_namespace;
               std::vector<std::string> path;
 
-              SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
+              SubstitutionFormatUtils::parseSubcommand(format, ':', filter_namespace, path);
               return std::make_unique<UpstreamHostMetadataFormatter>(filter_namespace, path,
                                                                      max_length);
             }}},
@@ -1362,69 +1362,6 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               return std::make_unique<EnvironmentFormatter>(key, max_length);
             }}},
       });
-}
-
-PlainStringFormatter::PlainStringFormatter(const std::string& str) { str_.set_string_value(str); }
-
-absl::optional<std::string>
-PlainStringFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                             const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                             absl::string_view, AccessLog::AccessLogType) const {
-  return str_.string_value();
-}
-
-ProtobufWkt::Value
-PlainStringFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                  absl::string_view, AccessLog::AccessLogType) const {
-  return str_;
-}
-
-PlainNumberFormatter::PlainNumberFormatter(double num) { num_.set_number_value(num); }
-
-absl::optional<std::string>
-PlainNumberFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                             const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                             absl::string_view, AccessLog::AccessLogType) const {
-  std::string str = absl::StrFormat("%g", num_.number_value());
-  return str;
-}
-
-ProtobufWkt::Value
-PlainNumberFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                  absl::string_view, AccessLog::AccessLogType) const {
-  return num_;
-}
-
-StreamInfoFormatter::StreamInfoFormatter(const std::string& command, const std::string& subcommand,
-                                         absl::optional<size_t> length) {
-  const auto& formatters = getKnownStreamInfoFormatterProviders();
-
-  auto it = formatters.find(command);
-
-  if (it == formatters.end()) {
-    throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", command));
-  }
-
-  // Check flags for the command.
-  CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, length);
-
-  // Create a pointer to the formatter by calling a function
-  // associated with formatter's name.
-  formatter_ = (*it).second.second(subcommand, length);
-}
-
-absl::optional<std::string> StreamInfoFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view, AccessLog::AccessLogType) const {
-  return formatter_->format(stream_info);
-}
-
-ProtobufWkt::Value StreamInfoFormatter::formatValue(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view, AccessLog::AccessLogType) const {
-  return formatter_->formatValue(stream_info);
 }
 
 } // namespace Formatter

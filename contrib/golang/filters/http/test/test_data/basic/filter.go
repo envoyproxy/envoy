@@ -33,6 +33,7 @@ type filter struct {
 	databuffer  string // return api.Stop
 	panic       string // hit panic in which phase
 	badapi      bool   // bad api call
+	config      *config
 }
 
 func parseQuery(path string) url.Values {
@@ -105,12 +106,24 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.callbacks.Log(api.Warn, "log test")
 	f.callbacks.Log(api.Error, "log test")
 	f.callbacks.Log(api.Critical, "log test")
+
 	api.LogTrace("log test")
 	api.LogDebug("log test")
 	api.LogInfo("log test")
 	api.LogWarn("log test")
 	api.LogError("log test")
 	api.LogCritical("log test")
+
+	api.LogTracef("log test %v", endStream)
+	api.LogDebugf("log test %v", endStream)
+	api.LogInfof("log test %v", endStream)
+	api.LogWarnf("log test %v", endStream)
+	api.LogErrorf("log test %v", endStream)
+	api.LogCriticalf("log test %v", endStream)
+
+	if f.callbacks.LogLevel() != api.GetLogLevel() {
+		return f.fail("log level mismatch")
+	}
 
 	if f.sleep {
 		time.Sleep(time.Millisecond * 100) // sleep 100 ms
@@ -144,6 +157,14 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 
 	val := fs.GetString("go_state_test_key")
 	header.Add("go-state-test-header-key", val)
+
+	f.config.counter.Increment(2)
+	value := f.config.counter.Get()
+	header.Add("go-metric-counter-test-header-key", strconv.FormatUint(value, 10))
+
+	f.config.gauge.Increment(3)
+	value = f.config.gauge.Get()
+	header.Add("go-metric-gauge-test-header-key", strconv.FormatUint(value, 10))
 
 	if strings.Contains(f.localreplay, "decode-header") {
 		return f.sendLocalReply("decode-header")
@@ -442,6 +463,10 @@ func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 		status := f.encodeTrailers(trailers)
 		return status
 	}
+}
+
+func (f *filter) OnLog() {
+	api.LogError("call log in OnLog")
 }
 
 func (f *filter) OnDestroy(reason api.DestroyReason) {
