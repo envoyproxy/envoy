@@ -3,9 +3,10 @@
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/common/upstream/utility.h"
 #include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/filters/test_listener_filter.pb.h"
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -24,12 +25,14 @@ constexpr absl::string_view expected_types[] = {
     "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
     "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
-class ListenerExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
-                                                  public BaseIntegrationTest {
+class ListenerExtensionDiscoveryIntegrationTestBase : public Grpc::GrpcClientIntegrationParamTest,
+                                                      public HttpIntegrationTest {
 public:
-  ListenerExtensionDiscoveryIntegrationTest()
-      : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig()), filter_name_("foo"),
-        data_("HelloWorld"), port_name_("http") {
+  ListenerExtensionDiscoveryIntegrationTestBase(Http::CodecType downstream_type,
+                                                const std::string& config,
+                                                const std::string& listener_filter_name)
+      : HttpIntegrationTest(downstream_type, ipVersion(), config),
+        filter_name_(listener_filter_name), port_name_("http") {
     // TODO(ggreenway): add tag extraction rules.
     // Missing stat tag-extraction rule for stat
     // 'extension_config_discovery.tcp_listener_filter.foo.grpc.ecds_cluster.streams_closed_7' and
@@ -37,26 +40,26 @@ public:
     skip_tag_extraction_rule_check_ = true;
   }
 
-  void addDynamicFilter(const std::string& name, bool apply_without_warming,
-                        bool set_default_config = true, bool rate_limit = false,
-                        ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
-                        bool second_connection = false) {
-    config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
-                                      matcher, second_connection,
+  void addDynamicFilterWithType(const std::string& filter_name,
+                                const std::string& filter_config_type_url,
+                                bool apply_without_warming,
+                                std::shared_ptr<Protobuf::Message> default_config,
+                                bool rate_limit = false,
+                                ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
+                                bool second_connection = false) {
+    config_helper_.addConfigModifier([filter_name, apply_without_warming, filter_config_type_url,
+                                      default_config, rate_limit, matcher, second_connection,
                                       this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       listener->set_stat_prefix("listener_stat");
       auto* listener_filter = listener->add_listener_filters();
 
-      listener_filter->set_name(name);
+      listener_filter->set_name(filter_name);
 
       auto* discovery = listener_filter->mutable_config_discovery();
-      discovery->add_type_urls(
-          "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig");
-      if (set_default_config) {
-        auto default_configuration = test::integration::filters::TestTcpListenerFilterConfig();
-        default_configuration.set_drain_bytes(default_drain_bytes_);
-        discovery->mutable_default_config()->PackFrom(default_configuration);
+      discovery->add_type_urls(filter_config_type_url);
+      if (default_config != nullptr) {
+        discovery->mutable_default_config()->PackFrom(*default_config);
       }
 
       discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -119,24 +122,12 @@ public:
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
 
-    // Add a tcp_proxy network filter.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter_chain = listener->add_filter_chains();
-      auto* filter = filter_chain->add_filters();
-      filter->set_name("envoy.filters.network.tcp_proxy");
-      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
-      config.set_stat_prefix("tcp_stats");
-      config.set_cluster("cluster_0");
-      filter->mutable_typed_config()->PackFrom(config);
-    });
-
     addEcdsCluster(std::string(EcdsClusterName));
     // Add 2nd cluster in case of two connections.
     if (two_connections_) {
       addEcdsCluster(std::string(Ecds2ClusterName));
     }
-    BaseIntegrationTest::initialize();
+    HttpIntegrationTest::initialize();
     registerTestServerPorts({port_name_});
   }
 
@@ -150,13 +141,13 @@ public:
     }
   }
 
-  ~ListenerExtensionDiscoveryIntegrationTest() override {
+  ~ListenerExtensionDiscoveryIntegrationTestBase() override {
     resetEcdsConnection(ecds_connection_);
     resetEcdsConnection(ecds2_connection_);
   }
 
   void createUpstreams() override {
-    BaseIntegrationTest::createUpstreams();
+    HttpIntegrationTest::createUpstreams();
     // Create two extension config discovery upstreams (fake_upstreams_[1] and fake_upstreams_[2]).
     addFakeUpstream(Http::CodecType::HTTP2);
     if (two_connections_) {
@@ -181,12 +172,9 @@ public:
     }
   }
 
-  void sendXdsResponse(const std::string& name, const std::string& version,
-                       const uint32_t drain_bytes, bool ttl = false,
-                       bool second_connection = false) {
-    // The to-be-drained bytes has to be smaller than data size.
-    ASSERT(drain_bytes <= data_.size());
-
+  void sendXdsResponseWithTypedConfig(const std::string& name, const std::string& version,
+                                      Protobuf::Message& filter_config, bool ttl = false,
+                                      bool second_connection = false) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
@@ -195,9 +183,7 @@ public:
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
 
-    auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
-    configuration.set_drain_bytes(drain_bytes);
-    typed_config.mutable_typed_config()->PackFrom(configuration);
+    typed_config.mutable_typed_config()->PackFrom(filter_config);
     resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
@@ -208,6 +194,75 @@ public:
     } else {
       ecds2_stream_->sendGrpcMessage(response);
     }
+  }
+
+  // Utilities used for config dump request.
+  absl::string_view request(const std::string port_key, const std::string method,
+                            const std::string endpoint, BufferingStreamDecoderPtr& response) {
+    response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
+                                                  Http::CodecType::HTTP1, version_);
+    EXPECT_TRUE(response->complete());
+    return response->headers().getStatusValue();
+  }
+
+  absl::string_view contentType(const BufferingStreamDecoderPtr& response) {
+    const Http::HeaderEntry* entry = response->headers().ContentType();
+    if (entry == nullptr) {
+      return "(null)";
+    }
+    return entry->value().getStringView();
+  }
+
+  const std::string filter_name_;
+  const std::string port_name_;
+  bool two_connections_{false};
+
+  FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
+  FakeUpstream& getEcds2FakeUpstream() const { return *fake_upstreams_[2]; }
+
+  // gRPC two ECDS connections set-up.
+  FakeHttpConnectionPtr ecds_connection_{nullptr};
+  FakeStreamPtr ecds_stream_{nullptr};
+  FakeHttpConnectionPtr ecds2_connection_{nullptr};
+  FakeStreamPtr ecds2_stream_{nullptr};
+};
+
+class ListenerExtensionDiscoveryIntegrationTest
+    : public ListenerExtensionDiscoveryIntegrationTestBase {
+public:
+  ListenerExtensionDiscoveryIntegrationTest()
+      : ListenerExtensionDiscoveryIntegrationTestBase(Http::CodecType::HTTP1,
+                                                      config_helper_.baseConfig(), "foo"),
+        data_("HelloWorld") {}
+
+  void initialize() override {
+    // Add a tcp_proxy network filter.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      auto* filter_chain = listener->add_filter_chains();
+      auto* filter = filter_chain->add_filters();
+      filter->set_name("envoy.filters.network.tcp_proxy");
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+      config.set_stat_prefix("tcp_stats");
+      config.set_cluster("cluster_0");
+      filter->mutable_typed_config()->PackFrom(config);
+    });
+
+    ListenerExtensionDiscoveryIntegrationTestBase::initialize();
+  }
+
+  // Overloaded with test TCP filter.
+  void addDynamicFilter(const std::string& filter_name, bool apply_without_warming,
+                        bool set_default_config = true, bool rate_limit = false,
+                        ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
+                        bool second_connection = false) {
+    auto default_configuration =
+        std::make_shared<test::integration::filters::TestTcpListenerFilterConfig>();
+    default_configuration->set_drain_bytes(default_drain_bytes_);
+    addDynamicFilterWithType(
+        filter_name, "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig",
+        apply_without_warming, set_default_config ? std::move(default_configuration) : nullptr,
+        rate_limit, matcher, second_connection);
   }
 
   // Client sends data_, which is drained by Envoy listener filter based on config, then received by
@@ -244,37 +299,19 @@ public:
     }
   }
 
-  // Utilities used for config dump.
-  absl::string_view request(const std::string port_key, const std::string method,
-                            const std::string endpoint, BufferingStreamDecoderPtr& response) {
-    response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
-                                                  Http::CodecType::HTTP1, version_);
-    EXPECT_TRUE(response->complete());
-    return response->headers().getStatusValue();
+  void sendXdsResponse(const std::string& name, const std::string& version, size_t drain_bytes,
+                       bool ttl = false, bool second_connection = false) {
+    // The to-be-drained bytes has to be smaller than data size.
+    ASSERT(drain_bytes <= data_.size());
+
+    auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
+    configuration.set_drain_bytes(drain_bytes);
+    sendXdsResponseWithTypedConfig(name, version, configuration, ttl, second_connection);
   }
 
-  absl::string_view contentType(const BufferingStreamDecoderPtr& response) {
-    const Http::HeaderEntry* entry = response->headers().ContentType();
-    if (entry == nullptr) {
-      return "(null)";
-    }
-    return entry->value().getStringView();
-  }
-
+protected:
   const uint32_t default_drain_bytes_{2};
-  const std::string filter_name_;
   const std::string data_;
-  const std::string port_name_;
-  bool two_connections_{false};
-
-  FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
-  FakeUpstream& getEcds2FakeUpstream() const { return *fake_upstreams_[2]; }
-
-  // gRPC two ECDS connections set-up.
-  FakeHttpConnectionPtr ecds_connection_{nullptr};
-  FakeStreamPtr ecds_stream_{nullptr};
-  FakeHttpConnectionPtr ecds2_connection_{nullptr};
-  FakeStreamPtr ecds2_stream_{nullptr};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ListenerExtensionDiscoveryIntegrationTest,
@@ -731,3 +768,145 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWith
 
 } // namespace
 } // namespace Envoy
+
+#ifdef ENVOY_ENABLE_QUIC
+
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
+#include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
+#include "test/integration/utility.h"
+
+namespace Envoy {
+namespace {
+
+class QuicListenerExtensionDiscoveryIntegrationTest
+    : public ListenerExtensionDiscoveryIntegrationTestBase {
+public:
+  QuicListenerExtensionDiscoveryIntegrationTest()
+      : ListenerExtensionDiscoveryIntegrationTestBase(Http::CodecType::HTTP3,
+                                                      ConfigHelper::quicHttpProxyConfig(), "foo") {}
+
+  // Overloaded with test QUIC filter.
+  void addDynamicFilter(bool apply_without_warming, bool set_default_config = true,
+                        bool rate_limit = false,
+                        ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
+                        bool second_connection = false) {
+    auto default_configuration =
+        std::make_shared<test::integration::filters::TestQuicListenerFilterConfig>();
+    default_configuration->set_added_value(default_added_value_);
+    addDynamicFilterWithType(
+        filter_name_, "type.googleapis.com/test.integration.filters.TestQuicListenerFilterConfig",
+        apply_without_warming, set_default_config ? std::move(default_configuration) : nullptr,
+        rate_limit, matcher, second_connection);
+  }
+
+  /*
+Network::ClientConnectionPtr makeClientConnectionWithOptions(
+    uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options)  override {
+  // Setting socket options is not supported for HTTP3.
+  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
+      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  Network::Address::InstanceConstSharedPtr local_addr =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+  auto& quic_transport_socket_factory_ref =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*quic_transport_socket_factory_);
+  return Quic::createQuicNetworkConnection(
+      *quic_connection_persistent_info_, quic_transport_socket_factory_ref.getCryptoConfig(),
+     quic::QuicServerId(
+          quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
+          static_cast<uint16_t>(port)),
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, *stats_store_.rootScope(),
+      options, nullptr, connection_id_generator_);
+}
+*/
+
+  void sendXdsResponse(const std::string& name, const std::string& version,
+                       const std::string& filter_state_value, bool ttl = false,
+                       bool second_connection = false) {
+    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+    configuration.set_added_value(filter_state_value);
+    sendXdsResponseWithTypedConfig(name, version, configuration, ttl, second_connection);
+  }
+
+protected:
+  std::string default_added_value_{"xyz"};
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, QuicListenerExtensionDiscoveryIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, EcdsBasicSuccess) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(/*apply_without_warming=*/false);
+  useAccessLog(fmt::format("%RESPONSE_CODE% %FILTER_STATE({})%",
+                           TestQuicListenerFilter::TestStringFilterState::key()));
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send 1st config update to have listener filter add "abc" in filter state.
+  sendXdsResponse(filter_name_, "v1", "abc");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  testRouterHeaderOnlyRequestAndResponse();
+  codec_client_->close();
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  EXPECT_THAT(log, testing::HasSubstr("200 \"abc\""));
+
+  // Send 2nd config update to have listener filter drain 3 bytes of data.
+  sendXdsResponse(filter_name_, "v2", "def");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
+  testRouterHeaderOnlyRequestAndResponse();
+  log = waitForAccessLog(access_log_name_, 1);
+  EXPECT_THAT(log, testing::HasSubstr("200 \"def\""));
+  codec_client_->close();
+}
+
+TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefault) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  // Do not have default listener filter config nor wait for ECDS update.
+  addDynamicFilter(/*apply_without_warming=*/false, /*set_default_config*/ false);
+  useAccessLog(fmt::format("%RESPONSE_CODE% %FILTER_STATE({})%",
+                           TestQuicListenerFilter::TestStringFilterState::key()));
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // This is a bad config with empty value string.
+  sendXdsResponse(filter_name_, "v1", "");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  Network::ClientConnectionPtr conn = makeClientConnection(lookupPort(port_name_));
+  std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
+  Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
+      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
+      timeSystem())};
+  auto codec = std::make_unique<IntegrationCodecClient>(
+      *dispatcher_, random_, std::move(conn), host_description, downstream_protocol_, true);
+  EXPECT_TRUE(codec->disconnected());
+  EXPECT_EQ("QUIC_NO_ERROR with details: Closed by application",
+            codec->connection()->transportFailureReason());
+  // The extension_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
+
+  sendXdsResponse(filter_name_, "v2", "abc");
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  testRouterHeaderOnlyRequestAndResponse();
+  codec_client_->close();
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  EXPECT_THAT(log, testing::HasSubstr("200 \"abc\""));
+}
+
+} // namespace
+} // namespace Envoy
+#endif

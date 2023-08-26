@@ -8,6 +8,7 @@
 #include "envoy/common/optref.h"
 
 #include "source/common/common/safe_memcpy.h"
+#include "source/common/network/listener_filter_manager_impl_base.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -21,6 +22,51 @@ QuicDispatcherStats generateStats(Stats::Scope& store) {
 }
 
 } // namespace
+
+// An object created on the stack during QUIC connection creation to apply listener filters, if
+// there is any, within the call stack.
+class QuicListenerFilterManager : public Network::ListenerFilterManagerImplBase,
+                                  public Network::ListenerFilterCallbacks {
+public:
+  QuicListenerFilterManager(Event::Dispatcher& dispatcher, Network::ConnectionSocket& socket,
+                            StreamInfo::StreamInfo& stream_info)
+      : Network::ListenerFilterManagerImplBase(), socket_(socket), stream_info_(stream_info),
+        dispatcher_(dispatcher) {}
+
+  // Network::ListenerFilterCallbacks
+  Network::ConnectionSocket& socket() override { return socket_; }
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  void continueFilterChain(bool /*success*/) override { IS_ENVOY_BUG("Should not be used."); }
+  void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
+    stream_info_.setDynamicMetadata(name, value);
+  }
+  envoy::config::core::v3::Metadata& dynamicMetadata() override {
+    return stream_info_.dynamicMetadata();
+  };
+  const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
+    return stream_info_.dynamicMetadata();
+  };
+  StreamInfo::FilterState& filterState() override { return *stream_info_.filterState().get(); }
+
+  // Network::ListenerFilterManagerImplBase
+  void startFilterChain() override {
+    for (auto iter = accept_filters_.begin(); iter != accept_filters_.end(); iter++) {
+      Network::FilterStatus status = (*iter)->onAccept(*this);
+      if (status == Network::FilterStatus::StopIteration) {
+        IS_ENVOY_BUG("QUIC listener filter shouldn't stop iteration.");
+        break;
+      }
+      if (!socket().ioHandle().isOpen()) {
+        break;
+      }
+    }
+  }
+
+private:
+  Network::ConnectionSocket& socket_;
+  StreamInfo::StreamInfo& stream_info_;
+  Event::Dispatcher& dispatcher_;
+};
 
 EnvoyQuicTimeWaitListManager::EnvoyQuicTimeWaitListManager(quic::QuicPacketWriter* writer,
                                                            Visitor* visitor,
@@ -92,8 +138,22 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr());
-  const Network::FilterChain* filter_chain =
-      listener_config_->filterChainManager().findFilterChain(*connection_socket, *stream_info);
+
+  QuicListenerFilterManager listener_filter_manager(dispatcher_, *connection_socket, *stream_info);
+  const bool success =
+      listener_config_->filterChainFactory().createListenerFilterChain(listener_filter_manager);
+  const Network::FilterChain* filter_chain = nullptr;
+  if (success) {
+    // Quic listener filters are not supposed to pause the filter chain iteration. So this call
+    // should finish iterating through all filters.
+    listener_filter_manager.startFilterChain();
+    // If any listener filter closed the socket, do not get a network filter chain. Thus early fail
+    // the connection.
+    if (connection_socket->ioHandle().isOpen()) {
+      filter_chain =
+          listener_config_->filterChainManager().findFilterChain(*connection_socket, *stream_info);
+    }
+  }
 
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
@@ -116,6 +176,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
         std::reference_wrapper<Network::Connection>(*quic_session));
     quic_session->storeConnectionMapPosition(connections_by_filter_chain_, *filter_chain,
                                              connections_by_filter_chain_[filter_chain].begin());
+  } else {
+    quic_session->close(Network::ConnectionCloseType::FlushWrite, "no filter chain found");
   }
   quic_session->Initialize();
   connection_handler_.incNumConnections();

@@ -704,10 +704,15 @@ void ListenerImpl::buildListenSocketOptions(
 void ListenerImpl::createListenerFilterFactories() {
   if (!config_.listener_filters().empty()) {
     switch (socket_type_) {
-    case Network::Socket::Type::Datagram:
-      udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
-          config_.listener_filters(), *listener_factory_context_);
-      break;
+    case Network::Socket::Type::Datagram: {
+      if (udp_listener_config_->listener_factory_->isTransportConnectionless()) {
+        udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
+            config_.listener_filters(), *listener_factory_context_);
+        break;
+      }
+      // Use the same listener filter interfaces as TCP for connection-oriented UDP traffic.
+      ABSL_FALLTHROUGH_INTENDED;
+    }
     case Network::Socket::Type::Stream:
       listener_filter_factories_ = parent_.factory_->createListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);

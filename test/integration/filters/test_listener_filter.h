@@ -1,5 +1,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "source/common/router/string_accessor_impl.h"
 
 namespace Envoy {
 /**
@@ -73,6 +76,36 @@ public:
   Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
     return Network::FilterStatus::Continue;
   }
+};
+
+/**
+ * Test QUIC listener filter which add a new filter state.
+ */
+class TestQuicListenerFilter : public Network::ListenerFilter {
+public:
+  class TestStringFilterState : public Router::StringAccessorImpl {
+  public:
+    explicit TestStringFilterState(std::string value) : Router::StringAccessorImpl(value) {}
+    static const absl::string_view key() { return "test.filter_state.string"; }
+  };
+
+  explicit TestQuicListenerFilter(std::string added_value) : added_value_(added_value) {}
+
+  // Network::ListenerFilter
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
+    cb.filterState().setData(TestStringFilterState::key(),
+                             std::make_unique<TestStringFilterState>(added_value_),
+                             StreamInfo::FilterState::StateType::ReadOnly,
+                             StreamInfo::FilterState::LifeSpan::Connection);
+    return Network::FilterStatus::Continue;
+  }
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    PANIC("onData() shouldn't be called on QUIC listener filter");
+  }
+  size_t maxReadBytes() const override { return 0; }
+
+private:
+  const std::string added_value_;
 };
 
 } // namespace Envoy

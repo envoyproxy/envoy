@@ -82,6 +82,34 @@ public:
   std::string name() const override { return "envoy.filters.udp_listener.test"; }
 };
 
+/**
+ * Config registration for the test filter.
+ */
+class TestQuicListenerFilterConfigFactory
+    : public Server::Configuration::NamedListenerFilterConfigFactory {
+public:
+  // NamedListenerFilterConfigFactory
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& proto_config,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext& context) override {
+    const auto& message = MessageUtil::downcastAndValidate<
+        const test::integration::filters::TestQuicListenerFilterConfig&>(
+        proto_config, context.messageValidationVisitor());
+    return [listener_filter_matcher, added_value = message.added_value()](
+               Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(listener_filter_matcher,
+                                     std::make_unique<TestQuicListenerFilter>(added_value));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::integration::filters::TestQuicListenerFilterConfig>();
+  }
+
+  std::string name() const override { return "envoy.filters.quic_listener.test"; }
+};
+
 REGISTER_FACTORY(TestInspectorConfigFactory,
                  Server::Configuration::NamedListenerFilterConfigFactory);
 
@@ -90,4 +118,8 @@ REGISTER_FACTORY(TestTcpInspectorConfigFactory,
 
 REGISTER_FACTORY(TestUdpInspectorConfigFactory,
                  Server::Configuration::NamedUdpListenerFilterConfigFactory);
+
+REGISTER_FACTORY(TestQuicListenerFilterConfigFactory,
+                 Server::Configuration::NamedListenerFilterConfigFactory);
+
 } // namespace Envoy

@@ -381,6 +381,7 @@ envoy_cc_library(
         ":envoy_quic_server_session_lib",
         ":quic_stat_names_lib",
         "//envoy/network:listener_interface",
+        "//source/common/network:listener_filter_manager_impl_base_lib",
         "@com_github_google_quiche//:quic_core_server_lib",
         "@com_github_google_quiche//:quic_core_utils_lib",
     ],

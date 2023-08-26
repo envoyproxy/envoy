@@ -572,3 +572,13 @@ envoy_cc_library(
         "//source/common/common:macros",
     ],
 )
+
+envoy_cc_library(
+    name = "listener_filter_manager_impl_base_lib",
+    srcs = ["listener_filter_manager_impl_base.cc"],
+    hdrs = ["listener_filter_manager_impl_base.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:filter_interface",
+    ],
+)
