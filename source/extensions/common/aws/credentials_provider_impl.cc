@@ -29,7 +29,7 @@ constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
 constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
 constexpr char TOKEN[] = "Token";
 constexpr char EXPIRATION[] = "Expiration";
-constexpr char EXPIRATION_FORMAT[] = "%E4Y%m%dT%H%M%S%z";
+constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
 constexpr char TRUE[] = "true";
 
 constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
