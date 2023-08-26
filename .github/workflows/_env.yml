@@ -12,13 +12,13 @@ on:
         default: envoyproxy/envoy-build-ubuntu
       build_image_sha:
         type: string
-        default: 50337314a150ed12447c87c1622eac6f611a069888722fb9a426e21ed161cc26
+        default: a553b413d147ebe9ec35ff19f0c4565589b3afb61fd607aad225eb647ee9924d
       build_image_mobile_sha:
         type: string
-        default: ca26ff05bd3f3a09468242faaf38ae48315e57f0a87c102352162f95ac620e6f
+        default: 3781ff7def228eddd434716d8cafdc987b70b7555765de2719eef0098ce20962
       build_image_tag:
         type: string
-        default: 41c5a05d708972d703661b702a63ef5060125c33
+        default: b62bcf2a06920c9812c02dbd63d7fcd750de6132
 
       check_mobile_run:
         type: boolean
