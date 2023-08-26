@@ -13,15 +13,18 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get -qq update -y \
     && apt-get -qq install --no-install-recommends -y curl
 COPY --chmod=777 "$ENVOY_CONFIG" /etc/envoy.yaml
+CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml"]
+
+FROM envoy-base as envoy-admin
+ARG ENVOY_ADMIN_PORT=10001
+ENV ENVOY_ADMIN_PORT="$ENVOY_ADMIN_PORT"
 HEALTHCHECK \
     --interval=1s \
     --timeout=1s \
     --start-period=1s \
     --retries=3 \
-    CMD curl -s localhost:8001/stats?filter=server.state | grep 0 \
-             && curl -s localhost:8001/stats?filter=listener_manager.workers_started | grep 1
-CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml"]
-
+    CMD curl -s "localhost:${ENVOY_ADMIN_PORT}/stats?filter=server.state" | grep 0 \
+             && curl -s "localhost:${ENVOY_ADMIN_PORT}/stats?filter=listener_manager.workers_started" | grep 1
 
 FROM envoy-base as envoy-fault-injection
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
