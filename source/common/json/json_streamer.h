@@ -87,10 +87,10 @@ public:
 
   protected:
     /**
-     * Initiates a new entry, serializing a comma separator if this is not the
+     * Initiates a new field, serializing a comma separator if this is not the
      * first one.
      */
-    virtual void addEntry();
+    virtual void nextField();
 
     /**
      * Renders a string or a double in json format. Doubles that are NaN are
@@ -160,7 +160,7 @@ public:
     void addEntries(const Entries& entries);
 
   protected:
-    virtual void addEntry() override;
+    virtual void nextField() override;
 
   private:
     bool expecting_value_{false};

@@ -52,25 +52,25 @@ Streamer::MapPtr Streamer::makeRootMap() {
 
 Streamer::MapPtr Streamer::Level::addMap() {
   ASSERT_THIS_IS_TOP_LEVEL;
-  addEntry();
+  nextField();
   return std::make_unique<Map>(streamer_);
 }
 
 Streamer::ArrayPtr Streamer::Level::addArray() {
   ASSERT_THIS_IS_TOP_LEVEL;
-  addEntry();
+  nextField();
   return std::make_unique<Array>(streamer_);
 }
 
 void Streamer::Level::addNumber(double number) {
   ASSERT_THIS_IS_TOP_LEVEL;
-  addEntry();
+  nextField();
   streamer_.addNumber(number);
 }
 
 void Streamer::Level::addString(absl::string_view str) {
   ASSERT_THIS_IS_TOP_LEVEL;
-  addEntry();
+  nextField();
   streamer_.addSanitized("\"", str, "\"");
 }
 
@@ -81,7 +81,7 @@ void Streamer::pop(Level* level) {
 
 void Streamer::push(Level* level) { levels_.push(level); }
 
-void Streamer::Level::addEntry() {
+void Streamer::Level::nextField() {
   if (is_first_) {
     is_first_ = false;
   } else {
@@ -89,18 +89,18 @@ void Streamer::Level::addEntry() {
   }
 }
 
-void Streamer::Map::addEntry() {
+void Streamer::Map::nextField() {
   if (expecting_value_) {
     expecting_value_ = false;
   } else {
-    Level::addEntry();
+    Level::nextField();
   }
 }
 
 void Streamer::Map::addKey(absl::string_view key) {
   ASSERT_THIS_IS_TOP_LEVEL;
   ASSERT(!expecting_value_);
-  addEntry();
+  nextField();
   streamer_.addSanitized("\"", key, "\":");
   expecting_value_ = true;
 }
