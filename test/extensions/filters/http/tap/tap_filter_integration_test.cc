@@ -1125,7 +1125,7 @@ typed_config:
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
 }
 
-// Verify record_req_resp_msg_caught_time works
+// Verify option record_headers_received_time
 // when a request header is matched in a static configuration
 TEST_P(TapIntegrationTest, StaticFilePerHttpBufferTraceTapForRequest) {
   constexpr absl::string_view filter_config =
@@ -1146,8 +1146,7 @@ typed_config:
           - format: PROTO_BINARY_LENGTH_DELIMITED
             file_per_tap:
               path_prefix: {}
-  output_config:
-      record_headers_received_time: true
+  record_headers_received_time: true
 )EOF";
 
   const std::string path_prefix = getTempPathPrefix();

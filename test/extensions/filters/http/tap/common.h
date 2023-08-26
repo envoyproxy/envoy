@@ -11,10 +11,10 @@ namespace TapFilter {
 
 class MockHttpTapConfig : public HttpTapConfig {
 public:
-  HttpPerRequestTapperPtr createPerRequestTapper(
-      const envoy::extensions::filters::http::tap::v3::OutputConfig& output_config,
-      uint64_t stream_id) override {
-    return HttpPerRequestTapperPtr{createPerRequestTapper_(output_config, stream_id)};
+  HttpPerRequestTapperPtr
+  createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
+                         uint64_t stream_id) override {
+    return HttpPerRequestTapperPtr{createPerRequestTapper_(tap_config, stream_id)};
   }
 
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr
@@ -24,7 +24,7 @@ public:
   }
 
   MOCK_METHOD(HttpPerRequestTapper*, createPerRequestTapper_,
-              (const envoy::extensions::filters::http::tap::v3::OutputConfig& output_config,
+              (const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
                uint64_t stream_id));
   MOCK_METHOD(Extensions::Common::Tap::PerTapSinkHandleManager*, createPerTapSinkHandleManager_,
               (uint64_t trace_id));

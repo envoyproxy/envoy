@@ -84,7 +84,7 @@ new_features:
     out to a custom sink extension.
 - area: tap
   change: |
-    added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.OutputConfig.record_headers_received_time>`
+    added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
 
 deprecated:

@@ -35,9 +35,8 @@ HttpTapConfigImpl::HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& pr
       time_source_(context.mainThreadDispatcher().timeSource()) {}
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(
-    const envoy::extensions::filters::http::tap::v3::OutputConfig& output_config,
-    uint64_t stream_id) {
-  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), output_config, stream_id);
+    const envoy::extensions::filters::http::tap::v3::Tap& tap_config, uint64_t stream_id) {
+  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), tap_config, stream_id);
 }
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {
@@ -49,7 +48,7 @@ void HttpPerRequestTapperImpl::streamRequestHeaders() {
 
 void HttpPerRequestTapperImpl::onRequestHeaders(const Http::RequestHeaderMap& headers) {
   request_headers_ = &headers;
-  if (shouldRecordHeadersReceivedTime()) {
+  if (should_record_headers_received_time_) {
     setTimeStamp(request_headers_received_time_);
   }
 
@@ -108,7 +107,7 @@ void HttpPerRequestTapperImpl::streamResponseHeaders() {
 
 void HttpPerRequestTapperImpl::onResponseHeaders(const Http::ResponseHeaderMap& headers) {
   response_headers_ = &headers;
-  if (shouldRecordHeadersReceivedTime()) {
+  if (should_record_headers_received_time_) {
     setTimeStamp(response_headers_received_time_);
   }
 
@@ -170,7 +169,7 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
   auto& http_trace = *buffered_full_trace_->mutable_http_buffered_trace();
   if (request_headers_ != nullptr) {
     request_headers_->iterate(fillHeaderList(http_trace.mutable_request()->mutable_headers()));
-    if (shouldRecordHeadersReceivedTime()) {
+    if (should_record_headers_received_time_) {
       http_trace.mutable_request()->mutable_headers_received_time()->MergeFrom(
           Protobuf::util::TimeUtil::NanosecondsToTimestamp(request_headers_received_time_));
     }
@@ -180,7 +179,7 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
   }
   if (response_headers_ != nullptr) {
     response_headers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_headers()));
-    if (shouldRecordHeadersReceivedTime()) {
+    if (should_record_headers_received_time_) {
       http_trace.mutable_response()->mutable_headers_received_time()->MergeFrom(
           Protobuf::util::TimeUtil::NanosecondsToTimestamp(response_headers_received_time_));
     }

@@ -23,13 +23,13 @@ class MockFilterConfig : public FilterConfig {
 public:
   MOCK_METHOD(HttpTapConfigSharedPtr, currentConfig, ());
   FilterStats& stats() override { return stats_; }
-  const envoy::extensions::filters::http::tap::v3::OutputConfig& getOutputConfig() const override {
-    return output_config_;
+  const envoy::extensions::filters::http::tap::v3::Tap& getTapConfig() const override {
+    return tap_config_;
   }
 
   Stats::IsolatedStoreImpl stats_store_;
   FilterStats stats_{Filter::generateStats("foo", *stats_store_.rootScope())};
-  const envoy::extensions::filters::http::tap::v3::OutputConfig output_config_;
+  const envoy::extensions::filters::http::tap::v3::Tap tap_config_;
 };
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {

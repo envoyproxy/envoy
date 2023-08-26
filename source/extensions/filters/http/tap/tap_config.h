@@ -66,12 +66,12 @@ class HttpTapConfig : public virtual Extensions::Common::Tap::TapConfig {
 public:
   /**
    * @return a new per-request HTTP tapper which is used to handle tapping of a discrete request.
-   * @param output_config provides http tap specific config to control output
+   * @param tap_config provides http tap config
    * @param stream_id supplies the owning HTTP stream ID.
    */
-  virtual HttpPerRequestTapperPtr createPerRequestTapper(
-      const envoy::extensions::filters::http::tap::v3::OutputConfig& output_config,
-      uint64_t stream_id) PURE;
+  virtual HttpPerRequestTapperPtr
+  createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
+                         uint64_t stream_id) PURE;
 
   /**
    * @return time source to use for timestamp

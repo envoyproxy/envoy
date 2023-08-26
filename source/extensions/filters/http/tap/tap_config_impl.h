@@ -24,9 +24,9 @@ public:
                     Server::Configuration::FactoryContext& context);
 
   // TapFilter::HttpTapConfig
-  HttpPerRequestTapperPtr createPerRequestTapper(
-      const envoy::extensions::filters::http::tap::v3::OutputConfig& output_config,
-      uint64_t stream_id) override;
+  HttpPerRequestTapperPtr
+  createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
+                         uint64_t stream_id) override;
 
   TimeSource& timeSource() const override { return time_source_; }
 
@@ -36,12 +36,12 @@ private:
 
 class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<Logger::Id::tap> {
 public:
-  HttpPerRequestTapperImpl(
-      HttpTapConfigSharedPtr config,
-      const envoy::extensions::filters::http::tap::v3::OutputConfig& output_config,
-      uint64_t stream_id)
-      : config_(std::move(config)), output_config_(output_config), stream_id_(stream_id),
-        sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
+  HttpPerRequestTapperImpl(HttpTapConfigSharedPtr config,
+                           const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
+                           uint64_t stream_id)
+      : config_(std::move(config)),
+        should_record_headers_received_time_(tap_config.record_headers_received_time()),
+        stream_id_(stream_id), sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
         statuses_(config_->createMatchStatusVector()) {
     config_->rootMatcher().onNewStream(statuses_);
   }
@@ -91,12 +91,8 @@ private:
                      .count();
   }
 
-  bool shouldRecordHeadersReceivedTime() const {
-    return output_config_.record_headers_received_time();
-  }
-
   HttpTapConfigSharedPtr config_;
-  const envoy::extensions::filters::http::tap::v3::OutputConfig& output_config_;
+  const bool should_record_headers_received_time_;
   const uint64_t stream_id_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;

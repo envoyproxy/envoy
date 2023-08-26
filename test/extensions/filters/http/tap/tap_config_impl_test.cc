@@ -31,11 +31,11 @@ public:
     EXPECT_CALL(*config_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
     time_system_.setSystemTime(std::chrono::seconds(0));
     EXPECT_CALL(matcher_, onNewStream(_)).WillOnce(SaveArgAddress(&statuses_));
-    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, output_config_, 1);
+    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, 1);
   }
 
   std::shared_ptr<MockHttpTapConfig> config_{std::make_shared<MockHttpTapConfig>()};
-  envoy::extensions::filters::http::tap::v3::OutputConfig output_config_;
+  envoy::extensions::filters::http::tap::v3::Tap tap_config_;
   // Raw pointer, returned via mock to unique_ptr.
   TapCommon::MockPerTapSinkHandleManager* sink_manager_ =
       new TapCommon::MockPerTapSinkHandleManager;
@@ -328,12 +328,12 @@ public:
     EXPECT_CALL(matcher_, onNewStream(_)).WillOnce(SaveArgAddress(&statuses_));
 
     // Make sure the record_req_resp_msg_caught_time is true
-    output_config_.set_record_headers_received_time(true);
-    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, output_config_, 1);
+    tap_config_.set_record_headers_received_time(true);
+    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, 1);
   }
 
   std::shared_ptr<MockHttpTapConfig> config_{std::make_shared<MockHttpTapConfig>()};
-  envoy::extensions::filters::http::tap::v3::OutputConfig output_config_;
+  envoy::extensions::filters::http::tap::v3::Tap tap_config_;
   // Raw pointer, returned via mock to unique_ptr.
   TapCommon::MockPerTapSinkHandleManager* sink_manager_ =
       new TapCommon::MockPerTapSinkHandleManager;
