@@ -5,7 +5,9 @@ package envoy.extensions.filters.udp.udp_proxy.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
@@ -47,6 +49,58 @@ message UdpProxyConfig {
       // (instead of individual stream level), dynamically created listeners can use the same hash key for each stream in the session.
       string key = 2 [(validate.rules).string = {min_len: 1}];
     }
+  }
+
+  // [#not-implemented-hide:]
+  message SessionFilter {
+    // The name of the filter configuration.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    oneof config_type {
+      // Filter specific configuration which depends on the filter being
+      // instantiated. See the supported filters for further documentation.
+      // [#extension-category: envoy.filters.udp.session]
+      google.protobuf.Any typed_config = 2;
+    }
+  }
+
+  // [#not-implemented-hide:]
+  message SessionBufferOptions{
+    // If set, the session will only buffer datagrams up to the requested limit, and will drop
+    // new UDP datagrams if the buffer contains the max_buffered_datagrams value at the time
+    // of a new datagram arrival. If not set, the default value is 1024 datagrams.
+    google.protobuf.UInt32Value max_buffered_datagrams = 1;
+
+    // If set, the session will only buffer datagrams up to the requested total buffered bytes limit,
+    // and will drop new UDP datagrams if the buffer contains the max_buffered_datagrams value
+    // at the time of a new datagram arrival. If not set, the default value is 16,384 (16KB).
+    google.protobuf.UInt64Value max_buffered_bytes = 2;
+  }
+
+  // [#not-implemented-hide:]
+  message UdpTunnelingConfig {
+    // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+    // Please refer to the UDP tunneling documentation for more information about the full URI
+    // template which the UDP Proxy will use in the CONNECT headers.
+    string proxy_host = 1;
+
+    // Optional port value to include in the URI of the CONNECT headers.
+    google.protobuf.UInt64Value proxy_port = 2;
+
+    // Use POST method instead of CONNECT method to tunnel the UDP stream.
+    bool use_post = 3;
+
+    // The path used with POST method. Default path is ``/``. If post path is specified and
+    // :ref:`use_post field <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.use_post>`
+    // isn't true, it will be rejected.
+    string post_path = 4;
+
+    // Additional request headers to upstream proxy. This is mainly used to
+    // trigger upstream to convert POST requests back to CONNECT requests.
+    //
+    // Neither ``:-prefixed`` pseudo-headers nor the Host: header can be overridden.
+    repeated config.core.v3.HeaderValueOption headers_to_add = 5
+        [(validate.rules).repeated = {max_items: 1000}];
   }
 
   // The stat prefix used when emitting UDP proxy filter stats.
@@ -110,4 +164,21 @@ message UdpProxyConfig {
 
   // Configuration for proxy access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
   repeated config.accesslog.v3.AccessLog proxy_access_log = 10;
+
+  // Optional session filters that will run for each UDP session.
+  // [#not-implemented-hide:]
+  repeated SessionFilter session_filters = 11;
+
+  // If configured, a UDP session will maintain a buffer that in certain cases will be filled with UDP datagrams
+  // that are waiting to be sent upstream. For further documentation about the scenarios where the UDP session will
+  // buffer datagrams, please refer to the UDP Proxy documentation.
+  // [#not-implemented-hide:]
+  SessionBufferOptions session_buffer_options = 12;
+
+  // If set, this configures tunneling, e.g. configuration options to tunnel UDP payload over
+  // HTTP. If this message is absent, the payload will be proxied upstream as per usual.
+  // please refer to the UDP Proxy documentation for more information about UDP tunneling and
+  // the underlying protocol.
+  // [#not-implemented-hide:]
+  UdpTunnelingConfig udp_tunneling_config = 13;
 }
