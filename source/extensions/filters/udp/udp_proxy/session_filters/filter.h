@@ -172,7 +172,7 @@ public:
    * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
    *                  FilterChainFactoryCallbacks.
    */
-  virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
+  virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) const PURE;
 };
 
 } // namespace SessionFilters
