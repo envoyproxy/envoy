@@ -247,7 +247,7 @@ an interface for users to provide specific header matching criteria such that, w
 When this occurs, the ``oauth_passthrough`` metric is incremented but ``success`` is not.
 
 :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>` provides
-possibility to update access token using by refresh token. By default after expiration the user is always redirected to the authorization endpoint to log in again.
+possibility to update access token by using a refresh token. By default after expiration the user is always redirected to the authorization endpoint to log in again.
 By enabling this flag new a access token is obtained using by a refresh token without redirection user to log in again. This requires the refresh token to be provided by authorization_endpoint when the user logged in.
 If the attempt to get an access token using by refresh token fails then the user is redirected to authorization endpoint as usual.
 
