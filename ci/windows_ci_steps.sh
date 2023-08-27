@@ -86,6 +86,9 @@ else
   TEST_TARGETS='//test/...'
 fi
 
+echo "VERSION"
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" version
+
 # Complete envoy-static build
 if [[ $BUILD_ENVOY_STATIC -eq 1 ]]; then
   bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
