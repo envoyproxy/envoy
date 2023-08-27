@@ -56,8 +56,6 @@ enum class OpCodes {
   AddWatch = 106,
 };
 
-const std::string opcodesToString(const OpCodes opcode);
-
 enum class WatcherType { Children = 1, Data = 2, Any = 3 };
 
 enum class AddWatchMode { Persistent, PersistentRecursive };

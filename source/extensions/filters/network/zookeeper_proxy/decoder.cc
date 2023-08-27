@@ -21,67 +21,6 @@ constexpr uint32_t MULTI_HEADER_LENGTH = 9;
 constexpr uint32_t PROTOCOL_VERSION_LENGTH = 4;
 constexpr uint32_t SERVER_HEADER_LENGTH = 16;
 
-const std::string opcodesToString(const OpCodes opcode) {
-  switch (opcode) {
-  case OpCodes::Connect:
-    return "connect";
-  case OpCodes::Create:
-    return "create";
-  case OpCodes::Delete:
-    return "delete";
-  case OpCodes::Exists:
-    return "exists";
-  case OpCodes::GetData:
-    return "getdata";
-  case OpCodes::SetData:
-    return "setdata";
-  case OpCodes::GetAcl:
-    return "getacl";
-  case OpCodes::SetAcl:
-    return "setacl";
-  case OpCodes::GetChildren:
-    return "getchildren";
-  case OpCodes::Sync:
-    return "sync";
-  case OpCodes::Ping:
-    return "ping";
-  case OpCodes::GetChildren2:
-    return "getchildren2";
-  case OpCodes::Check:
-    return "check";
-  case OpCodes::Multi:
-    return "multi";
-  case OpCodes::Create2:
-    return "create2";
-  case OpCodes::Reconfig:
-    return "reconfig";
-  case OpCodes::CheckWatches:
-    return "checkwatches";
-  case OpCodes::RemoveWatches:
-    return "removewatches";
-  case OpCodes::CreateContainer:
-    return "createcontainer";
-  case OpCodes::CreateTtl:
-    return "createttl";
-  case OpCodes::Close:
-    return "close";
-  case OpCodes::SetAuth:
-    return "auth";
-  case OpCodes::SetWatches:
-    return "setwatches";
-  case OpCodes::GetEphemerals:
-    return "getephemerals";
-  case OpCodes::GetAllChildrenNumber:
-    return "getallchildrennumber";
-  case OpCodes::SetWatches2:
-    return "setwatches2";
-  case OpCodes::AddWatch:
-    return "addwatch";
-  }
-
-  return "unknown_opcode";
-}
-
 const char* createFlagsToString(CreateFlags flags) {
   switch (flags) {
   case CreateFlags::Persistent:
