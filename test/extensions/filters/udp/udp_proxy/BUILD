@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:hash_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//source/extensions/matching/network/common:inputs_lib",
         "//test/mocks/api:api_mocks",

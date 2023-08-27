@@ -71,84 +71,22 @@ struct UdpProxyUpstreamStats {
 
 class UdpProxyFilterConfig {
 public:
-  UdpProxyFilterConfig(Server::Configuration::ListenerFactoryContext& context,
-                       const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
-      : cluster_manager_(context.clusterManager()), time_source_(context.timeSource()),
-        router_(std::make_shared<Router::RouterImpl>(config, context.getServerFactoryContext())),
-        session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
-        use_original_src_ip_(config.use_original_src_ip()),
-        use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
-        stats_(generateStats(config.stat_prefix(), context.scope())),
-        // Default prefer_gro to true for upstream client traffic.
-        upstream_socket_config_(config.upstream_socket_config(), true),
-        random_(context.api().randomGenerator()) {
-    if (use_original_src_ip_ &&
-        !Api::OsSysCallsSingleton::get().supportsIpTransparent(
-            context.getServerFactoryContext().options().localAddressIpVersion())) {
-      ExceptionUtil::throwEnvoyException(
-          "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
-          "is not running with the CAP_NET_ADMIN capability.");
-    }
+  virtual ~UdpProxyFilterConfig() = default;
 
-    session_access_logs_.reserve(config.access_log_size());
-    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
-      session_access_logs_.emplace_back(
-          AccessLog::AccessLogFactory::fromProto(log_config, context));
-    }
-
-    proxy_access_logs_.reserve(config.proxy_access_log_size());
-    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.proxy_access_log()) {
-      proxy_access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
-    }
-
-    if (!config.hash_policies().empty()) {
-      hash_policy_ = std::make_unique<HashPolicyImpl>(config.hash_policies());
-    }
-  }
-
-  const std::string route(const Network::Address::Instance& destination_address,
-                          const Network::Address::Instance& source_address) const {
-    return router_->route(destination_address, source_address);
-  }
-  const std::vector<std::string>& allClusterNames() const { return router_->allClusterNames(); }
-  Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
-  std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
-  bool usingOriginalSrcIp() const { return use_original_src_ip_; }
-  bool usingPerPacketLoadBalancing() const { return use_per_packet_load_balancing_; }
-  const Udp::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
-  UdpProxyDownstreamStats& stats() const { return stats_; }
-  TimeSource& timeSource() const { return time_source_; }
-  Random::RandomGenerator& randomGenerator() const { return random_; }
-  const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const {
-    return upstream_socket_config_;
-  }
-  const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const {
-    return session_access_logs_;
-  }
-  const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const {
-    return proxy_access_logs_;
-  }
-
-private:
-  static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
-                                               Stats::Scope& scope) {
-    const auto final_prefix = absl::StrCat("udp.", stat_prefix);
-    return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                           POOL_GAUGE_PREFIX(scope, final_prefix))};
-  }
-
-  Upstream::ClusterManager& cluster_manager_;
-  TimeSource& time_source_;
-  Router::RouterConstSharedPtr router_;
-  const std::chrono::milliseconds session_timeout_;
-  const bool use_original_src_ip_;
-  const bool use_per_packet_load_balancing_;
-  std::unique_ptr<const HashPolicyImpl> hash_policy_;
-  mutable UdpProxyDownstreamStats stats_;
-  const Network::ResolvedUdpSocketConfig upstream_socket_config_;
-  std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
-  std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
-  Random::RandomGenerator& random_;
+  virtual const std::string route(const Network::Address::Instance& destination_address,
+                                  const Network::Address::Instance& source_address) const PURE;
+  virtual const std::vector<std::string>& allClusterNames() const PURE;
+  virtual Upstream::ClusterManager& clusterManager() const PURE;
+  virtual std::chrono::milliseconds sessionTimeout() const PURE;
+  virtual bool usingOriginalSrcIp() const PURE;
+  virtual bool usingPerPacketLoadBalancing() const PURE;
+  virtual const Udp::HashPolicy* hashPolicy() const PURE;
+  virtual UdpProxyDownstreamStats& stats() const PURE;
+  virtual TimeSource& timeSource() const PURE;
+  virtual Random::RandomGenerator& randomGenerator() const PURE;
+  virtual const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const PURE;
+  virtual const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const PURE;
+  virtual const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const PURE;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -253,7 +191,7 @@ private:
     bool connected_{};
 
     UdpProxySessionStats session_stats_{};
-    absl::optional<StreamInfo::StreamInfoImpl> udp_session_stats_;
+    StreamInfo::StreamInfoImpl udp_session_info_;
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
