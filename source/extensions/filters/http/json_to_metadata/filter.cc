@@ -184,6 +184,8 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
     for (auto const& entry : struct_map) {
       filter_callback.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
+
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 }
 
