@@ -9,6 +9,8 @@ responses and events in the payload. Most opcodes known in
 `ZooKeeper 3.5 <https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java>`_
 are supported. The unsupported ones are related to SASL authentication.
 
+:ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy>`
+
 .. attention::
 
    The zookeeper_proxy filter is experimental and is currently under active
@@ -33,11 +35,11 @@ Statistics
 
 Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*.
 
-*_resp_fast* and *_resp_slow* metrics will only be emitted when :ref:`enable_latency_threshold_metrics <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.enable_latency_threshold_metrics>` is set to ``true``.
+*_resp_fast* and *_resp_slow* metrics will only be emitted when :ref:`enable_latency_threshold_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_latency_threshold_metrics>` is set to ``true``.
 
-*_rq_bytes* metrics will only be emitted when :ref:`enable_per_opcode_request_bytes_metrics <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.enable_per_opcode_request_bytes_metrics>` is set to ``true``.
+*_rq_bytes* metrics will only be emitted when :ref:`enable_per_opcode_request_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>` is set to ``true``.
 
-*_resp_bytes* metrics will only be emitted when :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.enable_per_opcode_response_bytes_metrics>` is set to ``true``.
+*_resp_bytes* metrics will only be emitted when :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>` is set to ``true``.
 
 The following counters are available:
 

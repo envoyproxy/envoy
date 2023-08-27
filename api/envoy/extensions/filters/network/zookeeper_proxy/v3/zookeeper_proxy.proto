@@ -44,7 +44,6 @@ message ZooKeeperProxy {
 
   // Whether to emit latency threshold metrics. If not set, defaults to false.
   // If false, setting `default_latency_threshold` and `latency_threshold_overrides` will not have effect.
-  // :ref:`envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.enable_latency_threshold_metrics`
   bool enable_latency_threshold_metrics = 4;
 
   // The default latency threshold to decide the fast/slow responses and emit metrics (used for error budget calculation).
@@ -62,11 +61,9 @@ message ZooKeeperProxy {
   repeated LatencyThresholdOverride latency_threshold_overrides = 6;
 
   // Whether to emit per opcode request bytes metrics. If not set, defaults to false.
-  // :ref:`envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.enable_per_opcode_request_bytes_metrics`
   bool enable_per_opcode_request_bytes_metrics = 7;
 
   // Whether to emit per opcode response bytes metrics. If not set, defaults to false.
-  // :ref:`envoy_v3_api_msg_extensions.filters.network.zookeeper_proxy.v3.enable_per_opcode_response_bytes_metrics`
   bool enable_per_opcode_response_bytes_metrics = 8;
 }
 
