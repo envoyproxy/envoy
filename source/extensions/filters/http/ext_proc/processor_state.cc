@@ -176,11 +176,12 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           // We reached the limit so send what we have. This is different from the buffered
           // case because we need to be set up to handle data that might come in while
           // waiting for the callback, so the chunk needs to stay on the queue.
-          Buffer::OwnedImpl out_data;
-          const auto& all_data = consolidateStreamedChunks(out_data);
-          ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode before end stream",
-                    all_data.buffer_length);
-          filter_.sendBodyChunk(*this, out_data,
+          const auto& all_data = consolidateStreamedChunks();
+          ENVOY_LOG(
+              debug,
+              "Sending {} bytes of data end_stream {} in buffered partial mode before end stream",
+              receivedData().length(), all_data.end_stream);
+          filter_.sendBodyChunk(*this, receivedData(),
                                 ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
         } else {
           // Let data continue to flow, but don't resume yet -- we would like to hold
@@ -505,19 +506,12 @@ absl::optional<QueuedChunkPtr> ChunkQueue::pop(bool undelivered_only,
   queue_.pop_front();
   bytes_enqueued_ -= chunk->buffer_length;
 
-  // Copy the data out.
-  uint8_t* data = new uint8_t[chunk->buffer_length];
-  received_data.copyOut(0, chunk->buffer_length, data);
-  out_data.add(data, chunk->buffer_length);
-  delete[] data;
-
-  // Drain the received buffer.
-  received_data.drain(chunk->buffer_length);
+  // Move the corresponding data out.
+  out_data.move(received_data, chunk->buffer_length);
   return chunk;
 }
 
-const QueuedChunk& ChunkQueue::consolidate(const Buffer::OwnedImpl& received_data,
-                                           Buffer::OwnedImpl& out_data) {
+const QueuedChunk& ChunkQueue::consolidate() {
   if (queue_.size() > 1) {
     auto new_chunk = std::make_unique<QueuedChunk>();
     new_chunk->end_stream = queue_.back()->end_stream;
@@ -526,12 +520,6 @@ const QueuedChunk& ChunkQueue::consolidate(const Buffer::OwnedImpl& received_dat
     queue_.push_front(std::move(new_chunk));
   }
   auto& chunk = *(queue_.front());
-  // Copy the data out.
-  uint8_t* data = new uint8_t[chunk.buffer_length];
-  received_data.copyOut(0, chunk.buffer_length, data);
-  out_data.add(data, chunk.buffer_length);
-  delete[] data;
-
   chunk.delivered = true;
   return chunk;
 }

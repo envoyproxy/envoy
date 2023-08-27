@@ -427,13 +427,11 @@ std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& 
     break;
   }
 
-  // Put all buffered data so far into one big buffer
-  Buffer::OwnedImpl out_data;
-  const auto& all_data = state.consolidateStreamedChunks(out_data);
+  const auto& all_data = state.consolidateStreamedChunks();
   ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
-            all_data.buffer_length, all_data.end_stream);
-  sendBodyChunk(state, out_data, ProcessorState::CallbackState::BufferedPartialBodyCallback,
-                all_data.end_stream);
+            state.receivedData().length(), all_data.end_stream);
+  sendBodyChunk(state, state.receivedData(),
+                ProcessorState::CallbackState::BufferedPartialBodyCallback, all_data.end_stream);
   state.setPaused(true);
   return {false, FilterDataStatus::StopIterationNoBuffer};
 }

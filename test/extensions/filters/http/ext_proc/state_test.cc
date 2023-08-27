@@ -141,7 +141,6 @@ TEST(StateTest, EnqueueDequeue) {
 TEST(StateTest, ConsolidateThree) {
   ChunkQueue queue;
   Buffer::OwnedImpl received_data;
-  Buffer::OwnedImpl out_data;
   Buffer::OwnedImpl data1("Hello");
   queue.push(data1, false, false, received_data);
   Buffer::OwnedImpl data2(", ");
@@ -150,10 +149,10 @@ TEST(StateTest, ConsolidateThree) {
   queue.push(data3, false, false, received_data);
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(13, queue.bytesEnqueued());
-  const auto& chunk = queue.consolidate(received_data, out_data);
+  const auto& chunk = queue.consolidate();
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(13, queue.bytesEnqueued());
-  EXPECT_EQ(out_data.toString(), "Hello, World!");
+  EXPECT_EQ(received_data.toString(), "Hello, World!");
   EXPECT_FALSE(chunk.end_stream);
   EXPECT_TRUE(chunk.delivered);
   EXPECT_EQ(chunk.buffer_length, 13);
@@ -162,13 +161,12 @@ TEST(StateTest, ConsolidateThree) {
 TEST(StateTest, ConsolidateOne) {
   ChunkQueue queue;
   Buffer::OwnedImpl received_data;
-  Buffer::OwnedImpl out_data;
   Buffer::OwnedImpl data1("Hello");
   queue.push(data1, false, false, received_data);
-  const auto& chunk = queue.consolidate(received_data, out_data);
+  const auto& chunk = queue.consolidate();
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(5, queue.bytesEnqueued());
-  EXPECT_EQ(out_data.toString(), "Hello");
+  EXPECT_EQ(received_data.toString(), "Hello");
   EXPECT_FALSE(chunk.end_stream);
   EXPECT_TRUE(chunk.delivered);
   EXPECT_EQ(chunk.buffer_length, 5);

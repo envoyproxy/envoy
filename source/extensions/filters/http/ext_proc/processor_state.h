@@ -44,8 +44,7 @@ public:
             Buffer::OwnedImpl& received_data);
   absl::optional<QueuedChunkPtr> pop(bool undelivered_only, Buffer::OwnedImpl& received_data,
                                      Buffer::OwnedImpl& out_data);
-  const QueuedChunk& consolidate(const Buffer::OwnedImpl& received_data,
-                                 Buffer::OwnedImpl& out_data);
+  const QueuedChunk& consolidate();
 
 private:
   // If we are in either streaming mode, store chunks that we received here,
@@ -99,6 +98,7 @@ public:
     return "OUTBOUND";
   }
   CallbackState callbackState() const { return callback_state_; }
+  Buffer::OwnedImpl& receivedData() { return received_data_; }
   void setPaused(bool paused) { paused_ = paused; }
 
   bool completeBodyAvailable() const { return complete_body_available_; }
@@ -151,8 +151,11 @@ public:
     return chunk_queue_.pop(undelivered_only, received_data_, out_data);
   }
   // Consolidate all the chunks on the queue into a single one and return a reference.
-  const QueuedChunk& consolidateStreamedChunks(Buffer::OwnedImpl& out_data) {
-    return chunk_queue_.consolidate(received_data_, out_data);
+  const QueuedChunk& consolidateStreamedChunks() {
+    const auto& chunk = chunk_queue_.consolidate();
+    // The consolidated chunk buffer length matches the received data length.
+    ASSERT(receivedData().length() == chunk.buffer_length);
+    return chunk;
   }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
