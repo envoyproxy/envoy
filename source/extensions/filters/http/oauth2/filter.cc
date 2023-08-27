@@ -157,7 +157,7 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view hos
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hmac_payload =
       absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hmac_hex_encoding_only")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hmac_base64_encoding_only")) {
     std::string base64_encoded_hmac;
     std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
     std::string hmac_string(hmac_result.begin(), hmac_result.end());

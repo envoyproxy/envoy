@@ -869,7 +869,7 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
   {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
     });
     test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
     auto cookie_names =
@@ -968,7 +968,7 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
   {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
     });
     Http::TestRequestHeaderMapImpl request_headers{
         {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -1298,7 +1298,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.oauth_use_url_encoding", "false"},
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
     });
     init();
     // First construct the initial request to the oauth filter with URI parameters.
@@ -1487,7 +1487,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.oauth_use_url_encoding", "true"},
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
     });
     init();
     // First construct the initial request to the oauth filter with URI parameters.
@@ -1589,36 +1589,17 @@ std::string oauthHMAC;
 
 TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
   TestScopedRuntime scoped_runtime;
-  switch (GetParam()) {
-  case 0:
+  if (GetParam() == 1) {
     scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "true"},
-    });
-    oauthHMAC = "e132b2c4f57f17bcb2bebd17809d9b91614e73cb7820e15e9f5936f5bf383004;";
-    break;
-
-  case 1:
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "true"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
     });
     oauthHMAC =
         "ZTEzMmIyYzRmNTdmMTdiY2IyYmViZDE3ODA5ZDliOTE2MTRlNzNjYjc4MjBlMTVlOWY1OTM2ZjViZjM4MzAwNA==;";
-    break;
-
-  case 2:
+  } else {
     scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
     });
-    oauthHMAC =
-        "ZTEzMmIyYzRmNTdmMTdiY2IyYmViZDE3ODA5ZDliOTE2MTRlNzNjYjc4MjBlMTVlOWY1OTM2ZjViZjM4MzAwNA==;";
-    break;
-
-  case 3:
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
-    });
-    oauthHMAC = "e132b2c4f57f17bcb2bebd17809d9b91614e73cb7820e15e9f5936f5bf383004;";
-    break;
+    oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
   }
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -1653,7 +1634,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
                                    std::chrono::seconds(600));
 }
 
-INSTANTIATE_TEST_SUITE_P(EndcodingParams, OAuth2Test, testing::Values(3, 2, 1, 0));
+INSTANTIATE_TEST_SUITE_P(EndcodingParams, OAuth2Test, testing::Values(1, 0));
 
 TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_value) {
   TestScopedRuntime scoped_runtime;
@@ -1665,12 +1646,12 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_v
     oauthHMAC =
         "ZmMzNzFkOWVkY2ZmNzc3M2NjYjk0ZTA0NDM4YTlkOWIxMTUxNmI3NDkyMGRkYjM1Mzg4YTBiMzc4NGRmOWU4Mw==;";
     scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
     });
   } else {
-    oauthHMAC = "fc371d9edcff7773ccb94e04438a9d9b11516b74920ddb35388a0b3784df9e83;";
+    oauthHMAC = "/Dcdntz/d3PMuU4EQ4qdmxFRa3SSDds1OIoLN4TfnoM=;";
     scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "true"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
     });
   }
 
@@ -1716,12 +1697,12 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_http
     oauthHMAC =
         "ZTEzMmIyYzRmNTdmMTdiY2IyYmViZDE3ODA5ZDliOTE2MTRlNzNjYjc4MjBlMTVlOWY1OTM2ZjViZjM4MzAwNA==;";
     scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "false"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
     });
   } else {
-    oauthHMAC = "e132b2c4f57f17bcb2bebd17809d9b91614e73cb7820e15e9f5936f5bf383004;";
+    oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
     scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_hex_encoding_only", "true"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
     });
   }
 
@@ -1789,6 +1770,57 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_P(OAuth2Test, CookieValidatorInTransition) {
+  TestScopedRuntime scoped_runtime;
+  if (GetParam() == 1) {
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
+    });
+  } else {
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
+    });
+  }
+  Http::TestRequestHeaderMapImpl request_headers_base64only{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=1600;version=1"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=access_code;version=1"},
+      {Http::Headers::get().Cookie.get(), "IdToken=some-id-token;version=1"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token;version=1"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "73ed6acf2acc9aa1bcf8ee1d9fb6f6f0ebcd34359c6f4e3225f35b642135cd81"
+       ";version=test"},
+  };
+
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
+      test_time_,
+      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"});
+  cookie_validator->setParams(request_headers_base64only, "mock-secret");
+
+  EXPECT_TRUE(cookie_validator->hmacIsValid());
+
+  Http::TestRequestHeaderMapImpl request_headers_hexbase64{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=1600;version=1"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=access_code;version=1"},
+      {Http::Headers::get().Cookie.get(), "IdToken=some-id-token;version=1"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token;version=1"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "NzNlZDZhY2YyYWNjOWFhMWJjZjhlZTFkOWZiNmY2ZjBlYmNkMzQzNTljNmY0ZTMyMjVmMzViNjQyMTM1Y2Q4MQ=="
+       ";version=test"},
+  };
+  cookie_validator->setParams(request_headers_hexbase64, "mock-secret");
+
+  EXPECT_TRUE(cookie_validator->hmacIsValid());
+}
 }
 
 } // namespace Oauth2
