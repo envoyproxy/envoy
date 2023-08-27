@@ -74,11 +74,6 @@ stages:
 - ${{ if eq(variables.pipelineDefault, true) }}:
   - template: stages.yml
     parameters:
-      buildStageDeps:
-      - env
-      checkStageDeps:
-      - env
-      concurrencyChecks: 10
       windowsBuildStageDeps:
       - env
 
