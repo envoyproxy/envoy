@@ -42,7 +42,7 @@
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/active_quic_listener.h"
-#include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_context.h"
 #endif
 
 #include "source/extensions/listener_managers/listener_manager/active_raw_udp_listener_config.h"

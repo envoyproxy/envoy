@@ -70,7 +70,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_stat_names_lib",
     srcs = ["quic_stat_names.cc"],
-    hdrs = ["quic_stat_names.h"],
+    hdrs = [
+        "quic_context.h",
+        "quic_stat_names.h",
+    ],
     tags = ["nofips"],
     deps = [
         "//envoy/stats:stats_interface",

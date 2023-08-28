@@ -21,7 +21,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
-#include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_context.h"
 #include "source/extensions/listener_managers/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 

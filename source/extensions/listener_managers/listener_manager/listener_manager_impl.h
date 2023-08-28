@@ -20,7 +20,7 @@
 
 #include "source/common/config/well_known_names.h"
 #include "source/common/filter/config_discovery_impl.h"
-#include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_context.h"
 #include "source/extensions/listener_managers/listener_manager/filter_chain_factory_context_callback.h"
 #include "source/extensions/listener_managers/listener_manager/filter_chain_manager_impl.h"
 #include "source/extensions/listener_managers/listener_manager/lds_api.h"

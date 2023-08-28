@@ -5,7 +5,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/worker.h"
 
-#include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_context.h"
 
 namespace Envoy {
 namespace Server {

@@ -18,7 +18,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
-#include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_context.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
