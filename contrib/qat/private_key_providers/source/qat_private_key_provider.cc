@@ -310,7 +310,7 @@ QatPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
 }
 
 bool QatPrivateKeyMethodProvider::checkFips() { return false; }
-bool QatPrivateKeyMethodProvider::initialized() { return initialized_; }
+bool QatPrivateKeyMethodProvider::isAvailable() { return initialized_; }
 
 QatPrivateKeyConnection::QatPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb,
                                                  Event::Dispatcher& dispatcher, QatHandle& handle,
@@ -375,7 +375,8 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
 
   if (EVP_PKEY_id(pkey.get()) != EVP_PKEY_RSA) {
     // TODO(ipuustin): add support also to ECDSA keys.
-    throw EnvoyException("Only RSA keys are supported.");
+    ENVOY_LOG(warn, "Only RSA keys are supported.");
+    return;
   }
   pkey_ = std::move(pkey);
 

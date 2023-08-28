@@ -499,7 +499,7 @@ bool CryptoMbPrivateKeyMethodProvider::checkFips() {
   return false;
 }
 
-bool CryptoMbPrivateKeyMethodProvider::initialized() { return initialized_; }
+bool CryptoMbPrivateKeyMethodProvider::isAvailable() { return initialized_; }
 
 Ssl::BoringSslPrivateKeyMethodSharedPtr
 CryptoMbPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {

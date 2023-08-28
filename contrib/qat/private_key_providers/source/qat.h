@@ -93,7 +93,7 @@ public:
   static int connectionIndex();
   static int contextIndex();
 
-  bool checkQatDevice();
+  const bool checkQatDevice();
 
 private:
   LibQatCryptoSharedPtr libqat_{};

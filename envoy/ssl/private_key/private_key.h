@@ -52,10 +52,10 @@ public:
   virtual bool checkFips() PURE;
 
   /**
-   * Check whether the private key method initialized successfully.
-   * @return true if the private key method initialized successfully, false if not.
+   * Check whether the private key method is available.
+   * @return true if the private key method is available, false if not.
    */
-  virtual bool initialized() PURE;
+  virtual bool isAvailable() PURE;
 
 #ifdef OPENSSL_IS_BORINGSSL
   /**

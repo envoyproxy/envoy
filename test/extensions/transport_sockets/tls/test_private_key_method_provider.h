@@ -68,7 +68,7 @@ public:
                                 Event::Dispatcher& dispatcher) override;
   void unregisterPrivateKeyMethod(SSL* ssl) override;
   bool checkFips() override;
-  bool initialized() override;
+  bool isAvailable() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int rsaConnectionIndex();
