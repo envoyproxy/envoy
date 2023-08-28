@@ -266,8 +266,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           // more from the queue unless it was never sent to the server.
         }
         should_continue = chunk->end_stream;
-        if (chunk->buffer_length > 0) {
-          ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk->buffer_length);
+        if (chunk_data.length() > 0) {
+          ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
           injectDataToFilterChain(chunk_data, chunk->end_stream);
         }
         chunk_data.drain(chunk_data.length());
@@ -308,9 +308,9 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         }
         MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
       }
-      if (chunk->buffer_length > 0) {
+      if (chunk_data.length() > 0) {
         ENVOY_LOG(trace, "Injecting {} bytes of processed data to filter stream",
-                  chunk->buffer_length);
+                  chunk_data.length());
         injectDataToFilterChain(chunk_data, chunk->end_stream);
       }
       should_continue = true;
@@ -322,9 +322,9 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       Buffer::OwnedImpl leftover_data;
       while (const auto leftover_chunk = dequeueStreamingChunk(false, leftover_data)) {
         auto& chunk = std::move(*leftover_chunk);
-        if (chunk->buffer_length > 0) {
+        if (leftover_data.length() > 0) {
           ENVOY_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
-                    chunk->buffer_length);
+                    leftover_data.length());
           injectDataToFilterChain(leftover_data, chunk->end_stream);
         }
         leftover_data.drain(leftover_data.length());
