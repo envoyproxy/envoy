@@ -82,7 +82,7 @@ public:
 
     filter_config_ = std::make_shared<FilterConfigImpl>(
         "test_prefix", std::move(codec_factory), route_config_provider_, factories, tracer_,
-        std::move(tracing_config_), factory_context_);
+        std::move(tracing_config_), std::vector<AccessLogInstanceSharedPtr>{}, factory_context_);
   }
 
   std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_;

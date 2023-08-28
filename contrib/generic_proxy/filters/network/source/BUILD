@@ -143,3 +143,31 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
     ],
 )
+
+envoy_cc_library(
+    name = "file_access_log_lib",
+    hdrs = [
+        "file_access_log.h",
+    ],
+    deps = [
+        "//envoy/access_log:access_log_config_interface",
+        "//envoy/access_log:access_log_interface",
+        "//source/common/common:utility_lib",
+        "//source/common/formatter:substitution_format_string_lib",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "access_log_lib",
+    srcs = [
+        "access_log.cc",
+    ],
+    hdrs = [
+        "access_log.h",
+    ],
+    deps = [
+        ":file_access_log_lib",
+        "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
+    ],
+)
