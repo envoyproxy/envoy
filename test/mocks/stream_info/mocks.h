@@ -160,6 +160,7 @@ public:
   BytesMeterSharedPtr upstream_bytes_meter_;
   BytesMeterSharedPtr downstream_bytes_meter_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
+  std::string route_name_;
   std::string filter_chain_name_;
   absl::optional<uint32_t> attempt_count_;
   absl::optional<std::string> virtual_cluster_name_;
