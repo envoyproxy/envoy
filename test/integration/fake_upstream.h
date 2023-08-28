@@ -836,7 +836,7 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
+            parent_.quic_options_, 1, parent_.quic_context_, parent_.validation_visitor_,
             absl::nullopt);
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
@@ -943,7 +943,7 @@ private:
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 #ifdef ENVOY_ENABLE_QUIC
-  Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
+  Quic::QuicContext quic_context_{stats_store_.symbolTable(), absl::nullopt};
 #endif
   bool initialized_ = false;
 };
