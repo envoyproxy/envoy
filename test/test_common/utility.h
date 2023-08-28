@@ -251,7 +251,17 @@ public:
                    Event::TestTimeSystem& time_system,
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
-  // TODO(nezdolik) add method docs
+  /**
+   * Wait for a proactive resource usage in the overload manager to be == a given value.
+   * @param overload_state used to lookup corresponding proactive resource.
+   * @param resource_name name of the proactive resource to lookup.
+   * @param expected_value target resource usage value.
+   * @param time_system the time system to use for waiting.
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
+   * @param timeout the maximum time to wait before timing out.
+   * @return AssertionSuccess() if the resource usage was == to the value within the timeout, else
+   * AssertionFailure().
+   */
   static AssertionResult waitForProactiveOverloadResourceUsageEq(
       Server::ThreadLocalOverloadState& overload_state,
       const Server::OverloadProactiveResourceName resource_name, int64_t expected_value,

@@ -194,8 +194,7 @@ public:
                            int64_t increment) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource == proactive_resources_->end()) {
-      ENVOY_LOG_MISC(warn,
-                     " {Failed to allocate resource usage, resource monitor is not configured}");
+      ENVOY_LOG_MISC(warn, "Failed to allocate resource usage, resource monitor is not configured");
       return false;
     }
 
@@ -207,7 +206,7 @@ public:
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource == proactive_resources_->end()) {
       ENVOY_LOG_MISC(warn,
-                     " {Failed to deallocate resource usage, resource monitor is not configured}");
+                     "Failed to deallocate resource usage, resource monitor is not configured");
       return false;
     }
 
@@ -223,10 +222,10 @@ public:
   getProactiveResourceMonitorForTest(OverloadProactiveResourceName resource_name) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource == proactive_resources_->end()) {
-      ENVOY_LOG_MISC(warn, " {Failed to get resource usage, resource monitor is not configured}");
+      ENVOY_LOG_MISC(warn, "Failed to get resource usage, resource monitor is not configured");
       return makeOptRefFromPtr<ProactiveResourceMonitor>(nullptr);
     }
-    return makeOptRef(proactive_resource->second.getProactiveResourceMonitorForTest());
+    return proactive_resource->second.getProactiveResourceMonitorForTest();
   }
 
 private:

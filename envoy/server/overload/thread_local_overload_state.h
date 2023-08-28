@@ -93,7 +93,7 @@ public:
   virtual bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) PURE;
 
   /**
-   * Returns proactive resource owned by overload manager.
+   * Returns the proactive resource owned by the overload manager.
    * @param name of the proactive resource to retrieve.
    */
   virtual ProactiveResourceMonitorOptRef

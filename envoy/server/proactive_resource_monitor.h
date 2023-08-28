@@ -70,7 +70,9 @@ public:
     }
   }
 
-  ProactiveResourceMonitor& getProactiveResourceMonitorForTest() { return *monitor_; };
+  ProactiveResourceMonitorOptRef getProactiveResourceMonitorForTest() {
+    return makeOptRefFromPtr<ProactiveResourceMonitor>(monitor_.get());
+  };
 
 private:
   const std::string name_;
