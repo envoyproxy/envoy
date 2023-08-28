@@ -1277,10 +1277,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
     // state and method of the original request, including the query string parameters.
     Http::TestRequestHeaderMapImpl second_response_headers{
         {Http::Headers::get().Status.get(), "302"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthHMAC="
-         "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-         "version=1;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "OauthHMAC="
+                                               "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
+                                               "version=1;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
@@ -1466,10 +1465,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
     // sequences.
     Http::TestRequestHeaderMapImpl second_response_headers{
         {Http::Headers::get().Status.get(), "302"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthHMAC="
-         "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-         "version=1;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "OauthHMAC="
+                                               "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
+                                               "version=1;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
