@@ -5,8 +5,22 @@ import java.io.FileWriter;
 import java.io.IOException;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 
+/*
+ * CronvoyLogger
+ *
+ * This class bridges Envoy and Cronet logging by providing an EnvoyLogger with Envoy's log API
+ * which also has Cronet-style setNetLogToFile and setNetLogToDisk functions.
+ *
+ * The Envoy engine is supplied the logger on start-up but will only log at the configured log
+ * level (Cronvoy defaults logging off). When logging is desired, the CronvoyUrlRequestContext
+ * sets the Envoy log level to TRACE or DEBUG (based on if logAll is set), and passes the desired
+ * log info to the CronvoyLogger. The CronvoyLogger will then in append pass Envoy log messages to
+ * the desired file until CronvoyUrlRequestContext.stopNetLog disables Envoy logging.
+ *
+ */
 final class CronvoyLogger implements EnvoyLogger {
   private FileWriter mWriter;
+  static final String LOG_TAG = CronvoyUrlRequestContext.class.getSimpleName();
 
   public CronvoyLogger() {}
 
@@ -17,7 +31,7 @@ final class CronvoyLogger implements EnvoyLogger {
         mWriter = null;
       }
     } catch (IOException e) {
-      System.err.println("Encountered " + e.toString() + " when trying to stopLogging");
+      android.util.Log.e(LOG_TAG, "Failed to stop logging", e);
     }
   }
 
@@ -27,7 +41,7 @@ final class CronvoyLogger implements EnvoyLogger {
       try {
         mWriter.write(str);
       } catch (IOException e) {
-        System.err.println("Encountered " + e.toString() + " when trying to log");
+        android.util.Log.e(LOG_TAG, "Failed to log message", e);
       }
     }
   }
@@ -37,7 +51,7 @@ final class CronvoyLogger implements EnvoyLogger {
       File file = new File(fileName);
       mWriter = new FileWriter(file, true);
     } catch (IOException e) {
-      System.err.println("Encountered " + e.toString() + " when trying to setNetLogToFile");
+      android.util.Log.e(LOG_TAG, "Failed to start logging", e);
     }
   }
 
@@ -47,7 +61,7 @@ final class CronvoyLogger implements EnvoyLogger {
       File file = new File(dirPath);
       mWriter = new FileWriter(file, true);
     } catch (IOException e) {
-      System.err.println("Encountered " + e.toString() + " when trying to setNetLogToDisk");
+      android.util.Log.e(LOG_TAG, "Failed to start logging", e);
     }
     // TODO(alyssawilk) implement size checks.
   }

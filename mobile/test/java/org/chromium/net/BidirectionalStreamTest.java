@@ -52,6 +52,10 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 /**
  * Test functionality of BidirectionalStream interface.
  */
