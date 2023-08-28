@@ -358,7 +358,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
               parent_.server_.serverFactoryContext(), parent_.server_.sslContextManager(),
               listenerScope(), parent_.server_.clusterManager(), validation_visitor_)),
-      quic_stat_names_(parent_.quicStatNames()),
+      quic_context_(parent_.quicContext()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
   std::vector<std::reference_wrapper<
@@ -479,7 +479,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             parent_.inPlaceFilterChainUpdate(*this);
                           }),
       transport_factory_context_(origin.transport_factory_context_),
-      quic_stat_names_(parent_.quicStatNames()),
+      quic_context_(parent_.quicContext()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
   buildAccessLog();
@@ -620,7 +620,7 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
                            "doesn't work with connection balancer.");
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
+        config_.udp_listener_config().quic_options(), concurrency, quic_context_,
         validation_visitor_, listener_factory_context_->processContext());
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes

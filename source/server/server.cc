@@ -103,7 +103,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
+      hooks_(hooks), quic_context_{store.symbolTable(), restarter_}, server_contexts_(*this),
       enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
   std::function set_up_logger = [&] {
     TRY_ASSERT_MAIN_THREAD {
@@ -645,7 +645,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ = listener_manager_factory->createListenerManager(
-      *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+      *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_context_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -717,7 +717,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
+      *ssl_context_manager_, *secret_manager_, quic_context_.statNames(), *this);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl

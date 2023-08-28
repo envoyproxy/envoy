@@ -65,11 +65,11 @@ public:
   std::unique_ptr<ListenerManager>
   createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
-                        Quic::QuicStatNames& quic_stat_names) override {
+                        Quic::QuicContext& quic_context) override {
     ASSERT(!factory);
     return std::make_unique<ListenerManagerImpl>(
         server, std::make_unique<ValidationListenerComponentFactory>(server), worker_factory,
-        enable_dispatcher_stats, quic_stat_names);
+        enable_dispatcher_stats, quic_context);
   }
   std::string name() const override {
     return Config::ServerExtensionValues::get().VALIDATION_LISTENER;

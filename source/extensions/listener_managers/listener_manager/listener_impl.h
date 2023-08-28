@@ -532,7 +532,7 @@ private:
   std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context_;
 
-  Quic::QuicStatNames& quic_stat_names_;
+  Quic::QuicContext& quic_context_;
   MissingListenerConfigStats missing_listener_config_stats_;
 
   // to access ListenerManagerImpl::factory_.

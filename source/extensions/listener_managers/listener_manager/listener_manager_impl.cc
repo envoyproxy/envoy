@@ -293,10 +293,10 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          std::unique_ptr<ListenerComponentFactory>&& factory,
                                          WorkerFactory& worker_factory,
                                          bool enable_dispatcher_stats,
-                                         Quic::QuicStatNames& quic_stat_names)
+                                         Quic::QuicContext& quic_context)
     : server_(server), factory_(std::move(factory)),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
-      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
+      enable_dispatcher_stats_(enable_dispatcher_stats), quic_context_(quic_context) {
   if (!factory_) {
     factory_ = std::make_unique<ProdListenerComponentFactory>(server);
   }

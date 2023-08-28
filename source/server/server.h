@@ -296,7 +296,7 @@ public:
   }
   bool enableReusePortDefault() override;
 
-  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+  Quic::QuicStatNames& quicStatNames() { return quic_context_.statNames(); }
 
   void setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) override {
     stats_store_.setSinkPredicates(std::move(sink_predicates));
@@ -398,7 +398,7 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
   ListenerHooks& hooks_;
-  Quic::QuicStatNames quic_stat_names_;
+  Quic::QuicContext quic_context_;
   ServerFactoryContextImpl server_contexts_;
   bool enable_reuse_port_default_;
   Regex::EnginePtr regex_engine_;

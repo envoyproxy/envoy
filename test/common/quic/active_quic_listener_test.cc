@@ -70,14 +70,14 @@ protected:
       Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
       Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
       const quic::QuicConfig& quic_config, bool kernel_worker_routing,
-      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicContext& quic_context,
       uint32_t packets_to_read_to_connection_count_ratio,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
       QuicConnectionIdGeneratorPtr&& cid_generator) override {
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
-        listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
+        listener_config, quic_config, kernel_worker_routing, enabled, quic_context,
         packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
         proof_source_factory, std::move(cid_generator), testWorkerSelector);
   }
@@ -114,7 +114,7 @@ protected:
         transport_socket_factory_(true, *store_.rootScope(),
                                   std::make_unique<NiceMock<Ssl::MockServerContextConfig>>()),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
-        quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
+        quic_context_(listener_config_.listenerScope().symbolTable(), absl::nullopt) {}
 
   template <typename A, typename B>
   std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
@@ -185,7 +185,7 @@ protected:
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
     return std::make_unique<TestActiveQuicListenerFactory>(
-        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, absl::nullopt);
+        options, /*concurrency=*/1, quic_context_, validation_visitor_, absl::nullopt);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -353,7 +353,7 @@ protected:
   uint32_t stream_window_size_{1024u};
   float idle_timeout_{5};
   float handshake_timeout_{30};
-  QuicStatNames quic_stat_names_;
+  QuicContext quic_context_;
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,

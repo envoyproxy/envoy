@@ -59,7 +59,7 @@ ValidationInstance::ValidationInstance(
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this),
-      quic_stat_names_(stats_store_.symbolTable()) {
+      quic_context_(stats_store_.symbolTable(), absl::nullopt) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
@@ -112,7 +112,7 @@ void ValidationInstance::initialize(const Options& options,
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
                           Config::ServerExtensionValues::get().VALIDATION_LISTENER)
-                          .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
+                          .createListenerManager(*this, nullptr, *this, false, quic_context_);
   thread_local_.registerThread(*dispatcher_, true);
 
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
@@ -127,7 +127,7 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
-      sslContextManager(), *secret_manager_, quic_stat_names_, *this);
+      sslContextManager(), *secret_manager_, quic_context_.statNames(), *this);
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

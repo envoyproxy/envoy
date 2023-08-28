@@ -189,7 +189,7 @@ class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id:
 public:
   ListenerManagerImpl(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats,
-                      Quic::QuicStatNames& quic_stat_names);
+                      Quic::QuicContext& quic_context);
 
   void onListenerWarmed(ListenerImpl& listener);
   void inPlaceFilterChainUpdate(ListenerImpl& listener);
@@ -216,7 +216,7 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
 
-  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+  Quic::QuicContext& quicContext() { return quic_context_; }
 
   Instance& server_;
   std::unique_ptr<ListenerComponentFactory> factory_;
@@ -336,7 +336,7 @@ private:
   using UpdateFailureState = envoy::admin::v3::UpdateFailureState;
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
-  Quic::QuicStatNames& quic_stat_names_;
+  Quic::QuicContext& quic_context_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
@@ -364,9 +364,9 @@ public:
   std::unique_ptr<ListenerManager>
   createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
-                        Quic::QuicStatNames& quic_stat_names) override {
+                        Quic::QuicContext& quic_context) override {
     return std::make_unique<ListenerManagerImpl>(server, std::move(factory), worker_factory,
-                                                 enable_dispatcher_stats, quic_stat_names);
+                                                 enable_dispatcher_stats, quic_context);
   }
   std::string name() const override {
     return Config::ServerExtensionValues::get().DEFAULT_LISTENER;

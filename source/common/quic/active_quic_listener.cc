@@ -29,7 +29,7 @@ ActiveQuicListener::ActiveQuicListener(
     Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
     Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicContext& quic_context,
     uint32_t packets_to_read_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
@@ -67,8 +67,8 @@ ActiveQuicListener::ActiveQuicListener(
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
-      *connection_id_generator_);
+      per_worker_stats_, dispatcher, listen_socket_, quic_context.statNames(),
+      crypto_server_stream_factory_, *connection_id_generator_);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -214,9 +214,9 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
-    QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
+    QuicContext& quic_context, ProtobufMessage::ValidationVisitor& validation_visitor,
     ProcessContextOptRef context)
-    : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
+    : concurrency_(concurrency), enabled_(config.enabled()), quic_context_(quic_context),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
@@ -341,7 +341,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
 
   return createActiveQuicListener(
       runtime, worker_index, concurrency_, dispatcher, parent, std::move(listen_socket_ptr), config,
-      quic_config_, kernel_worker_routing_, enabled_, quic_stat_names_,
+      quic_config_, kernel_worker_routing_, enabled_, quic_context_,
       packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
       proof_source_factory_.value(),
       quic_cid_generator_factory_->createQuicConnectionIdGenerator(worker_index));
@@ -352,14 +352,14 @@ ActiveQuicListenerFactory::createActiveQuicListener(
     Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
     Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicContext& quic_context,
     uint32_t packets_to_read_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator) {
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
-      listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
+      listener_config, quic_config, kernel_worker_routing, enabled, quic_context,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
       std::move(cid_generator), worker_selector_);
 }

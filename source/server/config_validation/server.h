@@ -190,7 +190,7 @@ private:
   Router::ContextImpl router_context_;
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
-  Quic::QuicStatNames quic_stat_names_;
+  Quic::QuicContext quic_context_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 
