@@ -93,7 +93,7 @@ public:
   Http::ContextImpl http_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Router::ContextImpl router_context_;
-  Quic::QuicStatNames quic_stat_names_;
+  Quic::QuicContext quic_context_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockStatsConfig>> stats_config_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>

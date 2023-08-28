@@ -116,7 +116,7 @@ public:
         *server_.server_factory_context_, server_.stats(), server_.threadLocal(),
         server_.httpContext(),
         [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-        ssl_context_manager_, server_.secretManager(), server_.quic_stat_names_, server_);
+        ssl_context_manager_, server_.secretManager(), server_.quic_context_.statNames(), server_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -174,7 +174,7 @@ public:
   NiceMock<Server::MockListenerComponentFactory>& component_factory_{*component_factory_ptr_};
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
-                                                worker_factory_, false, server_.quic_stat_names_};
+                                                worker_factory_, false, server_.quic_context_};
   Random::RandomGeneratorImpl random_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
