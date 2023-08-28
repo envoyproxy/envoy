@@ -1,5 +1,6 @@
-#include "source/common/http/filter_chain_helper.h"
 #include "source/extensions/filters/http/composite/action.h"
+
+#include "source/common/http/filter_chain_helper.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,54 +16,56 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   const auto& composite_action = MessageUtil::downcastAndValidate<
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
-      if (composite_action.has_config_discovery()){
-        auto config_discovery = composite_action.config_discovery();
-            if (context.server_factory_context_.has_value()){
-              Server::Configuration::ServerFactoryContext& server_factory_context = context.server_factory_context_.value();
-              Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
+  // Process dynamic filter configuration and setup extension configuration discovery service.
+  if (composite_action.has_dynamic_config()) {
+    auto config_discovery = composite_action.dynamic_config().config_discovery();
+    Server::Configuration::ServerFactoryContext& server_factory_context =
+        context.server_factory_context_.value();
+    Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
 
-  std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =  Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
+    std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
+        Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
             server_factory_context);
-            Envoy::Http::FilterFactoryCb callback = nullptr;
-            std::unique_ptr<Envoy::Filter::DynamicFilterConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>> provider = filter_config_provider_manager->createDynamicFilterConfigProvider(
-        config_discovery, "name", server_factory_context, factory_context, server_factory_context.clusterManager(),
-        false, "http", nullptr);
-               return [cb = provider->config().value()]() -> Matcher::ActionPtr {
-    return std::make_unique<ExecuteFilterAction>(cb);
-  };
-            }
+    Envoy::Http::FilterFactoryCb callback = nullptr;
+    std::unique_ptr<
+        Envoy::Filter::DynamicFilterConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>
+        provider = filter_config_provider_manager->createDynamicFilterConfigProvider(
+            config_discovery, composite_action.dynamic_config().name(), server_factory_context,
+            factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
+    return [cb = provider->config().value().get().factory_cb]() -> Matcher::ActionPtr {
+      return std::make_unique<ExecuteFilterAction>(cb);
+    };
+  } else {
+    // Static filter configuration.
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+            composite_action.typed_config());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        composite_action.typed_config().typed_config(), validation_visitor, factory);
 
-      } else {
+    Envoy::Http::FilterFactoryCb callback = nullptr;
 
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          composite_action.typed_config());
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      composite_action.typed_config().typed_config(), validation_visitor, factory);
+    // First, try to create the filter factory creation function from factory context (if exists).
+    if (context.factory_context_.has_value()) {
+      callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
+                                                      context.factory_context_.value());
+    }
 
-  Envoy::Http::FilterFactoryCb callback = nullptr;
+    // If above failed, try to create the filter factory creation function from server factory
+    // context (if exists).
+    if (callback == nullptr && context.server_factory_context_.has_value()) {
+      callback = factory.createFilterFactoryFromProtoWithServerContext(
+          *message, context.stat_prefix_, context.server_factory_context_.value());
+    }
 
-  // First, try to create the filter factory creation function from factory context (if exists).
-  if (context.factory_context_.has_value()) {
-    callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
-                                                    context.factory_context_.value());
+    if (callback == nullptr) {
+      throw EnvoyException("Failed to get filter factory creation function");
+    }
+
+    return [cb = std::move(callback)]() -> Matcher::ActionPtr {
+      return std::make_unique<ExecuteFilterAction>(cb);
+    };
   }
-
-  // If above failed, try to create the filter factory creation function from server factory
-  // context (if exists).
-  if (callback == nullptr && context.server_factory_context_.has_value()) {
-    callback = factory.createFilterFactoryFromProtoWithServerContext(
-        *message, context.stat_prefix_, context.server_factory_context_.value());
-  }
-
-  if (callback == nullptr) {
-    throw EnvoyException("Failed to get filter factory creation function");
-  }
-
-  return [cb = std::move(callback)]() -> Matcher::ActionPtr {
-    return std::make_unique<ExecuteFilterAction>(cb);
-  };
-      }
 }
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,

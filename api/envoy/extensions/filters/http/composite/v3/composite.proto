@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.composite.v3;
 
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "validate/validate.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -33,6 +34,17 @@ message Composite {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 }
 
+// Configuration for an extension configuration discovery service with name.
+message DynamicConfig {
+  // The name of the extension configuration. It also serves as a resource name in ExtensionConfigDS.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Configuration source specifier for an extension configuration discovery
+  // service. In case of a failure and without the default configuration, the
+  // listener closes the connections.
+  config.core.v3.ExtensionConfigSource config_discovery = 2;
+}
+
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
 // This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
 message ExecuteFilterAction {
@@ -42,9 +54,8 @@ message ExecuteFilterAction {
     // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
     config.core.v3.TypedExtensionConfig typed_config = 1;
 
-    // Configuration source specifier for an extension configuration discovery
-    // service. In case of a failure and without the default configuration, the
-    // listener closes the connections.
-    config.core.v3.ExtensionConfigSource config_discovery = 2;
+    // Dynamic configuration of filter obtained via extension configuration discovery
+    // service .
+    DynamicConfig dynamic_config = 2;
   }
 }
