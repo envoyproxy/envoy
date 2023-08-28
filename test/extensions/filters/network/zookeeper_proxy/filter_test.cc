@@ -29,12 +29,12 @@ MATCHER_P(MapEq, rhs, "") { return protoMapEq(arg, rhs); }
 class ZooKeeperFilterTest : public testing::Test {
 public:
   void initialize(
+      const bool enable_per_opcode_request_bytes_metrics = true,
+      const bool enable_per_opcode_response_bytes_metrics = true,
       const bool enable_latency_threshold_metrics = true,
       const std::chrono::milliseconds default_latency_threshold = std::chrono::milliseconds(100),
       const LatencyThresholdOverrideList& latency_threshold_overrides =
-          LatencyThresholdOverrideList(),
-      const bool enable_per_opcode_request_bytes_metrics = true,
-      const bool enable_per_opcode_response_bytes_metrics = true) {
+          LatencyThresholdOverrideList()) {
     config_ = std::make_shared<ZooKeeperFilterConfig>(
         stat_prefix_, 1048576, enable_per_opcode_request_bytes_metrics,
         enable_per_opcode_response_bytes_metrics, enable_latency_threshold_metrics,
@@ -689,12 +689,13 @@ public:
       }
     }
 
-    // For control responses
-    std::string old_resp_suffix = "_response";
-    std::string new_resp_suffix = "_resp";
-    size_t pos = resp.rfind(old_resp_suffix);
+    // Some opcode names in control response metadata have `_response` suffix.
+    // However, its corresponding metric names have `_resp` suffix.
+    std::string long_resp_suffix = "_response";
+    std::string short_resp_suffix = "_resp";
+    size_t pos = resp.rfind(long_resp_suffix);
     if (pos != std::string::npos) {
-      resp.replace(pos, old_resp_suffix.length(), new_resp_suffix);
+      resp.replace(pos, long_resp_suffix.length(), short_resp_suffix);
     }
 
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
@@ -730,7 +731,7 @@ TEST_F(ZooKeeperFilterTest, DisableErrorBudgetCalculation) {
   std::chrono::milliseconds default_latency_threshold(200);
   LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(false, default_latency_threshold, latency_threshold_overrides);
+  initialize(true, true, false, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
             ErrorBudgetResponseType::None);
@@ -753,7 +754,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultLatencyThresholdConfig
   std::chrono::milliseconds default_latency_threshold(200);
   LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(true, default_latency_threshold, latency_threshold_overrides);
+  initialize(true, true, true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
             ErrorBudgetResponseType::Fast);
@@ -780,7 +781,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithMultiLatencyThresholdConfig) 
   threshold_override->set_opcode(LatencyThresholdOverride::Multi);
   threshold_override->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
 
-  initialize(true, default_latency_threshold, latency_threshold_overrides);
+  initialize(true, true, true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(50)),
             ErrorBudgetResponseType::Fast);
@@ -810,7 +811,7 @@ TEST_F(ZooKeeperFilterTest, ErrorBudgetDecisionWithDefaultAndOtherLatencyThresho
   threshold_override->set_opcode(LatencyThresholdOverride::Create);
   threshold_override->mutable_threshold()->set_nanos(200000000); // 200 milliseconds
 
-  initialize(true, default_latency_threshold, latency_threshold_overrides);
+  initialize(true, true, true, default_latency_threshold, latency_threshold_overrides);
 
   EXPECT_EQ(config_->errorBudgetDecision(OpCodes::Connect, std::chrono::milliseconds(150)),
             ErrorBudgetResponseType::Fast);
@@ -839,7 +840,7 @@ TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestAndResponseBytesMetrics) {
   std::chrono::milliseconds default_latency_threshold(100);
   LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(true, default_latency_threshold, latency_threshold_overrides, false, false);
+  initialize(false, false, true, default_latency_threshold, latency_threshold_overrides);
 
   Buffer::OwnedImpl data = encodeConnect();
   expectSetDynamicMetadata({{{"opname", "connect"}}, {{"bytes", "32"}}});
@@ -870,7 +871,7 @@ TEST_F(ZooKeeperFilterTest, DisablePerOpcodeRequestBytesMetrics) {
   std::chrono::milliseconds default_latency_threshold(100);
   LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(true, default_latency_threshold, latency_threshold_overrides, false, true);
+  initialize(false, true, true, default_latency_threshold, latency_threshold_overrides);
 
   Buffer::OwnedImpl data = encodeConnect();
   expectSetDynamicMetadata({{{"opname", "connect"}}, {{"bytes", "32"}}});
@@ -901,7 +902,7 @@ TEST_F(ZooKeeperFilterTest, DisablePerOpcodeResponseBytesMetrics) {
   std::chrono::milliseconds default_latency_threshold(100);
   LatencyThresholdOverrideList latency_threshold_overrides;
 
-  initialize(true, default_latency_threshold, latency_threshold_overrides, true, false);
+  initialize(true, false, true, default_latency_threshold, latency_threshold_overrides);
 
   Buffer::OwnedImpl data = encodeConnect();
   expectSetDynamicMetadata({{{"opname", "connect"}}, {{"bytes", "32"}}});
