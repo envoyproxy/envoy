@@ -29,6 +29,11 @@ type (
 		PassThroughStreamDecoderFilter
 		PassThroughStreamEncoderFilter
 	}
+
+	// EmptyDownstreamFilter provides the no-op implementation of the DownstreamFilter interface
+	EmptyDownstreamFilter struct{}
+	// EmptyUpstreamFilter provides the no-op implementation of the UpstreamFilter interface
+	EmptyUpstreamFilter struct{}
 )
 
 // request
@@ -162,6 +167,21 @@ type DownstreamFilter interface {
 	OnWrite(buffer []byte, endOfStream bool) FilterStatus
 }
 
+func (*EmptyDownstreamFilter) OnNewConnection() FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyDownstreamFilter) OnData(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyDownstreamFilter) OnEvent(event ConnectionEvent) {
+}
+
+func (*EmptyDownstreamFilter) OnWrite(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
 type UpstreamFilter interface {
 	// Called when a connection is available to process a request/response.
 	OnPoolReady(cb ConnectionCallback)
@@ -171,6 +191,19 @@ type UpstreamFilter interface {
 	OnData(buffer []byte, endOfStream bool)
 	// Callback for connection events.
 	OnEvent(event ConnectionEvent)
+}
+
+func (*EmptyUpstreamFilter) OnPoolReady(cb ConnectionCallback) {
+}
+
+func (*EmptyUpstreamFilter) OnPoolFailure(poolFailureReason PoolFailureReason, transportFailureReason string) {
+}
+
+func (*EmptyUpstreamFilter) OnData(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyUpstreamFilter) OnEvent(event ConnectionEvent) {
 }
 
 type ConnectionCallback interface {
