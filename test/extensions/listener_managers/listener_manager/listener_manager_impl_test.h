@@ -83,7 +83,7 @@ protected:
         .WillByDefault(ReturnRef(validation_visitor));
     manager_ = std::make_unique<ListenerManagerImpl>(server_, std::move(listener_factory_ptr_),
                                                      worker_factory_, enable_dispatcher_stats_,
-                                                     server_.quic_stat_names_);
+                                                     server_.quic_context_);
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
