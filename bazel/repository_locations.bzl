@@ -471,7 +471,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2023-04-19",
         cpe = "N/A",
         license = "BSD-3-Clause",
-        license_url = "https://github.com/intel/hyperscan/blob/{version}/LICENSE",
+        license_url = "https://github.com/intel/hyperscan/blob/v{version}/LICENSE",
     ),
     io_opentracing_cpp = dict(
         project_name = "OpenTracing",
@@ -1196,7 +1196,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2023-03-03",
         cpe = "cpe:2.3:a:google:flatbuffers:*",
         license = "Apache-2.0",
-        license_url = "https://github.com/google/flatbuffers/blob/v{version}/LICENSE.txt",
+        license_url = "https://github.com/google/flatbuffers/blob/v{version}/LICENSE",
     ),
     com_googlesource_code_re2 = dict(
         project_name = "RE2",

@@ -9,6 +9,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/status.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -17,6 +18,31 @@
 
 namespace Envoy {
 namespace Formatter {
+
+HttpFormatterContext::HttpFormatterContext(const Http::RequestHeaderMap* request_headers,
+                                           const Http::ResponseHeaderMap* response_headers,
+                                           const Http::ResponseTrailerMap* response_trailers,
+                                           absl::string_view local_reply_body,
+                                           AccessLog::AccessLogType log_type)
+    : request_headers_(request_headers), response_headers_(response_headers),
+      response_trailers_(response_trailers), local_reply_body_(local_reply_body),
+      log_type_(log_type) {}
+
+const Http::RequestHeaderMap& HttpFormatterContext::requestHeaders() const {
+  return request_headers_ != nullptr ? *request_headers_
+                                     : *Http::StaticEmptyHeaders::get().request_headers;
+}
+const Http::ResponseHeaderMap& HttpFormatterContext::responseHeaders() const {
+  return response_headers_ != nullptr ? *response_headers_
+                                      : *Http::StaticEmptyHeaders::get().response_headers;
+}
+const Http::ResponseTrailerMap& HttpFormatterContext::responseTrailers() const {
+  return response_trailers_ != nullptr ? *response_trailers_
+                                       : *Http::StaticEmptyHeaders::get().response_trailers;
+}
+
+absl::string_view HttpFormatterContext::localReplyBody() const { return local_reply_body_; }
+AccessLog::AccessLogType HttpFormatterContext::accessLogType() const { return log_type_; }
 
 absl::optional<std::string> LocalReplyBodyFormatter::format(const Http::RequestHeaderMap&,
                                                             const Http::ResponseHeaderMap&,
@@ -402,6 +428,8 @@ FormatterProviderPtr HttpBuiltInCommandParser::parse(const std::string& command,
   // associated with formatter's name.
   return (*it).second.second(subcommand, max_length);
 }
+
+REGISTER_BUILT_IN_COMMAND_PARSER(HttpFormatterContext, HttpBuiltInCommandParser);
 
 static const std::string DEFAULT_FORMAT =
     "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
