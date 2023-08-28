@@ -14,6 +14,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_authz
+  change: |
+    removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.
