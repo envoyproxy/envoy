@@ -17,7 +17,6 @@ namespace Singleton {
  */
 class Registration : public Config::UntypedFactory {
 public:
-  ~Registration() override = default;
   std::string category() const override { return "envoy.singleton"; }
 };
 
