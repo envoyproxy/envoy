@@ -164,7 +164,7 @@ public:
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.oauth_hmac_,
                       "="
-                      "742bb4a2d31c2e868617bde3ad3f91f2b180d299d6c8c80d7f8f868af1ab1c42"
+                      "dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI="
                       ";version=test")},
     };
 
@@ -816,7 +816,7 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.oauth_hmac_,
                       "="
-                      "312abc9a435019d5f1d8b28694b1ccc12223f2b2d9467ac713a116bef4d4171d"
+                      "MSq8mkNQGdXx2LKGlLHMwSIj8rLZRnrHE6EWvvTUFx0="
                       ";version=test")},
     };
 
@@ -850,7 +850,7 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.oauth_hmac_,
                       "="
-                      "75b974e024abe9e585e76c1d343091b7f530e80e32e35c1ba66b54591c83d85a"
+                      "dbl04CSr6eWF52wdNDCRt/Uw6A4y41wbpmtUWRyD2Fo="
                       ";version=test")},
     };
 
@@ -952,7 +952,7 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
         {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
         {Http::Headers::get().Cookie.get(),
          "OauthHMAC="
-         "73ed6acf2acc9aa1bcf8ee1d9fb6f6f0ebcd34359c6f4e3225f35b642135cd81"
+         "c+1qzyrMmqG8+O4dn7b28OvNNDWcb04yJfNbZCE1zYE="
          ";version=test"},
     };
 
@@ -1791,7 +1791,7 @@ TEST_P(OAuth2Test, CookieValidatorInTransition) {
       {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token;version=1"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
-       "73ed6acf2acc9aa1bcf8ee1d9fb6f6f0ebcd34359c6f4e3225f35b642135cd81"
+       "Y9gCpVnhyaY+ecSxt/ZLZc/OMb8ZNivrVH1RByJxEbs="
        ";version=test"},
   };
 
@@ -1812,7 +1812,7 @@ TEST_P(OAuth2Test, CookieValidatorInTransition) {
       {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token;version=1"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
-       "NzNlZDZhY2YyYWNjOWFhMWJjZjhlZTFkOWZiNmY2ZjBlYmNkMzQzNTljNmY0ZTMyMjVmMzViNjQyMTM1Y2Q4MQ=="
+       "NjNkODAyYTU1OWUxYzlhNjNlNzljNGIxYjdmNjRiNjVjZmNlMzFiZjE5MzYyYmViNTQ3ZDUxMDcyMjcxMTFiYg=="
        ";version=test"},
   };
   cookie_validator->setParams(request_headers_hexbase64, "mock-secret");
