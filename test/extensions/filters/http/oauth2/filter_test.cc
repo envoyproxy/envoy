@@ -1821,7 +1821,6 @@ TEST_P(OAuth2Test, CookieValidatorInTransition) {
 
   EXPECT_TRUE(cookie_validator->hmacIsValid());
 }
-}
 
 } // namespace Oauth2
 } // namespace HttpFilters
