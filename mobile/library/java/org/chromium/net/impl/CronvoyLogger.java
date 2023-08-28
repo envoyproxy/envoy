@@ -1,8 +1,10 @@
 package org.chromium.net.impl;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 
 /*
@@ -19,27 +21,28 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
  *
  */
 final class CronvoyLogger implements EnvoyLogger {
-  private FileWriter mWriter;
+  private int mFilesize = 0;
+  private String mFileName = null;
   static final String LOG_TAG = CronvoyUrlRequestContext.class.getSimpleName();
 
   public CronvoyLogger() {}
 
-  public void stopLogging() {
-    try {
-      if (mWriter != null) {
-        mWriter.close();
-        mWriter = null;
-      }
-    } catch (IOException e) {
-      android.util.Log.e(LOG_TAG, "Failed to stop logging", e);
-    }
-  }
+  public void stopLogging() { mFileName = null; }
 
   @Override
   public void log(String str) {
-    if (mWriter != null) {
+    if (mFileName != null) {
       try {
-        mWriter.write(str);
+        Path path = Paths.get(mFileName);
+        // For now, just delete the file if it gets overlarge.
+        // If we need to we can copy the first half.
+        if (Files.size(path) > mFilesize) {
+          File file = new File(mFileName);
+          file.delete();
+          file.createNewFile();
+        }
+
+        Files.write(path, str.getBytes());
       } catch (IOException e) {
         android.util.Log.e(LOG_TAG, "Failed to log message", e);
       }
@@ -48,8 +51,10 @@ final class CronvoyLogger implements EnvoyLogger {
 
   public void setNetLogToFile(String fileName) {
     try {
-      File file = new File(fileName);
-      mWriter = new FileWriter(file, true);
+      mFilesize = 0;
+      mFileName = fileName;
+      File file = new File(mFileName);
+      file.createNewFile();
     } catch (IOException e) {
       android.util.Log.e(LOG_TAG, "Failed to start logging", e);
     }
@@ -57,12 +62,16 @@ final class CronvoyLogger implements EnvoyLogger {
 
   public void setNetLogToDisk(String dirPath, int maxSize) {
     try {
-      // TODO(alyssawilk) do we need to create the directory?
-      File file = new File(dirPath);
-      mWriter = new FileWriter(file, true);
+      mFilesize = maxSize;
+      mFileName = dirPath;
+      File file = new File(mFileName);
+      File directory = file.getParentFile();
+      if (directory != null) {
+        directory.mkdirs();
+      }
+      file.createNewFile();
     } catch (IOException e) {
       android.util.Log.e(LOG_TAG, "Failed to start logging", e);
     }
-    // TODO(alyssawilk) implement size checks.
   }
 }

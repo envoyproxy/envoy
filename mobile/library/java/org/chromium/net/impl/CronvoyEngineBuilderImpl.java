@@ -81,7 +81,7 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   private String mExperimentalOptions;
   private boolean mNetworkQualityEstimatorEnabled;
   private int mThreadPriority = INVALID_THREAD_PRIORITY;
-  private String mLogLevel = "info";
+  private String mLogLevel = "off";
 
   /**
    * Default config enables SPDY and QUIC, disables SDCH and HTTP cache.
