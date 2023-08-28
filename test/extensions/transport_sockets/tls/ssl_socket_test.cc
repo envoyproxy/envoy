@@ -6733,6 +6733,46 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
                .setExpectedServerStats("ssl.connection_error"));
 }
 
+// Test private key provider and cert validation can work together.
+TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem"
+      private_key_provider:
+        provider_name: test
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setPrivateKeyMethodExpected(true)
+               .setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
+}
+
 TEST_P(SslSocketTest, TestStaplesOcspResponseSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:

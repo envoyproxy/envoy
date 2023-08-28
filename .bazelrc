@@ -204,14 +204,19 @@ build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
 build:coverage --test_env=HEAPCHECK=
 build:coverage --combined_report=lcov
-build:coverage --strategy=TestRunner=sandboxed,local
+build:coverage --strategy=TestRunner=remote,sandboxed,local
 build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --experimental_generate_llvm_lcov
+build:coverage --experimental_split_coverage_postprocessing
+build:coverage --experimental_fetch_all_coverage_outputs
 build:coverage --collect_code_coverage
 build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],^//envoy[/:],^//contrib(?!/.*/test)[/:]"
-build:coverage --remote_download_toplevel
+build:coverage --remote_download_minimal
 build:coverage --define=tcmalloc=gperftools
+build:coverage --define=no_debug_info=1
+build:coverage --linkopt=-Wl,-s
+build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
