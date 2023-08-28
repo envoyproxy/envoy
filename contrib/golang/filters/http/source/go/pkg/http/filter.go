@@ -33,6 +33,7 @@ package http
 import "C"
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"unsafe"
 
@@ -77,7 +78,11 @@ func (r *httpRequest) sendPanicReply(details string) {
 
 func (r *httpRequest) RecoverPanic() {
 	if e := recover(); e != nil {
-		// TODO: print an error message to Envoy error log.
+		const size = 64 << 10
+		buf := make([]byte, size)
+		buf = buf[:runtime.Stack(buf, false)]
+		api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+
 		switch e {
 		case errRequestFinished, errFilterDestroyed:
 			// do nothing
