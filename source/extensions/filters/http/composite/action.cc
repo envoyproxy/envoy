@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/composite/action.h"
 
-#include "source/common/http/filter_chain_helper.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -22,18 +20,20 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     Server::Configuration::ServerFactoryContext& server_factory_context =
         context.server_factory_context_.value();
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
-
     std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
             server_factory_context);
-    Envoy::Http::FilterFactoryCb callback = nullptr;
-    std::unique_ptr<
-        Envoy::Filter::DynamicFilterConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>
-        provider = filter_config_provider_manager->createDynamicFilterConfigProvider(
-            config_discovery, composite_action.dynamic_config().name(), server_factory_context,
-            factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
-    return [cb = provider->config().value().get().factory_cb]() -> Matcher::ActionPtr {
-      return std::make_unique<ExecuteFilterAction>(cb);
+    provider_ = filter_config_provider_manager->createDynamicFilterConfigProvider(
+        config_discovery, composite_action.dynamic_config().name(), server_factory_context,
+        factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
+    return [this]() -> Matcher::ActionPtr {
+      auto config_value = provider_->config();
+      if (config_value.has_value()) {
+        auto factory_cb = config_value.value().get().factory_cb;
+        return std::make_unique<ExecuteFilterAction>(factory_cb);
+      }
+      // TODO(ramaraochavali): Add a missing config filter.
+      return nullptr;
     };
   } else {
     // Static filter configuration.
