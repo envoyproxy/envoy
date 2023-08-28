@@ -21,6 +21,19 @@ public:
   void setRedirectPathCovered() { redirect_path_covered_ = true; }
   void setRedirectCodeCovered() { redirect_code_covered_ = true; }
   bool covers(const Envoy::Router::RouteEntry* route) {
+    // This is a temporary debug logs to hightlight the cases when the pointers are equal but the
+    // route names or cluster names are not. Should be deleted before merge.
+    bool route_pointers_equal = route_entry_ == route;
+    bool cluster_and_route_names_equal =
+        cluster_name_ == route->clusterName() && route_name_ == route->routeName();
+    if (route_pointers_equal && !cluster_and_route_names_equal) {
+      ENVOY_LOG_MISC(debug,
+                     "pointers of entries are equal but route name or cluster name are not.\n"
+                     "covered route name: '{}' vs new route name: '{}'.\n"
+                     "covered cluster name: '{}' vs new cluster name: '{}'.",
+                     route_name_, route->routeName(), cluster_name_, route->clusterName());
+    }
+
     return route_entry_ == route && route_name_ == route->routeName() &&
            cluster_name_ == route->clusterName();
   }
