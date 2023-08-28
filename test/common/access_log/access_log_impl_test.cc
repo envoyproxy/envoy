@@ -139,7 +139,7 @@ typed_config:
 
   EXPECT_CALL(*file_, write(_));
 
-  auto route = std::make_shared<Router::MockRoute>();
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
   route->route_name_ = "route-test-name";
 
   stream_info_.route_ = route;
