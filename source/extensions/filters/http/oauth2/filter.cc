@@ -148,6 +148,7 @@ std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string
       absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
   std::string encoded_hmac;
   absl::Base64Escape(Hex::encode(crypto_util.getSha256Hmac(secret, hmac_payload)), &encoded_hmac);
+  std::cout << "Calculated HMAC: " << encoded_hmac << std::endl;
   return encoded_hmac;
 }
 
@@ -162,6 +163,7 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view hos
     std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
     std::string hmac_string(hmac_result.begin(), hmac_result.end());
     absl::Base64Escape(hmac_string, &base64_encoded_hmac);
+    std::cout << "Calculated Base64 only HMAC: " << base64_encoded_hmac << std::endl;
     return base64_encoded_hmac;
   } else {
     return encodeHmacHexBase64(secret, host, expires, token, id_token, refresh_token);
