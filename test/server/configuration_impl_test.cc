@@ -64,7 +64,7 @@ protected:
         cluster_manager_factory_(
             server_context_, server_.stats(), server_.threadLocal(), server_.httpContext(),
             [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-            server_.sslContextManager(), server_.secretManager(), server_.quic_stat_names_,
+            server_.sslContextManager(), server_.secretManager(), server_.quic_context_.statNames(),
             server_) {
     ON_CALL(server_context_.api_, threadFactory())
         .WillByDefault(
