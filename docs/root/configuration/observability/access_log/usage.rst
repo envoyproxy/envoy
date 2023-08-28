@@ -890,6 +890,7 @@ UDP
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
     If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to 'FIELD'.
 
   TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
@@ -901,7 +902,7 @@ UDP
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
-%UPSTREAM_FILTER_STATE(KEY:F):Z%
+%UPSTREAM_FILTER_STATE(KEY:F:FIELD?):Z%
   HTTP
     Extracts filter state from upstream components like cluster or transport socket extensions.
 
@@ -913,6 +914,7 @@ UDP
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
     If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to 'FIELD'.
 
   TCP/UDP
     Not implemented.

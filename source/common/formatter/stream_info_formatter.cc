@@ -241,19 +241,22 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     return absl::nullopt;
 #endif
   }
-  case FilterStateFormat::Field:
-    if (factory_) {
-      const auto reflection = factory_->reflect(state);
-      if (reflection) {
-        auto field_value = reflection->getField(field_name_);
-        auto string_value = absl::visit(StringFieldVisitor(), field_value);
-        if (string_value) {
-          SubstitutionFormatUtils::truncate(string_value.value(), max_length_);
-          return string_value;
-        }
-      }
+  case FilterStateFormat::Field: {
+    if (!factory_) {
+      return absl::nullopt;
     }
-    return absl::nullopt;
+    const auto reflection = factory_->reflect(state);
+    if (!reflection) {
+      return absl::nullopt;
+    }
+    auto field_value = reflection->getField(field_name_);
+    auto string_value = absl::visit(StringFieldVisitor(), field_value);
+    if (!string_value) {
+      return absl::nullopt;
+    }
+    SubstitutionFormatUtils::truncate(string_value.value(), max_length_);
+    return string_value;
+  }
   default:
     return absl::nullopt;
   }
@@ -289,20 +292,22 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
 #endif
     return SubstitutionFormatUtils::unspecifiedValue();
   }
-  case FilterStateFormat::Field:
-    if (factory_) {
-      const auto reflection = factory_->reflect(state);
-      if (reflection) {
-        auto field_value = reflection->getField(field_name_);
-        // Convert int64 to string to avoid numeric loss.
-        auto string_value = absl::visit(StringFieldVisitor(), field_value);
-        if (string_value) {
-          SubstitutionFormatUtils::truncate(string_value.value(), max_length_);
-          return ValueUtil::stringValue(string_value.value());
-        }
-      }
+  case FilterStateFormat::Field: {
+    if (!factory_) {
+      return SubstitutionFormatUtils::unspecifiedValue();
     }
-    return SubstitutionFormatUtils::unspecifiedValue();
+    const auto reflection = factory_->reflect(state);
+    if (!reflection) {
+      return SubstitutionFormatUtils::unspecifiedValue();
+    }
+    auto field_value = reflection->getField(field_name_);
+    auto string_value = absl::visit(StringFieldVisitor(), field_value);
+    if (!string_value) {
+      return SubstitutionFormatUtils::unspecifiedValue();
+    }
+    SubstitutionFormatUtils::truncate(string_value.value(), max_length_);
+    return ValueUtil::stringValue(string_value.value());
+  }
   default:
     return SubstitutionFormatUtils::unspecifiedValue();
   }
