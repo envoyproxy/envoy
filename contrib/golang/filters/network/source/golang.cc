@@ -32,7 +32,7 @@ void Filter::close(Network::ConnectionCloseType close_type) {
   }
   ENVOY_CONN_LOG(debug, "close addr: {}, type: {}", read_callbacks_->connection(), addr_,
                  static_cast<int>(close_type));
-  read_callbacks_->connection().close(close_type);
+  read_callbacks_->connection().close(close_type, "go_downstream_close");
 }
 
 void Filter::write(Buffer::Instance& buf, bool end_stream) {

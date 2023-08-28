@@ -651,9 +651,9 @@ protected:
 class UpstreamHttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::UpstreamHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
-          Server::Configuration::UpstreamHttpFactoryContext,
+          Server::Configuration::UpstreamFactoryContext,
           HttpDynamicFilterConfigProviderImpl<
-              Server::Configuration::UpstreamHttpFactoryContext,
+              Server::Configuration::UpstreamFactoryContext,
               Server::Configuration::UpstreamHttpFilterConfigFactory>> {
 public:
   absl::string_view statPrefix() const override { return "upstream_http_filter."; }
@@ -705,9 +705,9 @@ protected:
 class UpstreamNetworkFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory, Network::FilterFactoryCb,
-          Server::Configuration::CommonFactoryContext,
+          Server::Configuration::UpstreamFactoryContext,
           UpstreamNetworkDynamicFilterConfigProviderImpl<
-              Server::Configuration::CommonFactoryContext,
+              Server::Configuration::UpstreamFactoryContext,
               Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>> {
 public:
   absl::string_view statPrefix() const override { return "upstream_network_filter."; }

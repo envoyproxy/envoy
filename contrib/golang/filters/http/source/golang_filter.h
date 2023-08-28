@@ -22,10 +22,45 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
 
+enum class MetricType {
+  Counter = 0,
+  Gauge = 1,
+  Histogram = 2,
+  Max = 2,
+};
+
+class MetricStore {
+public:
+  MetricStore(Stats::ScopeSharedPtr scope) : scope_(scope) {}
+
+  static constexpr uint32_t kMetricTypeMask = 0x3;
+  static constexpr uint32_t kMetricIdIncrement = 0x4;
+
+  uint32_t nextCounterMetricId() { return next_counter_metric_id_ += kMetricIdIncrement; }
+  uint32_t nextGaugeMetricId() { return next_gauge_metric_id_ += kMetricIdIncrement; }
+  uint32_t nextHistogramMetricId() { return next_histogram_metric_id_ += kMetricIdIncrement; }
+
+  absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
+  absl::flat_hash_map<uint32_t, Stats::Gauge*> gauges_;
+  absl::flat_hash_map<uint32_t, Stats::Histogram*> histograms_;
+
+  Stats::ScopeSharedPtr scope_;
+
+private:
+  uint32_t next_counter_metric_id_ = static_cast<uint32_t>(MetricType::Counter);
+  uint32_t next_gauge_metric_id_ = static_cast<uint32_t>(MetricType::Gauge);
+  uint32_t next_histogram_metric_id_ = static_cast<uint32_t>(MetricType::Histogram);
+};
+
+using MetricStoreSharedPtr = std::shared_ptr<MetricStore>;
+
+struct httpConfigInternal;
+
 /**
  * Configuration for the HTTP golang extension filter.
  */
-class FilterConfig : Logger::Loggable<Logger::Id::http> {
+class FilterConfig : public std::enable_shared_from_this<FilterConfig>,
+                     Logger::Loggable<Logger::Id::http> {
 public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
                Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
@@ -38,6 +73,11 @@ public:
   uint64_t getConfigId();
   GolangFilterStats& stats() { return stats_; }
 
+  void newGoPluginConfig();
+  CAPIStatus defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id);
+  CAPIStatus incrementMetric(uint32_t metric_id, int64_t offset);
+  CAPIStatus getMetric(uint32_t metric_id, uint64_t* value);
+
 private:
   const std::string plugin_name_;
   const std::string so_id_;
@@ -48,11 +88,16 @@ private:
 
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
+  // TODO(StarryVae): use rwlock.
+  Thread::MutexBasicLockable mutex_{};
+  MetricStoreSharedPtr metric_store_ ABSL_GUARDED_BY(mutex_);
+  httpConfigInternal* config_{nullptr};
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-class RoutePluginConfig : Logger::Loggable<Logger::Id::http> {
+class RoutePluginConfig : public std::enable_shared_from_this<RoutePluginConfig>,
+                          Logger::Loggable<Logger::Id::http> {
 public:
   RoutePluginConfig(const std::string plugin_name,
                     const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config);
@@ -71,6 +116,7 @@ private:
   uint64_t cached_parent_id_ ABSL_GUARDED_BY(mutex_){0};
 
   absl::Mutex mutex_;
+  httpConfig* config_{nullptr};
 };
 
 using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;
@@ -261,6 +307,12 @@ struct httpRequestInternal : httpRequest {
   std::string strValue;
   httpRequestInternal(std::weak_ptr<Filter> f) { filter_ = f; }
   std::weak_ptr<Filter> weakFilter() { return filter_; }
+};
+
+struct httpConfigInternal : httpConfig {
+  std::weak_ptr<FilterConfig> config_;
+  httpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
+  std::weak_ptr<FilterConfig> weakFilterConfig() { return config_; }
 };
 
 class GoStringFilterState : public StreamInfo::FilterState::Object {

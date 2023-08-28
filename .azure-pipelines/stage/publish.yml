@@ -175,7 +175,6 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: bazel.distribution
-      tmpfsCacheDisabled: true
       stepsPre:
       - template: ../gpg.yml
         parameters:

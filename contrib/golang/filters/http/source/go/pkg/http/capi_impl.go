@@ -290,6 +290,10 @@ func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
+func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer) {
+	C.envoyGoConfigHttpFinalize(cfg)
+}
+
 var cAPI api.HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
@@ -318,4 +322,26 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 	}
 
 	return strings.Clone(value)
+}
+
+func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
+	var value uint32
+
+	res := C.envoyGoFilterHttpDefineMetric(unsafe.Pointer(cfg), C.uint32_t(metricType), unsafe.Pointer(&name), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	return value
+}
+
+func (c *httpCApiImpl) HttpIncrementMetric(cc unsafe.Pointer, metricId uint32, offset int64) {
+	cfg := (*httpConfig)(cc)
+	res := C.envoyGoFilterHttpIncrementMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.int64_t(offset))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetMetric(cc unsafe.Pointer, metricId uint32) uint64 {
+	cfg := (*httpConfig)(cc)
+	var value uint64
+	res := C.envoyGoFilterHttpGetMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	return value
 }

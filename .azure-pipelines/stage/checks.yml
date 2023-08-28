@@ -75,18 +75,19 @@ jobs:
       api:
         CI_TARGET: "bazel.api"
   timeoutInMinutes: 180
-  pool:
-    vmImage: $(agentUbuntu)
+  pool: envoy-x64-small
   steps:
   - template: ../bazel.yml
     parameters:
       ciTarget: $(CI_TARGET)
       envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
       cacheTestResults: ${{ parameters.cacheTestResults }}
+      managedAgent: false
       repoFetchDepth: $(REPO_FETCH_DEPTH)
       repoFetchTags: $(REPO_FETCH_TAGS)
       publishTestResults: variables.PUBLISH_TEST_RESULTS
       publishEnvoy: variables.PUBLISH_ENVOY
+      tmpfsDockerDisabled: true
       stepsPost:
       # TODO(phlax): consolidate "fix" paths/jobs
       - task: PublishBuildArtifacts@1

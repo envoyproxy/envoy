@@ -49,7 +49,7 @@ public:
                                                  Network::SocketCreationOptions{});
   }
 
-  bool valid() { return host_ != nullptr; }
+  bool valid() const override { return host_ != nullptr; }
 
 private:
   Upstream::HostConstSharedPtr host_;
