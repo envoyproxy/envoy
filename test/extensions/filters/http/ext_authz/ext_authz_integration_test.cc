@@ -74,11 +74,6 @@ public:
     }
     config_helper_.addConfigModifier([this, disable_with_metadata, failure_mode_allow](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ext_authz_cluster->set_name("ext_authz_cluster");
-      ConfigHelper::setHttp2(*ext_authz_cluster);
-
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz_cluster",
                      fake_upstreams_.back()->localAddress());
@@ -121,6 +116,15 @@ public:
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter),
                                    /*downstream_filter=*/usingDownstreamFilter());
+
+      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ext_authz_cluster->set_name("ext_authz_cluster");
+      // Don't configure ext_authz_cluster to require a check call to ext_authz_cluster.
+      if (!usingDownstreamFilter()) {
+        ext_authz_cluster->clear_typed_extension_protocol_options();
+      }
+      ConfigHelper::setHttp2(*ext_authz_cluster);
     });
   }
 
@@ -621,10 +625,6 @@ public:
     }
     config_helper_.addConfigModifier([this, legacy_allowed_headers](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ext_authz_cluster->set_name("ext_authz");
-
       if (legacy_allowed_headers) {
         TestUtility::loadFromYaml(legacy_default_config_, proto_config_);
       } else {
@@ -636,6 +636,14 @@ public:
 
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter),
                                    /*downstream_filter=*/usingDownstreamFilter());
+
+      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ext_authz_cluster->set_name("ext_authz");
+      // Don't configure ext_authz_cluster to require a check call to ext_authz_cluster.
+      if (!usingDownstreamFilter()) {
+        ext_authz_cluster->clear_typed_extension_protocol_options();
+      }
     });
   }
 
@@ -1184,10 +1192,6 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
-    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-    ext_authz_cluster->set_name("ext_authz");
-
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
     const std::string ext_authz_config = R"EOF(
   transport_api_version: V3
@@ -1204,6 +1208,14 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
     ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter),
                                  /*downstream_filter=*/usingDownstreamFilter());
+
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+    // Don't configure ext_authz_cluster to require a check call to ext_authz_cluster.
+    if (!usingDownstreamFilter()) {
+      ext_authz_cluster->clear_typed_extension_protocol_options();
+    }
   });
 
   const std::string local_reply_yaml = R"EOF(

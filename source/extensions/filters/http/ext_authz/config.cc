@@ -24,8 +24,19 @@ Http::FilterFactoryCb ExtAuthzFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
-  if (proto_config.clear_route_cache() && dual_info.is_upstream_filter) {
-    ExceptionUtil::throwEnvoyException("clear_route_cache cannot be enabled on upstream filters.");
+  if (dual_info.is_upstream_filter) {
+    if (proto_config.clear_route_cache()) {
+      ExceptionUtil::throwEnvoyException(
+          "clear_route_cache cannot be enabled on an upstream ext_authz filter.");
+    }
+    if (proto_config.include_peer_certificate()) {
+      ExceptionUtil::throwEnvoyException(
+          "include_peer_certificate cannot be enabled on an upstream ext_authz filter.");
+    }
+    if (proto_config.include_tls_session()) {
+      ExceptionUtil::throwEnvoyException(
+          "include_tls_session cannot be enabled on an upstream ext_auth filter.");
+    }
   }
   const auto filter_config =
       std::make_shared<FilterConfig>(proto_config, dual_info.scope, context.runtime(),
