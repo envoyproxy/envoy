@@ -20,33 +20,31 @@ namespace Json {
 #define ASSERT_THIS_IS_TOP_LEVEL                                                                   \
   do {                                                                                             \
   } while (0)
+#define ASSERT_LEVELS_EMPTY                                                                        \
+  do {                                                                                             \
+  } while (0)
 #else
 #define ASSERT_THIS_IS_TOP_LEVEL ASSERT(streamer_.topLevel() == this)
+#define ASSERT_LEVELS_EMPTY ASSERT(levels_.empty())
 #endif
 
 Streamer::Level::Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
     : streamer_(streamer), closer_(closer) {
   streamer_.addConstantString(opener);
+#ifndef NDEBUG
   streamer_.push(this);
+#endif
 }
 
 Streamer::Level::~Level() {
-  if (!is_closed_) {
-    close();
-  }
-}
-
-void Streamer::Level::close() {
-  if (!is_closed_) {
-    ASSERT_THIS_IS_TOP_LEVEL;
-    is_closed_ = true;
-    streamer_.addConstantString(closer_);
-    streamer_.pop(this);
-  }
+  streamer_.addConstantString(closer_);
+#ifndef NDEBUG
+  streamer_.pop(this);
+#endif
 }
 
 Streamer::MapPtr Streamer::makeRootMap() {
-  ASSERT(levels_.empty());
+  ASSERT_LEVELS_EMPTY;
   return std::make_unique<Map>(*this);
 }
 
@@ -74,12 +72,14 @@ void Streamer::Level::addString(absl::string_view str) {
   streamer_.addSanitized("\"", str, "\"");
 }
 
+#ifndef NDEBUG
 void Streamer::pop(Level* level) {
   ASSERT(levels_.top() == level);
   levels_.pop();
 }
 
 void Streamer::push(Level* level) { levels_.push(level); }
+#endif
 
 void Streamer::Level::nextField() {
   if (is_first_) {
@@ -137,12 +137,6 @@ void Streamer::addNumber(double number) {
     response_.addFragments({"null"});
   } else {
     response_.addFragments({absl::StrCat(number)});
-  }
-}
-
-void Streamer::clear() {
-  while (!levels_.empty()) {
-    levels_.top()->close();
   }
 }
 

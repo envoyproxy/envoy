@@ -25,7 +25,7 @@ class Streamer {
 public:
   using Value = absl::variant<absl::string_view, double>;
 
-  /*
+  /**
    * @param response The buffer in which to stream output. Note: this buffer can
    *                 be flushed during population; it is not necessary to hold
    *                 the entire json structure in memory before streaming it to
@@ -107,23 +107,7 @@ public:
   private:
     friend Streamer;
 
-    /**
-     * An aggregate can be closed in two ways. In either case, we need each
-     *     aggregate to emit its closing delimiter ("}" or "]").
-     *
-     *  1. The unique_ptr in which it is allocated is destructed or reset.
-     *     This is the normal mode of operation during serialization of a
-     *     series of map or array structures. This triggers emitting the
-     *     closing delimiter from the destructor.
-     *  2. At the end of serialization process a stack of aggregate objects
-     *     is unwound via Streamer::close(). When this occurs, we emit the
-     *     closing delimiter but need to avoid doing so again when the
-     *     object is eventually destroyed.
-     */
-    void close();
-
-    bool is_closed_{false}; // Used to avoid emitting the closing delimiter twice.
-    bool is_first_{true};   // Used to control whether a comma-separator is added for a new entry.
+    bool is_first_{true}; // Used to control whether a comma-separator is added for a new entry.
     Streamer& streamer_;
     absl::string_view closer_;
   };
@@ -186,12 +170,6 @@ public:
   };
 
   /**
-   * Unwinds the stack of levels, properlying closing all of them using the
-   * appropriate delimiters.
-   */
-  void clear();
-
-  /**
    * Makes a root map for the streamer. A similar function can be added
    * easily if this class is to be used for a JSON structure with a
    * top-level array.
@@ -206,6 +184,7 @@ private:
   friend Map;
   friend Array;
 
+#ifndef NDEBUG
   /**
    * Pushes a new level onto the stack.
    */
@@ -215,6 +194,7 @@ private:
    * Pops a level off of a stack, asserting that it matches.
    */
   void pop(Level* level);
+#endif
 
   /**
    * Takes a raw string, sanitizes it using JSON syntax, surrounds it
@@ -248,13 +228,11 @@ private:
   Buffer::Instance& response_;
   std::string sanitize_buffer_;
 
-  // Keeps a stack of Maps or Arrays (subclasses of Level). This stack serves
-  // two functions:
-  //   1. facilitates assertions that only the top-level map/array can be
-  //      written.
-  //   2. enables clear() to fully unwind the stack of maps and // arrays,
-  //      properly closing them using JSON syntax.
+#ifndef NDEBUG
+  // Keeps a stack of Maps or Arrays (subclasses of Level) to facilitate
+  // assertions that only the top-level map/array can be written.
   std::stack<Level*> levels_;
+#endif
 };
 
 } // namespace Json

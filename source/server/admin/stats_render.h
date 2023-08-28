@@ -105,12 +105,17 @@ private:
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
   bool histograms_initialized_{false};
-  Json::Streamer json_streamer_;
-  Json::Streamer::MapPtr json_stats_map_;
-  Json::Streamer::ArrayPtr json_stats_array_;
-  Json::Streamer::MapPtr json_histogram_map1_;
-  Json::Streamer::MapPtr json_histogram_map2_;
-  Json::Streamer::ArrayPtr json_histogram_array_;
+
+  struct JsonContext {
+    explicit JsonContext(Buffer::Instance& response);
+    Json::Streamer streamer_;
+    Json::Streamer::MapPtr stats_map_;
+    Json::Streamer::ArrayPtr stats_array_;
+    Json::Streamer::MapPtr histogram_map1_;
+    Json::Streamer::MapPtr histogram_map2_;
+    Json::Streamer::ArrayPtr histogram_array_;
+  };
+  std::unique_ptr<JsonContext> json_;
   Buffer::Instance& response_;
 };
 
