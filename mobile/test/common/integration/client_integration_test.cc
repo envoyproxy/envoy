@@ -29,6 +29,16 @@ public:
         .WillRepeatedly(Return(true));
   }
 
+  void createEnvoy() override {
+    // Allow last minute addition of QUIC hints. This is done lazily as it must be done after
+    // upstreams are created.
+    if (add_quic_hints_) {
+      // TODO(renjie) uncomment.
+      // auto address = fake_upstreams_[0]->localAddress();
+      // builder_.addQuicHint(address->ip()->addressAsString(), address->ip()->port());
+    }
+  }
+
   void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
   void basicTest();
@@ -36,6 +46,7 @@ public:
 
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
+  bool add_quic_hints_ = false;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
@@ -202,6 +213,24 @@ TEST_P(ClientIntegrationTest, BasicHttp2) {
   basicTest();
   // HTTP/2
   ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
+}
+
+// Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
+TEST_P(ClientIntegrationTest, DISABLED_Http3WithQuicHints) {
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  builder_.enablePlatformCertificatesValidation(true);
+  upstream_tls_ = true;
+  add_quic_hints_ = true;
+
+  initialize();
+  default_request_headers_.setScheme("https");
+  basicTest();
+  // HTTP/3
+  ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
 }
 
 TEST_P(ClientIntegrationTest, BasicHttps) {
