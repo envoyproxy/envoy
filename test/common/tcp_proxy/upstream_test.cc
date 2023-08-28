@@ -202,17 +202,6 @@ TYPED_TEST(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
 
-TYPED_TEST(HttpUpstreamTest, UpstreamTrailersNotMarksDoneReadingWhenFeatureDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.finish_reading_on_decode_trailers", "false"}});
-  this->setupUpstream();
-  EXPECT_CALL(this->encoder_.stream_, resetStream(_));
-  this->upstream_->doneWriting();
-  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
-  this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
-}
-
 template <typename T> class HttpUpstreamRequestEncoderTest : public testing::Test {
 public:
   HttpUpstreamRequestEncoderTest() {

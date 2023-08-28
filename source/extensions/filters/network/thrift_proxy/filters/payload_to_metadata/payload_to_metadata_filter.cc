@@ -84,8 +84,16 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
   if (match_type_ == MatchType::MethodName) {
     const std::string& method_name{method_or_service_name_};
-    return method_name.empty() ||
-           (metadata.hasMethodName() && metadata.methodName() == method_name);
+    if (method_name.empty()) {
+      return true;
+    }
+
+    const std::string& metadata_method_name = metadata.hasMethodName() ? metadata.methodName() : "";
+    const auto func_pos = metadata_method_name.find(':');
+    if (func_pos != std::string::npos) {
+      return metadata_method_name.substr(func_pos + 1) == method_name;
+    }
+    return metadata_method_name == method_name;
   }
   ASSERT(match_type_ == MatchType::ServiceName);
   const std::string& service_name{method_or_service_name_};

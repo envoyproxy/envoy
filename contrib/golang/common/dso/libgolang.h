@@ -96,10 +96,7 @@ extern "C" {
 // go:linkname envoyGoFilterNewHttpPluginConfig
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterNewHttpPluginConfig
 extern GoUint64
-envoyGoFilterNewHttpPluginConfig(GoUint64 namePtr,    // NOLINT(readability-identifier-naming)
-                                 GoUint64 nameLen,    // NOLINT(readability-identifier-naming)
-                                 GoUint64 configPtr,  // NOLINT(readability-identifier-naming)
-                                 GoUint64 configLen); // NOLINT(readability-identifier-naming)
+envoyGoFilterNewHttpPluginConfig(httpConfig* p0); // NOLINT(readability-identifier-naming)
 
 // go:linkname envoyGoFilterDestroyHttpPluginConfig
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterDestroyHttpPluginConfig

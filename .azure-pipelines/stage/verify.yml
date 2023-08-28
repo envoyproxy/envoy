@@ -22,16 +22,11 @@ jobs:
       itemPattern: "bazel.distribution/x64/packages.x64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
-  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      ENVOY_DOCKER_IN_DOCKER: 1
-      ENVOY_RBE: 1
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-    displayName: "Verify packages"
+  - template: ../bazel.yml
+    parameters:
+      ciTarget: verify_distro
+      env:
+        ENVOY_DOCKER_IN_DOCKER: 1
 
 - job: packages_arm64
   displayName: Debs (arm64)
@@ -46,20 +41,15 @@ jobs:
       itemPattern: "bazel.distribution/arm64/packages.arm64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
-  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
-    workingDirectory: $(Build.SourcesDirectory)
-    env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      ENVOY_DOCKER_IN_DOCKER: 1
-      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci"
-      GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        CI_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
-      ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
-        CI_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
-    displayName: "Verify packages"
+  - template: ../bazel.yml
+    parameters:
+      managedAgent: false
+      ciTarget: verify_distro
+      rbe: false
+      artifactSuffix: ".arm64"
+      tmpfsDockerDisabled: true
+      env:
+        ENVOY_DOCKER_IN_DOCKER: 1
 
 - job: verified
   displayName: Verification complete

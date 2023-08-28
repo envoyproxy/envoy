@@ -373,6 +373,7 @@ envoy_sh_test(
 
 envoy_sh_test(
     name = "run_envoy_test",
+    size = "large",
     srcs = ["run_envoy_test.sh"],
     cc_binary = [":hotrestart_main"],
     data = [
