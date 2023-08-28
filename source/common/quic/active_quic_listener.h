@@ -12,6 +12,7 @@
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_preferred_address_config_factory.h"
+#include "source/common/quic/quic_context.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
 
