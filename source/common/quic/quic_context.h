@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/optref.h"
+
 #include "source/common/quic/quic_stat_names.h"
 
 namespace Envoy {

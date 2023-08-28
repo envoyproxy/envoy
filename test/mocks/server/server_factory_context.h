@@ -4,7 +4,7 @@
 
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
-#include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_context.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
