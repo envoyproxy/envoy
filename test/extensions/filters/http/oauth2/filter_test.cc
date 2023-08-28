@@ -1279,7 +1279,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
         {Http::Headers::get().Status.get(), "302"},
         {Http::Headers::get().SetCookie.get(),
          "OauthHMAC="
-         "7d5eb63a02e2a428534100b7505803a7e979b028926f7cedee70a8262562bd6c;"
+         "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
          "version=1;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
@@ -1468,7 +1468,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
         {Http::Headers::get().Status.get(), "302"},
         {Http::Headers::get().SetCookie.get(),
          "OauthHMAC="
-         "7d5eb63a02e2a428534100b7505803a7e979b028926f7cedee70a8262562bd6c;"
+         "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
          "version=1;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
