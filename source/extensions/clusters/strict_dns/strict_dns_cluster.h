@@ -84,5 +84,7 @@ private:
                     ClusterFactoryContext& context) override;
 };
 
+DECLARE_FACTORY(StrictDnsClusterFactory);
+
 } // namespace Upstream
 } // namespace Envoy

@@ -29,7 +29,7 @@ jobs:
 
     - if: ${{ steps.env.outputs.trusted != 'true' }}
       name: Start status check
-      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.0.10
+      uses: envoyproxy/toolshed/gh-actions/status@actions-v0.0.16
       with:
         authToken: ${{ secrets.GITHUB_TOKEN }}
         context: ${{ inputs.workflow_name }}

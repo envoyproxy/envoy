@@ -113,6 +113,8 @@
                                       nodeSubZone:(nullable NSString *)nodeSubZone
                                  xdsServerAddress:(nullable NSString *)xdsServerAddress
                                     xdsServerPort:(UInt32)xdsServerPort
+                                    xdsAuthHeader:(nullable NSString *)xdsAuthHeader
+                                     xdsAuthToken:(nullable NSString *)xdsAuthToken
                                       xdsJwtToken:(nullable NSString *)xdsJwtToken
                        xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
@@ -166,6 +168,8 @@
   self.nodeSubZone = nodeSubZone;
   self.xdsServerAddress = xdsServerAddress;
   self.xdsServerPort = xdsServerPort;
+  self.xdsAuthHeader = xdsAuthHeader;
+  self.xdsAuthToken = xdsAuthToken;
   self.xdsJwtToken = xdsJwtToken;
   self.xdsJwtTokenLifetimeSeconds = xdsJwtTokenLifetimeSeconds;
   self.xdsSslRootCerts = xdsSslRootCerts;
@@ -262,6 +266,10 @@
 #ifdef ENVOY_GOOGLE_GRPC
   if (self.xdsServerAddress != nil) {
     Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
+    if (self.xdsAuthHeader != nil) {
+      xdsBuilder.setAuthenticationToken([self.xdsAuthHeader toCXXString],
+                                        [self.xdsAuthToken toCXXString]);
+    }
     if (self.xdsJwtToken != nil) {
       xdsBuilder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
                                            self.xdsJwtTokenLifetimeSeconds);

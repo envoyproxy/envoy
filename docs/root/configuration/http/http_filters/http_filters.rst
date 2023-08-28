@@ -40,6 +40,7 @@ HTTP filters
   health_check_filter
   header_to_metadata_filter
   ip_tagging_filter
+  json_to_metadata_filter
   jwt_authn_filter
   kill_request_filter
   language_filter

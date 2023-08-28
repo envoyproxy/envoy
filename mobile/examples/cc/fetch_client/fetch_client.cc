@@ -101,6 +101,7 @@ void Fetch::sendRequest(const absl::string_view url_string) {
 
 void Fetch::runEngine(absl::Notification& engine_running) {
   Platform::EngineBuilder engine_builder;
+  engine_builder.addLogLevel(Envoy::Platform::LogLevel::debug);
   engine_builder.setOnEngineRunning([&engine_running]() { engine_running.Notify(); });
   engine_ = engine_builder.build();
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);

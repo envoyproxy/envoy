@@ -20,6 +20,8 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/str_format.h"
+
 namespace {
 
 const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPatternCase pattern) {
@@ -151,7 +153,8 @@ void RouterCheckTool::assignUniqueRouteNames(
   Random::RandomGeneratorImpl random;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
-      route.set_name(random.uuid());
+      std::string name = absl::StrFormat("%s-%s", route.name(), random.uuid());
+      route.set_name(name);
     }
   }
 }
@@ -634,6 +637,8 @@ Options::Options(int argc, char** argv) {
       "o", "output-path", "Path to output file to write test results", false, "", "string", cmd);
   TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs(
       "unlabelled-configs", "unlabelled configs", false, "unlabelledConfigStrings", cmd);
+  TCLAP::SwitchArg detailed_coverage(
+      "", "detailed-coverage", "Show detailed coverage with routes without tests", cmd, false);
   try {
     cmd.parse(argc, argv);
   } catch (TCLAP::ArgException& e) {
@@ -646,6 +651,7 @@ Options::Options(int argc, char** argv) {
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
   disable_deprecation_check_ = disable_deprecation_check.getValue();
+  detailed_coverage_report_ = detailed_coverage.getValue();
 
   config_path_ = config_path.getValue();
   test_path_ = test_path.getValue();

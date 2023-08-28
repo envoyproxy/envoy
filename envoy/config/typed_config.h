@@ -52,7 +52,8 @@ public:
   std::set<std::string> configTypes() override {
     auto ptr = createEmptyConfigProto();
     ASSERT(ptr != nullptr);
-    return {ptr->GetDescriptor()->full_name()};
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*ptr);
+    return {reflectable_message->GetDescriptor()->full_name()};
   }
 };
 

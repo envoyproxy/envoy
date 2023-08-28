@@ -32,9 +32,7 @@ jobs:
       CI_TARGET: "windows"
       ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
       ENVOY_RBE: "true"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --config=remote-msvc-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
 
   - task: PublishTestResults@2

@@ -45,6 +45,12 @@ namespace Platform {
 XdsBuilder::XdsBuilder(std::string xds_server_address, const int xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
+XdsBuilder& XdsBuilder::setAuthenticationToken(std::string token_header, std::string token) {
+  authentication_token_header_ = std::move(token_header);
+  authentication_token_ = std::move(token);
+  return *this;
+}
+
 XdsBuilder& XdsBuilder::setJwtAuthenticationToken(std::string token,
                                                   const int token_lifetime_in_seconds) {
   jwt_token_ = std::move(token);
@@ -94,7 +100,12 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
         ->mutable_root_certs()
         ->set_inline_string(ssl_root_certs_);
   }
-  if (!jwt_token_.empty()) {
+
+  if (!authentication_token_header_.empty() && !authentication_token_.empty()) {
+    auto* auth_token_metadata = grpc_service.add_initial_metadata();
+    auth_token_metadata->set_key(authentication_token_header_);
+    auth_token_metadata->set_value(authentication_token_);
+  } else if (!jwt_token_.empty()) {
     auto& jwt = *grpc_service.mutable_google_grpc()
                      ->add_call_credentials()
                      ->mutable_service_account_jwt_access();
@@ -280,6 +291,17 @@ EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
   return *this;
 }
+
+EngineBuilder& EngineBuilder::setHttp3ConnectionOptions(std::string options) {
+  http3_connection_options_ = std::move(options);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setHttp3ClientConnectionOptions(std::string options) {
+  http3_client_connection_options_ = std::move(options);
+  return *this;
+}
+
 #endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
@@ -774,7 +796,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         h3_proxy_socket;
     h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_inner_socket);
     h3_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-    alpn_options.mutable_auto_config()->mutable_http3_protocol_options();
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->set_connection_options(http3_connection_options_);
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->set_client_connection_options(http3_client_connection_options_);
     alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
 
