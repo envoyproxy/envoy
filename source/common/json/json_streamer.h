@@ -184,18 +184,6 @@ private:
   friend Map;
   friend Array;
 
-#ifndef NDEBUG
-  /**
-   * Pushes a new level onto the stack.
-   */
-  void push(Level* level);
-
-  /**
-   * Pops a level off of a stack, asserting that it matches.
-   */
-  void pop(Level* level);
-#endif
-
   /**
    * Takes a raw string, sanitizes it using JSON syntax, surrounds it
    * with a prefix and suffix, and streams it out.
@@ -223,6 +211,16 @@ private:
    * @return the top Level*. This is used for asserts.
    */
   Level* topLevel() const { return levels_.top(); }
+
+  /**
+   * Pushes a new level onto the stack.
+   */
+  void push(Level* level);
+
+  /**
+   * Pops a level off of a stack, asserting that it matches.
+   */
+  void pop(Level* level);
 #endif
 
   Buffer::Instance& response_;

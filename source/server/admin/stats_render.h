@@ -106,6 +106,14 @@ private:
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
   bool histograms_initialized_{false};
 
+  // Captures the hierarchy of maps and arrays used to render scalar stats and
+  // histograms in various formats. This is separated in its own structure to
+  // facilitate clearing these structures in the reverse order of how they were
+  // created during finalize().
+  //
+  // Another option to consider: flattening the member variables of JsonContext
+  // into StatsJsonRender, and ensure that Render objects are always destructed
+  // before the output stream is considered complete.
   struct JsonContext {
     explicit JsonContext(Buffer::Instance& response);
     Json::Streamer streamer_;
