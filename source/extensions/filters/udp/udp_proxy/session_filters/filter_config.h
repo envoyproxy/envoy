@@ -26,12 +26,11 @@ public:
    * unable to produce a factory with the provided parameters, it should throw an EnvoyException
    * in the case of general error. The returned callback should always be initialized.
    * @param config supplies the configuration for the filter
-   * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
    * @return FilterFactoryCb the factory creation function.
    */
   virtual FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
+  createFilterFactoryFromProto(const Protobuf::Message& config,
                                Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.udp.session_filters"; }
