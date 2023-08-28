@@ -260,16 +260,6 @@ typed_config:
     EXPECT_EQ("go_state_test_value",
               getHeader(upstream_request_->headers(), "go-state-test-header-key"));
 
-    EXPECT_EQ("2", getHeader(upstream_request_->headers(), "go-metric-counter-test-header-key"));
-
-    EXPECT_EQ("3", getHeader(upstream_request_->headers(), "go-metric-gauge-test-header-key"));
-
-    EXPECT_EQ("3",
-              getHeader(upstream_request_->headers(), "go-metric-counter-record-test-header-key"));
-
-    EXPECT_EQ("1",
-              getHeader(upstream_request_->headers(), "go-metric-gauge-record-test-header-key"));
-
     // original header: x-test-header-0
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-test-header-0"));
 
@@ -417,6 +407,36 @@ typed_config:
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());
+
+    cleanup();
+  }
+
+  void testMetric(std::string path) {
+    initializeBasicFilter(METRIC);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+
+    waitForNextUpstreamRequest();
+
+    EXPECT_EQ("2", getHeader(upstream_request_->headers(), "go-metric-counter-test-header-key"));
+
+    EXPECT_EQ("3", getHeader(upstream_request_->headers(), "go-metric-gauge-test-header-key"));
+
+    EXPECT_EQ("3",
+              getHeader(upstream_request_->headers(), "go-metric-counter-record-test-header-key"));
+
+    EXPECT_EQ("1",
+              getHeader(upstream_request_->headers(), "go-metric-gauge-record-test-header-key"));
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
 
     cleanup();
   }
@@ -610,6 +630,7 @@ typed_config:
   const std::string PASSTHROUGH{"passthrough"};
   const std::string ROUTECONFIG{"routeconfig"};
   const std::string ACCESSLOG{"access_log"};
+  const std::string METRIC{"metric"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -721,6 +742,12 @@ TEST_P(GolangIntegrationTest, AccessLog) {
 
   cleanup();
 }
+
+// Mertic API testing
+TEST_P(GolangIntegrationTest, Metric) { testMetric("/test"); }
+
+// Metric API testing in async mode.
+TEST_P(GolangIntegrationTest, AsyncMetric) { testMetric("/test?async=1"); }
 
 // Basic API testing, i.e. add/remove/set Headers & data rewrite.
 TEST_P(GolangIntegrationTest, Basic) { testBasic("/test"); }
