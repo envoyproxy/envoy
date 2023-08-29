@@ -11,7 +11,7 @@ using HotRestartMessage = envoy::HotRestartMessage;
 
 class HotRestartingChild::UdpForwardingContext {
 public:
-  std::optional<std::pair<Network::Address::Instance&, Network::UdpListenerConfig&>>
+  absl::optional<std::pair<Network::Address::Instance&, Network::UdpListenerConfig&>>
   getListenerForUdpPacket(uint32_t /*worker_index*/, const Network::UdpRecvData& /*packet*/) {
     // TODO(ravenblack): get the listener
     return absl::nullopt;
