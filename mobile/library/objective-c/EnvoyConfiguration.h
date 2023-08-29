@@ -22,7 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableDNSCache;
 @property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
 @property (nonatomic, assign) BOOL enableHttp3;
-@property (nonatomic, strong) NSDictionary<NSString *, UInt32 *> *quicHints;
+@property (nonatomic, strong) NSDictionary<NSString *, NSNumber *> *quicHints;
 @property (nonatomic, assign) BOOL enableGzipDecompression;
 @property (nonatomic, assign) BOOL enableBrotliDecompression;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
@@ -77,7 +77,7 @@ NS_ASSUME_NONNULL_BEGIN
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                       enableHttp3:(BOOL)enableHttp3
-                                        quicHints:(NSDictionary<NSString *, UInt32 *> *)quicHints
+                                        quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding

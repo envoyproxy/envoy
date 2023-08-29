@@ -78,7 +78,7 @@
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                       enableHttp3:(BOOL)enableHttp3
-                                        quicHints:(NSDictionary<NSString *, UInt32 *> *)quicHints
+                                        quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
