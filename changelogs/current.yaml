@@ -55,7 +55,7 @@ bug_fixes:
 - area: aws signer
   change: |
     fixed a bug where expiration timestamp on task roles failed to validate. This causes failure of credential caching which
-    results in constant hits to the task role metadata URL
+    results in constant hits to the task role metadata URL.
 - area: router check tool
   change: |
     Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
