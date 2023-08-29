@@ -118,10 +118,9 @@ int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint
   return as_child_.duplicateParentListenSocket(address, worker_index);
 }
 
-void HotRestartImpl::registerUdpForwardingListener(
-    const Network::Address::Instance& /* address */,
-    Network::UdpListenerConfig& /* listener_config */) {
-  // TODO(ravenblack): Actually register it in the next PR.
+void HotRestartImpl::registerUdpForwardingListener(const Network::Address::Instance& address,
+                                                   Network::UdpListenerConfig& listener_config) {
+  as_child_.registerUdpForwardingListener(address, listener_config);
 }
 
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {

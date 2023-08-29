@@ -61,6 +61,13 @@ void HotRestartingChild::drainParentListeners() {
   sendHotRestartMessage(parent_address_, wrapped_request);
 }
 
+void HotRestartingChild::registerUdpForwardingListener(
+    const Network::Address::Instance& /* address */,
+    Network::UdpListenerConfig& /* listener_config */) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // TODO(ravenblack): Actually register it in the next PR.
+}
+
 absl::optional<HotRestart::AdminShutdownResponse>
 HotRestartingChild::sendParentAdminShutdownRequest() {
   if (restart_epoch_ == 0 || parent_terminated_) {

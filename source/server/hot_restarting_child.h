@@ -15,6 +15,8 @@ public:
                      mode_t socket_mode);
 
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
+  void registerUdpForwardingListener(const Network::Address::Instance& address,
+                                     Network::UdpListenerConfig& listener_config);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
