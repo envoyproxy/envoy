@@ -31,6 +31,9 @@ struct TestPrivateKeyConnectionTestOptions {
 
   // Return an error from the private key method completion function.
   bool async_method_error_{};
+
+  // Return true if the private key method is available.
+  bool is_available_{true};
 };
 
 // An example private key method provider for testing the decrypt() and sign()
