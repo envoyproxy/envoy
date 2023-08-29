@@ -92,7 +92,8 @@ public:
   //     f10: set
   //   }
   // }
-  void writeMessage(std::string string_value = "two") {
+  void writeMessage(const std::string& string_value = "two",
+                    const std::string& method_name = "foo") {
     Buffer::OwnedImpl buffer;
     auto metadata_ptr =
         std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
@@ -101,7 +102,9 @@ public:
     Buffer::OwnedImpl msg;
     ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
     metadata.setProtocol(protocol_);
-    metadata.setMethodName("foo");
+    if (!method_name.empty()) {
+      metadata.setMethodName(method_name);
+    }
     metadata.setMessageType(MessageType::Call);
     metadata.setSequenceId(0);
 
@@ -530,6 +533,56 @@ request_rules:
   filter_->onDestroy();
 }
 
+TEST_F(PayloadToMetadataTest, MethodNameWithServicePrefix) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  const std::map<std::string, std::string> expected = {{"present", "two"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  writeMessage("two", "service:foo");
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, WrongMethodNameWithServicePrefix) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  initializeFilter(request_config_yaml, false);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  writeMessage("two", "service:bar");
+  filter_->onDestroy();
+}
+
 TEST_F(PayloadToMetadataTest, DoNotMatchServiceName) {
   const std::string request_config_yaml = R"EOF(
 request_rules:
@@ -663,7 +716,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -695,7 +748,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -724,7 +777,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -751,7 +804,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -776,7 +829,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -806,7 +859,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -1046,7 +1099,7 @@ request_rules:
   // empty payload on the field
   const std::string value = "";
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
@@ -1074,7 +1127,7 @@ request_rules:
   auto length = MAX_PAYLOAD_VALUE_LEN + 1;
   const std::string value = std::string(length, 'x');
 
-  writeMessage(std::move(value));
+  writeMessage(value);
   filter_->onDestroy();
 }
 
