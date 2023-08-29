@@ -1641,3 +1641,8 @@ envoy.config_mux.sotw_grpc_mux_factory:
   - envoy.config_mux
   security_posture: unknown
   status: stable
+envoy.tracers.opentelemetry.resource_detectors.environment:
+  categories:
+  - envoy.tracers.opentelemetry.resource_detectors
+  security_posture: unknown
+  status: wip
