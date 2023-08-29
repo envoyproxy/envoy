@@ -801,7 +801,7 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
-    });    
+    });
     test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
     auto cookie_names =
         CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"};
@@ -948,7 +948,7 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
-    });    
+    });
     Http::TestRequestHeaderMapImpl request_headers{
         {Http::Headers::get().Host.get(), "traffic.example.com"},
         {Http::Headers::get().Path.get(), "/anypath"},
