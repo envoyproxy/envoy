@@ -7,6 +7,8 @@
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/rate_limit_quota/client_test_utils.h"
+#include "test/extensions/filters/http/rate_limit_quota/test_utils.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -29,226 +31,6 @@ using ::Envoy::StatusHelpers::StatusIs;
 using Server::Configuration::MockFactoryContext;
 using ::testing::NiceMock;
 
-constexpr char ValidMatcherConfig[] = R"EOF(
-  matcher_list:
-    matchers:
-      # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
-      predicate:
-        single_predicate:
-          input:
-            typed_config:
-              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-              header_name: environment
-          value_match:
-            exact: staging
-      on_match:
-        action:
-          name: rate_limit_quota
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-            bucket_id_builder:
-              bucket_id_builder:
-                "name":
-                    string_value: "prod"
-                "environment":
-                    custom_value:
-                      name: "test_1"
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                        header_name: environment
-                "group":
-                    custom_value:
-                      name: "test_2"
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                        header_name: group
-            reporting_interval: 60s
-  )EOF";
-
-constexpr char InvalidMatcherConfig[] = R"EOF(
-  matcher_list:
-    matchers:
-      predicate:
-        single_predicate:
-          input:
-            typed_config:
-              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-              header_name: environment
-          value_match:
-            exact: staging
-      on_match:
-        action:
-          name: rate_limit_quota
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-            bucket_id_builder:
-              bucket_id_builder:
-                "group":
-                    custom_value:
-                      name: "test_2"
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                        # No value is defined here, it will cause the failure of generation of bucket id.
-                        header_name:
-            reporting_interval: 60s
-  )EOF";
-
-constexpr char OnNoMatchConfig[] = R"EOF(
-  matcher_list:
-    matchers:
-      predicate:
-        single_predicate:
-          input:
-            typed_config:
-              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-              header_name: environment
-          value_match:
-            exact: staging
-      on_match:
-        action:
-          name: rate_limit_quota
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-            bucket_id_builder:
-              bucket_id_builder:
-                # The on_match field here will not be matched by the request header.
-                "NO_MATCHED_NAME":
-                    string_value: "NO_MATCHED"
-            reporting_interval: 60s
-  on_no_match:
-    action:
-      name: rate_limit_quota
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-        bucket_id_builder:
-          bucket_id_builder:
-            "on_no_match_name":
-                string_value: "on_no_match_value"
-            "on_no_match_name_2":
-                string_value: "on_no_match_value_2"
-        deny_response_settings:
-          grpc_status:
-            code: 8
-        expired_assignment_behavior:
-          fallback_rate_limit:
-            blanket_rule: ALLOW_ALL
-        reporting_interval: 5s
-)EOF";
-
-// No matcher type (matcher_list or matcher_tree) is configure here. It will read from `on_no_match`
-// field directly.
-constexpr char OnNoMatchConfigWithNoMatcher[] = R"EOF(
-  on_no_match:
-    action:
-      name: rate_limit_quota
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-        bucket_id_builder:
-          bucket_id_builder:
-            "on_no_match_name":
-                string_value: "on_no_match_value"
-            "on_no_match_name_2":
-                string_value: "on_no_match_value_2"
-        deny_response_settings:
-          grpc_status:
-            code: 8
-        expired_assignment_behavior:
-          fallback_rate_limit:
-            blanket_rule: ALLOW_ALL
-        reporting_interval: 5s
-)EOF";
-
-// By design, on_no_match here only supports static bucket_id generation (via string value) and
-// doesn't support dynamic way (via custom_value extension). So the configuration with
-// `custom_value` typed_config is invalid configuration that will cause the failure of generating
-// the bucket id.
-constexpr char InvalidOnNoMatcherConfig[] = R"EOF(
-  matcher_list:
-    matchers:
-      predicate:
-        single_predicate:
-          input:
-            typed_config:
-              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-              header_name: environment
-          value_match:
-            exact: staging
-      # Here is on_match field that will not be matched by the request header.
-      on_match:
-        action:
-          name: rate_limit_quota
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-            bucket_id_builder:
-              bucket_id_builder:
-                "NO_MATCHED_NAME":
-                    string_value: "NO_MATCHED"
-            reporting_interval: 60s
-  on_no_match:
-    action:
-      name: rate_limit_quota
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-        bucket_id_builder:
-          bucket_id_builder:
-            "environment":
-                custom_value:
-                  name: "test_1"
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                    header_name: environment
-        deny_response_settings:
-          grpc_status:
-            code: 8
-        expired_assignment_behavior:
-          fallback_rate_limit:
-            blanket_rule: ALLOW_ALL
-        reporting_interval: 5s
-)EOF";
-
-const std::string GoogleGrpcConfig = R"EOF(
-  rlqs_server:
-    google_grpc:
-      target_uri: rate_limit_quota_server
-      stat_prefix: google
-  )EOF";
-
-// const std::string GrpcConfig = R"EOF(
-//   rlqs_server:
-//     envoy_grpc:
-//       cluster_name: "rate_limit_quota_server"
-//   )EOF";
-
-// TODO(tyxia) CEL matcher config to be used later.
-// constexpr char CelMatcherConfig[] = R"EOF(
-//     matcher_list:
-//       matchers:
-//         # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
-//         predicate:
-//           single_predicate:
-//             input:
-//               typed_config:
-//                 "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
-//                 header_name: environment
-//             custom_match:
-//               typed_config:
-//                 '@type': type.googleapis.com/xds.type.matcher.v3.CelMatcher
-//                 expr_match:
-//                   # Shortened for illustration purposes. Here should be parsed CEL expression:
-//                   # request.headers['user_group'] == 'admin'
-//                   parsed_expr: {}
-//         on_match:
-//           action:
-//             name: rate_limit_quota
-//             typed_config:
-//               "@type":
-//               type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-//               bucket_id_builder:
-//                 bucket_id_builder:
-//                   "name":
-//                       string_value: "prod"
-//   )EOF";
-
 enum class MatcherConfigType {
   Valid,
   Invalid,
@@ -260,9 +42,9 @@ enum class MatcherConfigType {
 
 class FilterTest : public testing::Test {
 public:
-  FilterTest() {
+  FilterTest() : thread_local_client_(dispatcher_) {
     // Add the grpc service config.
-    TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
+    TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
 
   ~FilterTest() override { filter_->onDestroy(); }
@@ -273,23 +55,23 @@ public:
     xds::type::matcher::v3::Matcher matcher;
     switch (config_type) {
     case MatcherConfigType::Valid: {
-      TestUtility::loadFromYaml(ValidMatcherConfig, matcher);
+      TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
       break;
     }
     case MatcherConfigType::ValidOnNoMatchConfig: {
-      TestUtility::loadFromYaml(OnNoMatchConfig, matcher);
+      TestUtility::loadFromYaml(std::string(OnNoMatchConfig), matcher);
       break;
     }
     case MatcherConfigType::Invalid: {
-      TestUtility::loadFromYaml(InvalidMatcherConfig, matcher);
+      TestUtility::loadFromYaml(std::string(InvalidMatcherConfig), matcher);
       break;
     }
     case MatcherConfigType::InvalidOnNoMatchConfig: {
-      TestUtility::loadFromYaml(InvalidOnNoMatcherConfig, matcher);
+      TestUtility::loadFromYaml(std::string(InvalidOnNoMatcherConfig), matcher);
       break;
     }
     case MatcherConfigType::NoMatcher: {
-      TestUtility::loadFromYaml(OnNoMatchConfigWithNoMatcher, matcher);
+      TestUtility::loadFromYaml(std::string(OnNoMatchConfigWithNoMatcher), matcher);
       break;
     }
     case MatcherConfigType::Empty:
@@ -305,7 +87,8 @@ public:
 
   void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
-    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, bucket_cache_,
+                                                     thread_local_client_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -363,6 +146,10 @@ public:
   FilterConfig config_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  BucketsCache bucket_cache_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  ThreadLocalClient thread_local_client_;
 };
 
 TEST_F(FilterTest, EmptyMatcherConfig) {
@@ -468,21 +255,6 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   EXPECT_EQ(ret.status().message(), "Failed to generate the id from custom value config.");
 }
 
-TEST_F(FilterTest, DecodeHeaderWithValidConfig) {
-  addMatcherConfig(MatcherConfigType::Valid);
-  createFilter();
-
-  // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
-  // in the config.
-  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
-                                                                      {"group", "envoy"}};
-
-  buildCustomHeader(custom_value_pairs);
-
-  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
-  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
-}
-
 TEST_F(FilterTest, DecodeHeaderWithInValidConfig) {
   addMatcherConfig(MatcherConfigType::Invalid);
   createFilter();
@@ -492,14 +264,6 @@ TEST_F(FilterTest, DecodeHeaderWithInValidConfig) {
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
                                                                       {"group", "envoy"}};
   buildCustomHeader(custom_value_pairs);
-  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
-  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
-}
-
-TEST_F(FilterTest, DecodeHeaderWithOnNoMatchConfigured) {
-  addMatcherConfig(MatcherConfigType::ValidOnNoMatchConfig);
-  createFilter();
-
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }

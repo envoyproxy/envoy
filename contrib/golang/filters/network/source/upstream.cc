@@ -114,7 +114,7 @@ void UpstreamConn::close(Network::ConnectionCloseType close_type) {
   ENVOY_CONN_LOG(debug, "close addr: {}, type: {}", conn_->connection(), addr_,
                  static_cast<int>(close_type));
   ASSERT(conn_ != nullptr);
-  conn_->connection().close(close_type);
+  conn_->connection().close(close_type, "go_upstream_close");
 }
 
 void UpstreamConn::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
