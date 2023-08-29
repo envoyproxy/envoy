@@ -798,6 +798,10 @@ TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
 // Validates the behavior of the cookie validator when the combination of some fields could be same.
 TEST_F(OAuth2Test, CookieValidatorSame) {
   {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
+    });    
     test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
     auto cookie_names =
         CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"};
@@ -941,6 +945,10 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
 // Validates the behavior of the cookie validator when the expires_at value is not a valid integer.
 TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
   {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
+    });    
     Http::TestRequestHeaderMapImpl request_headers{
         {Http::Headers::get().Host.get(), "traffic.example.com"},
         {Http::Headers::get().Path.get(), "/anypath"},
@@ -1204,6 +1212,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.oauth_use_url_encoding", "false"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
     });
     init();
     // First construct the initial request to the oauth filter with URI parameters.
@@ -1389,6 +1398,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.oauth_use_url_encoding", "true"},
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
     });
     init();
     // First construct the initial request to the oauth filter with URI parameters.
@@ -1813,9 +1823,8 @@ TEST_P(OAuth2Test, CookieValidatorInTransition) {
        ";version=test"},
   };
   cookie_validator->setParams(request_headers_hexbase64, "mock-secret");
-  std::cout << "before second valid() " << GetParam() << std::endl;
+
   EXPECT_TRUE(cookie_validator->hmacIsValid());
-  std::cout << "after second valid() " << GetParam() << std::endl;
 }
 
 } // namespace Oauth2
