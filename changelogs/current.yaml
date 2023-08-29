@@ -44,6 +44,10 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: aws signer 
+  change: |
+    fixed a bug where expiration timestamp on task roles failed to validate. This causes failure of credential caching which
+    results in constant hits to the task role metadata URL
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
