@@ -144,7 +144,7 @@ private:
 };
 
 // Register the access log for the FormatterContext.
-REGISTER_FACTORY(GenericProxyFileAccessLogFactory, AccessLogInstanceFactory);
+REGISTER_FACTORY(FileAccessLogFactory, AccessLogInstanceFactory);
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

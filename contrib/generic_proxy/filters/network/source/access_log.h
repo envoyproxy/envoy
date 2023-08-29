@@ -32,8 +32,8 @@ using AccessLogInstanceSharedPtr = std::shared_ptr<AccessLogInstance>;
 using AccessLogInstanceFactory = AccessLog::AccessLogInstanceFactoryBase<FormatterContext>;
 
 // File access log for generic proxy.
-using GenericProxyFileAccessLog = FileAccessLog<FormatterContext>;
-using GenericProxyFileAccessLogFactory = FileAccessLogFactory<FormatterContext>;
+using FileAccessLog = FileAccessLogBase<FormatterContext>;
+using FileAccessLogFactory = FileAccessLogFactoryBase<FormatterContext>;
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

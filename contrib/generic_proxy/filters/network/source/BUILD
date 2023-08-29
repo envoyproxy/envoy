@@ -53,6 +53,7 @@ envoy_cc_contrib_extension(
         ":proxy_lib",
         "//contrib/generic_proxy/filters/network/source/router:config",
         "//envoy/server:filter_config_interface",
+        "//source/common/access_log:access_log_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg_cc_proto",
     ],
 )

@@ -29,8 +29,9 @@ public:
    * @param context supplies the server factory context.
    * @return an instance of extension filter implementation from a config proto.
    */
-  virtual FilterPtr createFilter(const Protobuf::Message& config,
-                                 Server::Configuration::CommonFactoryContext& context) PURE;
+  virtual FilterBasePtr<Context>
+  createFilter(const Protobuf::Message& config,
+               Server::Configuration::CommonFactoryContext& context) PURE;
 
   std::string category() const override { return category_; }
 

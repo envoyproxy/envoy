@@ -181,7 +181,7 @@ inline constexpr absl::string_view DefaultUnspecifiedValueStringView = "-";
 template <class FormatterContext>
 class CommonFormatterBaseImpl : public FormatterBase<FormatterContext> {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
   CommonFormatterBaseImpl(const std::string& format, bool omit_empty_values = false)
       : empty_value_string_(omit_empty_values ? absl::string_view{}
@@ -230,9 +230,9 @@ template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVis
  */
 template <class FormatterContext> class StructFormatterBase {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
-  using PlainNumber = PlainNumberFormatter;
-  using PlainString = PlainStringFormatter;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
+  using PlainNumber = PlainNumberFormatterBase<FormatterContext>;
+  using PlainString = PlainStringFormatterBase<FormatterContext>;
 
   StructFormatterBase(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                       bool omit_empty_values, const CommandParsers& commands = {})
@@ -429,7 +429,7 @@ using StructFormatterBasePtr = std::unique_ptr<StructFormatterBase<FormatterCont
 template <class FormatterContext>
 class CommonJsonFormatterBaseImpl : public FormatterBase<FormatterContext> {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
   CommonJsonFormatterBaseImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                               bool omit_empty_values, bool sort_properties,

@@ -325,7 +325,7 @@ public:
     auto& factory = Config::Utility::getAndCheckFactory<ExtensionFilterFactoryBase<Context>>(
         config.extension_filter());
     auto typed_filter_config = Config::Utility::translateToFactoryConfig(
-        config.extension_filter().typed_config(), context.messageValidationVisitor(), factory);
+        config.extension_filter(), context.messageValidationVisitor(), factory);
 
     return factory.createFilter(*typed_filter_config, context);
   }

@@ -192,8 +192,7 @@ void ActiveStream::completeRequest() {
   }
 
   for (const auto& access_log : parent_.config_->accessLogs()) {
-    access_log->log(FormatterContext{downstream_request_stream_.get(),
-                                     local_or_upstream_response_stream_.get()},
+    access_log->log({downstream_request_stream_.get(), local_or_upstream_response_stream_.get()},
                     stream_info_);
   }
 
