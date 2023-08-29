@@ -225,22 +225,17 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
       return absl::nullopt;
     }
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
-    std::string value;
-    const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
-    if (!status.ok()) {
-      // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
-      // TODO(lizan): add support of unknown Any.
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  std::string value;
+  const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
+  if (!status.ok()) {
+    // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
+    // TODO(lizan): add support of unknown Any.
       return absl::nullopt;
     }
 
     SubstitutionFormatUtils::truncate(value, max_length_);
     return value;
-#else
-    PANIC("FilterStateFormatter::format requires full proto support");
-    return absl::nullopt;
-#endif
-  }
   case FilterStateFormat::Field: {
     if (!factory_) {
       return absl::nullopt;

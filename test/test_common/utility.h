@@ -369,7 +369,7 @@ public:
    */
   static std::string uniqueFilename(absl::string_view prefix = "");
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two protos of the same type for equality.
    *
@@ -440,7 +440,7 @@ public:
   static std::vector<std::string> split(const std::string& source, const std::string& split,
                                         bool keep_empty_string = false);
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two RepeatedPtrFields of the same type for equality.
    *
@@ -1231,7 +1231,7 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   return equal;
 }
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 MATCHER_P(ProtoEq, expected, "") {
   const bool equal =
       TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/false);

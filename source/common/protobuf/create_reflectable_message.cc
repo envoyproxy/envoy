@@ -1,6 +1,6 @@
 #include "source/common/protobuf/utility.h"
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 
 namespace Envoy {
 Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
