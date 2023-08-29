@@ -989,9 +989,12 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   case EnvoyValue::RouteName:
     req_->strValue = state.streamInfo().getRouteName();
     break;
-  case EnvoyValue::FilterChainName:
-    req_->strValue = state.streamInfo().filterChainName();
+  case EnvoyValue::FilterChainName: {
+    const auto filter_chain_info = state.streamInfo().downstreamAddressProvider().filterChainInfo();
+    req_->strValue =
+        filter_chain_info.has_value() ? std::string(filter_chain_info->name()) : std::string();
     break;
+  }
   case EnvoyValue::ResponseCodeDetails:
     if (!state.streamInfo().responseCodeDetails().has_value()) {
       return CAPIStatus::CAPIValueNotFound;
