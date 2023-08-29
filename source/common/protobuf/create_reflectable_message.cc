@@ -184,14 +184,13 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/type/v3/token_bucket_descriptor.pb.h"
 #include "envoy/watchdog/v3/abort_action_descriptor.pb.h"
 
-using ::cc_proto_descriptor_library::internal::FileDescriptorInfo;
+using cc_proto_descriptor_library::internal::FileDescriptorInfo;
+using cc_proto_descriptor_library::TextFormatTranscoder;
 
 namespace {
 
-std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTranscoder() {
-  std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> transcoder =
-      std::make_unique<cc_proto_descriptor_library::TextFormatTranscoder>(
-          /*allow_global_fallback=*/false);
+std::unique_ptr<TextFormatTranscoder> createTranscoder() {
+  auto transcoder = std::make_unique<TextFormatTranscoder>(/*allow_global_fallback=*/false);
   std::vector<FileDescriptorInfo> file_descriptors = {
       protobuf::reflection::envoy_config_core_v3_base::kFileDescriptorInfo,
       protobuf::reflection::envoy_admin_v3_certs::kFileDescriptorInfo,
@@ -423,13 +422,12 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTransco
   return transcoder;
 }
 
-cc_proto_descriptor_library::TextFormatTranscoder& getTranscoder() {
+TextFormatTranscoder& getTranscoder() {
   // This transcoder is used by createDynamicMessage() to convert an instance of a MessageLite
   // subclass into an instance of Message. This Message instance has reflection capabilities
   // but does not have the per-field accessors that the generated C++ subclasses have.
   // As such it is only useful for reflection uses.
-  static std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> transcoder =
-      createTranscoder();
+  static std::unique_ptr<TextFormatTranscoder> transcoder = createTranscoder();
   return *transcoder;
 }
 
