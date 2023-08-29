@@ -1234,6 +1234,35 @@ TEST_P(DnsImplTest, CNameARecordLookupWithV6) {
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
+TEST_P(DnsImplTest, CNameARecordLookupV4ZeroTTL) {
+  server_->addCName("root.cnam.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  server_->setRecordTtl(std::chrono::seconds(0));
+  server_->setCnameTtl(std::chrono::seconds(60));
+
+  EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, std::chrono::seconds(0)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
+}
+
+// RFC 2181: TTL values can be between [0, INT_MAX]
+TEST_P(DnsImplTest, CNameARecordLookupV4MaxTTL) {
+  server_->addCName("root.cnam.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  server_->setRecordTtl(std::chrono::seconds(INT_MAX));
+  server_->setCnameTtl(std::chrono::seconds(INT_MAX));
+
+  EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, std::chrono::seconds(INT_MAX)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
+}
+
 TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
   server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, RecordType::A);
   server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, RecordType::AAAA);
