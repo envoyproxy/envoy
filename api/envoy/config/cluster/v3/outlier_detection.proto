@@ -162,9 +162,9 @@ message OutlierDetection {
   // Defaults to 0s.
   google.protobuf.Duration max_ejection_time_jitter = 22;
 
-  // If active health check is enabled and a host is ejected by outlier detection, a successful active health check
-  // unejects the host by default and consider it as healthy. Unejection also clears all the outlier detection counters.
-  // To change this default behavior set this config to false where active health check will not uneject the host.
+  // If active health checking is enabled and a host is ejected by outlier detection, a successful active health check
+  // unejects the host by default and considers it as healthy. Unejection also clears all the outlier detection counters.
+  // To change this default behavior set this config to ``false`` where active health checking will not uneject the host.
   // Defaults to true.
   google.protobuf.BoolValue successful_active_health_check_uneject_host = 23;
 }
