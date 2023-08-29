@@ -10,6 +10,15 @@ class HotRestart;
 } // namespace Server
 namespace Quic {
 
+// A wrapper around QuicStatNames and a HotRestart reference which may be unset.
+//
+// When HotRestart is available, ActiveQuicListener needs access to it in order to
+// register to receive packets forwarded from the parent to child instance.
+//
+// The parts are wrapped together into this object because the factory that takes
+// a QuicContext reference is instantiated per cluster - taking a reference to
+// StatName and HotRestart separately therefore increases the per-cluster memory
+// usage. Wrapping them into a single reference is more efficient.
 class QuicContext {
 public:
   QuicContext(Stats::SymbolTable& stat_names, OptRef<Envoy::Server::HotRestart> hot_restart)
