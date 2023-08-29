@@ -28,12 +28,11 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
         factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
     return [this]() -> Matcher::ActionPtr {
       auto config_value = provider_->config();
-      if (config_value.has_value()) {
-        auto factory_cb = config_value.value().get().factory_cb;
-        return std::make_unique<ExecuteFilterAction>(factory_cb);
+      if (!config_value.has_value()) {
+        throw EnvoyException("Failed to get dynamic config for filter");
       }
-      // TODO(ramaraochavali): Add a missing config filter.
-      return nullptr;
+      auto factory_cb = config_value.value().get().factory_cb;
+      return std::make_unique<ExecuteFilterAction>(factory_cb);
     };
   } else {
     // Static filter configuration.

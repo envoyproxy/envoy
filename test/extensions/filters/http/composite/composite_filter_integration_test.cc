@@ -119,6 +119,53 @@ public:
                                                  name));
   }
 
+  void prependCompositeDynamicFilter(const std::string& name = "composite") {
+    config_helper_.prependFilter(TestEnvironment::substitute(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                        dynamic_config:
+                          name: lua-filter-dynamic
+                          config_discovery:
+                            config_source:
+                                path_config_source:
+                                  path: "{{ test_tmpdir }}/dynamic_lua.yaml"
+                            type_urls:
+                            - type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    )EOF",
+                                                 name)));
+    TestEnvironment::writeStringToFileForTest("dynamic_lua.yaml", R"EOF(
+resources:
+  - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+    name: lua-filter-dynamic
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      default_source_code:
+        inline_string:
+          function envoy_on_response(response_handle)
+            response_handle:headers():add("lua-invoked", "true")
+          end")EOF",
+                                              false);
+  }
+
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
                                                                  {":path", "/somepath"},
                                                                  {":scheme", "http"},
@@ -150,6 +197,29 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
     auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
+}
+
+// Verifies that if we don't match the match action the request is proxied as normal, while if the
+// match action is hit we apply the specified dynamic filter to the stream.
+TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
+  prependCompositeDynamicFilter();
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HeaderValueOf("lua-invoked", "true"));
   }
 }
 
