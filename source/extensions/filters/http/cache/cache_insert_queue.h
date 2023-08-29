@@ -34,7 +34,8 @@ class CacheInsertFragment;
 // to receive more data.
 class CacheInsertQueue {
 public:
-  CacheInsertQueue(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
+  CacheInsertQueue(std::shared_ptr<HttpCache> cache,
+                   Http::StreamEncoderFilterCallbacks& encoder_callbacks,
                    InsertContextPtr insert_context, AbortInsertCallback abort);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata, bool end_stream);
@@ -72,6 +73,11 @@ private:
   // will remove its self-ownership (thereby deleting itself) upon
   // completion of its work.
   std::unique_ptr<CacheInsertQueue> self_ownership_;
+  // The queue needs to keep a copy of the cache alive; if only the filter
+  // keeps the cache alive then it's possible for the filter config to be deleted
+  // while a cache action is still in flight, which can cause the cache to be
+  // deleted prematurely.
+  std::shared_ptr<HttpCache> cache_;
 };
 
 } // namespace Cache
