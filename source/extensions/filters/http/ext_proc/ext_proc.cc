@@ -458,7 +458,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
-  if (!body_delivered && state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) {
+  if (!body_delivered && ((state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) ||
+                          (!state.chunkQueue().empty() && state.bodyMode() == ProcessingMode::BUFFERED_PARTIAL))) {
     // If no gRPC stream yet, opens it before sending data.
     switch (openStream()) {
     case StreamOpenState::Error:
@@ -472,8 +473,12 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
-    sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback,
-                  false);
+    if (state.bodyMode() == ProcessingMode::BUFFERED) {
+      sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback, false);
+    } else {
+      const auto& all_data = state.consolidateStreamedChunks(true);
+      sendBodyChunk(state, all_data.data, ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
+    }
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
