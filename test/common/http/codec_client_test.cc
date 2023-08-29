@@ -496,8 +496,9 @@ public:
         socket->connectionInfoProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), nullptr, nullptr);
     NiceMock<Network::MockListenerConfig> listener_config;
+    Server::ThreadLocalOverloadStateOptRef overload_state;
     upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_,
-                                                     runtime_, listener_config);
+                                                     runtime_, listener_config, overload_state);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
