@@ -754,6 +754,40 @@ request_rules:
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
+TEST_F(FilterTest, OnMissingSecondLayerString) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: foo
+    - key: bar
+    on_present:
+      metadata_namespace: envoy.lb
+      key: baz
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: "missing"
+)EOF");
+  const std::string request_body =
+      R"delimiter(
+        {"foo": "James, James, Morrison, Morrison, weather-beaten, off-key"})delimiter";
+
+  const std::map<std::string, std::string> expected = {{"version", "missing"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(incoming_headers_, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+}
+
 TEST_F(FilterTest, NoRequestContentType) {
   initializeFilter(request_config_yaml_);
 
@@ -836,6 +870,58 @@ TEST_F(FilterTest, InvalidJsonPayload) {
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 1);
+}
+
+TEST_F(FilterTest, OnMissingQuotedString) {
+  initializeFilter(request_config_yaml_);
+  const std::string request_body = R"delimiter("")delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(incoming_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, OnMissingQuotedJsonObject) {
+  initializeFilter(request_config_yaml_);
+  const std::string request_body =
+      R"delimiter("{\"model\": \"gpt-3.5-turbo\",\"temperature\": 0.2,\"stream\": false}")delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(incoming_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, OnMissingPureNumber) {
+  initializeFilter(request_config_yaml_);
+  const std::string request_body = R"delimiter(5566)delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(incoming_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq_invalid_json_body"), 0);
 }
 
 // TODO(kuochunghsu): Planned to support trimming.

@@ -28,6 +28,7 @@ export ENVOY_BUILD_FILTER_EXAMPLE="${ENVOY_BUILD_FILTER_EXAMPLE:-0}"
 
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
+read -ra BAZEL_STARTUP_EXTRA_OPTIONS <<< "${BAZEL_STARTUP_EXTRA_OPTIONS:-}"
 read -ra BAZEL_OPTIONS <<< "${BAZEL_OPTIONS:-}"
 
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
@@ -105,12 +106,15 @@ trap cleanup EXIT
 _bazel="$(which bazel)"
 
 BAZEL_STARTUP_OPTIONS=(
+    "${BAZEL_STARTUP_EXTRA_OPTIONS[@]}"
     "--output_user_root=${BUILD_DIR}/bazel_root"
     "--output_base=${BUILD_DIR}/bazel_root/base")
 
 bazel () {
-    # echo "RUNNING BAZEL (${PWD}): ${BAZEL_STARTUP_OPTIONS[*]} <> ${*}" >&2
-    "$_bazel" "${BAZEL_STARTUP_OPTIONS[@]}" "$@"
+    local startup_options
+    read -ra startup_options <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
+    # echo "RUNNING BAZEL (${PWD}): ${startup_options[*]} <> ${*}" >&2
+    "$_bazel" "${startup_options[@]}" "$@"
 }
 
 export _bazel

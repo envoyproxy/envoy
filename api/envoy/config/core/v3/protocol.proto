@@ -95,10 +95,12 @@ message QuicProtocolOptions {
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
   QuicKeepAliveSettings connection_keepalive = 5;
 
-  // An array of QUIC connection options represented in a serialized string, separated by commas.
+  // A comma-separated list of strings representing QUIC connection options defined in
+  // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>` and to be sent by upstream connections.
   string connection_options = 6;
 
-  // An array of QUIC client connection options represented in a serialized string, separated by commas.
+  // A comma-separated list of strings representing QUIC client connection options defined in
+  // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>` and to be sent by upstream connections.
   string client_connection_options = 7;
 }
 

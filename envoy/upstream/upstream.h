@@ -625,6 +625,7 @@ public:
 #define ALL_CLUSTER_CONFIG_UPDATE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)         \
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
+  COUNTER(assignment_use_cached)                                                                   \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_empty)                                                                            \
   COUNTER(update_failure)                                                                          \

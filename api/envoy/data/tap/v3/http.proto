@@ -5,6 +5,8 @@ package envoy.data.tap.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/data/tap/v3/common.proto";
 
+import "google/protobuf/timestamp.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -34,6 +36,9 @@ message HttpBufferedTrace {
 
     // Message trailers.
     repeated config.core.v3.HeaderValue trailers = 3;
+
+    // The timestamp after receiving the message headers.
+    google.protobuf.Timestamp headers_received_time = 4;
   }
 
   // Request message.

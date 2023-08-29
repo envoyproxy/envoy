@@ -174,6 +174,10 @@ class EnvoyConfigurationTest {
     )
   }
 
+  fun isGoogleGrpcDisabled(): Boolean {
+    return System.getProperty("envoy_jni_google_grpc_disabled") != null;
+  }
+
   @Test
   fun `configuration default values`() {
     JniLibrary.loadTestLibrary()
@@ -324,13 +328,16 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       rtdsResourceName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
     assertThat(resolvedTemplate).contains("fake_rtds_layer");
     assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
     assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
@@ -338,6 +345,10 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test adding RTDS and CDS`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0, enableCds = true
@@ -365,6 +376,10 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test enableCds with default string`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       enableCds = true, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
@@ -378,6 +393,10 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `test RTDS default timeout`() {
+    if (isGoogleGrpcDisabled()) {
+      return;
+    }
+
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
       rtdsResourceName = "fake_rtds_layer", xdsAddress = "FAKE_ADDRESS", xdsPort = 0
@@ -402,5 +421,5 @@ class EnvoyConfigurationTest {
     // statsSinks
     assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
     assertThat(resolvedTemplate).contains("stats.example.com");
-  }
+ }
 }

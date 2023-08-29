@@ -65,13 +65,18 @@ def create_issues(access_token, runtime_and_pr):
     issues = []
     for runtime_guard, pr, commit in runtime_and_pr:
         # Who is the author?
+        login = None
         if pr:
             # Extract PR title, number, and author.
-            pr_info = repo.get_pull(pr)
-            change_title = pr_info.title
             number = ('#%d') % pr
-            login = pr_info.user.login
-        else:
+            try:
+                pr_info = repo.get_pull(pr)
+                change_title = pr_info.title
+                login = pr_info.user.login
+            except github.GithubException:
+                print("Failed to fetch info for %s, trying backup method", number)
+
+        if not login:
             # Extract commit message, sha, and author.
             # Only keep commit message title (remove description), and truncate to 50 characters.
             change_title = commit.message.split('\n')[0][:50]
@@ -134,7 +139,7 @@ def get_runtime_and_pr():
     # PR they were added.
     features_to_flip = []
 
-    runtime_features = re.compile(r'.*RUNTIME_GUARD.(envoy_reloadable_features_.*).;')
+    runtime_features = re.compile(r'.*RUNTIME_GUARD.(envoy_(reloadable|restart)_features_.*).;')
 
     removal_date = date.today() - datetime.timedelta(days=183)
     found_test_feature_true = False
