@@ -8,6 +8,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
@@ -21,13 +23,17 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-               Server::Configuration::TracerFactoryContext& context)
+               Server::Configuration::TracerFactoryContext& context,
+               const ResourceProvider& resource_provider)
     : tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()),
       tracing_stats_{OPENTELEMETRY_TRACER_STATS(
           POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))} {
   auto& factory_context = context.serverFactoryContext();
+  Resource resource = resource_provider.getResource(opentelemetry_config, context);
+
   // Create the tracer in Thread Local Storage.
-  tls_slot_ptr_->set([opentelemetry_config, &factory_context, this](Event::Dispatcher& dispatcher) {
+  tls_slot_ptr_->set([opentelemetry_config, &factory_context, this,
+                      resource](Event::Dispatcher& dispatcher) {
     OpenTelemetryGrpcTraceExporterPtr exporter;
     if (opentelemetry_config.has_grpc_service()) {
       Grpc::AsyncClientFactoryPtr&& factory =
@@ -39,7 +45,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     }
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
-        factory_context.runtime(), dispatcher, tracing_stats_, opentelemetry_config.service_name());
+        factory_context.runtime(), dispatcher, tracing_stats_, resource);
 
     return std::make_shared<TlsTracer>(std::move(tracer));
   });

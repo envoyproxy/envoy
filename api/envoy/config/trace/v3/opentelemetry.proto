@@ -4,7 +4,10 @@ package envoy.config.trace.v3;
 
 import "envoy/config/core/v3/grpc_service.proto";
 
+import "google/protobuf/any.proto";
+
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "OpentelemetryProto";
@@ -13,6 +16,16 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/trace/v
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: OpenTelemetry tracer]
+
+message ResourceDetector {
+  // The name of the resource detector to instantiate.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Resource detector specific configuration which depends on the detector being
+  // instantiated. See the supported detectors for further documentation.
+  // Not required for detectors that don't need a config. E.g., Environment variable Detector
+  google.protobuf.Any typed_config = 2;
+}
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
@@ -25,4 +38,8 @@ message OpenTelemetryConfig {
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
   // If it is not provided, it will default to "unknown_service:envoy".
   string service_name = 2;
+
+  // An ordered list of resource detectors
+  // [#extension-category: envoy.tracers.opentelemetry.resource_detectors]
+  repeated ResourceDetector resource_detectors = 3;
 }
