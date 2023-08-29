@@ -1142,8 +1142,8 @@ WasmResult Context::setEnvoyFilterState(std::string_view path, std::string_view 
     return WasmResult::NotFound;
   }
 
-  stream_info->filterState()->setData(path, object, StreamInfo::FilterState::StateType::Mutable,
-                                      prototype.life_span_);
+  stream_info->filterState()->setData(path, std::move(object),
+                                      StreamInfo::FilterState::StateType::Mutable);
   return WasmResult::Ok;
 }
 
