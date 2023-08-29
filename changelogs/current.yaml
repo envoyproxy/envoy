@@ -47,6 +47,9 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: router check tool
+  change: |
+    Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
