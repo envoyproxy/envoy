@@ -184,8 +184,8 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/type/v3/token_bucket_descriptor.pb.h"
 #include "envoy/watchdog/v3/abort_action_descriptor.pb.h"
 
-using cc_proto_descriptor_library::internal::FileDescriptorInfo;
 using cc_proto_descriptor_library::TextFormatTranscoder;
+using cc_proto_descriptor_library::internal::FileDescriptorInfo;
 
 namespace {
 
