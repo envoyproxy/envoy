@@ -25,6 +25,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: verify_distro
+      publishTestResults: false
       env:
         ENVOY_DOCKER_IN_DOCKER: 1
 
@@ -47,6 +48,7 @@ jobs:
       ciTarget: verify_distro
       rbe: false
       artifactSuffix: ".arm64"
+      publishTestResults: false
       tmpfsDockerDisabled: true
       env:
         ENVOY_DOCKER_IN_DOCKER: 1
@@ -54,7 +56,8 @@ jobs:
 - job: verified
   displayName: Verification complete
   dependsOn: ["packages_x64", "packages_arm64"]
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:
