@@ -26,6 +26,11 @@ minor_behavior_changes:
   change: |
     Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header`` to false.
+- area: router
+  change: |
+    Enable copying response_code from the upstream stream_info onto the downstream stream_info.
+    This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
