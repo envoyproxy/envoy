@@ -75,7 +75,9 @@ public:
       listener_->enable();
     }
   }
-  void shutdownListener() override { listener_.reset(); }
+  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
+    listener_.reset();
+  }
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override {
