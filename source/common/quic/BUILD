@@ -68,12 +68,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_context_lib",
+    hdrs = ["quic_context.h"],
+    tags = ["nofips"],
+    deps = [":quic_stat_names_lib"],
+)
+
+envoy_cc_library(
     name = "quic_stat_names_lib",
     srcs = ["quic_stat_names.cc"],
-    hdrs = [
-        "quic_context.h",
-        "quic_stat_names.h",
-    ],
+    hdrs = ["quic_stat_names.h"],
     tags = ["nofips"],
     deps = [
         "//envoy/stats:stats_interface",
@@ -409,6 +413,7 @@ envoy_cc_library(
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_preferred_address_config_factory_interface",
         ":envoy_quic_utils_lib",
+        ":quic_context_lib",
         "//envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",

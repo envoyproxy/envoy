@@ -370,7 +370,7 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:worker_interface",
-        "//source/common/quic:quic_stat_names_lib",
+        "//source/common/quic:quic_context_lib",
     ],
 )
 
@@ -426,7 +426,7 @@ envoy_cc_library(
         "//source/common/memory:heap_shrinker_lib",
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/quic:quic_stat_names_lib",
+        "//source/common/quic:quic_context_lib",
         "//source/common/router:rds_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/secret:secret_manager_impl_lib",

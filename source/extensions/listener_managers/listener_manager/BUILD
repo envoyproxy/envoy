@@ -64,7 +64,7 @@ envoy_cc_extension(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:stream_info_lib",
-        "//source/common/quic:quic_stat_names_lib",
+        "//source/common/quic:quic_context_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/upstreams/http/generic:config",
         "//source/extensions/udp_packet_writer/default:config",
