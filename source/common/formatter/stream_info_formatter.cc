@@ -151,7 +151,7 @@ FilterStateFormatter::create(const std::string& format, const absl::optional<siz
     throw EnvoyException("Invalid filter state serialize type, only "
                          "support PLAIN/TYPED/FIELD.");
   }
-  if (serialize_type == FIELD_SERIALIZATION ^ !field_name.empty()) {
+  if ((serialize_type == FIELD_SERIALIZATION) ^ !field_name.empty()) {
     throw EnvoyException("Invalid filter state serialize type, FIELD "
                          "should be used with the field name.");
   }
