@@ -11,128 +11,124 @@ namespace {
 
 TEST(StateTest, EmptyQueue) {
   ChunkQueue queue;
-  Buffer::OwnedImpl received_data;
   Buffer::OwnedImpl out_data;
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(0, queue.bytesEnqueued());
-  EXPECT_FALSE(queue.pop(false, received_data, out_data));
+  EXPECT_FALSE(queue.pop(false, out_data));
 }
 
 TEST(StateTest, BasicQueue) {
   ChunkQueue queue;
-  Buffer::OwnedImpl received_data;
   Buffer::OwnedImpl out_data;
   Buffer::OwnedImpl data1("Hello");
 
-  EXPECT_EQ(received_data.length(), 0);
-  queue.push(data1, false, false, received_data);
-  EXPECT_EQ(received_data.toString(), "Hello");
+  EXPECT_EQ(queue.receivedData().length(), 0);
+  queue.push(data1, false, false);
+  EXPECT_EQ(queue.receivedData().toString(), "Hello");
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(5, queue.bytesEnqueued());
-  auto popped = queue.pop(false, received_data, out_data);
+  auto popped = queue.pop(false, out_data);
   EXPECT_EQ(out_data.toString(), "Hello");
   EXPECT_FALSE((*popped)->end_stream);
   EXPECT_FALSE((*popped)->delivered);
-  EXPECT_EQ((*popped)->buffer_length, 5);
+  EXPECT_EQ((*popped)->length, 5);
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(0, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.length(), 0);
+  EXPECT_EQ(queue.receivedData().length(), 0);
 }
 
-TEST(StateTest, EmptyString) {
+TEST(StateTest, OkToPushEmptyDataToQueue) {
   ChunkQueue queue;
-  Buffer::OwnedImpl received_data;
   Buffer::OwnedImpl out_data;
   Buffer::OwnedImpl data1("");
 
-  EXPECT_EQ(received_data.length(), 0);
-  queue.push(data1, true, true, received_data);
-  EXPECT_EQ(received_data.toString(), "");
+  EXPECT_EQ(queue.receivedData().length(), 0);
+  queue.push(data1, true, true);
+  EXPECT_EQ(queue.receivedData().toString(), "");
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(0, queue.bytesEnqueued());
-  auto popped = queue.pop(false, received_data, out_data);
+  auto popped = queue.pop(false, out_data);
   EXPECT_EQ(out_data.toString(), "");
   EXPECT_TRUE((*popped)->end_stream);
   EXPECT_TRUE((*popped)->delivered);
-  EXPECT_EQ((*popped)->buffer_length, 0);
+  EXPECT_EQ((*popped)->length, 0);
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(0, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.length(), 0);
+  EXPECT_EQ(queue.receivedData().length(), 0);
 
   Buffer::OwnedImpl data2("Hello");
-  queue.push(data2, false, false, received_data);
-  EXPECT_EQ(received_data.toString(), "Hello");
-  queue.push(data1, true, true, received_data);
-  EXPECT_EQ(received_data.toString(), "Hello");
+  queue.push(data2, false, false);
+  EXPECT_EQ(queue.receivedData().toString(), "Hello");
+  queue.push(data1, true, true);
+  EXPECT_EQ(queue.receivedData().toString(), "Hello");
 
   out_data.drain(out_data.length());
-  popped = queue.pop(false, received_data, out_data);
+  popped = queue.pop(false, out_data);
   EXPECT_EQ(out_data.toString(), "Hello");
   EXPECT_FALSE((*popped)->end_stream);
   EXPECT_FALSE((*popped)->delivered);
-  EXPECT_EQ((*popped)->buffer_length, 5);
+  EXPECT_EQ((*popped)->length, 5);
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(0, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.length(), 0);
+  EXPECT_EQ(queue.receivedData().length(), 0);
 
   out_data.drain(out_data.length());
-  popped = queue.pop(false, received_data, out_data);
+  popped = queue.pop(false, out_data);
   EXPECT_EQ(out_data.toString(), "");
   EXPECT_TRUE((*popped)->end_stream);
   EXPECT_TRUE((*popped)->delivered);
-  EXPECT_EQ((*popped)->buffer_length, 0);
+  EXPECT_EQ((*popped)->length, 0);
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(0, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.length(), 0);
+  EXPECT_EQ(queue.receivedData().length(), 0);
 }
 
 TEST(StateTest, EnqueueDequeue) {
   ChunkQueue queue;
-  Buffer::OwnedImpl received_data;
   Buffer::OwnedImpl out_data;
   Buffer::OwnedImpl data1("Hello");
-  queue.push(data1, false, false, received_data);
+  queue.push(data1, false, false);
   Buffer::OwnedImpl data2(", World!");
-  queue.push(data2, false, false, received_data);
-  EXPECT_EQ(received_data.toString(), "Hello, World!");
+  queue.push(data2, false, false);
+  EXPECT_EQ(queue.receivedData().toString(), "Hello, World!");
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(13, queue.bytesEnqueued());
-  auto popped = queue.pop(false, received_data, out_data);
+  auto popped = queue.pop(false, out_data);
   EXPECT_EQ(out_data.toString(), "Hello");
   EXPECT_FALSE((*popped)->end_stream);
   EXPECT_FALSE((*popped)->delivered);
-  EXPECT_EQ((*popped)->buffer_length, 5);
+  EXPECT_EQ((*popped)->length, 5);
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(8, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.length(), 8);
-  EXPECT_EQ(received_data.toString(), ", World!");
+  EXPECT_EQ(queue.receivedData().length(), 8);
+  EXPECT_EQ(queue.receivedData().toString(), ", World!");
   Buffer::OwnedImpl data3("Bye");
-  queue.push(data3, true, false, received_data);
+  queue.push(data3, true, false);
   EXPECT_EQ(11, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.toString(), ", World!Bye");
+  EXPECT_EQ(queue.receivedData().toString(), ", World!Bye");
 
   out_data.drain(out_data.length());
-  popped = queue.pop(false, received_data, out_data);
+  popped = queue.pop(false, out_data);
   EXPECT_EQ(out_data.toString(), ", World!");
   EXPECT_FALSE((*popped)->end_stream);
   EXPECT_FALSE((*popped)->delivered);
-  EXPECT_EQ((*popped)->buffer_length, 8);
+  EXPECT_EQ((*popped)->length, 8);
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(3, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.toString(), "Bye");
+  EXPECT_EQ(queue.receivedData().toString(), "Bye");
 
   out_data.drain(out_data.length());
-  popped = queue.pop(false, received_data, out_data);
+  popped = queue.pop(false, out_data);
   EXPECT_EQ(out_data.toString(), "Bye");
   EXPECT_TRUE((*popped)->end_stream);
   EXPECT_FALSE((*popped)->delivered);
-  EXPECT_EQ((*popped)->buffer_length, 3);
+  EXPECT_EQ((*popped)->length, 3);
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(0, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.length(), 0);
+  EXPECT_EQ(queue.receivedData().length(), 0);
 
   out_data.drain(out_data.length());
-  popped = queue.pop(false, received_data, out_data);
+  popped = queue.pop(false, out_data);
   EXPECT_FALSE(popped);
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(0, queue.bytesEnqueued());
@@ -140,36 +136,34 @@ TEST(StateTest, EnqueueDequeue) {
 
 TEST(StateTest, ConsolidateThree) {
   ChunkQueue queue;
-  Buffer::OwnedImpl received_data;
   Buffer::OwnedImpl data1("Hello");
-  queue.push(data1, false, false, received_data);
+  queue.push(data1, false, false);
   Buffer::OwnedImpl data2(", ");
-  queue.push(data2, false, false, received_data);
+  queue.push(data2, false, false);
   Buffer::OwnedImpl data3("World!");
-  queue.push(data3, false, false, received_data);
+  queue.push(data3, false, false);
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(13, queue.bytesEnqueued());
   const auto& chunk = queue.consolidate();
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(13, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.toString(), "Hello, World!");
+  EXPECT_EQ(queue.receivedData().toString(), "Hello, World!");
   EXPECT_FALSE(chunk.end_stream);
   EXPECT_TRUE(chunk.delivered);
-  EXPECT_EQ(chunk.buffer_length, 13);
+  EXPECT_EQ(chunk.length, 13);
 }
 
 TEST(StateTest, ConsolidateOne) {
   ChunkQueue queue;
-  Buffer::OwnedImpl received_data;
   Buffer::OwnedImpl data1("Hello");
-  queue.push(data1, false, false, received_data);
+  queue.push(data1, false, false);
   const auto& chunk = queue.consolidate();
   EXPECT_FALSE(queue.empty());
   EXPECT_EQ(5, queue.bytesEnqueued());
-  EXPECT_EQ(received_data.toString(), "Hello");
+  EXPECT_EQ(queue.receivedData().toString(), "Hello");
   EXPECT_FALSE(chunk.end_stream);
   EXPECT_TRUE(chunk.delivered);
-  EXPECT_EQ(chunk.buffer_length, 5);
+  EXPECT_EQ(chunk.length, 5);
 }
 
 } // namespace

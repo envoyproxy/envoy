@@ -180,8 +180,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           ENVOY_LOG(
               debug,
               "Sending {} bytes of data end_stream {} in buffered partial mode before end stream",
-              receivedData().length(), all_data.end_stream);
-          filter_.sendBodyChunk(*this, receivedData(),
+              getQueueData().length(), all_data.end_stream);
+          filter_.sendBodyChunk(*this, getQueueData(),
                                 ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
         } else {
           // Let data continue to flow, but don't resume yet -- we would like to hold
@@ -257,8 +257,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         auto chunk = std::move(*queued_chunk);
         if (chunk->delivered) {
           if (common_response.has_body_mutation()) {
-            ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}",
-                      chunk->buffer_length);
+            ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
             MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
           }
           delivered_one = true;
@@ -375,7 +374,7 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
 
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream,
                                            bool delivered) {
-  chunk_queue_.push(data, end_stream, delivered, received_data_);
+  chunk_queue_.push(data, end_stream, delivered);
   if (queueOverHighLimit()) {
     requestWatermark();
   }
@@ -386,7 +385,7 @@ void ProcessorState::clearAsyncState() {
   Buffer::OwnedImpl chunk_data;
   while (const auto queued_chunk = dequeueStreamingChunk(false, chunk_data)) {
     auto& chunk = std::move(*queued_chunk);
-    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->buffer_length);
+    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->length);
     injectDataToFilterChain(chunk_data, chunk->end_stream);
     chunk_data.drain(chunk_data.length());
   }
@@ -479,23 +478,20 @@ void EncodingProcessorState::clearWatermark() {
   }
 }
 
-void ChunkQueue::push(Buffer::Instance& data, bool end_stream, bool delivered,
-                      Buffer::OwnedImpl& received_data) {
+void ChunkQueue::push(Buffer::Instance& data, bool end_stream, bool delivered) {
   // Adding the chunk into the queue.
   auto next_chunk = std::make_unique<QueuedChunk>();
-  next_chunk->buffer_length = data.length();
+  next_chunk->length = data.length();
   next_chunk->end_stream = end_stream;
   next_chunk->delivered = delivered;
   queue_.push_back(std::move(next_chunk));
   bytes_enqueued_ += data.length();
 
   // Adding the data to the buffer.
-  received_data.move(data);
+  received_data_.move(data);
 }
 
-absl::optional<QueuedChunkPtr> ChunkQueue::pop(bool undelivered_only,
-                                               Buffer::OwnedImpl& received_data,
-                                               Buffer::OwnedImpl& out_data) {
+absl::optional<QueuedChunkPtr> ChunkQueue::pop(bool undelivered_only, Buffer::OwnedImpl& out_data) {
   if (queue_.empty()) {
     return absl::nullopt;
   }
@@ -504,10 +500,10 @@ absl::optional<QueuedChunkPtr> ChunkQueue::pop(bool undelivered_only,
   }
   QueuedChunkPtr chunk = std::move(queue_.front());
   queue_.pop_front();
-  bytes_enqueued_ -= chunk->buffer_length;
+  bytes_enqueued_ -= chunk->length;
 
   // Move the corresponding data out.
-  out_data.move(received_data, chunk->buffer_length);
+  out_data.move(received_data_, chunk->length);
   return chunk;
 }
 
@@ -515,7 +511,7 @@ const QueuedChunk& ChunkQueue::consolidate() {
   if (queue_.size() > 1) {
     auto new_chunk = std::make_unique<QueuedChunk>();
     new_chunk->end_stream = queue_.back()->end_stream;
-    new_chunk->buffer_length = bytes_enqueued_;
+    new_chunk->length = bytes_enqueued_;
     queue_.clear();
     queue_.push_front(std::move(new_chunk));
   }

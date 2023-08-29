@@ -29,7 +29,7 @@ public:
   bool end_stream = false;
   // True if the chunk was actually sent to the gRPC stream
   bool delivered = false;
-  uint32_t buffer_length = 0;
+  uint32_t length = 0;
 };
 using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
@@ -40,11 +40,10 @@ public:
   ChunkQueue& operator=(const ChunkQueue&) = delete;
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
-  void push(Buffer::Instance& data, bool end_stream, bool delivered,
-            Buffer::OwnedImpl& received_data);
-  absl::optional<QueuedChunkPtr> pop(bool undelivered_only, Buffer::OwnedImpl& received_data,
-                                     Buffer::OwnedImpl& out_data);
+  void push(Buffer::Instance& data, bool end_stream, bool delivered);
+  absl::optional<QueuedChunkPtr> pop(bool undelivered_only, Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
+  Buffer::OwnedImpl& receivedData() { return received_data_; }
 
 private:
   // If we are in either streaming mode, store chunks that we received here,
@@ -54,6 +53,8 @@ private:
   std::deque<QueuedChunkPtr> queue_;
   // The total size of chunks in the queue.
   uint32_t bytes_enqueued_{};
+  // The received data that had not been sent to downstream/upstream.
+  Buffer::OwnedImpl received_data_;
 };
 
 class ProcessorState : public Logger::Loggable<Logger::Id::ext_proc> {
@@ -98,7 +99,6 @@ public:
     return "OUTBOUND";
   }
   CallbackState callbackState() const { return callback_state_; }
-  Buffer::OwnedImpl& receivedData() { return received_data_; }
   void setPaused(bool paused) { paused_ = paused; }
 
   bool completeBodyAvailable() const { return complete_body_available_; }
@@ -142,21 +142,17 @@ public:
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
   virtual uint32_t bufferLimit() const PURE;
 
+  Buffer::OwnedImpl& getQueueData() { return chunk_queue_.receivedData(); }
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream, bool delivered);
   // If the queue has chunks, return the head of the queue.
   absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only,
                                                        Buffer::OwnedImpl& out_data) {
     // we should return both chunk, and the corresponding data as well here.
-    return chunk_queue_.pop(undelivered_only, received_data_, out_data);
+    return chunk_queue_.pop(undelivered_only, out_data);
   }
   // Consolidate all the chunks on the queue into a single one and return a reference.
-  const QueuedChunk& consolidateStreamedChunks() {
-    const auto& chunk = chunk_queue_.consolidate();
-    // The consolidated chunk buffer length matches the received data length.
-    ASSERT(receivedData().length() == chunk.buffer_length);
-    return chunk;
-  }
+  const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
 
@@ -214,10 +210,8 @@ protected:
   // Envoy should receive at most one such message in one particular state.
   bool new_timeout_received_{false};
 
-  // The buffer which stores all the received data that had not been shipped.
-  Buffer::OwnedImpl received_data_;
   // The queue which store the received data chunks in order. It keeps the logical
-  // offset/size information of the chunk. The actual data is kept in the received_data_.
+  // offset/size information of the chunk.
   ChunkQueue chunk_queue_;
 
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
