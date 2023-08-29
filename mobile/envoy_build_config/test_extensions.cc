@@ -12,7 +12,7 @@
 
 #include "external/envoy_build_config/test_extensions.h"
 
-#ifndef ENVOY_ENABLE_FULL_PROTOS
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
 #include "source/common/protobuf/protobuf.h"
 #include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 
@@ -39,7 +39,7 @@ void register_test_extensions() {
   Envoy::HttpFilters::TestRead::forceRegisterTestReadFilterFactory();
   Envoy::Upstream::forceRegisterStaticClusterFactory();
 
-#ifndef ENVOY_ENABLE_FULL_PROTOS
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
   std::vector<Envoy::FileDescriptorInfo> file_descriptors = {
       protobuf::reflection::test_common_http_filters_test_event_tracker_filter::kFileDescriptorInfo,
       protobuf::reflection::test_common_http_filters_test_read_filter::kFileDescriptorInfo,

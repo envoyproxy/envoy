@@ -7,7 +7,7 @@
 #include "library/common/data/utility.h"
 #include "library/common/stats/utility.h"
 
-#ifndef ENVOY_ENABLE_FULL_PROTOS
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
 
 #include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 #include "source/common/protobuf/protobuf.h"
@@ -69,7 +69,7 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   // https://github.com/envoyproxy/envoy-mobile/issues/332
   Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
 
-#ifndef ENVOY_ENABLE_FULL_PROTOS
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
   registerMobileProtoDescriptors();
 #endif
 }
