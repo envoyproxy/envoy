@@ -2,8 +2,6 @@
 
 #include "envoy/registry/registry.h"
 
-#include "google/protobuf/struct.pb.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
