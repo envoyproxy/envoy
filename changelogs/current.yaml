@@ -47,6 +47,9 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: router check tool
+  change: |
+    Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -62,6 +65,9 @@ removed_config_or_runtime:
 - area: dns
   change: |
     Removed ``envoy.restart_features.use_apple_api_for_dns_lookups`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
 
 - area: quic
   change: |

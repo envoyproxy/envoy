@@ -182,6 +182,7 @@ open class EngineBuilder: NSObject {
 #else
   private var enableHttp3: Bool = false
 #endif
+  private var quicHints: [String: Int] = [:]
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -388,6 +389,19 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Add a host port pair that's known to support QUIC.
+  ///
+  /// - parameter host: the string representation of the host name
+  /// - parameter port: the host's port number
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addQuicHint(_ host: String, _ port: Int) -> Self {
+    self.quicHints[host] = port
+    return self
+  }
+#endif
+
   /// Add an interval at which to flush Envoy stats.
   ///
   /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
@@ -398,7 +412,6 @@ open class EngineBuilder: NSObject {
     self.statsFlushSeconds = statsFlushSeconds
     return self
   }
-#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -812,6 +825,7 @@ open class EngineBuilder: NSObject {
       enableDNSCache: self.enableDNSCache,
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHttp3: self.enableHttp3,
+      quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
@@ -885,6 +899,9 @@ private extension EngineBuilder {
     cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
 #if ENVOY_ENABLE_QUIC
     cxxBuilder.enableHttp3(self.enableHttp3)
+    for (host, port) in self.quicHints {
+      cxxBuilder.addQuicHint(host.toCXX(), Int32(port))
+    }
 #endif
     cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
     cxxBuilder.enableBrotliDecompression(self.enableBrotliDecompression)
