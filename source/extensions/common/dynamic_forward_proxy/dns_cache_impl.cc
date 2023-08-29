@@ -510,10 +510,9 @@ void DnsCacheImpl::addCacheEntry(
   if (address_list.empty()) {
     value = absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
   } else {
-    for (auto& addr : address_list) {
-      value += absl::StrCat((value.empty() ? "" : "\n"), addr->asString(), "|", ttl.count(), "|",
-                            seconds_since_epoch);
-    }
+    value = absl::StrJoin(address_list, "\n", [&](std::string* out, const auto& addr) {
+      absl::StrAppend(out, addr->asString(), "|", ttl.count(), "|", seconds_since_epoch);
+    });
   }
   key_value_store_->addOrUpdate(host, value, absl::nullopt);
 }

@@ -139,7 +139,7 @@ def get_runtime_and_pr():
     # PR they were added.
     features_to_flip = []
 
-    runtime_features = re.compile(r'.*RUNTIME_GUARD.(envoy_reloadable_features_.*).;')
+    runtime_features = re.compile(r'.*RUNTIME_GUARD.(envoy_(reloadable|restart)_features_.*).;')
 
     removal_date = date.today() - datetime.timedelta(days=183)
     found_test_feature_true = False

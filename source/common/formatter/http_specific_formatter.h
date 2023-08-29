@@ -11,7 +11,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
-#include "source/common/formatter/stream_info_formatter.h"
+#include "source/common/formatter/substitution_format_utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -221,6 +221,14 @@ private:
       absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
                                                        FormatterProviderCreateFunc>>;
   static const FormatterProviderLookupTbl& getKnownFormatters();
+};
+
+/**
+ * Util class for HTTP access log format.
+ */
+class HttpSubstitutionFormatUtils {
+public:
+  static FormatterPtr defaultSubstitutionFormatter();
 };
 
 } // namespace Formatter
