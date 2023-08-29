@@ -115,7 +115,7 @@ jobs:
       run: git config --global --add safe.directory /__w/envoy/envoy
 
     - if: ${{ inputs.diskspace_hack }}
-      uses: ./.github/actions/diskspace
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.17
     - run: |
         echo "disk space at beginning of build:"
         df -h
