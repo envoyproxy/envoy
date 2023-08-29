@@ -11,7 +11,7 @@ using HotRestartMessage = envoy::HotRestartMessage;
 
 class HotRestartingChild::UdpForwardingContext {
 public:
-  OptRef<Network::UdpListenerCallbacks>
+  std::optional<std::pair<Network::Address::Instance&, Network::UdpListenerConfig&>>
   getListenerForUdpPacket(uint32_t /*worker_index*/, const Network::UdpRecvData& /*packet*/) {
     // TODO(ravenblack): get the listener
     return absl::nullopt;
@@ -35,6 +35,9 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                               socket_mode);
 }
 
+// Destructor must be specified in the cc file because UdpForwardingContext must be defined first.
+HotRestartingChild::~HotRestartingChild() = default;
+
 void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
   socket_event_udp_forwarding_ = dispatcher.createFileEvent(
       udp_forwarding_rpc_stream_.domain_socket_,
@@ -49,10 +52,10 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
 void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
 
 void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data) {
-  OptRef<Network::UdpListenerCallbacks> listener =
-      udp_forwarding_context_->getListenerForUdpPacket(worker_index, data);
-  if (listener.has_value()) {
-    listener->onData(std::move(data));
+  auto addr_and_listener = udp_forwarding_context_->getListenerForUdpPacket(worker_index, data);
+  if (addr_and_listener.has_value()) {
+    auto [addr, listener_config] = *addr_and_listener;
+    listener_config.listenerWorkerRouter(addr).deliver(worker_index, std::move(data));
   }
 }
 

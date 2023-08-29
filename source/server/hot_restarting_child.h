@@ -15,6 +15,7 @@ class HotRestartingChild : public HotRestartingBase {
 public:
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
                      mode_t socket_mode);
+  ~HotRestartingChild() override;
 
   void initialize(Event::Dispatcher& dispatcher);
   void shutdown();
