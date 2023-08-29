@@ -162,10 +162,9 @@ public:
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
         {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.oauth_hmac_,
-                      "="
-                      "dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI="
-                      ";version=test")},
+         absl::StrCat(cookie_names.oauth_hmac_, "="
+                                                "dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI="
+                                                ";version=test")},
     };
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
@@ -814,10 +813,9 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
         {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.oauth_hmac_,
-                      "="
-                      "MSq8mkNQGdXx2LKGlLHMwSIj8rLZRnrHE6EWvvTUFx0="
-                      ";version=test")},
+         absl::StrCat(cookie_names.oauth_hmac_, "="
+                                                "MSq8mkNQGdXx2LKGlLHMwSIj8rLZRnrHE6EWvvTUFx0="
+                                                ";version=test")},
     };
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
@@ -848,10 +846,9 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
         {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.oauth_hmac_,
-                      "="
-                      "dbl04CSr6eWF52wdNDCRt/Uw6A4y41wbpmtUWRyD2Fo="
-                      ";version=test")},
+         absl::StrCat(cookie_names.oauth_hmac_, "="
+                                                "dbl04CSr6eWF52wdNDCRt/Uw6A4y41wbpmtUWRyD2Fo="
+                                                ";version=test")},
     };
 
     cookie_validator->setParams(request_headers_second, "mock-secret");
@@ -950,10 +947,9 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
         {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber;version=test"},
         {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
-        {Http::Headers::get().Cookie.get(),
-         "OauthHMAC="
-         "c+1qzyrMmqG8+O4dn7b28OvNNDWcb04yJfNbZCE1zYE="
-         ";version=test"},
+        {Http::Headers::get().Cookie.get(), "OauthHMAC="
+                                            "c+1qzyrMmqG8+O4dn7b28OvNNDWcb04yJfNbZCE1zYE="
+                                            ";version=test"},
     };
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
@@ -1772,15 +1768,16 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
 
 TEST_P(OAuth2Test, CookieValidatorInTransition) {
   TestScopedRuntime scoped_runtime;
-  if (GetParam() == 1) {
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
-    });
-  } else {
+  if (GetParam() == 0) {
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
     });
+  } else {
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
+    });
   }
+
   Http::TestRequestHeaderMapImpl request_headers_base64only{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/_signout"},
@@ -1789,18 +1786,18 @@ TEST_P(OAuth2Test, CookieValidatorInTransition) {
       {Http::Headers::get().Cookie.get(), "BearerToken=access_code;version=1"},
       {Http::Headers::get().Cookie.get(), "IdToken=some-id-token;version=1"},
       {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token;version=1"},
-      {Http::Headers::get().Cookie.get(),
-       "OauthHMAC="
-       "Y9gCpVnhyaY+ecSxt/ZLZc/OMb8ZNivrVH1RByJxEbs="
-       ";version=test"},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC="
+                                          "Y9gCpVnhyaY+ecSxt/ZLZc/OMb8ZNivrVH1RByJxEbs="
+                                          ";version=test"},
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
       test_time_,
       CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"});
   cookie_validator->setParams(request_headers_base64only, "mock-secret");
-
+  std::cout << "before first valid() " << GetParam() << std::endl;
   EXPECT_TRUE(cookie_validator->hmacIsValid());
+  std::cout << "after first valid() " << GetParam() << std::endl;
 
   Http::TestRequestHeaderMapImpl request_headers_hexbase64{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -1816,8 +1813,9 @@ TEST_P(OAuth2Test, CookieValidatorInTransition) {
        ";version=test"},
   };
   cookie_validator->setParams(request_headers_hexbase64, "mock-secret");
-
+  std::cout << "before second valid() " << GetParam() << std::endl;
   EXPECT_TRUE(cookie_validator->hmacIsValid());
+  std::cout << "after second valid() " << GetParam() << std::endl;
 }
 
 } // namespace Oauth2
