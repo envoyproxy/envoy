@@ -24,13 +24,22 @@ namespace Envoy {
 
 bool initialize() {
   std::vector<FileDescriptorInfo> file_descriptors = {
-    protobuf::reflection::library_common_extensions_cert_validator_platform_bridge_platform_bridge::kFileDescriptorInfo,
-    protobuf::reflection::library_common_extensions_filters_http_local_error_filter::kFileDescriptorInfo,
-    protobuf::reflection::library_common_extensions_filters_http_network_configuration_filter::kFileDescriptorInfo,
-    protobuf::reflection::library_common_extensions_filters_http_platform_bridge_filter::kFileDescriptorInfo,
-    protobuf::reflection::library_common_extensions_filters_http_socket_tag_filter::kFileDescriptorInfo,
-    protobuf::reflection::library_common_extensions_key_value_platform_platform::kFileDescriptorInfo,
-    protobuf::reflection::library_common_extensions_retry_options_network_configuration_predicate::kFileDescriptorInfo,
+      protobuf::reflection::
+          library_common_extensions_cert_validator_platform_bridge_platform_bridge::
+              kFileDescriptorInfo,
+      protobuf::reflection::library_common_extensions_filters_http_local_error_filter::
+          kFileDescriptorInfo,
+      protobuf::reflection::library_common_extensions_filters_http_network_configuration_filter::
+          kFileDescriptorInfo,
+      protobuf::reflection::library_common_extensions_filters_http_platform_bridge_filter::
+          kFileDescriptorInfo,
+      protobuf::reflection::library_common_extensions_filters_http_socket_tag_filter::
+          kFileDescriptorInfo,
+      protobuf::reflection::library_common_extensions_key_value_platform_platform::
+          kFileDescriptorInfo,
+      protobuf::reflection::
+          library_common_extensions_retry_options_network_configuration_predicate::
+              kFileDescriptorInfo,
   };
   for (const FileDescriptorInfo& descriptor : file_descriptors) {
     loadFileDescriptors(descriptor);
@@ -43,7 +52,7 @@ void registerMobileProtoDescriptors() {
   (void)initialized;
 }
 
-}  // namespace Envoy
+} // namespace Envoy
 
 #endif
 
@@ -63,7 +72,6 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
 #ifndef ENVOY_ENABLE_FULL_PROTOS
   registerMobileProtoDescriptors();
 #endif
-
 }
 
 envoy_status_t Engine::run(const std::string config, const std::string log_level) {

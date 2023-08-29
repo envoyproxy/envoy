@@ -190,7 +190,8 @@ namespace {
 
 std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTranscoder() {
   std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> transcoder =
-      std::make_unique<cc_proto_descriptor_library::TextFormatTranscoder>(/*allow_global_fallback=*/false);
+      std::make_unique<cc_proto_descriptor_library::TextFormatTranscoder>(
+          /*allow_global_fallback=*/false);
   std::vector<FileDescriptorInfo> file_descriptors = {
       protobuf::reflection::envoy_config_core_v3_base::kFileDescriptorInfo,
       protobuf::reflection::envoy_admin_v3_certs::kFileDescriptorInfo,

@@ -41,14 +41,15 @@ void register_test_extensions() {
 
 #ifndef ENVOY_ENABLE_FULL_PROTOS
   std::vector<Envoy::FileDescriptorInfo> file_descriptors = {
-    protobuf::reflection::test_common_http_filters_test_event_tracker_filter::kFileDescriptorInfo,
-    protobuf::reflection::test_common_http_filters_test_read_filter::kFileDescriptorInfo,
-    protobuf::reflection::test_common_http_filters_assertion_filter::kFileDescriptorInfo,
-    protobuf::reflection::test_common_http_filters_test_remote_response_filter::kFileDescriptorInfo,
-    protobuf::reflection::test_common_http_filters_test_accessor_filter::kFileDescriptorInfo,
-    protobuf::reflection::test_common_http_filters_route_cache_reset_filter::kFileDescriptorInfo,
-    protobuf::reflection::test_common_http_filters_test_kv_store_filter::kFileDescriptorInfo,
-    protobuf::reflection::test_common_http_filters_test_logger_filter::kFileDescriptorInfo,
+      protobuf::reflection::test_common_http_filters_test_event_tracker_filter::kFileDescriptorInfo,
+      protobuf::reflection::test_common_http_filters_test_read_filter::kFileDescriptorInfo,
+      protobuf::reflection::test_common_http_filters_assertion_filter::kFileDescriptorInfo,
+      protobuf::reflection::test_common_http_filters_test_remote_response_filter::
+          kFileDescriptorInfo,
+      protobuf::reflection::test_common_http_filters_test_accessor_filter::kFileDescriptorInfo,
+      protobuf::reflection::test_common_http_filters_route_cache_reset_filter::kFileDescriptorInfo,
+      protobuf::reflection::test_common_http_filters_test_kv_store_filter::kFileDescriptorInfo,
+      protobuf::reflection::test_common_http_filters_test_logger_filter::kFileDescriptorInfo,
   };
   for (const Envoy::FileDescriptorInfo& descriptor : file_descriptors) {
     Envoy::loadFileDescriptors(descriptor);
