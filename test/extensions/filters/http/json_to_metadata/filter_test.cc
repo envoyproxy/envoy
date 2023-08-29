@@ -133,6 +133,7 @@ TEST_F(FilterTest, BasicStringMatch) {
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   testRequestWithBody(request_body);
 

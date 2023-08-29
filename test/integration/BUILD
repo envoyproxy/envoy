@@ -2343,6 +2343,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "access_log_integration_test",
+    size = "large",
+    srcs = [
+        "access_log_integration_test.cc",
+    ],
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "weighted_cluster_integration_test",
     size = "large",
     srcs = ["weighted_cluster_integration_test.cc"],
