@@ -825,7 +825,7 @@ open class EngineBuilder: NSObject {
       enableDNSCache: self.enableDNSCache,
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHttp3: self.enableHttp3,
-      quicHints: self.quicHints.mapValues { NSNumber(integer: $0) },
+      quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
@@ -900,7 +900,7 @@ private extension EngineBuilder {
 #if ENVOY_ENABLE_QUIC
     cxxBuilder.enableHttp3(self.enableHttp3)
     for (host, port) in self.quicHints {
-      cxxBuilder.addQuicHint(host.toCXX(), port)
+      cxxBuilder.addQuicHint(host.toCXX(), Int32(port))
     }
 #endif
     cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
