@@ -14,6 +14,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_authz
+  change: |
+    removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.
@@ -109,12 +112,19 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+<<<<<<< HEAD
 - area: tcp
   change: |
     added the support to detect and send TCP RST for raw buffer socket based connection, and this is disabled by default.
     This literally is supported for linux. Windows also works but some behaviors are different.
     It can be enabled or disabled by a setting method and the runtime guard
     ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
+=======
+- area: tap
+  change: |
+    added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
+    to control writing request and response headers received time in trace output.
+>>>>>>> upstream/main
 
 deprecated:
 - area: tracing
