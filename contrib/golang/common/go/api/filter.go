@@ -267,11 +267,13 @@ type ConfigCallbackHandler interface {
 type CounterMetric interface {
 	Increment(offset int64)
 	Get() uint64
+	Record(value uint64)
 }
 
 type GaugeMetric interface {
 	Increment(offset int64)
 	Get() uint64
+	Record(value uint64)
 }
 
 // TODO

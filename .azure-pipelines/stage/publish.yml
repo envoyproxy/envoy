@@ -175,6 +175,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: bazel.distribution
+      publishTestResults: false
       stepsPre:
       - template: ../gpg.yml
         parameters:
@@ -211,6 +212,7 @@ jobs:
       rbe: false
       artifactSuffix: ".arm64"
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      publishTestResults: false
       tmpfsDockerDisabled: true
       stepsPre:
       - template: ../gpg.yml
@@ -325,6 +327,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: release.signed
+      publishTestResults: false
       env:
         GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
       stepsPre:
@@ -338,7 +341,8 @@ jobs:
 - job: success
   dependsOn: ["docker", "docs", "signed_release"]
   displayName: Success (linux artefacts)
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) check passes if all of
   # the preceding checks either pass or are skipped
   # adapted from:

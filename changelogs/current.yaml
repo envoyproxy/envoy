@@ -14,6 +14,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_authz
+  change: |
+    removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.
@@ -51,6 +54,9 @@ bug_fixes:
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
     to ``false``. This new configuration flag is a substitute for the removed runtime option
     ``envoy.reloadable_features_successful_active_health_check_uneject_host``.
+- area: router check tool
+  change: |
+    Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
