@@ -14,6 +14,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_authz
+  change: |
+    removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.
@@ -44,6 +47,9 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: router check tool
+  change: |
+    Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -109,6 +115,10 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: tap
+  change: |
+    added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
+    to control writing request and response headers received time in trace output.
 
 deprecated:
 - area: tracing

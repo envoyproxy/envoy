@@ -33,6 +33,7 @@ package http
 import "C"
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"unsafe"
 
@@ -77,7 +78,11 @@ func (r *httpRequest) sendPanicReply(details string) {
 
 func (r *httpRequest) RecoverPanic() {
 	if e := recover(); e != nil {
-		// TODO: print an error message to Envoy error log.
+		const size = 64 << 10
+		buf := make([]byte, size)
+		buf = buf[:runtime.Stack(buf, false)]
+		api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+
 		switch e {
 		case errRequestFinished, errFilterDestroyed:
 			// do nothing
@@ -276,6 +281,10 @@ func (m *counterMetric) Get() uint64 {
 	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
 }
 
+func (m *counterMetric) Record(value uint64) {
+	cAPI.HttpRecordMetric(unsafe.Pointer(m.config), m.metricId, value)
+}
+
 type gaugeMetric struct {
 	config   *httpConfig
 	metricId uint32
@@ -287,4 +296,8 @@ func (m *gaugeMetric) Increment(offset int64) {
 
 func (m *gaugeMetric) Get() uint64 {
 	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
+}
+
+func (m *gaugeMetric) Record(value uint64) {
+	cAPI.HttpRecordMetric(unsafe.Pointer(m.config), m.metricId, value)
 }

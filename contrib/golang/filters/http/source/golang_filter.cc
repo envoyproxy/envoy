@@ -1360,6 +1360,29 @@ CAPIStatus FilterConfig::getMetric(uint32_t metric_id, uint64_t* value) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus FilterConfig::recordMetric(uint32_t metric_id, uint64_t value) {
+  Thread::LockGuard lock(mutex_);
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = metric_store_->counters_.find(metric_id);
+    if (it != metric_store_->counters_.end()) {
+      it->second->add(value);
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = metric_store_->gauges_.find(metric_id);
+    if (it != metric_store_->gauges_.end()) {
+      it->second->set(value);
+    }
+  } else {
+    ASSERT(type == MetricType::Histogram);
+    auto it = metric_store_->histograms_.find(metric_id);
+    if (it != metric_store_->histograms_.end()) {
+      it->second->recordValue(value);
+    }
+  }
+  return CAPIStatus::CAPIOK;
+}
+
 uint64_t FilterConfig::getConfigId() { return config_id_; }
 
 FilterConfigPerRoute::FilterConfigPerRoute(
