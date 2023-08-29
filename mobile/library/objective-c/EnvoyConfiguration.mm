@@ -203,7 +203,7 @@
 #ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(self.enableHttp3);
   for (NSString *host in self.quicHints) {
-    builder.addQuicHint([host toCXXString], [self.runtimeGuards objectForKey:host])
+    builder.addQuicHint([host toCXXString], [self.quicHints objectForKey:host]);
   }
 #endif
 

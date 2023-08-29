@@ -179,7 +179,7 @@ open class EngineBuilder: NSObject {
   private var enableBrotliDecompression: Bool = false
 #if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
-  private var QuicHints: [String: Int] = [:]
+  private var quicHints: [String: Int] = [:]
 #else
   private var enableHttp3: Bool = false
 #endif
