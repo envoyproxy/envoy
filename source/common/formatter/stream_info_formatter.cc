@@ -201,7 +201,7 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     return absl::nullopt;
   }
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   std::string value;
   const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
   if (!status.ok()) {
