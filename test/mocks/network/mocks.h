@@ -260,6 +260,7 @@ public:
   MOCK_METHOD(bool, createListenerFilterChain, (ListenerFilterManager & listener));
   MOCK_METHOD(void, createUdpListenerFilterChain,
               (UdpListenerFilterManager & listener, UdpReadFilterCallbacks& callbacks));
+  MOCK_METHOD(bool, createQuicListenerFilterChain, (QuicListenerFilterManager & listener));
 };
 
 class MockListenSocket : public Socket {

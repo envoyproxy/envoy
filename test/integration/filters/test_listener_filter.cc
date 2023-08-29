@@ -86,10 +86,10 @@ public:
  * Config registration for the test filter.
  */
 class TestQuicListenerFilterConfigFactory
-    : public Server::Configuration::NamedListenerFilterConfigFactory {
+    : public Server::Configuration::NamedQuicListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+  Network::QuicListenerFilterFactoryCb createListenerFilterFactoryFromProto(
       const Protobuf::Message& proto_config,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       Server::Configuration::ListenerFactoryContext& context) override {
@@ -97,7 +97,7 @@ public:
         const test::integration::filters::TestQuicListenerFilterConfig&>(
         proto_config, context.messageValidationVisitor());
     return [listener_filter_matcher, added_value = message.added_value()](
-               Network::ListenerFilterManager& filter_manager) -> void {
+               Network::QuicListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(listener_filter_matcher,
                                      std::make_unique<TestQuicListenerFilter>(added_value));
     };
@@ -120,6 +120,6 @@ REGISTER_FACTORY(TestUdpInspectorConfigFactory,
                  Server::Configuration::NamedUdpListenerFilterConfigFactory);
 
 REGISTER_FACTORY(TestQuicListenerFilterConfigFactory,
-                 Server::Configuration::NamedListenerFilterConfigFactory);
+                 Server::Configuration::NamedQuicListenerFilterConfigFactory);
 
 } // namespace Envoy

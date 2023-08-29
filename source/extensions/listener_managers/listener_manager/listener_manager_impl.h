@@ -68,6 +68,14 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
+  /**
+   * Static worker for createQuicListenerFilterFactoryList() that can be used directly in tests.
+   */
+  static Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryListImpl(
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context,
+      Filter::QuicListenerFilterConfigProviderManagerImpl& config_provider_manager);
+
   static Network::ListenerFilterMatcherSharedPtr
   createListenerFilterMatcher(const envoy::config::listener::v3::ListenerFilter& listener_filter);
 
@@ -96,6 +104,12 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return createUdpListenerFilterFactoryListImpl(filters, context);
   }
+  Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) override {
+    return createQuicListenerFilterFactoryListImpl(filters, context,
+                                                   quic_listener_config_provider_manager_);
+  }
   Network::SocketSharedPtr createListenSocket(
       Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
       const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
@@ -114,6 +128,7 @@ private:
   uint64_t next_listener_tag_{1};
   Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
 };
 
 class ListenerImpl;

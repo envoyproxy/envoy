@@ -78,10 +78,11 @@ public:
   }
 };
 
+#ifdef ENVOY_ENABLE_QUIC
 /**
  * Test QUIC listener filter which add a new filter state.
  */
-class TestQuicListenerFilter : public Network::ListenerFilter {
+class TestQuicListenerFilter : public Network::QuicListenerFilter {
 public:
   class TestStringFilterState : public Router::StringAccessorImpl {
   public:
@@ -91,7 +92,7 @@ public:
 
   explicit TestQuicListenerFilter(std::string added_value) : added_value_(added_value) {}
 
-  // Network::ListenerFilter
+  // Network::QuicListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
     cb.filterState().setData(TestStringFilterState::key(),
                              std::make_unique<TestStringFilterState>(added_value_),
@@ -99,13 +100,19 @@ public:
                              StreamInfo::FilterState::LifeSpan::Connection);
     return Network::FilterStatus::Continue;
   }
-  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
-    PANIC("onData() shouldn't be called on QUIC listener filter");
+  bool isCompatibleWithServerPreferredAddress(
+      const quic::QuicSocketAddress& /*server_preferred_address*/) const override {
+    return true;
   }
-  size_t maxReadBytes() const override { return 0; }
+  Network::FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& /*new_address*/,
+                                             Network::Connection& /*connection*/) override {
+    return Network::FilterStatus::StopIteration;
+  }
 
 private:
   const std::string added_value_;
 };
+
+#endif
 
 } // namespace Envoy

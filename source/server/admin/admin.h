@@ -110,6 +110,7 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
                                     Network::UdpReadFilterCallbacks&) override {}
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
   bool createFilterChain(Http::FilterChainManager& manager, bool,

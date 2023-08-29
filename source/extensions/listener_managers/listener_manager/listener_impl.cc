@@ -710,8 +710,10 @@ void ListenerImpl::createListenerFilterFactories() {
             config_.listener_filters(), *listener_factory_context_);
         break;
       }
-      // Use the same listener filter interfaces as TCP for connection-oriented UDP traffic.
-      ABSL_FALLTHROUGH_INTENDED;
+      // This is a QUIC listener.
+      quic_listener_filter_factories_ = parent_.factory_->createQuicListenerFilterFactoryList(
+          config_.listener_filters(), *listener_factory_context_);
+      break;
     }
     case Network::Socket::Type::Stream:
       listener_filter_factories_ = parent_.factory_->createListenerFilterFactoryList(
@@ -976,6 +978,18 @@ void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManage
                                                 Network::UdpReadFilterCallbacks& callbacks) {
   Configuration::FilterChainUtility::buildUdpFilterChain(manager, callbacks,
                                                          udp_listener_filter_factories_);
+}
+
+bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterManager& manager) {
+  if (Configuration::FilterChainUtility::buildQuicFilterChain(manager,
+                                                              quic_listener_filter_factories_)) {
+    return true;
+  } else {
+    ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                     "Close socket and stop the iteration onAccept.");
+    missing_listener_config_stats_.extension_config_missing_.inc();
+    return false;
+  }
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

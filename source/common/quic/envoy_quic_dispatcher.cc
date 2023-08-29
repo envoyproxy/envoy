@@ -21,17 +21,55 @@ QuicDispatcherStats generateStats(Stats::Scope& store) {
   return {QUIC_DISPATCHER_STATS(POOL_COUNTER_PREFIX(store, "quic.dispatcher"))};
 }
 
+class GenericListenerFilter : public Network::QuicListenerFilter {
+public:
+  GenericListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
+                        Network::QuicListenerFilterPtr listener_filter)
+      : listener_filter_(std::move(listener_filter)), matcher_(std::move(matcher)) {}
+
+  // Network::QuicListenerFilter
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
+    if (isDisabled(cb)) {
+      return Network::FilterStatus::Continue;
+    }
+    return listener_filter_->onAccept(cb);
+  }
+  bool isCompatibleWithServerPreferredAddress(
+      const quic::QuicSocketAddress& server_preferred_address) const override {
+    return listener_filter_->isCompatibleWithServerPreferredAddress(server_preferred_address);
+  }
+  Network::FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+                                             Network::Connection& connection) override {
+    return listener_filter_->onPeerAddressChanged(new_address, connection);
+  }
+
+private:
+  /**
+   * Check if this filter filter should be disabled on the incoming socket.
+   * @param cb the callbacks the filter instance can use to communicate with the filter chain.
+   **/
+  bool isDisabled(Network::ListenerFilterCallbacks& cb) {
+    if (matcher_ == nullptr) {
+      return false;
+    } else {
+      return matcher_->matches(cb);
+    }
+  }
+
+  const Network::QuicListenerFilterPtr listener_filter_;
+  const Network::ListenerFilterMatcherSharedPtr matcher_;
+};
+
 } // namespace
 
 // An object created on the stack during QUIC connection creation to apply listener filters, if
 // there is any, within the call stack.
-class QuicListenerFilterManager : public Network::ListenerFilterManagerImplBase,
-                                  public Network::ListenerFilterCallbacks {
+class QuicListenerFilterManagerImpl : public Network::QuicListenerFilterManager,
+                                      public Network::ListenerFilterCallbacks {
 public:
-  QuicListenerFilterManager(Event::Dispatcher& dispatcher, Network::ConnectionSocket& socket,
-                            StreamInfo::StreamInfo& stream_info)
-      : Network::ListenerFilterManagerImplBase(), socket_(socket), stream_info_(stream_info),
-        dispatcher_(dispatcher) {}
+  QuicListenerFilterManagerImpl(Event::Dispatcher& dispatcher, Network::ConnectionSocket& socket,
+                                StreamInfo::StreamInfo& stream_info)
+      : socket_(socket), stream_info_(stream_info), dispatcher_(dispatcher) {}
 
   // Network::ListenerFilterCallbacks
   Network::ConnectionSocket& socket() override { return socket_; }
@@ -48,15 +86,36 @@ public:
   };
   StreamInfo::FilterState& filterState() override { return *stream_info_.filterState().get(); }
 
-  // Network::ListenerFilterManagerImplBase
-  void startFilterChain() override {
+  // Network::QuicListenerFilterManager
+  void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                       Network::QuicListenerFilterPtr&& filter) override {
+    accept_filters_.emplace_back(
+        std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
+  }
+  bool shouldAdvertiseServerPreferredAddress(
+      const quic::QuicSocketAddress& server_preferred_address) const override {
+    for (auto iter = accept_filters_.begin(); iter != accept_filters_.end(); iter++) {
+      if (!(*iter)->isCompatibleWithServerPreferredAddress(server_preferred_address)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+                            Network::Connection& connection) override {
+    for (auto iter = accept_filters_.begin(); iter != accept_filters_.end(); iter++) {
+      Network::FilterStatus status = (*iter)->onPeerAddressChanged(new_address, connection);
+      if (status == Network::FilterStatus::StopIteration ||
+          connection.state() == Network::Connection::State::Closed) {
+        return;
+      }
+    }
+  }
+
+  void startFilterChain() {
     for (auto iter = accept_filters_.begin(); iter != accept_filters_.end(); iter++) {
       Network::FilterStatus status = (*iter)->onAccept(*this);
-      if (status == Network::FilterStatus::StopIteration) {
-        IS_ENVOY_BUG("QUIC listener filter shouldn't stop iteration.");
-        break;
-      }
-      if (!socket().ioHandle().isOpen()) {
+      if (status == Network::FilterStatus::StopIteration || !socket().ioHandle().isOpen()) {
         break;
       }
     }
@@ -66,6 +125,7 @@ private:
   Network::ConnectionSocket& socket_;
   StreamInfo::StreamInfo& stream_info_;
   Event::Dispatcher& dispatcher_;
+  std::list<Network::QuicListenerFilterPtr> accept_filters_;
 };
 
 EnvoyQuicTimeWaitListManager::EnvoyQuicTimeWaitListManager(quic::QuicPacketWriter* writer,
@@ -139,9 +199,10 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr());
 
-  QuicListenerFilterManager listener_filter_manager(dispatcher_, *connection_socket, *stream_info);
+  QuicListenerFilterManagerImpl listener_filter_manager(dispatcher_, *connection_socket,
+                                                        *stream_info);
   const bool success =
-      listener_config_->filterChainFactory().createListenerFilterChain(listener_filter_manager);
+      listener_config_->filterChainFactory().createQuicListenerFilterChain(listener_filter_manager);
   const Network::FilterChain* filter_chain = nullptr;
   if (success) {
     // Quic listener filters are not supposed to pause the filter chain iteration. So this call
@@ -150,6 +211,14 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     // If any listener filter closed the socket, do not get a network filter chain. Thus early fail
     // the connection.
     if (connection_socket->ioHandle().isOpen()) {
+      for (auto address_family : {quiche::IpAddressFamily::IP_V4, quiche::IpAddressFamily::IP_V6}) {
+        absl::optional<quic::QuicSocketAddress> address =
+            quic_config.GetPreferredAddressToSend(address_family);
+        if (address.has_value() && address->IsInitialized() &&
+            !listener_filter_manager.shouldAdvertiseServerPreferredAddress(address.value())) {
+          quic_config.ClearAlternateServerAddressToSend(address_family);
+        }
+      }
       filter_chain =
           listener_config_->filterChainManager().findFilterChain(*connection_socket, *stream_info);
     }
