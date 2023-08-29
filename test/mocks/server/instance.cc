@@ -17,7 +17,7 @@ MockInstance::MockInstance()
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()),
-      quic_context_(stats_store_.symbolTable(), absl::nullopt),
+      quic_context_(stats_store_.symbolTable(), /* hot_restart = */ absl::nullopt),
       stats_config_(std::make_shared<NiceMock<Configuration::MockStatsConfig>>()),
       server_factory_context_(
           std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),

@@ -943,7 +943,7 @@ private:
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 #ifdef ENVOY_ENABLE_QUIC
-  Quic::QuicContext quic_context_{stats_store_.symbolTable(), absl::nullopt};
+  Quic::QuicContext quic_context_{stats_store_.symbolTable(), /* hot_restart = */ absl::nullopt};
 #endif
   bool initialized_ = false;
 };

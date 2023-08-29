@@ -59,7 +59,7 @@ ValidationInstance::ValidationInstance(
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this),
-      quic_context_(stats_store_.symbolTable(), absl::nullopt) {
+      quic_context_(stats_store_.symbolTable(), /* hot_restart = */ absl::nullopt) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {

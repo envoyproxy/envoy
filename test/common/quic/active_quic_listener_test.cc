@@ -114,7 +114,8 @@ protected:
         transport_socket_factory_(true, *store_.rootScope(),
                                   std::make_unique<NiceMock<Ssl::MockServerContextConfig>>()),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
-        quic_context_(listener_config_.listenerScope().symbolTable(), absl::nullopt) {}
+        quic_context_(listener_config_.listenerScope().symbolTable(),
+                      /* hot_restart = */ absl::nullopt) {}
 
   template <typename A, typename B>
   std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
