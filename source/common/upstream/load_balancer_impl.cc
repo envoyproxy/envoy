@@ -1,8 +1,10 @@
+#include "load_balancer_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
 #include <atomic>
 #include <bitset>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -474,7 +476,8 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
     return;
   }
   HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
-  const size_t num_upstream_localities = host_set.healthyHostsPerLocality().get().size();
+  const HostsPerLocality& upstreamHostsPerLocality = host_set.healthyHostsPerLocality();
+  const size_t num_upstream_localities = upstreamHostsPerLocality.get().size();
   ASSERT(num_upstream_localities >= 2);
 
   // It is worth noting that all of the percentages calculated are orthogonal from
@@ -486,12 +489,16 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   //
   // Basically, fairness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
-  auto locality_percentages = calculateLocalityPercentages(localHostSet().healthyHostsPerLocality(),
-                                                           host_set.healthyHostsPerLocality());
+  const HostsPerLocality& localHostsPerLocality = localHostSet().healthyHostsPerLocality();
+  auto locality_percentages =
+      calculateLocalityPercentages(localHostsPerLocality, upstreamHostsPerLocality);
 
   // If we have lower percent of hosts in the local cluster in the same locality,
   // we can push all of the requests directly to upstream cluster in the same locality.
-  if (locality_percentages->upstream_percentage[0] >= locality_percentages->local_percentage[0]) {
+  if (upstreamHostsPerLocality.hasLocalLocality() &&
+      locality_percentages->at(0).upstream_percentage > 0 &&
+      locality_percentages->at(0).upstream_percentage >=
+          locality_percentages->at(0).local_percentage) {
     state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
     return;
   }
@@ -502,8 +509,11 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // For example, if local percentage is 20% and upstream is 10%
   // we can route only 50% of requests directly.
   // Local percent can be 0% if there are no upstream hosts in the local locality.
-  state.local_percent_to_route_ = locality_percentages->upstream_percentage[0] * 10000 /
-                                  locality_percentages->local_percentage[0];
+  state.local_percent_to_route_ = upstreamHostsPerLocality.hasLocalLocality() &&
+                                          locality_percentages->at(0).local_percentage > 0
+                                      ? locality_percentages->at(0).upstream_percentage * 10000 /
+                                            locality_percentages->at(0).local_percentage
+                                      : 0;
 
   // Local locality does not have additional capacity (we have already routed what we could).
   // Now we need to figure out how much traffic we can route cross locality and to which exact
@@ -522,32 +532,26 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // Now to find a locality to route (bucket) we could simply iterate over residual_capacity
   // searching where sampled value is placed.
   state.residual_capacity_.resize(num_upstream_localities);
-
-  auto percentage_index_it = locality_percentages->upstream_to_percentage_index.begin();
   for (uint64_t i = 0; i < num_upstream_localities; ++i) {
     uint64_t last_residual_capacity = i > 0 ? state.residual_capacity_[i - 1] : 0;
-    if (percentage_index_it->first != i) {
-      // Locality with index "i" does not have any upstream hosts, but we keep accumulating previous
-      // values to make search easier on the next step.
+    LocalityPercentages this_locality_percentages = locality_percentages->at(i);
+    if (i == 0 && upstreamHostsPerLocality.hasLocalLocality()) {
+      // This is a local locality, we have already routed what we could.
       state.residual_capacity_[i] = last_residual_capacity;
       continue;
     }
 
-    uint64_t combined_locality_index = percentage_index_it->second;
     // Only route to the localities that have additional capacity.
-    if (locality_percentages->upstream_percentage[combined_locality_index] >
-        locality_percentages->local_percentage[combined_locality_index]) {
-      state.residual_capacity_[i] =
-          last_residual_capacity +
-          locality_percentages->upstream_percentage[combined_locality_index] -
-          locality_percentages->local_percentage[combined_locality_index];
+    if (this_locality_percentages.upstream_percentage >
+        this_locality_percentages.local_percentage) {
+      state.residual_capacity_[i] = last_residual_capacity +
+                                    this_locality_percentages.upstream_percentage -
+                                    this_locality_percentages.local_percentage;
     } else {
       // Locality with index "i" does not have residual capacity, but we keep accumulating previous
       // values to make search easier on the next step.
       state.residual_capacity_[i] = last_residual_capacity;
     }
-
-    ++percentage_index_it;
   }
 }
 
@@ -631,123 +635,49 @@ bool LoadBalancerBase::isHostSetInPanic(const HostSet& host_set) const {
   return false;
 }
 
-ZoneAwareLoadBalancerBase::LocalityPercentagesPtr
+std::unique_ptr<absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>>
 ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     const HostsPerLocality& local_hosts_per_locality,
     const HostsPerLocality& upstream_hosts_per_locality) {
   uint64_t total_local_hosts = 0;
+  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> local_counts;
   for (const auto& locality_hosts : local_hosts_per_locality.get()) {
     total_local_hosts += locality_hosts.size();
+    // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
+    if (!locality_hosts.empty()) {
+      local_counts.insert(std::make_pair(locality_hosts[0]->locality(), locality_hosts.size()));
+    }
   }
   uint64_t total_upstream_hosts = 0;
   for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
     total_upstream_hosts += locality_hosts.size();
   }
 
-  std::vector<uint64_t> local_percentage;
-  std::vector<uint64_t> upstream_percentage;
-  std::map<uint64_t, uint64_t> upstream_to_percentage_index;
-
-  // Iterate through all localities in the upstream and local cluster in merged sorted order
-  // and calculate percentage of hosts in each non-empty locality.
-  //
-  // Rules in order of precedence:
-  // 1. If we are at the end of one of the locality lists, consume from the other.
-  // 2. If one of the localities is empty, consume from it (but no need to put it into the
-  // percentage list).
-  // 3. If the local locality is equal to the upstream locality, consume both.
-  // 4. Consume from the local set if the local set iterator is still at the beginning.
-  //    => Hosts in the current envoy's local locality are always in the first locality bucket in
-  //    hosts per locality.
-  //    => There is always at least one host in the local set in the current envoy's local locality.
-  //    => The current upstream locality is not empty, and not equal to the current envoy's local
-  //    locality.
-  // 5. Otherwise, consume from the list with the smaller locality at the current position.
-
-  auto local_it = local_hosts_per_locality.get().begin();
-  auto upstream_it = upstream_hosts_per_locality.get().begin();
-  uint64_t upstream_index = 0; // for upstream_to_percentage_index
-  while (local_it != local_hosts_per_locality.get().end() ||
-         upstream_it != upstream_hosts_per_locality.get().end()) {
-    bool local_at_end = local_it == local_hosts_per_locality.get().end();
-    bool upstream_at_end = upstream_it == upstream_hosts_per_locality.get().end();
-    bool is_current_local_locality = local_it == local_hosts_per_locality.get().begin();
-
-    uint64_t local_hosts_in_locality = 0;
-    uint64_t upstream_hosts_in_locality = 0;
-    // Use the first host in the list (if it exists) to determine the locality of the bucket.
-    envoy::config::core::v3::Locality local_locality;
-    envoy::config::core::v3::Locality upstream_locality;
-    if (!local_at_end) {
-      local_hosts_in_locality = local_it->size();
-      if (local_hosts_in_locality > 0) {
-        local_locality = local_it->begin()->get()->locality();
-      }
+  absl::FixedArray<LocalityPercentages> percentages(upstream_hosts_per_locality.get().size());
+  for (uint32_t i = 0; i < upstream_hosts_per_locality.get().size(); ++i) {
+    const auto& upstream_hosts = upstream_hosts_per_locality.get()[i];
+    if (upstream_hosts.empty()) {
+      // If there are no upstream hosts in a given locality, the upstream percentage is 0.
+      // We can't determine the locality of this group, so we can't find the corresponding local
+      // count. However, if there are no upstream hosts in a locality, the local percentage doesn't
+      // matter.
+      percentages[i] = LocalityPercentages{0, 0};
+      continue;
     }
-    if (!upstream_at_end) {
-      upstream_hosts_in_locality = upstream_it->size();
-      if (upstream_hosts_in_locality > 0) {
-        upstream_locality = upstream_it->begin()->get()->locality();
-      }
-    }
+    const auto& locality = upstream_hosts[0]->locality();
 
-    bool consume_local_locality = false;
-    bool consume_upstream_locality = false;
-    bool is_empty_consumption =
-        false; // indicates that nothing should be pushed into the percentage list
-    if (!local_at_end && upstream_at_end) { // Rule 1
-      consume_local_locality = true;
-    } else if (local_at_end && !upstream_at_end) { // Rule 1
-      consume_upstream_locality = true;
-    } else if (local_hosts_in_locality == 0) { // Rule 2
-      consume_local_locality = true;
-      is_empty_consumption = true;
-    } else if (upstream_hosts_in_locality == 0) { // Rule 2
-      consume_upstream_locality = true;
-      is_empty_consumption = true;
-    } else if (LocalityEqualTo()(local_locality, upstream_locality)) { // Rule 3
-      consume_local_locality = true;
-      consume_upstream_locality = true;
-    } else if (is_current_local_locality) { // Rule 4
-      consume_local_locality = true;
-    } else if (LocalityLess()(local_locality, upstream_locality)) { // Rule 5
-      consume_local_locality = true;
-    } else { // Rule 5: upstream_locality < local_locality
-      consume_upstream_locality = true;
-    }
+    const auto& local_count_it = local_counts.find(locality);
+    const uint64_t local_count = local_count_it == local_counts.end() ? 0 : local_count_it->second;
 
-    if (consume_local_locality) {
-      if (!is_empty_consumption) {
-        // Note that local_hosts_in_locality > 0 is always true, but the check is added for extra
-        // defense
-        local_percentage.emplace_back(local_hosts_in_locality > 0
-                                          ? 10000ULL * local_hosts_in_locality / total_local_hosts
-                                          : 0);
-      }
-      ++local_it;
-    } else if (!is_empty_consumption) {
-      local_percentage.emplace_back(0);
-    }
-    if (consume_upstream_locality) {
-      if (!is_empty_consumption) {
-        // Note that upstream_hosts_in_locality > 0 is always true, but the check is added for extra
-        // defense
-        upstream_percentage.emplace_back(upstream_hosts_in_locality > 0
-                                             ? 10000ULL * upstream_hosts_in_locality /
-                                                   total_upstream_hosts
-                                             : 0);
-        upstream_to_percentage_index[upstream_index] = upstream_percentage.size() - 1;
-      }
-      ++upstream_it;
-      ++upstream_index;
-    } else if (!is_empty_consumption) {
-      upstream_percentage.emplace_back(0);
-    }
+    const uint64_t local_percentage =
+        total_local_hosts > 0 ? 10000ULL * local_count / total_local_hosts : 0;
+    const uint64_t upstream_percentage =
+        total_upstream_hosts > 0 ? 10000ULL * upstream_hosts.size() / total_upstream_hosts : 0;
+
+    percentages[i] = LocalityPercentages{local_percentage, upstream_percentage};
   }
 
-  return std::make_unique<LocalityPercentages>(
-      LocalityPercentages{std::move(local_percentage), std::move(upstream_percentage),
-                          std::move(upstream_to_percentage_index)});
+  return std::make_unique<absl::FixedArray<LocalityPercentages>>(std::move(percentages));
 }
 
 uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& host_set) const {
