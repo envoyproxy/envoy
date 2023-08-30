@@ -2,6 +2,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -55,6 +57,14 @@ public:
 };
 
 } // namespace
+
+LegacyTypedMaglevLbConfig::LegacyTypedMaglevLbConfig(
+    const envoy::config::cluster::v3::Cluster::MaglevLbConfig& config)
+    : lb_config_(config) {}
+
+TypedMaglevLbConfig::TypedMaglevLbConfig(
+    const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config)
+    : lb_config_(config) {}
 
 ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr
 MaglevLoadBalancer::createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,

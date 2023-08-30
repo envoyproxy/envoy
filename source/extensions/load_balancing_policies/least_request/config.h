@@ -5,6 +5,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
 
 namespace Envoy {
@@ -27,6 +28,12 @@ struct LeastRequestCreator : public Logger::Loggable<Logger::Id::upstream> {
 class Factory : public Common::FactoryBase<LeastRequestLbProto, LeastRequestCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.least_request") {}
+
+  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+                                             ProtobufMessage::ValidationVisitor& visitor) override {
+    return std::make_unique<Upstream::TypedLeastRequestLbConfig>(
+        MessageUtil::downcastAndValidate<const LeastRequestLbProto&>(*config, visitor));
+  }
 };
 
 } // namespace LeastRequest

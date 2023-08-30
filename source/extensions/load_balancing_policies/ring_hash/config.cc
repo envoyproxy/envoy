@@ -13,24 +13,27 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                 const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
                 Random::RandomGenerator& random, TimeSource&) {
 
-  const auto* typed_lb_config =
-      dynamic_cast<const Upstream::LoadBalancerConfigWrapper*>(lb_config.ptr());
-  auto typed_proto_config = typed_lb_config == nullptr
-                                ? OptRef<const RingHashLbProto>{}
-                                : typed_lb_config->typedProtoConfig<RingHashLbProto>();
+  const auto typed_lb_config =
+      dynamic_cast<const Upstream::TypedRingHashLbConfig*>(lb_config.ptr());
+
+  const auto legacy_lb_config =
+      dynamic_cast<const Upstream::LegacyTypedRingHashLbConfig*>(lb_config.ptr());
 
   // Assume legacy config.
-  if (!typed_proto_config.has_value()) {
+  if (typed_lb_config == nullptr) {
     return std::make_unique<Upstream::RingHashLoadBalancer>(
         priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
-        cluster_info.lbRingHashConfig(), cluster_info.lbConfig());
+        legacy_lb_config == nullptr || !legacy_lb_config->lb_config_.has_value()
+            ? cluster_info.lbRingHashConfig()
+            : legacy_lb_config->lb_config_.value(),
+        cluster_info.lbConfig());
   }
 
   return std::make_unique<Upstream::RingHashLoadBalancer>(
       priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
       PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
                                                      healthy_panic_threshold, 100, 50),
-      typed_proto_config.value());
+      typed_lb_config->lb_config_);
 }
 
 /**

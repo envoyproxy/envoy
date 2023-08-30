@@ -32,6 +32,7 @@ using HostHashSet = absl::flat_hash_set<HostSharedPtr>;
 
 using SubsetLoadbalancingPolicyProto =
     envoy::extensions::load_balancing_policies::subset::v3::Subset;
+using LegacySubsetLoadbalancingPolicyProto = envoy::config::cluster::v3::Cluster::LbSubsetConfig;
 
 class ChildLoadBalancerCreator {
 public:
@@ -104,8 +105,7 @@ private:
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 
-template <class ProtoType>
-class LoadBalancerSubsetInfoImplBase : public Upstream::LoadBalancerSubsetInfo {
+class ProdLoadBalancerSubsetInfoImpl : public Upstream::LoadBalancerSubsetInfo {
 public:
   // TODO(wbpcode): use legacy enum for backward compatibility for now.
   using FallbackPolicy =
@@ -115,7 +115,25 @@ public:
   using SubsetFallbackPolicy = envoy::config::cluster::v3::Cluster::LbSubsetConfig::
       LbSubsetSelector::LbSubsetSelectorFallbackPolicy;
 
-  LoadBalancerSubsetInfoImplBase(const ProtoType& subset_config)
+  ProdLoadBalancerSubsetInfoImpl(const SubsetLoadbalancingPolicyProto& subset_config)
+      : default_subset_(subset_config.default_subset()),
+        fallback_policy_(static_cast<FallbackPolicy>(subset_config.fallback_policy())),
+        metadata_fallback_policy_(
+            static_cast<MetadataFallbackPolicy>(subset_config.metadata_fallback_policy())),
+        enabled_(!subset_config.subset_selectors().empty()),
+        locality_weight_aware_(subset_config.locality_weight_aware()),
+        scale_locality_weight_(subset_config.scale_locality_weight()),
+        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
+    for (const auto& subset : subset_config.subset_selectors()) {
+      if (!subset.keys().empty()) {
+        subset_selectors_.emplace_back(std::make_shared<Upstream::SubsetSelectorImpl>(
+            subset.keys(), static_cast<SubsetFallbackPolicy>(subset.fallback_policy()),
+            subset.fallback_keys_subset(), subset.single_host_per_subset()));
+      }
+    }
+  }
+
+  ProdLoadBalancerSubsetInfoImpl(const LegacySubsetLoadbalancingPolicyProto& subset_config)
       : default_subset_(subset_config.default_subset()),
         fallback_policy_(static_cast<FallbackPolicy>(subset_config.fallback_policy())),
         metadata_fallback_policy_(
@@ -159,6 +177,36 @@ private:
   const bool scale_locality_weight_ : 1;
   const bool panic_mode_any_ : 1;
   const bool list_as_any_ : 1;
+};
+
+class SubsetLoadBalancerConfig : public Upstream::LoadBalancerConfig {
+public:
+  SubsetLoadBalancerConfig(const SubsetLoadbalancingPolicyProto& subset_config,
+                           ProtobufMessage::ValidationVisitor& visitor);
+
+  SubsetLoadBalancerConfig(const LegacySubsetLoadbalancingPolicyProto& subset_config,
+                           Upstream::LoadBalancerConfigPtr sub_load_balancer_config,
+                           Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory)
+      : subset_info_(subset_config), sub_load_balancer_config_(std::move(sub_load_balancer_config)),
+        sub_load_balancer_factory_(sub_load_balancer_factory) {
+    ASSERT(sub_load_balancer_factory_ != nullptr, "sub_load_balancer_factory_ must not be nullptr");
+  }
+
+  Upstream::ThreadAwareLoadBalancerPtr
+  createLoadBalancer(const Upstream::ClusterInfo& cluster_info,
+                     const Upstream::PrioritySet& child_priority_set, Runtime::Loader& runtime,
+                     Random::RandomGenerator& random, TimeSource& time_source) const {
+    return sub_load_balancer_factory_->create(*sub_load_balancer_config_, cluster_info,
+                                              child_priority_set, runtime, random, time_source);
+  }
+
+  const Upstream::LoadBalancerSubsetInfo& subsetInfo() const { return subset_info_; }
+
+private:
+  ProdLoadBalancerSubsetInfoImpl subset_info_;
+
+  Upstream::LoadBalancerConfigPtr sub_load_balancer_config_;
+  Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory_{};
 };
 
 class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {

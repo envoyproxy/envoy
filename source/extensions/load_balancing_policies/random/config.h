@@ -5,6 +5,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
 
 namespace Envoy {
@@ -24,6 +25,12 @@ struct RandomCreator : public Logger::Loggable<Logger::Id::upstream> {
 class Factory : public Common::FactoryBase<RandomLbProto, RandomCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.random") {}
+
+  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+                                             ProtobufMessage::ValidationVisitor& visitor) override {
+    return std::make_unique<Upstream::TypedRandomLbConfig>(
+        MessageUtil::downcastAndValidate<const RandomLbProto&>(*config, visitor));
+  }
 };
 
 } // namespace Random

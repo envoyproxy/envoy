@@ -7,6 +7,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/upstream/load_balancer_factory_base.h"
+#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,6 +26,12 @@ public:
                                               Runtime::Loader& runtime,
                                               Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
+
+  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+                                             ProtobufMessage::ValidationVisitor& visitor) override {
+    return std::make_unique<Upstream::TypedMaglevLbConfig>(
+        MessageUtil::downcastAndValidate<const MaglevLbProto&>(*config, visitor));
+  }
 };
 
 } // namespace Maglev

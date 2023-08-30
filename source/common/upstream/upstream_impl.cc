@@ -51,7 +51,11 @@
 #include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/load_balancer_factory_base.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
+#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
+#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -875,7 +879,7 @@ ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
     Stats::Scope& scope, const ClusterRequestResponseSizeStatNames& stat_names) {
-  return ClusterRequestResponseSizeStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 ClusterLoadReportStats
@@ -983,6 +987,92 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
            : absl::nullopt),
       config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
       config.has_http2_protocol_options(), validation_visitor);
+}
+
+std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
+LBPolicyConfigConverter::getTypedLbConfigFromLegacy(
+    const envoy::config::cluster::v3::Cluster& config) {
+
+  LoadBalancerConfigPtr lb_config;
+  TypedLoadBalancerFactory* lb_factory = nullptr;
+
+  switch (config.lb_policy()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::config::cluster::v3::Cluster::ROUND_ROBIN: {
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.round_robin");
+    auto legacy_type_lb_config = std::make_unique<LegacyTypedRoundRobinLbConfig>();
+    if (config.has_round_robin_lb_config()) {
+      legacy_type_lb_config->lb_config_ = config.round_robin_lb_config();
+    }
+    lb_config = std::move(legacy_type_lb_config);
+    break;
+  }
+  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST: {
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.least_request");
+    auto legacy_type_lb_config = std::make_unique<LegacyTypedLeastRequestLbConfig>();
+    if (config.has_least_request_lb_config()) {
+      legacy_type_lb_config->lb_config_ = config.least_request_lb_config();
+    }
+    lb_config = std::move(legacy_type_lb_config);
+    break;
+  }
+  case envoy::config::cluster::v3::Cluster::RANDOM: {
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.random");
+    auto legacy_type_lb_config = std::make_unique<LegacyTypedRandomLbConfig>();
+    lb_config = std::move(legacy_type_lb_config);
+    break;
+  }
+  case envoy::config::cluster::v3::Cluster::RING_HASH: {
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.ring_hash");
+    auto legacy_type_lb_config = std::make_unique<LegacyTypedRingHashLbConfig>();
+    if (config.has_ring_hash_lb_config()) {
+      legacy_type_lb_config->lb_config_ = config.ring_hash_lb_config();
+    }
+    lb_config = std::move(legacy_type_lb_config);
+    break;
+  }
+  case envoy::config::cluster::v3::Cluster::MAGLEV: {
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.maglev");
+    auto legacy_type_lb_config = std::make_unique<LegacyTypedMaglevLbConfig>();
+    if (config.has_maglev_lb_config()) {
+      legacy_type_lb_config->lb_config_ = config.maglev_lb_config();
+    }
+    lb_config = std::move(legacy_type_lb_config);
+    break;
+  }
+  case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED: {
+    if (config.has_lb_subset_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    }
+
+    lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.cluster_provided");
+    break;
+  }
+  case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
+    PANIC("Should not reach here");
+    break;
+  }
+  }
+
+  if (config.has_lb_subset_config()) {
+    auto subset_lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.subset");
+    ASSERT(subset_lb_factory != nullptr, "subset LB factory is null");
+    auto typed_subset_lb_config = std::make_unique<SubsetLoadBalancerConfig>(
+        config.lb_subset_config(), std::move(lb_config), lb_factory);
+
+    return {std::move(typed_subset_lb_config), subset_lb_factory};
+  }
+
+  return {std::move(lb_config), lb_factory};
 }
 
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
@@ -1126,6 +1216,18 @@ ClusterInfoImpl::ClusterInfoImpl(
   // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
   if (config.has_load_balancing_policy()) {
     configureLbPolicies(config, server_context);
+  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.convert_legacy_lb_config")) {
+    auto lb_pair = LBPolicyConfigConverter::getTypedLbConfigFromLegacy(config);
+    load_balancer_config_ = std::move(lb_pair.first);
+    load_balancer_factory_ = lb_pair.second;
+    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
+
+    // Clear unnecessary legacy config because all legacy config is wrapped in load_balancer_config_
+    // except the original_dst_lb_config.
+    lb_subset_ = nullptr;
+    if (config.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+      lb_policy_config_ = nullptr;
+    }
   } else {
     switch (config.lb_policy()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;

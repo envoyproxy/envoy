@@ -7,6 +7,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/upstream/load_balancer_factory_base.h"
+#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,6 +26,12 @@ public:
                                               Runtime::Loader& runtime,
                                               Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
+
+  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+                                             ProtobufMessage::ValidationVisitor& visitor) override {
+    return std::make_unique<Upstream::TypedRingHashLbConfig>(
+        MessageUtil::downcastAndValidate<const RingHashLbProto&>(*config, visitor));
+  }
 };
 
 } // namespace RingHash

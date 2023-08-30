@@ -426,6 +426,8 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/server:transport_socket_config_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:ring_hash_lb_lib",
+        "//source/extensions/load_balancing_policies/maglev:maglev_lb_lib",
     ],
 )
 

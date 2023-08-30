@@ -17,16 +17,29 @@ Upstream::LoadBalancerPtr RoundRobinCreator::operator()(
   const auto typed_lb_config =
       dynamic_cast<const Upstream::TypedRoundRobinLbConfig*>(lb_config.ptr());
 
+  const auto legacy_lb_config =
+      dynamic_cast<const Upstream::LegacyTypedRoundRobinLbConfig*>(lb_config.ptr());
+
   // The load balancing policy configuration will be loaded and validated in the main thread when we
   // load the cluster configuration. So we can assume the configuration is valid here.
-  ASSERT(typed_lb_config != nullptr,
+  ASSERT(typed_lb_config != nullptr || legacy_lb_config != nullptr,
          "Invalid load balancing policy configuration for least request load balancer");
 
-  return std::make_unique<Upstream::RoundRobinLoadBalancer>(
-      params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
-      PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
-                                                     healthy_panic_threshold, 100, 50),
-      makeOptRefFromPtr(typed_lb_config), time_source);
+  if (typed_lb_config != nullptr) {
+    return std::make_unique<Upstream::RoundRobinLoadBalancer>(
+        params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
+        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
+                                                       healthy_panic_threshold, 100, 50),
+        typed_lb_config->lb_config_, time_source);
+  } else {
+    return std::make_unique<Upstream::RoundRobinLoadBalancer>(
+        params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
+        cluster_info.lbConfig(),
+        legacy_lb_config->lb_config_.has_value()
+            ? legacy_lb_config->lb_config_.value()
+            : OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>{},
+        time_source);
+  }
 }
 
 /**

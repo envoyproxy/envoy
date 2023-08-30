@@ -7,13 +7,34 @@
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/bit_array.h"
 #include "source/common/upstream/thread_aware_lb_impl.h"
-#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
+
+/**
+ * Load balancer config that used to wrap legacy maglev config.
+ */
+class LegacyTypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  LegacyTypedMaglevLbConfig(const envoy::config::cluster::v3::Cluster::MaglevLbConfig& config);
+  LegacyTypedMaglevLbConfig() = default;
+
+  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_config_;
+};
+
+/**
+ * Load balancer config that used to wrap typed maglev config.
+ */
+class TypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  TypedMaglevLbConfig(const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config);
+
+  const envoy::extensions::load_balancing_policies::maglev::v3::Maglev lb_config_;
+};
 
 /**
  * All Maglev load balancer stats. @see stats_macros.h

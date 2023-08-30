@@ -30,7 +30,7 @@ public:
 
   Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
                                              ProtobufMessage::ValidationVisitor& visitor) override {
-    return std::make_unique<Envoy::Upstream::TypedRoundRobinLbConfig>(
+    return std::make_unique<Upstream::TypedRoundRobinLbConfig>(
         MessageUtil::downcastAndValidate<const RoundRobinLbProto&>(*config, visitor));
   }
 };
