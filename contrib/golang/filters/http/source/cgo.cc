@@ -268,6 +268,15 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value
                                      });
 }
 
+CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key, void* value, int* rc) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key, value, rc](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto key_str = referGoString(key);
+        auto value_str = reinterpret_cast<GoString*>(value);
+        return filter->getStringProperty(key_str, value_str, rc);
+      });
+}
+
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name,
                                          void* metric_id) {
   return envoyGoConfigHandlerWrapper(
