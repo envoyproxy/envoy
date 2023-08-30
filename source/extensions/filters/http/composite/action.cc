@@ -21,14 +21,14 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
         context.server_factory_context_.value();
     std::cout << "creating singleton manager and provider" << std::endl;
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
-    filter_config_provider_manager_ =
+    std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
             server_factory_context);
     std::cout << "created filter config provider manager" << std::endl;
-    if (filter_config_provider_manager_ == nullptr) {
+    if (filter_config_provider_manager == nullptr) {
       throw EnvoyException("Failed to create filter config provider manager");
     }
-    provider_ = filter_config_provider_manager_->createDynamicFilterConfigProvider(
+    provider_ = filter_config_provider_manager->createDynamicFilterConfigProvider(
         config_discovery, composite_action.dynamic_config().name(), server_factory_context,
         factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
     std::cout << "created dynamic filter config provider" << std::endl;
