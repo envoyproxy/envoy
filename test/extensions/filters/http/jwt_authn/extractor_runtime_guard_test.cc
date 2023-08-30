@@ -45,18 +45,17 @@ public:
 // chars_after_space expected to get all token include characters after the space:
 TEST_F(ExtractorRuntimeGuardTest,
        TestDefaultHeaderLocationWithValidJWTEndedWithSpaceAndMoreCharachters) {
-    std::string chars_after_space = "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj";
-    std::string concatenated = std::string(GoodToken) + " ." + chars_after_space;
-    const char* valid_token_with_space_and_chars = concatenated.c_str();
+  std::string chars_after_space = "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj";
+  std::string concatenated = std::string(GoodToken) + " ." + chars_after_space;
+  const char* valid_token_with_space_and_chars = concatenated.c_str();
+  auto headers = TestRequestHeaderMapImpl{
+      {absl::StrCat("Authorization"), absl::StrCat("Bearer ", valid_token_with_space_and_chars)}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
 
-    auto headers = TestRequestHeaderMapImpl{
-            {absl::StrCat("Authorization"), absl::StrCat("Bearer ", valid_token_with_space_and_chars)}};
-    auto tokens = extractor_->extract(headers);
-    EXPECT_EQ(tokens.size(), 1);
-
-    // Only the issue1 is using default header location.
-    EXPECT_EQ(tokens[0]->token(), std::string(GoodToken));
-    EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+  // Only the issue1 is using default header location.
+  EXPECT_EQ(tokens[0]->token(), std::string(GoodToken));
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
 }
 
 } // namespace
