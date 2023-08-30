@@ -202,6 +202,7 @@ open class EngineBuilder(
   internal var enableHttp3 = true
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
+  private var quicHints = mutableMapOf<String, Int>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -710,6 +711,19 @@ open class EngineBuilder(
   }
 
   /**
+   * Add a host port pair that's known to speak QUIC.
+   *
+   * @param host the host's name.
+   * @param port the port number.
+   *
+   * @return This builder.
+   */
+   fun addQuicHint(host: String, port: Int): EngineBuilder {
+    this.quicHints.put(host, port)
+    return this
+   }
+
+  /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
    * @return A new instance of Envoy.
@@ -731,6 +745,7 @@ open class EngineBuilder(
       enableHttp3,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
+      quicHints,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
