@@ -14,6 +14,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_authz
+  change: |
+    removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.
@@ -23,6 +26,11 @@ minor_behavior_changes:
   change: |
     Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header`` to false.
+- area: router
+  change: |
+    Enable copying response_code from the upstream stream_info onto the downstream stream_info.
+    This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -44,6 +52,13 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: aws signer
+  change: |
+    fixed a bug where expiration timestamp on task roles failed to validate. This causes failure of credential caching which
+    results in constant hits to the task role metadata URL.
+- area: router check tool
+  change: |
+    Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -59,6 +74,9 @@ removed_config_or_runtime:
 - area: dns
   change: |
     Removed ``envoy.restart_features.use_apple_api_for_dns_lookups`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
 
 - area: quic
   change: |
@@ -100,6 +118,10 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: upstream
+  change: |
+    added :ref:`allow_redundant_keys <envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.allow_redundant_keys>`
+    to suppport redundant keys in request metadata for subset load balancing.
 - area: access_logs
   change: |
     added :ref:`json_format_options <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format_options>` config option to
@@ -109,6 +131,10 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: tap
+  change: |
+    added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
+    to control writing request and response headers received time in trace output.
 
 - area: upstream
   change: |
