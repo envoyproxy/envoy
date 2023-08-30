@@ -254,7 +254,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(",foo,bar", request_.attributes().request().http().headers().at("x-duplicate-header"));
-
+  EXPECT_EQ("foo", request_.attributes().request().http().headers().at("x-normal-header"));
   EXPECT_EQ("", request_.attributes().request().http().headers().at("x-empty-header"));
   EXPECT_TRUE(request_.attributes().request().has_time());
 }
