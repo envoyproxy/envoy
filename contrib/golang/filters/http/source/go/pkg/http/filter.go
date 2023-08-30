@@ -130,10 +130,6 @@ func (r *httpRequest) LogLevel() api.LogType {
 	return cAPI.HttpLogLevel()
 }
 
-func (r *httpRequest) GetProperty(key string) (string, error) {
-	return cAPI.HttpGetStringProperty(unsafe.Pointer(r), key)
-}
-
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &streamInfo{
 		request: r,
