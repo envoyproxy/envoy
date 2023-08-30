@@ -429,8 +429,8 @@ std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& 
 
   const auto& all_data = state.consolidateStreamedChunks();
   ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
-            state.getQueueData().length(), all_data.end_stream);
-  sendBodyChunk(state, state.getQueueData(),
+            state.chunkQueue().receivedData().length(), all_data.end_stream);
+  sendBodyChunk(state, state.chunkQueue().receivedData(),
                 ProcessorState::CallbackState::BufferedPartialBodyCallback, all_data.end_stream);
   state.setPaused(true);
   return {false, FilterDataStatus::StopIterationNoBuffer};

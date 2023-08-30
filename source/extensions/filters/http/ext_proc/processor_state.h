@@ -142,7 +142,7 @@ public:
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
   virtual uint32_t bufferLimit() const PURE;
 
-  Buffer::OwnedImpl& getQueueData() { return chunk_queue_.receivedData(); }
+  ChunkQueue& chunkQueue() { return chunk_queue_; }
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream, bool delivered);
   // If the queue has chunks, return the head of the queue.
@@ -209,11 +209,7 @@ protected:
   // Flag to track whether Envoy already received the new timeout message.
   // Envoy should receive at most one such message in one particular state.
   bool new_timeout_received_{false};
-
-  // The queue which store the received data chunks in order. It keeps the logical
-  // offset/size information of the chunk.
   ChunkQueue chunk_queue_;
-
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
 

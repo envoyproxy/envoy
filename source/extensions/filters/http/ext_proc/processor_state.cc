@@ -180,8 +180,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           ENVOY_LOG(
               debug,
               "Sending {} bytes of data end_stream {} in buffered partial mode before end stream",
-              getQueueData().length(), all_data.end_stream);
-          filter_.sendBodyChunk(*this, getQueueData(),
+              chunkQueue().receivedData().length(), all_data.end_stream);
+          filter_.sendBodyChunk(*this, chunkQueue().receivedData(),
                                 ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
         } else {
           // Let data continue to flow, but don't resume yet -- we would like to hold
