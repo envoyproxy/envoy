@@ -58,7 +58,7 @@ using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
 using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 
 /**
- * Interface for non-HTTP access log filters.
+ * Templated interface for access log filters.
  */
 template <class Context> class FilterBase {
 public:
@@ -72,6 +72,11 @@ public:
 };
 template <class Context> using FilterBasePtr = std::unique_ptr<FilterBase<Context>>;
 
+/**
+ * Templated interface for access log instances.
+ * TODO(wbpcode): refactor existing access log instances and related other interfaces to use this
+ * interface. See https://github.com/envoyproxy/envoy/issues/28773.
+ */
 template <class Context> class InstanceBase {
 public:
   virtual ~InstanceBase() = default;
