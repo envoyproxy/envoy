@@ -32,7 +32,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
         throw EnvoyException("Failed to get dynamic config for filter");
       }
       auto factory_cb = config_value.value().get().factory_cb;
-      return std::make_unique<ExecuteFilterAction>(factory_cb);
+      return std::make_unique<ExecuteFilterAction>(std::move(factory_cb));
     };
   } else {
     // Static filter configuration.
