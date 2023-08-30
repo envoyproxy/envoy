@@ -201,7 +201,7 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     return absl::nullopt;
   }
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   std::string value;
   const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
   if (!status.ok()) {
@@ -1245,8 +1245,11 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return std::make_unique<StreamInfoStringFormatterProvider>(
                   [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-                    if (!stream_info.filterChainName().empty()) {
-                      return stream_info.filterChainName();
+                    if (const auto info = stream_info.downstreamAddressProvider().filterChainInfo();
+                        info.has_value()) {
+                      if (!info->name().empty()) {
+                        return std::string(info->name());
+                      }
                     }
                     return absl::nullopt;
                   });

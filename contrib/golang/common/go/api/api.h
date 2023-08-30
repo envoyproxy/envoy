@@ -83,10 +83,11 @@ CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value
                                                  int life_span, int stream_sharing);
 CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value);
 
-CAPIStatus envoyGoFilterHttpDefineMetric(void* r, uint32_t metric_type, void* name,
+CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name,
                                          void* metric_id);
-CAPIStatus envoyGoFilterHttpIncrementMetric(void* r, uint32_t metric_id, int64_t offset);
-CAPIStatus envoyGoFilterHttpGetMetric(void* r, uint32_t metric_id, void* value);
+CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset);
+CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value);
+CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value);
 
 // downstream
 CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int closeType);
