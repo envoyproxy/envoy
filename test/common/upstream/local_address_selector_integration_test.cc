@@ -1,6 +1,7 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "test/common/upstream/test_local_address_selector.h"
@@ -98,17 +99,38 @@ TEST_P(HttpProtocolIntegrationTest, BindConfigOverride) {
 
   // Set up custom local address selector factory
   std::shared_ptr<size_t> num_calls = std::make_shared<size_t>(0);
-  TestUpstreamLocalAddressSelectorFactory factory(num_calls, true);
+  TestUpstreamLocalAddressSelectorFactory factory(num_calls, false);
   Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> registration(factory);
   setUpstreamCount(2);
+  uint32_t const port_value_0 = 1234;
+  uint32_t const port_value_1 = 12345;
 
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this, port_value_0 = port_value_0, port_value_1 = port_value_1](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Specify bind config on the bootstrap with default address selector.
+    auto bootstrap_bind_config =
+        bootstrap.mutable_cluster_manager()->mutable_upstream_bind_config();
+    bootstrap_bind_config->mutable_source_address()->set_address("127.0.0.1");
+    bootstrap_bind_config->mutable_source_address()->set_port_value(port_value_0);
+    auto bootstrap_extra_source_address = bootstrap_bind_config->add_extra_source_addresses();
+    bootstrap_extra_source_address->mutable_address()->set_address("::1");
+    bootstrap_extra_source_address->mutable_address()->set_port_value(port_value_0);
+    auto bootstrap_address_selector_config =
+        bootstrap_bind_config->mutable_local_address_selector();
+    envoy::config::upstream::local_address_selector::v3::DefaultLocalAddressSelector config;
+    bootstrap_address_selector_config->mutable_typed_config()->PackFrom(config);
+    bootstrap_address_selector_config->set_name(
+        "envoy.upstream.local_address_selector.default_local_address_selector");
+
     // Specify a cluster with bind config.
     bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
         *bootstrap.mutable_static_resources()->mutable_clusters(0));
     bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
     auto bind_config =
         bootstrap.mutable_static_resources()->mutable_clusters(1)->mutable_upstream_bind_config();
+    bind_config->mutable_source_address()->set_address(
+        version_ == Network::Address::IpVersion::v4 ? "127.0.0.2" : "::1");
+    bind_config->mutable_source_address()->set_port_value(port_value_1);
     ProtobufWkt::Empty empty;
     auto address_selector_config = bind_config->mutable_local_address_selector();
     address_selector_config->mutable_typed_config()->PackFrom(empty);
@@ -141,6 +163,24 @@ TEST_P(HttpProtocolIntegrationTest, BindConfigOverride) {
   auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
   waitForNextUpstreamRequest();
 
+  std::string address_string;
+  if (version_ == Network::Address::IpVersion::v4) {
+    address_string = "127.0.0.1";
+  } else {
+    address_string = "::1";
+  }
+  std::string address_cluster0 = fake_upstream_connection_->connection()
+                                     .connectionInfoProvider()
+                                     .remoteAddress()
+                                     ->ip()
+                                     ->addressAsString();
+  size_t port_value_cluster0 = fake_upstream_connection_->connection()
+                                   .connectionInfoProvider()
+                                   .remoteAddress()
+                                   ->ip()
+                                   ->port();
+  EXPECT_EQ(address_cluster0, address_string);
+  EXPECT_EQ(port_value_cluster0, port_value_0);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -168,6 +208,23 @@ TEST_P(HttpProtocolIntegrationTest, BindConfigOverride) {
   response = codec_client_->makeRequestWithBody(request_headers2, 1024);
   waitForNextUpstreamRequest(1);
 
+  if (version_ == Network::Address::IpVersion::v4) {
+    address_string = "127.0.0.2";
+  } else {
+    address_string = "::1";
+  }
+  std::string address_cluster1 = fake_upstream_connection_->connection()
+                                     .connectionInfoProvider()
+                                     .remoteAddress()
+                                     ->ip()
+                                     ->addressAsString();
+  size_t port_value_cluster1 = fake_upstream_connection_->connection()
+                                   .connectionInfoProvider()
+                                   .remoteAddress()
+                                   ->ip()
+                                   ->port();
+  EXPECT_EQ(address_cluster1, address_string);
+  EXPECT_EQ(port_value_cluster1, port_value_1);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
   ASSERT_TRUE(response->waitForEndStream());

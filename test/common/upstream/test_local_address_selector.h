@@ -12,7 +12,7 @@ class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:
   TestUpstreamLocalAddressSelector(
       std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
-      std::shared_ptr<size_t> num_calls, bool return_empty_source_address)
+      std::shared_ptr<size_t> num_calls, bool return_empty_source_address = false)
       : upstream_local_addresses_{std::move(upstream_local_addresses)}, num_calls_{num_calls},
         return_empty_source_address_{return_empty_source_address} {}
 
