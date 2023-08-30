@@ -27,6 +27,9 @@ class ExecuteFilterActionFactory
     : public Logger::Loggable<Logger::Id::filter>,
       public Matcher::ActionFactory<Http::Matching::HttpFilterActionContext> {
 public:
+  ~ExecuteFilterActionFactory() {
+    std::cout << "execute action factory destructo called..." << std::endl;
+  }
   std::string name() const override { return "composite-action"; }
 
   Matcher::ActionFactoryCb
@@ -42,6 +45,7 @@ private:
   std::unique_ptr<
       Envoy::Filter::DynamicFilterConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>
       provider_;
+  std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager_;
 };
 
 DECLARE_FACTORY(ExecuteFilterActionFactory);

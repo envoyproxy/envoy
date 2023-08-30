@@ -19,11 +19,12 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     auto config_discovery = composite_action.dynamic_config().config_discovery();
     Server::Configuration::ServerFactoryContext& server_factory_context =
         context.server_factory_context_.value();
+    std::cout << "creating singleton manager and provider" << std::endl;
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
-    std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
+    filter_config_provider_manager_ =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
             server_factory_context);
-    provider_ = filter_config_provider_manager->createDynamicFilterConfigProvider(
+    provider_ = filter_config_provider_manager_->createDynamicFilterConfigProvider(
         config_discovery, composite_action.dynamic_config().name(), server_factory_context,
         factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
     return [this]() -> Matcher::ActionPtr {
