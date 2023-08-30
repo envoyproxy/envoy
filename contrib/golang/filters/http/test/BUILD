@@ -57,6 +57,7 @@ envoy_cc_test(
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",
         "//contrib/golang/filters/http/test/test_data/metric:filter.so",
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
+        "//contrib/golang/filters/http/test/test_data/property:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
