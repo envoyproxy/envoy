@@ -231,7 +231,7 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     if (!status.ok()) {
       // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
       // TODO(lizan): add support of unknown Any.
-        return absl::nullopt;
+      return absl::nullopt;
     }
 
     SubstitutionFormatUtils::truncate(value, max_length_);
