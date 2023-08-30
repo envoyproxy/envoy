@@ -1,6 +1,7 @@
 package org.chromium.net.impl;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,26 +24,38 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 final class CronvoyLogger implements EnvoyLogger {
   private int mFilesize = 0;
   private String mFileName = null;
+  private FileWriter mWriter = null;
   static final String LOG_TAG = CronvoyUrlRequestContext.class.getSimpleName();
 
   public CronvoyLogger() {}
 
-  public void stopLogging() { mFileName = null; }
+  public void stopLogging() {
+    mFileName = null;
+    try {
+      if (mWriter != null) {
+        mWriter.close();
+      }
+    } catch (IOException e) {
+      android.util.Log.e(LOG_TAG, "Failed to stop logging", e);
+    }
+    mWriter = null;
+  }
 
   @Override
   public void log(String str) {
-    if (mFileName != null) {
+    if (mWriter != null) {
       try {
         Path path = Paths.get(mFileName);
         // For now, just delete the file if it gets overlarge.
         // If we need to we can copy the first half.
-        if (Files.size(path) > mFilesize) {
+        if (mFilesize > 0 && Files.size(path) > mFilesize) {
           File file = new File(mFileName);
           file.delete();
           file.createNewFile();
+          mWriter = new FileWriter(file, true);
         }
-
-        Files.write(path, str.getBytes());
+        mWriter.write(str);
+        mWriter.flush();
       } catch (IOException e) {
         android.util.Log.e(LOG_TAG, "Failed to log message", e);
       }
@@ -55,6 +68,7 @@ final class CronvoyLogger implements EnvoyLogger {
       mFileName = fileName;
       File file = new File(mFileName);
       file.createNewFile();
+      mWriter = new FileWriter(file, true);
     } catch (IOException e) {
       android.util.Log.e(LOG_TAG, "Failed to start logging", e);
     }
@@ -63,13 +77,13 @@ final class CronvoyLogger implements EnvoyLogger {
   public void setNetLogToDisk(String dirPath, int maxSize) {
     try {
       mFilesize = maxSize;
-      mFileName = dirPath;
+      // This is the default Cronet logfile name.
+      mFileName = dirPath + "/netlog.json";
+      File directory = new File(dirPath);
+      directory.mkdirs();
       File file = new File(mFileName);
-      File directory = file.getParentFile();
-      if (directory != null) {
-        directory.mkdirs();
-      }
       file.createNewFile();
+      mWriter = new FileWriter(file, true);
     } catch (IOException e) {
       android.util.Log.e(LOG_TAG, "Failed to start logging", e);
     }

@@ -48,6 +48,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
   private final Object mLock = new Object();
   private final ConditionVariable mInitCompleted = new ConditionVariable(false);
   private final AtomicInteger mActiveRequestCount = new AtomicInteger(0);
+  private EnvoyEngine.LogLevel mLogLevel = EnvoyEngine.LogLevel.OFF;
 
   @GuardedBy("mLock") private EnvoyEngine mEngine;
   /**
@@ -87,6 +88,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
         builder.threadPriority(THREAD_PRIORITY_BACKGROUND + THREAD_PRIORITY_MORE_FAVORABLE);
     mUserAgent = builder.getUserAgent();
     synchronized (mLock) {
+
       mEngine = builder.createEngine(() -> {
         mNetworkThread = Thread.currentThread();
         android.os.Process.setThreadPriority(threadPriority);
@@ -97,8 +99,9 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
           taskToExecuteWhenInitializationIsCompleted.run();
         }
         return null;
-      }, mCronvoyLogger);
+      }, mCronvoyLogger, mLogLevel.toString().toLowerCase());
     }
+    mInitCompleted.block();
   }
 
   public EnvoyEngine getEnvoyEngine() {
@@ -202,9 +205,12 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
     synchronized (mLock) {
       // Turn up logging
       if (logAll) {
-        mEngine.setLogLevel(EnvoyEngine.LogLevel.TRACE);
+        mLogLevel = EnvoyEngine.LogLevel.TRACE;
       } else {
-        mEngine.setLogLevel(EnvoyEngine.LogLevel.DEBUG);
+        mLogLevel = EnvoyEngine.LogLevel.DEBUG;
+      }
+      if (mEngine != null) {
+        mEngine.setLogLevel(mLogLevel);
       }
     }
   }
@@ -215,9 +221,12 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
     synchronized (mLock) {
       // Turn up logging
       if (logAll) {
-        mEngine.setLogLevel(EnvoyEngine.LogLevel.TRACE);
+        mLogLevel = EnvoyEngine.LogLevel.TRACE;
       } else {
-        mEngine.setLogLevel(EnvoyEngine.LogLevel.DEBUG);
+        mLogLevel = EnvoyEngine.LogLevel.DEBUG;
+      }
+      if (mEngine != null) {
+        mEngine.setLogLevel(mLogLevel);
       }
     }
   }
@@ -225,6 +234,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
   @Override
   public void stopNetLog() {
     synchronized (mLock) {
+      mLogLevel = EnvoyEngine.LogLevel.OFF;
       if (mEngine != null) {
         mEngine.setLogLevel(EnvoyEngine.LogLevel.OFF);
       }

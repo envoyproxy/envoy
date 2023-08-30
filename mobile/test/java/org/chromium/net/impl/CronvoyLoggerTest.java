@@ -39,11 +39,10 @@ public class CronvoyLoggerTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testBasicLogToFile() throws Exception {
-    File file = File.createTempFile("some-prefix", "some-ext");
+    File file = File.createTempFile("some-prefix", "file-ext");
     file.deleteOnExit();
     String filename = file.getAbsolutePath() + "foo"; // Pick a path that doesn't exist.
     CronvoyLogger logger = new CronvoyLogger();
-    System.out.println(file.getAbsolutePath());
     logger.setNetLogToFile(filename);
     logger.log("hello");
     logger.stopLogging();
@@ -57,16 +56,15 @@ public class CronvoyLoggerTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testBasicLogToDisk() throws Exception {
-    File file = File.createTempFile("some-prefix", "some-ext");
+    File file = File.createTempFile("some-prefix", "basic-ext");
     file.deleteOnExit();
     String filename = file.getAbsolutePath() + "bar/foo"; // Pick a directory that doesn't exist.
     CronvoyLogger logger = new CronvoyLogger();
-    System.out.println(file.getAbsolutePath());
     logger.setNetLogToDisk(filename, 5000);
     logger.log("hello");
     logger.stopLogging();
     char[] buffer = new char[5000];
-    byte[] bytes = Files.readAllBytes(Paths.get(filename));
+    byte[] bytes = Files.readAllBytes(Paths.get(filename + "/netlog.json"));
     String fileContent = new String(bytes);
     assertEquals(fileContent, "hello");
   }
@@ -75,17 +73,16 @@ public class CronvoyLoggerTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testLogToDiskWithLimits() throws Exception {
-    File file = File.createTempFile("some-prefix", "some-ext");
+    File file = File.createTempFile("some-prefix", "limits-ext");
     file.deleteOnExit();
-    String filename = file.getAbsolutePath();
+    String filename = file.getAbsolutePath() + "bar";
     CronvoyLogger logger = new CronvoyLogger();
-    System.out.println(file.getAbsolutePath());
     logger.setNetLogToDisk(filename, 5);
-    logger.log("hello");
+    logger.log("hello!");
     logger.log("goodbye");
     logger.stopLogging();
     char[] buffer = new char[5000];
-    byte[] bytes = Files.readAllBytes(Paths.get(filename));
+    byte[] bytes = Files.readAllBytes(Paths.get(filename + "/netlog.json"));
     String fileContent = new String(bytes);
     assertEquals("goodbye", fileContent);
   }
