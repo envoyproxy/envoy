@@ -369,6 +369,7 @@ public:
    */
   static std::string uniqueFilename(absl::string_view prefix = "");
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two protos of the same type for equality.
    *
@@ -410,6 +411,7 @@ public:
            lhs.version() == rhs.version() && lhs.hasResource() == rhs.hasResource() &&
            (!lhs.hasResource() || protoEqual(lhs.resource(), rhs.resource()));
   }
+#endif
 
   /**
    * Symmetrically pad a string with '=' out to a desired length.
@@ -438,6 +440,7 @@ public:
   static std::vector<std::string> split(const std::string& source, const std::string& split,
                                         bool keep_empty_string = false);
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two RepeatedPtrFields of the same type for equality.
    *
@@ -502,6 +505,7 @@ public:
 
     return AssertionSuccess();
   }
+#endif
 
   /**
    * Returns a "novel" IPv4 loopback address, if available.
@@ -1227,6 +1231,7 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   return equal;
 }
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 MATCHER_P(ProtoEq, expected, "") {
   const bool equal =
       TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/false);
@@ -1322,6 +1327,8 @@ MATCHER_P(Percent, rhs, "") {
   expected.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
+
+#endif
 
 #ifdef ENVOY_ENABLE_YAML
 MATCHER_P(JsonStringEq, expected, "") {

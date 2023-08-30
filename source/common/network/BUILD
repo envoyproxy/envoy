@@ -467,6 +467,7 @@ envoy_cc_library(
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
         "//envoy/common:hashable_interface",
+        "//envoy/common:optref_lib",
         "//envoy/network:proxy_protocol_options_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/stream_info:filter_state_interface",
@@ -491,7 +492,9 @@ envoy_cc_library(
     srcs = ["filter_state_dst_address.cc"],
     hdrs = ["filter_state_dst_address.h"],
     deps = [
+        ":utility_lib",
         "//envoy/network:address_interface",
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],

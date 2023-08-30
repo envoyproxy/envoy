@@ -250,6 +250,9 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
   quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
   configQuicInitialFlowControlWindow(config, quic_config);
+  quic_config.SetConnectionOptionsToSend(quic::ParseQuicTagVector(config.connection_options()));
+  quic_config.SetClientConnectionOptions(
+      quic::ParseQuicTagVector(config.client_connection_options()));
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,

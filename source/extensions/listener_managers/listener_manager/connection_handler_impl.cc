@@ -245,7 +245,7 @@ void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
   if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
     iter->second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
       if (listener.listener() != nullptr) {
-        listener.shutdownListener();
+        listener.shutdownListener({});
       }
     });
   }
@@ -255,7 +255,7 @@ void ConnectionHandlerImpl::stopListeners() {
   for (auto& iter : listener_map_by_tag_) {
     iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
       if (listener.listener() != nullptr) {
-        listener.shutdownListener();
+        listener.shutdownListener({});
       }
     });
   }

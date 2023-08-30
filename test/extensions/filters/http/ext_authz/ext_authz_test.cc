@@ -2271,6 +2271,14 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {
   queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
 
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithRepeatedUnmodifiedQueryParameters) {
+  const std::string original_path{"/users?leave-me=alone&leave-me=in-peace"};
+  const std::string expected_path{"/users?leave-me=alone&leave-me=in-peace"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{"remove-me"};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithAddedQueryParameters) {
   const std::string original_path{"/users"};
   const std::string expected_path{"/users?add-me=123"};

@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:context_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

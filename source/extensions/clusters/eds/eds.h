@@ -5,6 +5,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/config/subscription.h"
@@ -29,10 +30,12 @@ namespace Upstream {
  */
 class EdsClusterImpl
     : public BaseDynamicClusterImpl,
-      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
+      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>,
+      private Config::EdsResourceRemovalCallback {
 public:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                  ClusterFactoryContext& cluster_context);
+  virtual ~EdsClusterImpl();
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
@@ -60,6 +63,12 @@ private:
     const std::string& name = info_->edsServiceName();
     return !name.empty() ? name : info_->name();
   }
+
+  // Updates the internal data structures with a given cluster load assignment.
+  void update(const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
+
+  // EdsResourceRemovalCallback
+  void onCachedResourceRemoved(absl::string_view resource_name) override;
 
   // ClusterImplBase
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
@@ -106,6 +115,13 @@ private:
   // relevant parts of the config for each locality. Note that this field must
   // be set when LEDS is used.
   std::unique_ptr<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
+
+  // An optional cache for the EDS resources.
+  // Upon a (warming) timeout, a cached resource will be used.
+  Config::EdsResourcesCacheOptRef eds_resources_cache_;
+
+  // Tracks whether a cached resource is used as the current EDS resource.
+  bool using_cached_resource_{false};
 };
 
 using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;

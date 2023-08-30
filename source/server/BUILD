@@ -512,6 +512,7 @@ envoy_cc_library(
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/init:manager_interface",
         "//envoy/server:options_interface",
         "//source/common/common:assert_lib",

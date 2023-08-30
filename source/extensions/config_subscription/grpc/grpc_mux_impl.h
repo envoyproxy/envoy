@@ -26,6 +26,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_stream.h"
 
 #include "absl/container/node_hash_map.h"
@@ -40,13 +41,7 @@ class GrpcMuxImpl : public GrpcMux,
                     public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
-              Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-              BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
-              XdsResourcesDelegateOptRef xds_resources_delegate,
-              EdsResourcesCachePtr eds_resources_cache, const std::string& target_xds_authority);
+  GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
 
   ~GrpcMuxImpl() override;
 

@@ -1091,6 +1091,22 @@ value:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithErrorContent) {
+  envoy::test::Sensitive actual;
+  TestUtility::loadFromYaml(R"EOF(
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    # The target field is string but value here is int.
+    insensitive_string: 123
+    # The target field is int but value here is string.
+    insensitive_int: "abc"
+)EOF",
+                            actual);
+
+  EXPECT_NO_THROW(MessageUtil::redact(actual));
+}
+
 TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypeUrlTypedStruct) {
   TypeParam actual;
   TypeParam expected = actual;

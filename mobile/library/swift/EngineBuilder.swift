@@ -19,6 +19,8 @@ open class XdsBuilder: NSObject {
 
   let xdsServerAddress: String
   let xdsServerPort: UInt32
+  var authHeader: String?
+  var authToken: String?
   var jwtToken: String?
   var jwtTokenLifetimeInSeconds: UInt32 = XdsBuilder.defaultJwtTokenLifetimeInSeconds
   var sslRootCerts: String?
@@ -36,6 +38,22 @@ open class XdsBuilder: NSObject {
   public init(xdsServerAddress: String, xdsServerPort: UInt32) {
     self.xdsServerAddress = xdsServerAddress
     self.xdsServerPort = xdsServerPort
+  }
+
+  /// Sets the authentication HTTP header and token value for authentication with the xDS
+  /// management server.
+  ///
+  /// - parameter header: The HTTP authentication header.
+  /// - parameter token:  The authentication token to be sent in the header.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setAuthenticationToken(
+    header: String,
+    token: String) -> Self {
+    self.authHeader = header
+    self.authToken = token
+    return self
   }
 
   /// Sets JWT as the authentication method to the xDS management server, using the given token.
@@ -164,6 +182,7 @@ open class EngineBuilder: NSObject {
 #else
   private var enableHttp3: Bool = false
 #endif
+  private var quicHints: [String: Int] = [:]
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -370,6 +389,19 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Add a host port pair that's known to support QUIC.
+  ///
+  /// - parameter host: the string representation of the host name
+  /// - parameter port: the host's port number
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addQuicHint(_ host: String, _ port: Int) -> Self {
+    self.quicHints[host] = port
+    return self
+  }
+#endif
+
   /// Add an interval at which to flush Envoy stats.
   ///
   /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
@@ -380,7 +412,6 @@ open class EngineBuilder: NSObject {
     self.statsFlushSeconds = statsFlushSeconds
     return self
   }
-#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -754,6 +785,8 @@ open class EngineBuilder: NSObject {
   func makeConfig() -> EnvoyConfiguration {
     var xdsServerAddress: String?
     var xdsServerPort: UInt32 = 0
+    var xdsAuthHeader: String?
+    var xdsAuthToken: String?
     var xdsJwtToken: String?
     var xdsJwtTokenLifetimeSeconds: UInt32 = 0
     var xdsSslRootCerts: String?
@@ -767,6 +800,8 @@ open class EngineBuilder: NSObject {
 #if ENVOY_GOOGLE_GRPC
     xdsServerAddress = self.xdsBuilder?.xdsServerAddress
     xdsServerPort = self.xdsBuilder?.xdsServerPort ?? 0
+    xdsAuthHeader = self.xdsBuilder?.authHeader
+    xdsAuthToken = self.xdsBuilder?.authToken
     xdsJwtToken = self.xdsBuilder?.jwtToken
     xdsJwtTokenLifetimeSeconds = self.xdsBuilder?.jwtTokenLifetimeInSeconds ?? 0
     xdsSslRootCerts = self.xdsBuilder?.sslRootCerts
@@ -790,6 +825,7 @@ open class EngineBuilder: NSObject {
       enableDNSCache: self.enableDNSCache,
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHttp3: self.enableHttp3,
+      quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
       enableGzipDecompression: self.enableGzipDecompression,
       enableBrotliDecompression: self.enableBrotliDecompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
@@ -818,6 +854,8 @@ open class EngineBuilder: NSObject {
       nodeSubZone: self.nodeSubZone,
       xdsServerAddress: xdsServerAddress,
       xdsServerPort: xdsServerPort,
+      xdsAuthHeader: xdsAuthHeader,
+      xdsAuthToken: xdsAuthToken,
       xdsJwtToken: xdsJwtToken,
       xdsJwtTokenLifetimeSeconds: xdsJwtTokenLifetimeSeconds,
       xdsSslRootCerts: xdsSslRootCerts,
@@ -861,6 +899,9 @@ private extension EngineBuilder {
     cxxBuilder.enableDnsCache(self.enableDNSCache, Int32(self.dnsCacheSaveIntervalSeconds))
 #if ENVOY_ENABLE_QUIC
     cxxBuilder.enableHttp3(self.enableHttp3)
+    for (host, port) in self.quicHints {
+      cxxBuilder.addQuicHint(host.toCXX(), Int32(port))
+    }
 #endif
     cxxBuilder.enableGzipDecompression(self.enableGzipDecompression)
     cxxBuilder.enableBrotliDecompression(self.enableBrotliDecompression)
@@ -919,6 +960,10 @@ private extension EngineBuilder {
     if let xdsBuilder = self.xdsBuilder {
       var cxxXdsBuilder = Envoy.Platform.XdsBuilder(xdsBuilder.xdsServerAddress.toCXX(),
                                                     Int32(xdsBuilder.xdsServerPort))
+      if let xdsAuthHeader = xdsBuilder.authHeader {
+        cxxXdsBuilder.setAuthenticationToken(xdsAuthHeader.toCXX(),
+                                             xdsBuilder.authToken?.toCXX() ?? "".toCXX())
+      }
       if let xdsJwtToken = xdsBuilder.jwtToken {
         cxxXdsBuilder.setJwtAuthenticationToken(xdsJwtToken.toCXX(),
                                                 Int32(xdsBuilder.jwtTokenLifetimeInSeconds))

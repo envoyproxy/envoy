@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/cache_insert_queue.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -54,7 +55,7 @@ class CacheFilter : public Http::PassThroughFilter,
 public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
-              OptRef<HttpCache> http_cache);
+              std::shared_ptr<HttpCache> http_cache);
   // Http::StreamFilterBase
   void onDestroy() override;
   void onStreamComplete() override;
@@ -126,10 +127,13 @@ private:
   // being cancelled.
   InsertStatus insertStatus() const;
 
+  // insert_queue_ ownership may be passed to the queue itself during
+  // CacheFilter::onDestroy, allowing the insert queue to outlive the filter
+  // while the necessary cache write operations complete.
+  std::unique_ptr<CacheInsertQueue> insert_queue_;
   TimeSource& time_source_;
-  OptRef<HttpCache> cache_;
+  std::shared_ptr<HttpCache> cache_;
   LookupContextPtr lookup_;
-  InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
 
   // Tracks what body bytes still need to be read from the cache. This is
