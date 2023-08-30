@@ -139,7 +139,7 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
 size_t MessageUtil::hash(const Protobuf::Message& message) {
   std::string text_format;
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   {
     Protobuf::TextFormat::Printer printer;
     printer.SetExpandAny(true);
@@ -155,7 +155,7 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
   return HashUtil::xxHash64(text_format);
 }
 
-#ifndef ENVOY_ENABLE_FULL_PROTOS
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
 // NOLINTNEXTLINE(readability-identifier-naming)
 bool MessageLiteDifferencer::Equals(const Protobuf::Message& message1,
                                     const Protobuf::Message& message2) {
@@ -339,7 +339,7 @@ void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
 }
 
 void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message) {
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   any_message.PackFrom(message);
 #else
   any_message.set_type_url(message.GetTypeName());
@@ -348,7 +348,7 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
                                      message.GetDescriptor()->full_name(),
@@ -363,7 +363,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
 
 absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
                                           Protobuf::Message& message) {
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     return absl::InternalError(absl::StrCat("Unable to unpack as ",
                                             message.GetDescriptor()->full_name(), ": ",

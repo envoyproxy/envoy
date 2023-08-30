@@ -6,6 +6,7 @@
 
 using testing::_;
 using testing::HasSubstr;
+using testing::Not;
 
 namespace Envoy {
 namespace Logger {
@@ -36,6 +37,36 @@ TEST_F(LambdaDelegateTest, LogCb) {
 
   ENVOY_LOG_MISC(error, expected_msg);
   EXPECT_THAT(actual_msg, HasSubstr(expected_msg));
+}
+
+TEST_F(LambdaDelegateTest, LogCbWithLevels) {
+  std::string unexpected_msg = "Hello NoLambdaDelegate";
+  std::string expected_msg = "Hello LambdaDelegate";
+  std::string actual_msg;
+
+  LambdaDelegate delegate({[](envoy_data data, const void* context) -> void {
+                             auto* actual_msg =
+                                 static_cast<std::string*>(const_cast<void*>(context));
+                             *actual_msg = Data::Utility::copyToString(data);
+                             release_envoy_data(data);
+                           },
+                           [](const void*) -> void {}, &actual_msg},
+                          Registry::getSink());
+
+  // Set the log to critical. The message should not be logged.
+  Context::changeAllLogLevels(spdlog::level::critical);
+  ENVOY_LOG_MISC(error, unexpected_msg);
+  EXPECT_THAT(actual_msg, Not(HasSubstr(unexpected_msg)));
+
+  // Change to error. The message should be logged.
+  Context::changeAllLogLevels(spdlog::level::err);
+  ENVOY_LOG_MISC(error, expected_msg);
+  EXPECT_THAT(actual_msg, HasSubstr(expected_msg));
+
+  // Change back to critical and test one more time.
+  Context::changeAllLogLevels(spdlog::level::critical);
+  ENVOY_LOG_MISC(error, expected_msg);
+  EXPECT_THAT(actual_msg, Not(HasSubstr(unexpected_msg)));
 }
 
 TEST_F(LambdaDelegateTest, ReleaseCb) {
