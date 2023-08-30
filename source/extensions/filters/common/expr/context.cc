@@ -335,7 +335,10 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
                                             &arena_);
     }
   } else if (value == FilterChainName) {
-    return CelValue::CreateString(&info_.filterChainName());
+    const auto filter_chain_info = info_.downstreamAddressProvider().filterChainInfo();
+    const absl::string_view filter_chain_name =
+        filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
+    return CelValue::CreateStringView(filter_chain_name);
   }
   return {};
 }

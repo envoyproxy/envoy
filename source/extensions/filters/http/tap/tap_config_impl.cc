@@ -31,10 +31,12 @@ fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*
 HttpTapConfigImpl::HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer,
                                      Server::Configuration::FactoryContext& context)
-    : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
+    : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer, context),
+      time_source_(context.mainThreadDispatcher().timeSource()) {}
 
-HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t stream_id) {
-  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), stream_id);
+HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(
+    const envoy::extensions::filters::http::tap::v3::Tap& tap_config, uint64_t stream_id) {
+  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), tap_config, stream_id);
 }
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {
@@ -46,6 +48,10 @@ void HttpPerRequestTapperImpl::streamRequestHeaders() {
 
 void HttpPerRequestTapperImpl::onRequestHeaders(const Http::RequestHeaderMap& headers) {
   request_headers_ = &headers;
+  if (should_record_headers_received_time_) {
+    setTimeStamp(request_headers_received_time_);
+  }
+
   config_->rootMatcher().onHttpRequestHeaders(headers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
     ASSERT(!started_streaming_trace_);
@@ -101,6 +107,10 @@ void HttpPerRequestTapperImpl::streamResponseHeaders() {
 
 void HttpPerRequestTapperImpl::onResponseHeaders(const Http::ResponseHeaderMap& headers) {
   response_headers_ = &headers;
+  if (should_record_headers_received_time_) {
+    setTimeStamp(response_headers_received_time_);
+  }
+
   config_->rootMatcher().onHttpResponseHeaders(headers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
     if (!started_streaming_trace_) {
@@ -159,12 +169,20 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
   auto& http_trace = *buffered_full_trace_->mutable_http_buffered_trace();
   if (request_headers_ != nullptr) {
     request_headers_->iterate(fillHeaderList(http_trace.mutable_request()->mutable_headers()));
+    if (should_record_headers_received_time_) {
+      http_trace.mutable_request()->mutable_headers_received_time()->MergeFrom(
+          Protobuf::util::TimeUtil::NanosecondsToTimestamp(request_headers_received_time_));
+    }
   }
   if (request_trailers_ != nullptr) {
     request_trailers_->iterate(fillHeaderList(http_trace.mutable_request()->mutable_trailers()));
   }
   if (response_headers_ != nullptr) {
     response_headers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_headers()));
+    if (should_record_headers_received_time_) {
+      http_trace.mutable_response()->mutable_headers_received_time()->MergeFrom(
+          Protobuf::util::TimeUtil::NanosecondsToTimestamp(response_headers_received_time_));
+    }
   }
   if (response_trailers_ != nullptr) {
     response_trailers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_trailers()));

@@ -36,6 +36,8 @@ TEST(TestConfig, ConfigIsApplied) {
 #ifdef ENVOY_ENABLE_QUIC
       .setHttp3ConnectionOptions("5RTO")
       .setHttp3ClientConnectionOptions("MPQC")
+      .addQuicHint("www.abc.com", 443)
+      .addQuicHint("www.def.com", 443)
 #endif
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
@@ -70,6 +72,8 @@ TEST(TestConfig, ConfigIsApplied) {
 #ifdef ENVOY_ENABLE_QUIC
       "connection_options: \"5RTO\"",
       "client_connection_options: \"MPQC\"",
+      "hostname: \"www.abc.com\"",
+      "hostname: \"www.def.com\"",
 #endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",

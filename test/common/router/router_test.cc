@@ -805,6 +805,24 @@ TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
+TEST_F(RouterTest, ResponseCodeSetByUpstream) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_TRUE(callbacks_.streamInfo().responseCode().has_value());
+  EXPECT_EQ(callbacks_.streamInfo().responseCode().value(), 200);
+}
+
 // Validate that x-envoy-upstream-service-time is added on a regular
 // request/response path.
 TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
