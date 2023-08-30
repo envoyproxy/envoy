@@ -586,6 +586,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -594,17 +596,20 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  data_.add("foo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+  data_.add(buffer1.toString());
 
-  data_.add("bar");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer2("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer2, false));
+  data_.add(buffer2.toString());
 
-  data_.add("barfoo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer3("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer3, false));
+  data_.add(buffer3.toString());
 
-  data_.add("more data after watermark is set is possible");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  Buffer::OwnedImpl buffer4("more data after watermark is set is possible");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer4, true));
 
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 }
@@ -629,6 +634,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -645,24 +652,28 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  data_.add("foo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+  data_.add(buffer1.toString());
 
-  data_.add("bar");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer2("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer2, false));
+  data_.add(buffer2.toString());
 
-  data_.add("barfoo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer3("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer3, false));
+  // data added by the previous decodeData call.
 
-  data_.add("more data after watermark is set is possible");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer4("more data after watermark is set is possible");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer4, false));
+  data_.add(buffer4.toString());
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  data_.add("more data after calling check request");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  Buffer::OwnedImpl buffer5("more data after calling check request");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer5, true));
 
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 }
@@ -686,6 +697,8 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -694,8 +707,9 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  data_.add("foo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  Buffer::OwnedImpl buffer("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+  data_.add(buffer.toString());
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 }
 
@@ -713,6 +727,8 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
@@ -726,10 +742,15 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-  data_.add("foo");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
-  data_.add("bar");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+  data_.add(buffer1.toString());
+
+  Buffer::OwnedImpl buffer2("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer2, true));
+  // data added by the previous decodeData call.
+
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 
   EXPECT_EQ(data_.length(), check_request.attributes().request().http().body().size());
@@ -751,6 +772,8 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
@@ -768,10 +791,13 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   uint8_t raw[1] = {0xc0};
   Buffer::OwnedImpl raw_buffer(raw, 1);
 
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(raw_buffer, false));
   data_.add(raw_buffer);
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
-  data_.add(raw_buffer);
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark,
+            filter_->decodeData(raw_buffer, true));
+  // data added by the previous decodeData call.
+
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0, check_request.attributes().request().http().body().size());
@@ -2240,6 +2266,14 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {
   const std::string original_path{"/users?leave-me=alone"};
   const std::string expected_path{"/users?leave-me=alone"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{"remove-me"};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithRepeatedUnmodifiedQueryParameters) {
+  const std::string original_path{"/users?leave-me=alone&leave-me=in-peace"};
+  const std::string expected_path{"/users?leave-me=alone&leave-me=in-peace"};
   const Http::Utility::QueryParamsVector add_me{};
   const std::vector<std::string> remove_me{"remove-me"};
   queryParameterTest(original_path, expected_path, add_me, remove_me);

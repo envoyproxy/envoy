@@ -129,6 +129,8 @@ public:
                const absl::flat_hash_set<std::string>& add_these_names));
 
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
+
+  MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
 };
 
 class MockGrpcStreamCallbacks

@@ -17,7 +17,7 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
       access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
-          Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
+          Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
                                       POOL_GAUGE(*fake_stats_.rootScope()),
@@ -328,7 +328,8 @@ void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
       .WillOnce(InvokeWithoutArgs([this]() {
         auto header_validator = std::make_unique<
             Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
-            header_validator_config_, Protocol::Http11, header_validator_stats_);
+            header_validator_config_, Protocol::Http11, header_validator_stats_,
+            header_validator_config_overrides_);
 
         return header_validator;
       }));

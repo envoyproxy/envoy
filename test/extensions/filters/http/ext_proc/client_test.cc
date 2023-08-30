@@ -60,6 +60,7 @@ protected:
   void onGrpcError(Grpc::Status::GrpcStatus status) override { grpc_status_ = status; }
 
   void onGrpcClose() override { grpc_closed_ = true; }
+  void logGrpcStreamInfo() override {}
 
   std::unique_ptr<ProcessingResponse> last_response_;
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;

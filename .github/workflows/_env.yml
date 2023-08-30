@@ -42,6 +42,8 @@ on:
         default:
 
     outputs:
+      debug:
+        value: false
       agent_ubuntu:
         value: ubuntu-22.04
       build_image_ubuntu:

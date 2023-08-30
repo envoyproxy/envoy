@@ -19,6 +19,14 @@ typedef struct { // NOLINT(modernize-use-using)
   int phase;
 } httpRequest;
 
+typedef struct { // NOLINT(modernize-use-using)
+  unsigned long long int plugin_name_ptr;
+  unsigned long long int plugin_name_len;
+  unsigned long long int config_ptr;
+  unsigned long long int config_len;
+  int is_route_config;
+} httpConfig;
+
 typedef enum { // NOLINT(modernize-use-using)
   Set,
   Append,
@@ -65,14 +73,21 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value);
 CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name, void* hand);
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf);
 
-void envoyGoFilterHttpLog(uint32_t level, void* message);
-uint32_t envoyGoFilterHttpLogLevel();
+void envoyGoFilterLog(uint32_t level, void* message);
+uint32_t envoyGoFilterLogLevel();
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
+void envoyGoConfigHttpFinalize(void* c);
 
 CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key, void* value, int state_type,
                                                  int life_span, int stream_sharing);
 CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value);
+
+CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name,
+                                         void* metric_id);
+CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset);
+CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value);
+CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value);
 
 // downstream
 CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int closeType);
@@ -82,7 +97,7 @@ void envoyGoFilterDownstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterDownstreamInfo(void* wrapper, int t, void* ret);
 
 // upstream
-void* envoyGoFilterUpstreamConnect(void* libraryID, void* addr);
+void* envoyGoFilterUpstreamConnect(void* libraryID, void* addr, unsigned long long int connID);
 CAPIStatus envoyGoFilterUpstreamWrite(void* wrapper, void* buffers, int buffersNum, int endStream);
 CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int closeType);
 void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);

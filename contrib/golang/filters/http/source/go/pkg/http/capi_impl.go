@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -279,15 +279,19 @@ func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName strin
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
-	C.envoyGoFilterHttpLog(C.uint32_t(level), unsafe.Pointer(&message))
+	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(&message))
 }
 
 func (c *httpCApiImpl) HttpLogLevel() api.LogType {
-	return api.LogType(C.envoyGoFilterHttpLogLevel())
+	return api.GetLogLevel()
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
+}
+
+func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer) {
+	C.envoyGoConfigHttpFinalize(cfg)
 }
 
 var cAPI api.HttpCAPI = &httpCApiImpl{}
@@ -318,4 +322,32 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 	}
 
 	return strings.Clone(value)
+}
+
+func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
+	var value uint32
+
+	res := C.envoyGoFilterHttpDefineMetric(unsafe.Pointer(cfg), C.uint32_t(metricType), unsafe.Pointer(&name), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	return value
+}
+
+func (c *httpCApiImpl) HttpIncrementMetric(cc unsafe.Pointer, metricId uint32, offset int64) {
+	cfg := (*httpConfig)(cc)
+	res := C.envoyGoFilterHttpIncrementMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.int64_t(offset))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetMetric(cc unsafe.Pointer, metricId uint32) uint64 {
+	cfg := (*httpConfig)(cc)
+	var value uint64
+	res := C.envoyGoFilterHttpGetMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	return value
+}
+
+func (c *httpCApiImpl) HttpRecordMetric(cc unsafe.Pointer, metricId uint32, value uint64) {
+	cfg := (*httpConfig)(cc)
+	res := C.envoyGoFilterHttpRecordMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.uint64_t(value))
+	handleCApiStatus(res)
 }

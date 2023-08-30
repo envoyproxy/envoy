@@ -142,14 +142,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (buffer_data_ && !skip_check_) {
-    const bool buffer_is_full = isBufferFull();
+    const bool buffer_is_full = isBufferFull(data.length());
     if (end_stream || buffer_is_full) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
                        *decoder_callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
-      if (!buffer_is_full) {
-        // Make sure data is available in initiateCall.
-        decoder_callbacks_->addDecodedData(data, true);
-      }
+      // Make sure data is available in initiateCall.
+      decoder_callbacks_->addDecodedData(data, true);
       initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
@@ -320,36 +318,36 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       response_headers_to_set_ = std::move(response->response_headers_to_set);
     }
 
-    absl::optional<Http::Utility::QueryParams> modified_query_parameters;
+    absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
     if (!response->query_parameters_to_set.empty()) {
-      modified_query_parameters =
-          Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+      modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
+          request_headers_->Path()->value().getStringView());
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
       for (const auto& [key, value] : response->query_parameters_to_set) {
         ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
-        (*modified_query_parameters)[key] = value;
+        modified_query_parameters->overwrite(key, value);
       }
     }
 
     if (!response->query_parameters_to_remove.empty()) {
       if (!modified_query_parameters) {
-        modified_query_parameters =
-            Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+        modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
+            request_headers_->Path()->value().getStringView());
       }
       ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
                        *decoder_callbacks_);
       for (const auto& key : response->query_parameters_to_remove) {
         ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
-        (*modified_query_parameters).erase(key);
+        modified_query_parameters->remove(key);
       }
     }
 
     // We modified the query parameters in some way, so regenerate the `path` header and set it
     // here.
     if (modified_query_parameters) {
-      const auto new_path = Http::Utility::replaceQueryString(request_headers_->Path()->value(),
-                                                              modified_query_parameters.value());
+      const auto new_path =
+          modified_query_parameters->replaceQueryString(request_headers_->Path()->value());
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter modified query parameter(s), using new path for request: {}",
           *decoder_callbacks_, new_path);
@@ -444,12 +442,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 }
 
-bool Filter::isBufferFull() const {
-  const auto* buffer = decoder_callbacks_->decodingBuffer();
-  if (config_->allowPartialMessage() && buffer != nullptr) {
-    return buffer->length() >= config_->maxRequestBytes();
+bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
+  if (!config_->allowPartialMessage()) {
+    return false;
   }
-  return false;
+
+  uint64_t num_bytes_buffered = num_bytes_processing;
+  const auto* buffer = decoder_callbacks_->decodingBuffer();
+  if (buffer != nullptr) {
+    num_bytes_buffered += buffer->length();
+  }
+
+  return num_bytes_buffered >= config_->maxRequestBytes();
 }
 
 void Filter::continueDecoding() {

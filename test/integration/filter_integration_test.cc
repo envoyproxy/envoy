@@ -121,10 +121,6 @@ TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(FilterIntegrationTest, AddBodyToRequestAndWaitForIt) {
-  // Make sure one end to end test verifies the old path with runtime singleton,
-  // to check for regressions.
-  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "false");
-
   prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");
@@ -691,7 +687,7 @@ name: passthrough-filter
   verifyUpStreamRequestAfterStopAllFilter();
 }
 
-// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
+// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(FilterIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
   prependFilter(R"EOF(
@@ -1249,10 +1245,6 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
 }
 
 TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeFilter) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {
-    return;
-  }
   prependFilter(R"EOF(
   name: assert-non-reentrant-filter
   )EOF");

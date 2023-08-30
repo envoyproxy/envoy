@@ -20,7 +20,7 @@ package network
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -91,8 +91,8 @@ func (c *cgoApiImpl) SetFilterState(f unsafe.Pointer, key string, value string, 
 	// TODO: handle res
 }
 
-func (c *cgoApiImpl) UpstreamConnect(libraryID string, addr string) unsafe.Pointer {
-	return unsafe.Pointer(C.envoyGoFilterUpstreamConnect(unsafe.Pointer(&libraryID), unsafe.Pointer(&addr)))
+func (c *cgoApiImpl) UpstreamConnect(libraryID string, addr string, connID uint64) unsafe.Pointer {
+	return unsafe.Pointer(C.envoyGoFilterUpstreamConnect(unsafe.Pointer(&libraryID), unsafe.Pointer(&addr), C.ulonglong(connID)))
 }
 
 func (c *cgoApiImpl) UpstreamWrite(f unsafe.Pointer, bufferPtr unsafe.Pointer, bufferLen int, endStream int) {

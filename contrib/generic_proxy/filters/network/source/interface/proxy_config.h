@@ -6,6 +6,7 @@
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
+#include "contrib/generic_proxy/filters/network/source/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,6 +46,11 @@ public:
    * @return connection manager tracing config.
    */
   virtual OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const PURE;
+
+  /**
+   * @return stats to use.
+   */
+  virtual GenericFilterStats& stats() PURE;
 };
 
 } // namespace GenericProxy

@@ -28,6 +28,9 @@ public:
                     absl::string_view host_name) override;
 
   bool validationPending() const { return validation_timer_->enabled(); }
+  void setExpectedLocalAddress(absl::string_view expected_local_address) {
+    expected_local_address_ = expected_local_address;
+  }
 
 private:
   Event::TimerPtr validation_timer_;
@@ -35,6 +38,7 @@ private:
   Ssl::ValidateResultCallbackPtr callback_;
   std::vector<std::string> cert_chain_in_str_;
   absl::optional<std::string> expected_host_name_;
+  absl::optional<std::string> expected_local_address_;
 };
 
 class TimedCertValidatorFactory : public CertValidatorFactory {

@@ -1541,7 +1541,7 @@ public:
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster&) override {}
+  void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override {}
   void onClusterRemoval(const std::string&) override {}
 
 private:

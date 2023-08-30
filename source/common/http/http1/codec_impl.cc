@@ -1071,6 +1071,9 @@ ServerConnectionImpl::ServerConnectionImpl(
       headers_with_underscores_action_(headers_with_underscores_action),
       abort_dispatch_(
           overload_manager.getLoadShedPoint("envoy.load_shed_points.http1_server_abort_dispatch")) {
+  ENVOY_LOG_ONCE_IF(trace, abort_dispatch_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.http1_server_abort_dispatch is not "
+                    "found. Is it configured?");
   owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();

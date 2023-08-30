@@ -296,6 +296,8 @@ public:
   NiceMock<MockHeaderValidatorStats> header_validator_stats_;
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
 };
 
 class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,

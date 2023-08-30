@@ -231,7 +231,8 @@ public:
             headers_with_underscores_action_));
     header_validator_ = std::make_unique<
         Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
-        header_validator_config_, Protocol::Http11, http1CodecStats());
+        header_validator_config_, Protocol::Http11, http1CodecStats(),
+        header_validator_config_overrides_);
   }
 
 protected:
@@ -242,6 +243,8 @@ protected:
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
   ServerHeaderValidatorPtr header_validator_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
@@ -4817,6 +4820,42 @@ TEST_P(Http1ServerConnectionImplTest, Char22InHeaderValue) {
   auto status = codec_->dispatch(buffer);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+}
+
+TEST_P(Http1ClientConnectionImplTest, MultipleContentLength) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             "Content-Length: 3\r\n"
+                             "Content-Length: 3\r\n"
+                             "\r\n"
+                             "foo\r\n\r\n");
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_UNEXPECTED_CONTENT_LENGTH");
+}
+
+TEST_P(Http1ServerConnectionImplTest, MultipleContentLength) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                           "Content-Length: 3\r\n"
+                           "Content-Length: 3\r\n"
+                           "\r\n"
+                           "foo\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_UNEXPECTED_CONTENT_LENGTH");
 }
 
 } // namespace Http

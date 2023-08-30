@@ -51,16 +51,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Whether subsequent HTTP requests are transmitted synchronously or whether they are
 //   sent asynchronously.
 // * To modify request or response trailers if they already exist
-// * To add request or response trailers where they are not present
 //
 // The filter supports up to six different processing steps. Each is represented by
 // a gRPC stream message that is sent to the external processor. For each message, the
 // processor must send a matching response.
 //
 // * Request headers: Contains the headers from the original HTTP request.
-// * Request body: Sent in a single message if the BUFFERED or BUFFERED_PARTIAL
-//   mode is chosen, in multiple messages if the STREAMED mode is chosen, and not
-//   at all otherwise.
+// * Request body: Delivered if they are present and sent in a single message if
+//   the BUFFERED or BUFFERED_PARTIAL mode is chosen, in multiple messages if the
+//   STREAMED mode is chosen, and not at all otherwise.
 // * Request trailers: Delivered if they are present and if the trailer mode is set
 //   to SEND.
 // * Response headers: Contains the headers from the HTTP response. Keep in mind
@@ -99,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -200,6 +199,13 @@ message ExternalProcessor {
   // :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
   // If not set, ``mode_override`` API in the response message will be ignored.
   bool allow_mode_override = 14;
+
+  // If set to true, ignore the
+  // :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
+  // message in an external processor response. In such case, no local reply will be sent.
+  // Instead, the stream to the external processor will be closed. There will be no
+  // more external processing for this stream from now on.
+  bool disable_immediate_response = 15;
 }
 
 // The HeaderForwardingRules structure specifies what headers are

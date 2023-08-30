@@ -177,7 +177,7 @@ An example set up proxying HTTP would look something like this:
    .. code-block:: console
 
       $ envoy -c configs/encapsulate_in_http1_connect.yaml --base-id 1
-      $ envoy -c configs/terminate_connect.yaml --base-id 1
+      $ envoy -c configs/terminate_http1_connect.yaml --base-id 1
 
 
    For HTTP/2 ``CONNECT``, try either:

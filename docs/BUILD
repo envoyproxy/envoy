@@ -71,7 +71,7 @@ genrule(
         $(location //source/extensions:extensions_metadata.yaml) \\
         $(location //contrib:extensions_metadata.yaml) $@
     """,
-    exec_tools = ["//tools/docs:generate_extensions_security_rst"],
+    tools = ["//tools/docs:generate_extensions_security_rst"],
 )
 
 genrule(
@@ -82,7 +82,7 @@ genrule(
         $(location //bazel:all_repository_locations) \
         $@
     """,
-    exec_tools = [
+    tools = [
         "//bazel:all_repository_locations",
         "//tools/docs:generate_external_deps_rst",
     ],
@@ -108,7 +108,7 @@ genrule(
     cmd = """
     cat $(location :v3_proto_srcs) $(location :xds_proto_srcs)  > $@
     """,
-    exec_tools = [
+    tools = [
         ":v3_proto_srcs",
         ":xds_proto_srcs",
     ],
@@ -122,7 +122,7 @@ genrule(
     $(location //tools/protodoc:generate_empty) \\
         $(location empty_extensions.json) $@
     """,
-    exec_tools = ["//tools/protodoc:generate_empty"],
+    tools = ["//tools/protodoc:generate_empty"],
 )
 
 genrule(
@@ -136,7 +136,7 @@ genrule(
     $(location //tools/docs:generate_api_rst) \\
         $(location proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
     """,
-    exec_tools = ["//tools/docs:generate_api_rst"],
+    tools = ["//tools/docs:generate_api_rst"],
 )
 
 pkg_files(
@@ -178,7 +178,7 @@ genrule(
     cmd = """
     $(location //tools/docs:generate_version_histories) $@
     """,
-    exec_tools = [
+    tools = [
         ":versions.yaml",
         "//:VERSION.txt",
         "//changelogs",
@@ -247,14 +247,14 @@ genrule(
          $(location rst) \
          $@
     """,
-    exec_tools = [
-        "//bazel:volatile_env",
-        "//tools/docs:sphinx_runner",
+    stamp = 1,
+    tools = [
         ":rst",
         "//:VERSION.txt",
+        "//bazel:volatile_env",
+        "//tools/docs:sphinx_runner",
         "@envoy_api//:v3_proto_set",
     ],
-    stamp = 1,
 )
 
 # No git stamping, speeds up local dev switching branches
@@ -269,10 +269,10 @@ genrule(
          $(location :rst) \
          $@
     """,
-    exec_tools = [
-        "//tools/docs:sphinx_runner",
+    tools = [
         ":rst",
         "//:VERSION.txt",
+        "//tools/docs:sphinx_runner",
         "@envoy_api//:v3_proto_set",
     ],
 )

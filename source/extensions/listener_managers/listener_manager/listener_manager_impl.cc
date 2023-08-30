@@ -85,7 +85,19 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
   ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
+    const bool is_terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  filter #{}:", i);
+
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::Filter::ConfigTypeCase::kConfigDiscovery) {
+      ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
+      ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
+          proto_config.config_discovery(), proto_config.name(),
+          filter_chain_factory_context.getServerFactoryContext(), filter_chain_factory_context,
+          filter_chain_factory_context.clusterManager(), is_terminal, "network", nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
@@ -102,7 +114,7 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
         filters[i].name(), factory.name(), "network",
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.getServerFactoryContext()),
-        i == filters.size() - 1);
+        is_terminal);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
     ret.push_back(
@@ -145,8 +157,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         }
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.getServerFactoryContext(), context, false, "listener",
-          createListenerFilterMatcher(proto_config));
+          config_discovery, name, context.getServerFactoryContext(), context,
+          context.clusterManager(), false, "listener", createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",

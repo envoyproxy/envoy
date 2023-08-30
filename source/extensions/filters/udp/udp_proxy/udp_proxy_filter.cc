@@ -17,7 +17,10 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
   for (const auto& entry : config_->allClusterNames()) {
     Upstream::ThreadLocalCluster* cluster = config->clusterManager().getThreadLocalCluster(entry);
     if (cluster != nullptr) {
-      onClusterAddOrUpdate(*cluster);
+      Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+        return *cluster;
+      };
+      onClusterAddOrUpdate(cluster->info()->name(), command);
     }
   }
 
@@ -36,9 +39,11 @@ UdpProxyFilter::~UdpProxyFilter() {
   }
 }
 
-void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  auto cluster_name = cluster.info()->name();
+void UdpProxyFilter::onClusterAddOrUpdate(absl::string_view cluster_name,
+                                          Upstream::ThreadLocalClusterCommand& get_cluster) {
   ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster_name);
+
+  auto& cluster = get_cluster();
   ASSERT((!cluster_infos_.contains(cluster_name)) ||
          &cluster_infos_[cluster_name]->cluster_ != &cluster);
 

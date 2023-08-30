@@ -313,6 +313,7 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   headers.OnHeader(":authority", host);
   headers.OnHeader(":method", "GET");
   headers.OnHeader(":path", "/");
+  headers.OnHeader(":scheme", "https");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
@@ -548,6 +549,7 @@ TEST_F(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");
   request_headers.OnHeader(":path", "/");
+  request_headers.OnHeader(":scheme", "https");
   request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
@@ -647,6 +649,7 @@ TEST_F(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   std::string host("www.abc.com");
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");
+  request_headers.OnHeader(":scheme", "https");
   request_headers.OnHeader(":path", "/");
   request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Request headers should be propagated to decoder.
@@ -897,6 +900,7 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");
   request_headers.OnHeader(":path", "/");
+  request_headers.OnHeader(":scheme", "https");
   request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))

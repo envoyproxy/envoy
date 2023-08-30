@@ -22,6 +22,14 @@ namespace NetworkFilters {
 namespace GenericProxy {
 namespace {
 
+class GenericProxyIntegrationTest : public BaseIntegrationTest {
+public:
+  GenericProxyIntegrationTest(const std::string config_yaml)
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, config_yaml) {
+    skip_tag_extraction_rule_check_ = true;
+  };
+};
+
 class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -99,8 +107,7 @@ public:
   using TestResponseDecoderCallbackSharedPtr = std::shared_ptr<TestResponseDecoderCallback>;
 
   void initialize(const std::string& config_yaml, CodecFactoryPtr codec_factory) {
-    integration_ =
-        std::make_unique<BaseIntegrationTest>(Network::Address::IpVersion::v4, config_yaml);
+    integration_ = std::make_unique<GenericProxyIntegrationTest>(config_yaml);
     integration_->initialize();
 
     // Create codec for downstream client.
@@ -256,7 +263,7 @@ public:
   TestResponseEncoderCallbackSharedPtr response_encoder_callback_;
 
   // Integration test server.
-  std::unique_ptr<BaseIntegrationTest> integration_;
+  std::unique_ptr<GenericProxyIntegrationTest> integration_;
 
   // Callbacks for downstream connection.
   ConnectionCallbacksSharedPtr connection_callbacks_;

@@ -58,8 +58,6 @@ std::vector<std::string> stringsFromGoSlice(void* slice) {
   return list;
 }
 
-const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -70,6 +68,16 @@ CAPIStatus envoyGoFilterHandlerWrapper(void* r,
   auto weak_filter = req->weakFilter();
   if (auto filter = weak_filter.lock()) {
     return f(filter);
+  }
+  return CAPIStatus::CAPIFilterIsGone;
+}
+
+CAPIStatus
+envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<FilterConfig>&)> fc) {
+  auto config = reinterpret_cast<httpConfigInternal*>(c);
+  auto weak_filter_config = config->weakFilterConfig();
+  if (auto filter_config = weak_filter_config.lock()) {
+    return fc(filter_config);
   }
   return CAPIStatus::CAPIFilterIsGone;
 }
@@ -198,11 +206,6 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
-void envoyGoFilterHttpLog(uint32_t level, void* message) {
-  auto mesg = referGoString(message);
-  getFilterLogger().log(level, mesg);
-}
-
 CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name, void* buf) {
   return envoyGoFilterHandlerWrapper(r, [name, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
     auto name_str = copyGoString(name);
@@ -210,7 +213,6 @@ CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name, void* buf) {
     return filter->getDynamicMetadata(name_str, buf_slice);
   });
 }
-uint32_t envoyGoFilterHttpLogLevel() { return getFilterLogger().level(); }
 
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
   return envoyGoFilterHandlerWrapper(
@@ -228,6 +230,13 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   // phase of the go object.
   auto req = reinterpret_cast<httpRequestInternal*>(r);
   delete req;
+}
+
+void envoyGoConfigHttpFinalize(void* c) {
+  // config is used by go, so need to use raw memory and then it is safe to release at the gc
+  // finalize phase of the go object.
+  auto config = reinterpret_cast<httpConfigInternal*>(c);
+  delete config;
 }
 
 CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
@@ -257,6 +266,39 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value
                                        auto value_str = reinterpret_cast<GoString*>(value);
                                        return filter->getStringFilterState(key_str, value_str);
                                      });
+}
+
+CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name,
+                                         void* metric_id) {
+  return envoyGoConfigHandlerWrapper(
+      c,
+      [metric_type, name, metric_id](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        auto name_str = referGoString(name);
+        auto metric_id_int = reinterpret_cast<uint32_t*>(metric_id);
+        return filter_config->defineMetric(metric_type, name_str, metric_id_int);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, offset](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        return filter_config->incrementMetric(metric_id, offset);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        auto value_int = reinterpret_cast<uint64_t*>(value);
+        return filter_config->getMetric(metric_id, value_int);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        return filter_config->recordMetric(metric_id, value);
+      });
 }
 
 #ifdef __cplusplus

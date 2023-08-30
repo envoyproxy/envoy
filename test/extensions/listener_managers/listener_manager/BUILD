@@ -50,7 +50,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    shard_count = 4,
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/api:os_sys_calls_lib",

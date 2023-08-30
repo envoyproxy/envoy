@@ -125,14 +125,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), mEnableGzipDecompression, brotliEnabled(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
+        quicClientConnectionOptions(), quicHints(), mEnableGzipDecompression, brotliEnabled(),
         mEnableSocketTag, mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
         mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
         mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, statSinks, runtimeGuards, mEnablePlatformCertificatesValidation,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
-        /*xdsPort=*/0, /*xdsJwtToken=*/"", /*xdsJwtTokenLifetime=*/0, /*xdsSslRootCerts=*/"",
+        /*xdsPort=*/0, /*xdsAuthenticationHeader=*/"", /*xdsAuthenticationToken=*/"",
+        /*xdsJwtToken=*/"", /*xdsJwtTokenLifetime=*/0, /*xdsSslRootCerts=*/"",
         /*xdsSni=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, /*cdsResourcesLocator=*/"",
         /*cdsTimeoutSeconds=*/0, /*enableCds=*/false);
   }

@@ -83,7 +83,8 @@ versioning guidelines:
   conforms to the public interface documentation should continue to compile and work within the
   deprecation window. Within this window, a warning of deprecation should be carefully logged (some
   features might need rate limiting for logging this). We make no guarantees about code or deployments
-  that rely on undocumented behavior.
+  that rely on undocumented behavior. See [extension removal policy](./EXTENSION_POLICY.md#removing-existing-extensions)
+  for more information.
 * All deprecations/breaking changes will be clearly listed in the [version history](docs/root/version_history/).
 * High risk deprecations/breaking changes may be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
@@ -143,7 +144,7 @@ versioning guidelines:
   git checkout main
   git pull
   git checkout "$branch"
-  git pull
+  git merge main
   ```
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no

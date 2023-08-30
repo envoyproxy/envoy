@@ -4,25 +4,32 @@ package main
 typedef struct {
   int foo;
 } httpRequest;
+
+typedef struct {
+  unsigned long long int plugin_name_ptr;
+  unsigned long long int plugin_name_len;
+  unsigned long long int config_ptr;
+  unsigned long long int config_len;
+  int is_route_config;
+} httpConfig;
 */
 import "C"
-import "unsafe"
-
 import (
 	"sync"
+	"unsafe"
 )
 
 var configCache = &sync.Map{}
 
 //export envoyGoFilterNewHttpPluginConfig
-func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uint64) uint64 {
+func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 	// already existing return 0, just for testing the destroy api.
-	if _, ok := configCache.Load(configLen); ok {
+	if _, ok := configCache.Load(uint64(c.config_len)); ok {
 		return 0
 	}
 	// mark this configLen already existing
-	configCache.Store(configLen, configLen)
-	return configLen
+	configCache.Store(uint64(c.config_len), uint64(c.config_len))
+	return uint64(c.config_len)
 }
 
 //export envoyGoFilterDestroyHttpPluginConfig
@@ -43,6 +50,10 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 //export envoyGoFilterOnHttpData
 func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
 	return 0
+}
+
+//export envoyGoFilterOnHttpLog
+func envoyGoFilterOnHttpLog(r *C.httpRequest) {
 }
 
 //export envoyGoFilterOnHttpDestroy
@@ -84,10 +95,10 @@ func envoyGoFilterOnDownstreamWrite(wrapper unsafe.Pointer, dataSize uint64, dat
 }
 
 //export envoyGoFilterOnUpstreamConnectionReady
-func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer) {}
+func envoyGoFilterOnUpstreamConnectionReady(wrapper unsafe.Pointer, connID uint64) {}
 
 //export envoyGoFilterOnUpstreamConnectionFailure
-func envoyGoFilterOnUpstreamConnectionFailure(wrapper unsafe.Pointer, reason int) {}
+func envoyGoFilterOnUpstreamConnectionFailure(wrapper unsafe.Pointer, reason int, connID uint64) {}
 
 //export envoyGoFilterOnUpstreamData
 func envoyGoFilterOnUpstreamData(wrapper unsafe.Pointer, dataSize uint64, dataPtr uint64, sliceNum int, endOfStream int) {

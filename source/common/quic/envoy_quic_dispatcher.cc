@@ -126,6 +126,24 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   return quic_session;
 }
 
+bool EnvoyQuicDispatcher::processPacket(const quic::QuicSocketAddress& self_address,
+                                        const quic::QuicSocketAddress& peer_address,
+                                        const quic::QuicReceivedPacket& packet) {
+  // Assume a packet was dispatched successfully, if OnFailedToDispatchPacket is not called.
+  current_packet_dispatch_success_ = true;
+  ProcessPacket(self_address, peer_address, packet);
+  return current_packet_dispatch_success_;
+}
+
+bool EnvoyQuicDispatcher::OnFailedToDispatchPacket(
+    const quic::ReceivedPacketInfo& received_packet_info) {
+  if (!accept_new_connections()) {
+    current_packet_dispatch_success_ = false;
+    return true;
+  }
+  return quic::QuicDispatcher::OnFailedToDispatchPacket(received_packet_info);
+}
+
 void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
     const Network::FilterChain* filter_chain) {
   auto iter = connections_by_filter_chain_.find(filter_chain);

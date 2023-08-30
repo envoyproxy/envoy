@@ -58,7 +58,10 @@ envoy_quiche_platform_impl_cc_library(
     name = "quiche_time_utils_impl_lib",
     srcs = ["quiche_time_utils_impl.cc"],
     hdrs = ["quiche_time_utils_impl.h"],
-    external_deps = ["abseil_base"],
+    external_deps = [
+        "abseil_base",
+        "abseil_time",
+    ],
 )
 
 envoy_quiche_platform_impl_cc_library(

@@ -264,6 +264,7 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";
   spdy_headers[":path"] = "/";
+  spdy_headers[":scheme"] = "https";
   spdy_headers.AppendValueOrAddHeader("cookie", "a=b");
   spdy_headers.AppendValueOrAddHeader("cookie", "c=d");
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_headers);

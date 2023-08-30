@@ -36,8 +36,13 @@ def jvm_flags(lib_name):
     return [
         "-Djava.library.path=library/common/jni:test/common/jni",
         "-Denvoy_jni_library_name={}".format(lib_name),
-        "-Xcheck:jni",
-    ]
+        # TODO(RyanTheOptimist): Uncomment this when when
+        # https://github.com/envoyproxy/envoy/issues/28981 is fixed.
+        # "-Xcheck:jni",
+    ] + select({
+        "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],
+        "//conditions:default": [],
+    })
 
 # A basic macro to make it easier to declare and run kotlin tests which depend on a JNI lib
 # This will create the native .so binary (for linux) and a .jnilib (for macOS) look up

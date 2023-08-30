@@ -1289,6 +1289,23 @@ TEST_F(FilterTest, BindUpstreamConnectionSuccessAndWriteSomethinToConnection) {
   response_decoder_callback->onDecodingFailure();
 }
 
+TEST_F(FilterTest, TestStats) {
+  initializeFilter(false, true);
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+  filter_->newDownstreamRequest(std::move(request), ExtendedOptions(123, true, false, false));
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+  EXPECT_EQ(1, filter_config_->stats().request_.value());
+  EXPECT_EQ(1, filter_config_->stats().request_active_.value());
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  Buffer::OwnedImpl buffer;
+  buffer.add("123");
+  active_stream->onEncodingSuccess(buffer);
+  EXPECT_EQ(1, filter_config_->stats().response_.value());
+  EXPECT_EQ(0, filter_config_->stats().request_active_.value());
+}
+
 } // namespace
 } // namespace GenericProxy
 } // namespace NetworkFilters

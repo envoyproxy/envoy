@@ -20,14 +20,17 @@ envoy_cc_library(
     deps = [
         ":rds_lib",
         ":route_lib",
+        ":stats_lib",
         ":upstream_lib",
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
         "//contrib/generic_proxy/filters/network/source/interface:proxy_config_interface",
         "//contrib/generic_proxy/filters/network/source/router:router_lib",
         "//envoy/network:filter_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:tracer_config_lib",
         "//source/common/tracing:tracer_lib",
@@ -129,5 +132,14 @@ envoy_cc_library(
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
         "//envoy/network:connection_interface",
         "//envoy/upstream:thread_local_cluster_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "stats_lib",
+    hdrs = ["stats.h"],
+    deps = [
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
     ],
 )
