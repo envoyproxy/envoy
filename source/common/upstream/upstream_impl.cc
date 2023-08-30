@@ -1230,8 +1230,11 @@ ClusterInfoImpl::ClusterInfoImpl(
     const bool is_terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  upstream filter #{}:", i);
 
-    if (proto_config.config_type_case() ==
-        envoy::config::cluster::v3::Filter::ConfigTypeCase::kConfigDiscovery) {
+    if (proto_config.has_config_discovery()) {
+      if (proto_config.has_typed_config()) {
+        throw EnvoyException("Only one of typed_config or config_discovery can be used");
+      }
+
       ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
       filter_factories_.push_back(
           network_filter_config_provider_manager_->createDynamicFilterConfigProvider(
