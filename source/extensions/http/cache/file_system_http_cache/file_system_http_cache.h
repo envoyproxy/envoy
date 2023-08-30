@@ -27,8 +27,11 @@ struct CacheShared;
 
 /**
  * An instance of a cache. There may be multiple caches in a single envoy configuration.
- * Caches are owned by filter configurations, and jointly own the CacheSingleton; if all
- * cache instances are destroyed, the CacheSingleton is destroyed.
+ * Caches are jointly owned by filters using the cache and the filter configurations.
+ * When the filter configurations are destroyed and all cache actions from those filters
+ * are resolved, the cache instance is destroyed.
+ * Cache instances jointly own the CacheSingleton.
+ * If all cache instances are destroyed, the CacheSingleton is destroyed.
  *
  * See DESIGN.md for details of cache behavior.
  */
