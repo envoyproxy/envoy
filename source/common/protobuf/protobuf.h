@@ -29,7 +29,7 @@
 #include "google/protobuf/util/type_resolver_util.h"
 #include "google/protobuf/wrappers.pb.h"
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 
 namespace google::protobuf {
 using ReflectableMessage = ::google::protobuf::Message*;

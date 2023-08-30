@@ -5,6 +5,7 @@
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/context.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -800,7 +801,11 @@ TEST(Context, XDSAttributes) {
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
   EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
   const std::string chain_name = "fake_filter_chain_name";
-  info.setFilterChainName(chain_name);
+
+  auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
+  filter_chain_info->filter_chain_name_ = "fake_filter_chain_name";
+  info.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
+
   Protobuf::Arena arena;
   XDSWrapper wrapper(arena, info);
 
