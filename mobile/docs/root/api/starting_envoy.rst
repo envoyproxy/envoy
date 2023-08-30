@@ -381,7 +381,7 @@ Specify whether to enable HTTP/3. Defaults to false. Only available when the Env
 ``addQuicHint``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Add a host port pair that's known to support QUIC. Defaults to false. Only available when HTTP/3 is enabled.
+Add a host port pair that's known to support QUIC. Only available when HTTP/3 is enabled.
 It can be called multiple times to append a list of QUIC hints.
 This allows HTTP/3 to be used for the first request to the hosts, thus saving a TCP round trip.
 
