@@ -30,6 +30,11 @@ minor_behavior_changes:
   change: |
     Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
     Local and upstream clusters can now have different sets of localities, which previously caused issues.
+- area: router
+  change: |
+    Enable copying response_code from the upstream stream_info onto the downstream stream_info.
+    This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -51,6 +56,9 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: router check tool
+  change: |
+    Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -66,6 +74,9 @@ removed_config_or_runtime:
 - area: dns
   change: |
     Removed ``envoy.restart_features.use_apple_api_for_dns_lookups`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
 
 - area: quic
   change: |
@@ -107,6 +118,10 @@ new_features:
 - area: redis
   change: |
     added support for lmove command.
+- area: upstream
+  change: |
+    added :ref:`allow_redundant_keys <envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.allow_redundant_keys>`
+    to suppport redundant keys in request metadata for subset load balancing.
 - area: access_logs
   change: |
     added :ref:`json_format_options <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format_options>` config option to
