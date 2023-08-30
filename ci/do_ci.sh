@@ -581,9 +581,12 @@ case $CI_TARGET in
                   "${FETCH_TARGETS[@]}" \
                 && break
             n=$((n+1))
-            if [[ "$n" -ne 10 ]]; then
+            if [[ "$n" -lt 10 ]]; then
                 sleep 15
                 echo "Retrying fetch ..."
+            else
+                echo "Fetch failed"
+                exit 1
             fi
         done
         ;;

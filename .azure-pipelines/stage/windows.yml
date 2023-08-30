@@ -91,17 +91,12 @@ jobs:
       WINDOWS_BUILD_TYPE: $(windowsBuildType)
       WINDOWS_IMAGE_BASE: $(windowsImageBase)
       WINDOWS_IMAGE_TAG: $(windowsImageTag)
-  - task: PublishBuildArtifacts@1
-    inputs:
-      pathtoPublish: "$(Build.StagingDirectory)/build_images"
-      artifactName: docker_windows
-    timeoutInMinutes: 10
-    condition: not(canceled())
 
 - job: released
   displayName: Complete
   dependsOn: ["release", "docker"]
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:
