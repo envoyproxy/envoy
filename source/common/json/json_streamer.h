@@ -23,7 +23,7 @@ namespace Json {
  */
 class Streamer {
 public:
-  using Value = absl::variant<absl::string_view, double>;
+  using Value = absl::variant<absl::string_view, double, uint64_t, int64_t>;
 
   /**
    * @param response The buffer in which to stream output. Note: this buffer can
@@ -74,6 +74,8 @@ public:
      * a value. You must call Map::addKey prior to calling this.
      */
     void addNumber(double d);
+    void addNumber(uint64_t u);
+    void addNumber(int64_t i);
 
     /**
      * Adds a string constant value to the current array or map. The string
@@ -93,14 +95,11 @@ public:
     virtual void nextField();
 
     /**
-     * Renders a string or a double in json format. Doubles that are NaN are
+     * Renders a string or a number in json format. Doubles that are NaN are
      * rendered as 'null'. Strings are json-sanitized if needed, and surrounded
      * by quotes.
      *
      * @param Value the value to render.
-     * @return true if the value was a string, thus requiring a flush() before
-     *              returning control to the streamer client, which may mutate
-     *              the string.
      */
     void addValue(const Value& value);
 
@@ -194,6 +193,8 @@ private:
    * Serializes a number.
    */
   void addNumber(double d);
+  void addNumber(uint64_t u);
+  void addNumber(int64_t i);
 
   /**
    * Flushes out any pending fragments.

@@ -123,8 +123,7 @@ void StatsJsonRender::drainIfNeeded(Buffer::Instance& response) {
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
   ASSERT(!histograms_initialized_);
-  json_->stats_array_->addMap()->addEntries(
-      {{"name", name}, {"value", static_cast<double>(value)}});
+  json_->stats_array_->addMap()->addEntries({{"name", name}, {"value", value}});
   drainIfNeeded(response);
 }
 
@@ -251,9 +250,8 @@ void StatsJsonRender::populateBucketsVerbose(
     const std::vector<Stats::ParentHistogram::Bucket>& buckets, Json::Streamer::Map& map) {
   Json::Streamer::ArrayPtr buckets_array = map.addArray();
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
-    buckets_array->addMap()->addEntries({{"lower_bound", bucket.lower_bound_},
-                                         {"width", bucket.width_},
-                                         {"count", static_cast<double>(bucket.count_)}});
+    buckets_array->addMap()->addEntries(
+        {{"lower_bound", bucket.lower_bound_}, {"width", bucket.width_}, {"count", bucket.count_}});
   }
 }
 
@@ -286,8 +284,8 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   for (uint32_t i = 0; i < min_size; ++i) {
     Json::Streamer::MapPtr bucket_map = buckets->addMap();
     bucket_map->addEntries({{"upper_bound", supported_buckets[i]},
-                            {"interval", static_cast<double>(interval_buckets[i])},
-                            {"cumulative", static_cast<double>(cumulative_buckets[i])}});
+                            {"interval", interval_buckets[i]},
+                            {"cumulative", cumulative_buckets[i]}});
   }
 }
 

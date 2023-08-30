@@ -24,20 +24,36 @@ TEST_F(JsonStreamerTest, EmptyMap) {
   EXPECT_EQ("{}", buffer_.toString());
 }
 
-TEST_F(JsonStreamerTest, MapOneNumber) {
+TEST_F(JsonStreamerTest, MapOneDouble) {
   {
     Streamer::MapPtr map = streamer_.makeRootMap();
-    map->addEntries({{"a", 0.0}});
+    map->addEntries({{"a", 3.141592654}});
   }
-  EXPECT_EQ(R"EOF({"a":0})EOF", buffer_.toString());
+  EXPECT_EQ(R"EOF({"a":3.141592654})EOF", buffer_.toString());
 }
 
-TEST_F(JsonStreamerTest, MapTwoNumbers) {
+TEST_F(JsonStreamerTest, MapTwoDoubles) {
   {
     Streamer::MapPtr map = streamer_.makeRootMap();
-    map->addEntries({{"a", 0.0}, {"b", 1.0}});
+    map->addEntries({{"a", -989282.1087}, {"b", 1.23456789012345e+67}});
   }
-  EXPECT_EQ(R"EOF({"a":0,"b":1})EOF", buffer_.toString());
+  EXPECT_EQ(R"EOF({"a":-989282.1087,"b":1.23456789012345e+67})EOF", buffer_.toString());
+}
+
+TEST_F(JsonStreamerTest, MapOneUInt) {
+  {
+    Streamer::MapPtr map = streamer_.makeRootMap();
+    map->addEntries({{"a", 18446744073709551615ull}});
+  }
+  EXPECT_EQ(R"EOF({"a":18446744073709551615})EOF", buffer_.toString());
+}
+
+TEST_F(JsonStreamerTest, MapTwoInts) {
+  {
+    Streamer::MapPtr map = streamer_.makeRootMap();
+    map->addEntries({{"a", 9223372036854775807ll}, {"b", -9223372036854775807ll}});
+  }
+  EXPECT_EQ(R"EOF({"a":9223372036854775807,"b":-9223372036854775807})EOF", buffer_.toString());
 }
 
 TEST_F(JsonStreamerTest, MapOneString) {

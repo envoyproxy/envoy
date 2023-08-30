@@ -66,6 +66,18 @@ void Streamer::Level::addNumber(double number) {
   streamer_.addNumber(number);
 }
 
+void Streamer::Level::addNumber(uint64_t number) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  streamer_.addNumber(number);
+}
+
+void Streamer::Level::addNumber(int64_t number) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  streamer_.addNumber(number);
+}
+
 void Streamer::Level::addString(absl::string_view str) {
   ASSERT_THIS_IS_TOP_LEVEL;
   nextField();
@@ -120,6 +132,12 @@ void Streamer::Level::addValue(const Value& value) {
   case 1:
     addNumber(absl::get<double>(value));
     break;
+  case 2:
+    addNumber(absl::get<uint64_t>(value));
+    break;
+  case 3:
+    addNumber(absl::get<int64_t>(value));
+    break;
   default:
     IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
     break;
@@ -136,9 +154,13 @@ void Streamer::addNumber(double number) {
   if (std::isnan(number)) {
     response_.addFragments({"null"});
   } else {
-    response_.addFragments({absl::StrCat(number)});
+    response_.addFragments({absl::StrFormat("%.15g", number)});
   }
 }
+
+void Streamer::addNumber(uint64_t number) { response_.addFragments({absl::StrCat(number)}); }
+
+void Streamer::addNumber(int64_t number) { response_.addFragments({absl::StrCat(number)}); }
 
 void Streamer::addSanitized(absl::string_view prefix, absl::string_view str,
                             absl::string_view suffix) {
