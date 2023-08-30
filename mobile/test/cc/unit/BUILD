@@ -6,7 +6,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "envoy_config_test",
-    srcs = ["envoy_config_test.cc"],
+    srcs = envoy_select_enable_yaml(["envoy_config_test.cc"]),
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
