@@ -1438,10 +1438,9 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
 #if defined(ENVOY_ENABLE_QUIC)
-    if (cluster.transport_socket().DebugString().find("envoy.transport_sockets.quic") ==
-        std::string::npos) {
+    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
       throw EnvoyException(
-          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
+          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {} {}", cluster.name(),
                       cluster.DebugString()));
     }
 #else
