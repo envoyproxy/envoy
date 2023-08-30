@@ -232,7 +232,7 @@ void UpstreamRequest::writeToConnection(Buffer::Instance& buffer) {
   }
 }
 
-OptRef<Network::Connection> UpstreamRequest::optionalConnection() {
+OptRef<Network::Connection> UpstreamRequest::connection() {
   if (stream_reset_ || response_complete_) {
     return {};
   }

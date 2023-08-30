@@ -13,7 +13,7 @@ public:
   MOCK_METHOD(void, onDecodingSuccess, (RequestPtr request, ExtendedOptions));
   MOCK_METHOD(void, onDecodingFailure, ());
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
-  MOCK_METHOD(OptRef<Network::Connection>, optionalConnection, ());
+  MOCK_METHOD(OptRef<Network::Connection>, connection, ());
 };
 
 class MockResponseDecoderCallback : public ResponseDecoderCallback {
@@ -21,7 +21,7 @@ public:
   MOCK_METHOD(void, onDecodingSuccess, (ResponsePtr response, ExtendedOptions));
   MOCK_METHOD(void, onDecodingFailure, ());
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
-  MOCK_METHOD(OptRef<Network::Connection>, optionalConnection, ());
+  MOCK_METHOD(OptRef<Network::Connection>, connection, ());
 };
 
 class MockRequestEncoderCallback : public RequestEncoderCallback {

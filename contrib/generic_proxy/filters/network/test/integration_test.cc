@@ -99,7 +99,7 @@ public:
     }
     void onDecodingFailure() override {}
     void writeToConnection(Buffer::Instance&) override {}
-    OptRef<Network::Connection> optionalConnection() override {
+    OptRef<Network::Connection> connection() override {
       if (parent_.upstream_connection_ != nullptr) {
         return parent_.upstream_connection_->connection();
       }
