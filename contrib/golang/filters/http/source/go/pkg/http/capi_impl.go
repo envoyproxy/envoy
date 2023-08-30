@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -35,19 +35,34 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 const (
-	ValueRouteName = 1
+	ValueRouteName               = 1
+	ValueFilterChainName         = 2
+	ValueProtocol                = 3
+	ValueResponseCode            = 4
+	ValueResponseCodeDetails     = 5
+	ValueAttemptCount            = 6
+	ValueDownstreamLocalAddress  = 7
+	ValueDownstreamRemoteAddress = 8
+	ValueUpstreamLocalAddress    = 9
+	ValueUpstreamRemoteAddress   = 10
+	ValueUpstreamClusterName     = 11
+	ValueVirtualClusterName      = 12
 )
 
 type httpCApiImpl struct{}
 
 // Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
-// panic here and it will be recover in the Go entry function (TODO).
+// panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
 	case C.CAPIOK:
@@ -80,12 +95,17 @@ func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, b
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpSendPanicReply(r unsafe.Pointer, details string) {
+	res := C.envoyGoFilterHttpSendPanicReply(r, unsafe.Pointer(&details))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *string) {
 	res := C.envoyGoFilterHttpGetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
+func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	// TODO: use a memory pool for better performance,
 	// since these go strings in strs, will be copied into the following map.
 	strs := make([]string, num*2)
@@ -100,18 +120,29 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 	res := C.envoyGoFilterHttpCopyHeaders(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
 
-	m := make(map[string]string, num)
+	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
 		key := strs[i]
 		value := strs[i+1]
-		m[key] = value
+
+		if v, found := m[key]; !found {
+			m[key] = []string{value}
+		} else {
+			m[key] = append(v, value)
+		}
 	}
 	runtime.KeepAlive(buf)
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetHeader(r unsafe.Pointer, key *string, value *string) {
-	res := C.envoyGoFilterHttpSetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
+func (c *httpCApiImpl) HttpSetHeader(r unsafe.Pointer, key *string, value *string, add bool) {
+	var act C.headerAction
+	if add {
+		act = C.HeaderAdd
+	} else {
+		act = C.HeaderSet
+	}
+	res := C.envoyGoFilterHttpSetHeaderHelper(r, unsafe.Pointer(key), unsafe.Pointer(value), act)
 	handleCApiStatus(res)
 }
 
@@ -145,7 +176,7 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
+func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	// TODO: use a memory pool for better performance,
 	// but, should be very careful, since string is const in go,
 	// and we have to make sure the strings is not using before reusing,
@@ -158,30 +189,109 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	res := C.envoyGoFilterHttpCopyTrailers(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
 
-	m := make(map[string]string, num)
+	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
 		key := strs[i]
 		value := strs[i+1]
-		m[key] = value
+
+		if v, found := m[key]; !found {
+			m[key] = []string{value}
+		} else {
+			m[key] = append(v, value)
+		}
 	}
 	return m
 }
 
-func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string) {
-	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value))
+func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool) {
+	var act C.headerAction
+	if add {
+		act = C.HeaderAdd
+	} else {
+		act = C.HeaderSet
+	}
+	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value), act)
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetRouteName(r unsafe.Pointer) string {
+func (c *httpCApiImpl) HttpRemoveTrailer(r unsafe.Pointer, key *string) {
+	res := C.envoyGoFilterHttpRemoveTrailer(r, unsafe.Pointer(key))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringValue(rr unsafe.Pointer, id int) (string, bool) {
+	r := (*httpRequest)(rr)
 	var value string
-	res := C.envoyGoFilterHttpGetStringValue(r, ValueRouteName, unsafe.Pointer(&value))
+	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
+	// since there might be multiple concurrency goroutines invoking this API on the Go side.
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	res := C.envoyGoFilterHttpGetStringValue(unsafe.Pointer(r.req), C.int(id), unsafe.Pointer(&value))
+	if res == C.CAPIValueNotFound {
+		return "", false
+	}
 	handleCApiStatus(res)
 	// copy the memory from c to Go.
-	return strings.Clone(value)
+	return strings.Clone(value), true
+}
+
+func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool) {
+	var value uint64
+	res := C.envoyGoFilterHttpGetIntegerValue(r, C.int(id), unsafe.Pointer(&value))
+	if res == C.CAPIValueNotFound {
+		return 0, false
+	}
+	handleCApiStatus(res)
+	return value, true
+}
+
+func (c *httpCApiImpl) HttpGetDynamicMetadata(rr unsafe.Pointer, filterName string) map[string]interface{} {
+	r := (*httpRequest)(rr)
+	var buf []byte
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req), unsafe.Pointer(&filterName), unsafe.Pointer(&buf))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+	// copy the memory from c to Go.
+	var meta structpb.Struct
+	proto.Unmarshal(buf, &meta)
+	return meta.AsMap()
+}
+
+func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{}) {
+	v, err := structpb.NewValue(value)
+	if err != nil {
+		panic(err)
+	}
+	buf, err := proto.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	res := C.envoyGoFilterHttpSetDynamicMetadata(r, unsafe.Pointer(&filterName), unsafe.Pointer(&key), unsafe.Pointer(&buf))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
+	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(&message))
+}
+
+func (c *httpCApiImpl) HttpLogLevel() api.LogType {
+	return api.GetLogLevel()
 }
 
 func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
+}
+
+func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer) {
+	C.envoyGoConfigHttpFinalize(cfg)
 }
 
 var cAPI api.HttpCAPI = &httpCApiImpl{}
@@ -189,4 +299,55 @@ var cAPI api.HttpCAPI = &httpCApiImpl{}
 // SetHttpCAPI for mock cAPI
 func SetHttpCAPI(api api.HttpCAPI) {
 	cAPI = api
+}
+
+func (c *httpCApiImpl) HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
+	res := C.envoyGoFilterHttpSetStringFilterState(r, unsafe.Pointer(&key), unsafe.Pointer(&value), C.int(stateType), C.int(lifeSpan), C.int(streamSharing))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) string {
+	r := (*httpRequest)(rr)
+	var value string
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req), unsafe.Pointer(&key), unsafe.Pointer(&value))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+
+	return strings.Clone(value)
+}
+
+func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
+	var value uint32
+
+	res := C.envoyGoFilterHttpDefineMetric(unsafe.Pointer(cfg), C.uint32_t(metricType), unsafe.Pointer(&name), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	return value
+}
+
+func (c *httpCApiImpl) HttpIncrementMetric(cc unsafe.Pointer, metricId uint32, offset int64) {
+	cfg := (*httpConfig)(cc)
+	res := C.envoyGoFilterHttpIncrementMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.int64_t(offset))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetMetric(cc unsafe.Pointer, metricId uint32) uint64 {
+	cfg := (*httpConfig)(cc)
+	var value uint64
+	res := C.envoyGoFilterHttpGetMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	return value
+}
+
+func (c *httpCApiImpl) HttpRecordMetric(cc unsafe.Pointer, metricId uint32, value uint64) {
+	cfg := (*httpConfig)(cc)
+	res := C.envoyGoFilterHttpRecordMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.uint64_t(value))
+	handleCApiStatus(res)
 }

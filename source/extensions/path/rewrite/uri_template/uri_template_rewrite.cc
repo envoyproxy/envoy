@@ -55,15 +55,15 @@ absl::StatusOr<std::string> UriTemplateRewriter::rewritePath(absl::string_view p
   RewriteSegments rewrite_pattern_segments =
       parseRewritePattern(rewrite_pattern_, regex_pattern_str).value();
 
-  RE2 regex = RE2(Internal::toStringPiece(regex_pattern_str));
+  RE2 regex = RE2(regex_pattern_str);
   if (!regex.ok()) {
     return absl::InternalError("Regex library failed");
   }
 
   // First capture is the whole matched regex pattern.
   int capture_num = regex.NumberOfCapturingGroups() + 1;
-  std::vector<re2::StringPiece> captures(capture_num);
-  if (!regex.Match(Internal::toStringPiece(pattern), /*startpos=*/0,
+  std::vector<absl::string_view> captures(capture_num);
+  if (!regex.Match(pattern, /*startpos=*/0,
                    /*endpos=*/pattern.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
     return absl::InvalidArgumentError("Pattern not match");
   }
@@ -75,7 +75,7 @@ absl::StatusOr<std::string> UriTemplateRewriter::rewritePath(absl::string_view p
     if (literal != nullptr) {
       absl::StrAppend(&new_path, *literal);
     } else if (capture_index != nullptr) {
-      absl::StrAppend(&new_path, absl::string_view(captures[*capture_index].as_string()));
+      absl::StrAppend(&new_path, captures[*capture_index]);
     }
   }
 

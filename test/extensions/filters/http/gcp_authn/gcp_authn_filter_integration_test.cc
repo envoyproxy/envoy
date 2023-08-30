@@ -82,7 +82,7 @@ public:
       gcp_authn_filter.mutable_typed_config()->PackFrom(proto_config_);
 
       // Add the filter to the filter chain.
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(gcp_authn_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(gcp_authn_filter));
     });
   }
 

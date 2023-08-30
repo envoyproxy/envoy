@@ -48,6 +48,8 @@ namespace Envoy {
 
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
 #define TSAN_TIMEOUT_FACTOR 3
+#elif defined(ENVOY_CONFIG_COVERAGE)
+#define TSAN_TIMEOUT_FACTOR 3
 #else
 #define TSAN_TIMEOUT_FACTOR 1
 #endif
@@ -305,6 +307,20 @@ public:
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Wait for a histogram to have samples.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the histogram was populated within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitForNumHistogramSamplesGe(
+      Stats::Store& store, const std::string& name, uint64_t min_sample_count_required,
+      Event::TestTimeSystem& time_system, Event::Dispatcher& main_dispatcher,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
    * Read a histogram's sample count from the main thread.
    * @param store supplies the stats store.
    * @param name histogram name.
@@ -312,6 +328,14 @@ public:
    */
   static uint64_t readSampleCount(Event::Dispatcher& main_dispatcher,
                                   const Stats::ParentHistogram& histogram);
+  /**
+   * Read a histogram's sum from the main thread.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @return double the sample sum.
+   */
+  static double readSampleSum(Event::Dispatcher& main_dispatcher,
+                              const Stats::ParentHistogram& histogram);
 
   /**
    * Find a readout in a stats store.
@@ -345,6 +369,7 @@ public:
    */
   static std::string uniqueFilename(absl::string_view prefix = "");
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two protos of the same type for equality.
    *
@@ -386,25 +411,7 @@ public:
            lhs.version() == rhs.version() && lhs.hasResource() == rhs.hasResource() &&
            (!lhs.hasResource() || protoEqual(lhs.resource(), rhs.resource()));
   }
-
-  /**
-   * Compare two JSON strings serialized from ProtobufWkt::Struct for equality. When two identical
-   * ProtobufWkt::Struct are serialized into JSON strings, the results have the same set of
-   * properties (values), but the positions may be different.
-   *
-   * @param lhs JSON string on LHS.
-   * @param rhs JSON string on RHS.
-   * @param support_root_array Whether to support parsing JSON arrays.
-   * @return bool indicating whether the JSON strings are equal.
-   */
-  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs,
-                              bool support_root_array = false) {
-    if (!support_root_array) {
-      return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
-    }
-
-    return protoEqual(jsonArrayToStruct(lhs), jsonArrayToStruct(rhs));
-  }
+#endif
 
   /**
    * Symmetrically pad a string with '=' out to a desired length.
@@ -433,6 +440,7 @@ public:
   static std::vector<std::string> split(const std::string& source, const std::string& split,
                                         bool keep_empty_string = false);
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   /**
    * Compare two RepeatedPtrFields of the same type for equality.
    *
@@ -497,6 +505,7 @@ public:
 
     return AssertionSuccess();
   }
+#endif
 
   /**
    * Returns a "novel" IPv4 loopback address, if available.
@@ -511,17 +520,6 @@ public:
 #else
     return "127.0.0.9";
 #endif
-  }
-
-  /**
-   * Return typed proto message object for YAML.
-   * @param yaml YAML string.
-   * @return MessageType parsed from yaml.
-   */
-  template <class MessageType> static MessageType parseYaml(const std::string& yaml) {
-    MessageType message;
-    TestUtility::loadFromYaml(yaml, message);
-    return message;
   }
 
   // Allows pretty printed test names.
@@ -570,7 +568,8 @@ public:
   static std::string convertTime(const std::string& input, const std::string& input_format,
                                  const std::string& output_format);
 
-  static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
+  static constexpr std::chrono::milliseconds DefaultTimeout =
+      std::chrono::milliseconds(10000) * TSAN_TIMEOUT_FACTOR;
 
   /**
    * Return a prefix string matcher.
@@ -624,32 +623,9 @@ public:
    */
   static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
-  // Strict variants of Protobuf::MessageUtil
-  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
-    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
-  }
-
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
-    MessageUtil::loadFromJson(json, message);
-  }
-
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
-  }
-
-  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
-    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
-  }
-
   template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     return MessageUtil::anyConvert<MessageType>(message);
-  }
-
-  template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
-    MessageUtil::loadFromYamlAndValidate(yaml, message,
-                                         ProtobufMessage::getStrictValidationVisitor());
   }
 
   template <class MessageType>
@@ -661,29 +637,6 @@ public:
   static const MessageType& downcastAndValidate(const Protobuf::Message& config) {
     return MessageUtil::downcastAndValidate<MessageType>(
         config, ProtobufMessage::getStrictValidationVisitor());
-  }
-
-  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
-    // Explicit round-tripping to support conversions inside tests between arbitrary messages as a
-    // convenience.
-    ProtobufWkt::Struct tmp;
-    MessageUtil::jsonConvert(source, tmp);
-    MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
-  }
-
-  static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
-    ProtobufWkt::Struct message;
-    MessageUtil::loadFromJson(json, message);
-    return message;
-  }
-
-  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
-    // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
-    std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
-
-    ProtobufWkt::Struct message;
-    MessageUtil::loadFromJson(root_message, message);
-    return message;
   }
 
   /**
@@ -782,6 +735,84 @@ public:
       PANIC("reached unexpected code");
     }
   }
+
+#ifdef ENVOY_ENABLE_YAML
+  /**
+   * Compare two JSON strings serialized from ProtobufWkt::Struct for equality. When two identical
+   * ProtobufWkt::Struct are serialized into JSON strings, the results have the same set of
+   * properties (values), but the positions may be different.
+   *
+   * @param lhs JSON string on LHS.
+   * @param rhs JSON string on RHS.
+   * @param support_root_array Whether to support parsing JSON arrays.
+   * @return bool indicating whether the JSON strings are equal.
+   */
+  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs,
+                              bool support_root_array = false) {
+    if (!support_root_array) {
+      return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+    }
+
+    return protoEqual(jsonArrayToStruct(lhs), jsonArrayToStruct(rhs));
+  }
+
+  /**
+   * Return typed proto message object for YAML.
+   * @param yaml YAML string.
+   * @return MessageType parsed from yaml.
+   */
+  template <class MessageType> static MessageType parseYaml(const std::string& yaml) {
+    MessageType message;
+    TestUtility::loadFromYaml(yaml, message);
+    return message;
+  }
+
+  // Strict variants of Protobuf::MessageUtil
+  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
+    MessageUtil::loadFromJson(json, message);
+  }
+
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
+    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
+  }
+
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
+    // Explicit round-tripping to support conversions inside tests between arbitrary messages as a
+    // convenience.
+    ProtobufWkt::Struct tmp;
+    MessageUtil::jsonConvert(source, tmp);
+    MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
+  }
+
+  static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(json, message);
+    return message;
+  }
+
+  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
+    // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
+    std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
+
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(root_message, message);
+    return message;
+  }
+
+  template <class MessageType>
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    MessageUtil::loadFromYamlAndValidate(yaml, message,
+                                         ProtobufMessage::getStrictValidationVisitor());
+  }
+#endif
 };
 
 /**
@@ -921,6 +952,19 @@ public:
     }
     header_map_->verifyByteSizeInternalForTest();
   }
+  TestHeaderMapImplBase(const std::initializer_list<std::pair<std::string, std::string>>& values,
+                        const uint32_t max_headers_kb, const uint32_t max_headers_count) {
+    if (header_map_) {
+      header_map_.reset();
+    }
+    header_map_ = Impl::create(max_headers_kb, max_headers_count);
+
+    for (auto& value : values) {
+      header_map_->addCopy(LowerCaseString(value.first), value.second);
+    }
+    header_map_->verifyByteSizeInternalForTest();
+  }
+
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
       : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
@@ -963,6 +1007,9 @@ public:
   // HeaderMap
   bool operator==(const HeaderMap& rhs) const override { return header_map_->operator==(rhs); }
   bool operator!=(const HeaderMap& rhs) const override { return header_map_->operator!=(rhs); }
+
+  bool operator==(const TestHeaderMapImplBase& rhs) const { return header_map_->operator==(rhs); }
+  bool operator!=(const TestHeaderMapImplBase& rhs) const { return header_map_->operator!=(rhs); }
   void addViaMove(HeaderString&& key, HeaderString&& value) override {
     header_map_->addViaMove(std::move(key), std::move(value));
     header_map_->verifyByteSizeInternalForTest();
@@ -1003,6 +1050,8 @@ public:
     header_map_->verifyByteSizeInternalForTest();
   }
   uint64_t byteSize() const override { return header_map_->byteSize(); }
+  uint32_t maxHeadersKb() const override { return header_map_->maxHeadersKb(); }
+  uint32_t maxHeadersCount() const override { return header_map_->maxHeadersCount(); }
   HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }
@@ -1182,6 +1231,7 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   return equal;
 }
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 MATCHER_P(ProtoEq, expected, "") {
   const bool equal =
       TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/false);
@@ -1278,6 +1328,9 @@ MATCHER_P(Percent, rhs, "") {
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
 
+#endif
+
+#ifdef ENVOY_ENABLE_YAML
 MATCHER_P(JsonStringEq, expected, "") {
   const bool equal = TestUtility::jsonStringEqual(arg, expected);
   if (!equal) {
@@ -1291,5 +1344,14 @@ MATCHER_P(JsonStringEq, expected, "") {
   }
   return equal;
 }
+#endif
+
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
 
 } // namespace Envoy

@@ -25,10 +25,10 @@ quic::WriteResult convertToQuicWriteResult(Api::IoCallUint64Result& result) {
 EnvoyQuicPacketWriter::EnvoyQuicPacketWriter(Network::UdpPacketWriterPtr envoy_udp_packet_writer)
     : envoy_udp_packet_writer_(std::move(envoy_udp_packet_writer)) {}
 
-quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t buffer_len,
-                                                     const quic::QuicIpAddress& self_ip,
-                                                     const quic::QuicSocketAddress& peer_address,
-                                                     quic::PerPacketOptions* options) {
+quic::WriteResult EnvoyQuicPacketWriter::WritePacket(
+    const char* buffer, size_t buffer_len, const quic::QuicIpAddress& self_ip,
+    const quic::QuicSocketAddress& peer_address, quic::PerPacketOptions* options,
+    [[maybe_unused]] const quic::QuicPacketWriterParams& params) {
   ASSERT(options == nullptr, "Per packet option is not supported yet.");
 
   Buffer::BufferFragmentImpl fragment(buffer, buffer_len, nullptr);
@@ -66,8 +66,7 @@ EnvoyQuicPacketWriter::GetNextWriteLocation(const quic::QuicIpAddress& self_ip,
       quicAddressToEnvoyAddressInstance(peer_address);
   Network::UdpPacketWriterBuffer write_location = envoy_udp_packet_writer_->getNextWriteLocation(
       local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
-  return quic::QuicPacketBuffer(reinterpret_cast<char*>(write_location.buffer_),
-                                write_location.release_buffer_);
+  return {reinterpret_cast<char*>(write_location.buffer_), write_location.release_buffer_};
 }
 
 quic::WriteResult EnvoyQuicPacketWriter::Flush() {

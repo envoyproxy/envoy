@@ -126,6 +126,8 @@ void CacheShared::evict() {
   });
   size_bytes_ = size;
   size_count_ = count;
+  stats_.size_bytes_.set(size);
+  stats_.size_count_.set(count);
   uint64_t size_kept = 0;
   uint64_t count_kept = 0;
   uint64_t max_size = config_.has_max_cache_size_bytes() ? config_.max_cache_size_bytes().value()

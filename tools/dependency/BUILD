@@ -25,9 +25,9 @@ envoy_entry_point(
 )
 
 envoy_entry_point(
-    name = "pip_check",
+    name = "dependatool",
     args = ["--path=%s" % PATH],
-    pkg = "envoy.dependency.pip_check",
+    pkg = "dependatool",
 )
 
 py_binary(
@@ -67,7 +67,7 @@ genrule(
         --download_cves $@ \
         --repository_locations=$(location //bazel:all_repository_locations)
     """,
-    exec_tools = [
+    tools = [
         ":cve_download",
         "//bazel:all_repository_locations",
     ],

@@ -221,7 +221,7 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
   return formatted_time;
 }
 
-std::string DateFormatter::now(TimeSource& time_source) {
+std::string DateFormatter::now(TimeSource& time_source) const {
   return fromTime(time_source.systemTime());
 }
 
@@ -400,7 +400,7 @@ std::string StringUtil::removeTokens(absl::string_view source, absl::string_view
                                      absl::string_view joiner) {
   auto values = Envoy::StringUtil::splitToken(source, delimiters, false, true);
   auto end = std::remove_if(values.begin(), values.end(),
-                            [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
+                            [&](absl::string_view t) { return tokens_to_remove.contains(t); });
   return absl::StrJoin(values.begin(), end, joiner);
 }
 

@@ -100,9 +100,8 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
   auto message = buildMessageToSign(absl::string_view(service_url.data(), service_url.length()),
                                     absl::string_view(method_name.data(), method_name.length()));
 
-  try {
-    signer_->sign(message, false);
-  } catch (const EnvoyException& e) {
+  TRY_NEEDS_AUDIT { signer_->sign(message, false); }
+  END_TRY catch (const EnvoyException& e) {
     return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
   }
 

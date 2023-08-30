@@ -76,14 +76,16 @@ public:
   ~MockDriver() override;
 
   SpanPtr startSpan(const Config& config, TraceContext& trace_context,
-                    const std::string& operation_name, SystemTime start_time,
+                    const StreamInfo::StreamInfo& stream_info, const std::string& operation_name,
                     const Tracing::Decision tracing_decision) override {
-    return SpanPtr{startSpan_(config, trace_context, operation_name, start_time, tracing_decision)};
+    return SpanPtr{
+        startSpan_(config, trace_context, stream_info, operation_name, tracing_decision)};
   }
 
   MOCK_METHOD(Span*, startSpan_,
-              (const Config& config, TraceContext& trace_context, const std::string& operation_name,
-               SystemTime start_time, const Tracing::Decision tracing_decision));
+              (const Config& config, TraceContext& trace_context,
+               const StreamInfo::StreamInfo& stream_info, const std::string& operation_name,
+               const Tracing::Decision tracing_decision));
 };
 
 class MockTracerManager : public TracerManager {

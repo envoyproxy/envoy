@@ -15,6 +15,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/network/filter_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -111,6 +112,7 @@ public:
     }
   }
 
+  void initializeReadFilters() override { connection_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return {}; }
   void close() override;
   uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }

@@ -62,9 +62,8 @@ public:
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
-                                      bool bind_to_port, bool ignore_global_conn_limit) override {
-    return impl_.createListener(std::move(socket), cb, runtime, bind_to_port,
-                                ignore_global_conn_limit);
+                                      const Network::ListenerConfig& listener_config) override {
+    return impl_.createListener(std::move(socket), cb, runtime, listener_config);
   }
 
   Network::UdpListenerPtr
@@ -96,7 +95,7 @@ public:
     return impl_.listenForSignal(signal_num, std::move(cb));
   }
 
-  void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
+  void post(Event::PostCb callback) override { impl_.post(std::move(callback)); }
 
   void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override {
     impl_.deleteInDispatcherThread(std::move(deletable));

@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/extension_config_provider.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener_filter_buffer.h"
 #include "envoy/network/transport_socket.h"
@@ -399,6 +400,14 @@ public:
  */
 using ListenerFilterFactoryCb = std::function<void(ListenerFilterManager& filter_manager)>;
 
+template <class FactoryCb>
+using FilterConfigProvider = Envoy::Config::ExtensionConfigProvider<FactoryCb>;
+
+template <class FactoryCb>
+using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider<FactoryCb>>;
+
+using NetworkFilterFactoriesList = std::vector<FilterConfigProviderPtr<FilterFactoryCb>>;
+
 /**
  * Interface representing a single filter chain.
  */
@@ -420,9 +429,10 @@ public:
   virtual std::chrono::milliseconds transportSocketConnectTimeout() const PURE;
 
   /**
-   * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
+   * @return const Filter::NetworkFilterFactoriesList& a list of filter factory providers to be
+   * used by the new connection.
    */
-  virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
+  virtual const NetworkFilterFactoriesList& networkFilterFactories() const PURE;
 
   /**
    * @return the name of this filter chain.
@@ -541,7 +551,7 @@ public:
    *   false, e.g. filter chain is empty.
    */
   virtual bool createNetworkFilterChain(Connection& connection,
-                                        const std::vector<FilterFactoryCb>& filter_factories) PURE;
+                                        const NetworkFilterFactoriesList& filter_factories) PURE;
 
   /**
    * Called to create the listener filter chain.
@@ -570,6 +580,8 @@ public:
   virtual ~MatchingData() = default;
 
   virtual const ConnectionSocket& socket() const PURE;
+  virtual const StreamInfo::FilterState& filterState() const PURE;
+  virtual const envoy::config::core::v3::Metadata& dynamicMetadata() const PURE;
 
   const ConnectionInfoProvider& connectionInfoProvider() const {
     return socket().connectionInfoProvider();

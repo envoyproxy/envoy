@@ -1,10 +1,9 @@
-version: "3.8"
 services:
 
   envoy-front-proxy:
     build:
       context: .
-      dockerfile: Dockerfile-envoy
+      dockerfile: ../shared/envoy/Dockerfile
     ports:
     - "${PORT_PROXY:-10000}:10000"
     depends_on:
@@ -19,32 +18,28 @@ services:
 
   service1:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
     environment:
     - SERVICE_NAME=1
 
   service1-mirror:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
     environment:
     - SERVICE_NAME=1
 
   service2:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
     environment:
     - SERVICE_NAME=2
 
   service2-mirror:
     build:
-      context: ../shared/flask
-    volumes:
-    - ./service.py:/code/service.py
+      context: ../shared/python
+      target: aiohttp-tracing-service
     environment:
     - SERVICE_NAME=2

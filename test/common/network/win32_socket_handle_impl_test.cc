@@ -75,10 +75,12 @@ TEST_F(Win32SocketHandleImplTest, ReadvWithBufferShouldReadFromBuffer) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   constexpr int data_length = 10;
   std::string data(data_length, '*');
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Invoke([&](os_fd_t, const iovec* iov, int) {
-    memcpy(iov->iov_base, data.data(), data_length); // NOLINT(safe-memcpy)
-    return Api::SysCallSizeResult{data_length, 0};
-  }));
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .WillOnce(Invoke([&](os_fd_t, void* buffer, size_t, int) {
+        memcpy(buffer, data.data(), data_length); // NOLINT(safe-memcpy)
+        return Api::SysCallSizeResult{data_length, 0};
+      }));
 
   absl::FixedArray<char> buf(data_length);
   auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
@@ -108,13 +110,10 @@ TEST_F(Win32SocketHandleImplTest, RecvWithoutPeekShouldReadFromWire) {
 TEST_F(Win32SocketHandleImplTest, RecvWithPeekMultipleTimes) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .WillOnce(Invoke([&](os_fd_t, const iovec* iov, int num_iovs) {
-        size_t size_to_read = 0;
-        for (auto i = 0; i < num_iovs; i++) {
-          size_to_read += iov[i].iov_len;
-        }
-        EXPECT_EQ(10, size_to_read);
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .WillOnce(Invoke([&](os_fd_t, void*, size_t length, int) {
+        EXPECT_EQ(10, length);
         return Api::SysCallSizeResult{5, 0};
       }))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
@@ -123,15 +122,12 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekMultipleTimes) {
   absl::FixedArray<char> buf(10);
   auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
   EXPECT_EQ(rc.return_value_, 5);
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .WillOnce(Invoke([&](os_fd_t, const iovec* iov, int num_iovs) {
-        size_t size_to_read = 0;
-        for (auto i = 0; i < num_iovs; i++) {
-          size_to_read += iov[i].iov_len;
-        }
-        EXPECT_EQ(5, size_to_read);
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .WillOnce(Invoke([&](os_fd_t, void*, size_t length, int) {
+        EXPECT_EQ(5, length);
         return Api::SysCallSizeResult{5, 0};
       }));
+
   auto rc2 = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
   EXPECT_EQ(rc2.return_value_, 10);
 }
@@ -139,7 +135,8 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekMultipleTimes) {
 TEST_F(Win32SocketHandleImplTest, RecvWithPeekReactivatesReadOnBlock) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(1)
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
 
@@ -153,9 +150,10 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekFlagReturnsFinalError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   constexpr int data_length = 10;
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(2)
-      .WillOnce(Invoke([&](os_fd_t, const iovec*, int) {
+      .WillOnce(Invoke([&](os_fd_t, void*, size_t, int) {
         return Api::SysCallSizeResult{data_length / 2, 0};
       }))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_CONNRESET}));
@@ -170,10 +168,12 @@ TEST_F(Win32SocketHandleImplTest, ReadvWithPeekShouldReadFromBuffer) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   constexpr int data_length = 10;
   std::string data(data_length, '*');
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Invoke([&](os_fd_t, const iovec* iov, int) {
-    memcpy(iov->iov_base, data.data(), data_length); // NOLINT(safe-memcpy)
-    return Api::SysCallSizeResult{data_length, 0};
-  }));
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .WillOnce(Invoke([&](os_fd_t, void* buffer, size_t, int) {
+        memcpy(buffer, data.data(), data_length); // NOLINT(safe-memcpy)
+        return Api::SysCallSizeResult{data_length, 0};
+      }));
 
   absl::FixedArray<char> buf(data_length);
   auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);

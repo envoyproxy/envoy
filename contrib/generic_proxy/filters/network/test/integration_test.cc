@@ -22,6 +22,14 @@ namespace NetworkFilters {
 namespace GenericProxy {
 namespace {
 
+class GenericProxyIntegrationTest : public BaseIntegrationTest {
+public:
+  GenericProxyIntegrationTest(const std::string config_yaml)
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, config_yaml) {
+    skip_tag_extraction_rule_check_ = true;
+  };
+};
+
 class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -58,21 +66,19 @@ public:
   using TestReadFilterSharedPtr = std::shared_ptr<TestReadFilter>;
 
   struct TestRequestEncoderCallback : public RequestEncoderCallback {
-    void onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) override {
+    void onEncodingSuccess(Buffer::Instance& buffer) override {
       buffer_.move(buffer);
-      expect_response_ = expect_response;
       complete_ = true;
       request_bytes_ = buffer_.length();
     }
     bool complete_{};
     size_t request_bytes_{};
     Buffer::OwnedImpl buffer_;
-    bool expect_response_;
   };
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
 
   struct TestResponseEncoderCallback : public ResponseEncoderCallback {
-    void onEncodingSuccess(Buffer::Instance& buffer, bool) override {
+    void onEncodingSuccess(Buffer::Instance& buffer) override {
       buffer_.move(buffer);
       complete_ = true;
       response_bytes_ = buffer_.length();
@@ -86,12 +92,13 @@ public:
   struct TestResponseDecoderCallback : public ResponseDecoderCallback {
     TestResponseDecoderCallback(IntegrationTest& parent) : parent_(parent) {}
 
-    void onDecodingSuccess(ResponsePtr response) override {
+    void onDecodingSuccess(ResponsePtr response, ExtendedOptions) override {
       response_ = std::move(response);
       complete_ = true;
       parent_.integration_->dispatcher_->exit();
     }
     void onDecodingFailure() override {}
+    void writeToConnection(Buffer::Instance&) override {}
 
     bool complete_{};
     ResponsePtr response_;
@@ -100,8 +107,7 @@ public:
   using TestResponseDecoderCallbackSharedPtr = std::shared_ptr<TestResponseDecoderCallback>;
 
   void initialize(const std::string& config_yaml, CodecFactoryPtr codec_factory) {
-    integration_ =
-        std::make_unique<BaseIntegrationTest>(Network::Address::IpVersion::v4, config_yaml);
+    integration_ = std::make_unique<GenericProxyIntegrationTest>(config_yaml);
     integration_->initialize();
 
     // Create codec for downstream client.
@@ -135,33 +141,37 @@ public:
               value: {}
           route_config:
             name: test-routes
-            routes:
-              matcher_tree:
-                input:
-                  name: request-service
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
-                exact_match_map:
-                  map:
-                    service_name_0:
-                      matcher:
-                        matcher_list:
-                          matchers:
-                          - predicate:
-                              single_predicate:
-                                input:
-                                  name: request-properties
+            virtual_hosts:
+            - name: test
+              hosts:
+              - "*"
+              routes:
+                matcher_tree:
+                  input:
+                    name: request-service
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
+                  exact_match_map:
+                    map:
+                      service_name_0:
+                        matcher:
+                          matcher_list:
+                            matchers:
+                            - predicate:
+                                single_predicate:
+                                  input:
+                                    name: request-properties
+                                    typed_config:
+                                      "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
+                                      property_name: version
+                                  value_match:
+                                    exact: v1
+                              on_match:
+                                action:
+                                  name: route
                                   typed_config:
-                                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
-                                    property_name: version
-                                value_match:
-                                  exact: v1
-                            on_match:
-                              action:
-                                name: route
-                                typed_config:
-                                  "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
-                                  cluster: cluster_0
+                                    "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
+                                    cluster: cluster_0
 )EOF");
   }
 
@@ -195,6 +205,8 @@ public:
   void waitForUpstreamRequestForTest(uint64_t num_bytes, std::string* data) {
     auto result = upstream_connection_->waitForData(num_bytes, data);
     RELEASE_ASSERT(result, result.failure_message());
+    // Clear data for next test.
+    upstream_connection_->clearData();
   }
 
   // Send upstream response.
@@ -251,7 +263,7 @@ public:
   TestResponseEncoderCallbackSharedPtr response_encoder_callback_;
 
   // Integration test server.
-  std::unique_ptr<BaseIntegrationTest> integration_;
+  std::unique_ptr<GenericProxyIntegrationTest> integration_;
 
   // Callbacks for downstream connection.
   ConnectionCallbacksSharedPtr connection_callbacks_;
@@ -331,6 +343,122 @@ TEST_P(IntegrationTest, RequestAndResponse) {
   EXPECT_NE(response_decoder_callback_->response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->response_->status().code(), StatusCode::kOk);
   EXPECT_EQ(response_decoder_callback_->response_->getByKey("zzzz"), "xxxx");
+
+  cleanup();
+}
+
+TEST_P(IntegrationTest, MultipleRequestsWithSameStreamId) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  codec_factory_config.protocol_options_ = ProtocolOptions{true};
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
+  codec_factory->protocol_options_ = ProtocolOptions{true};
+
+  initialize(defaultConfig(), std::move(codec_factory));
+
+  EXPECT_TRUE(makeClientConnectionForTest());
+
+  FakeStreamCodecFactory::FakeRequest request_1;
+  request_1.host_ = "service_name_0";
+  request_1.method_ = "hello";
+  request_1.path_ = "/path_or_anything";
+  request_1.protocol_ = "fake_fake_fake";
+  request_1.data_ = {{"version", "v1"}, {"stream_id", "1"}};
+
+  sendRequestForTest(request_1);
+
+  waitForUpstreamConnectionForTest();
+  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
+
+  FakeStreamCodecFactory::FakeRequest request_2;
+  request_2.host_ = "service_name_0";
+  request_2.method_ = "hello";
+  request_2.path_ = "/path_or_anything";
+  request_2.protocol_ = "fake_fake_fake";
+  request_2.data_ = {{"version", "v1"}, {"stream_id", "1"}};
+
+  // Send the second request with the same stream id and expect the connection to be closed.
+  sendRequestForTest(request_2);
+
+  // Wait for the connection to be closed.
+  auto result = upstream_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+
+  cleanup();
+}
+
+TEST_P(IntegrationTest, MultipleRequests) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  codec_factory_config.protocol_options_ = ProtocolOptions{true};
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  auto codec_factory = std::make_unique<FakeStreamCodecFactory>();
+  codec_factory->protocol_options_ = ProtocolOptions{true};
+
+  initialize(defaultConfig(), std::move(codec_factory));
+
+  EXPECT_TRUE(makeClientConnectionForTest());
+
+  FakeStreamCodecFactory::FakeRequest request_1;
+  request_1.host_ = "service_name_0";
+  request_1.method_ = "hello";
+  request_1.path_ = "/path_or_anything";
+  request_1.protocol_ = "fake_fake_fake";
+  request_1.data_ = {{"version", "v1"}, {"stream_id", "1"}};
+
+  sendRequestForTest(request_1);
+
+  waitForUpstreamConnectionForTest();
+  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
+
+  FakeStreamCodecFactory::FakeRequest request_2;
+  request_2.host_ = "service_name_0";
+  request_2.method_ = "hello";
+  request_2.path_ = "/path_or_anything";
+  request_2.protocol_ = "fake_fake_fake";
+  request_2.data_ = {{"version", "v1"}, {"stream_id", "2"}};
+
+  // Reset request encoder callback.
+  request_encoder_callback_ = std::make_shared<TestRequestEncoderCallback>();
+
+  // Send the second request with the different stream id and expect the connection to be alive.
+  sendRequestForTest(request_2);
+  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
+
+  FakeStreamCodecFactory::FakeResponse response_2;
+  response_2.protocol_ = "fake_fake_fake";
+  response_2.status_ = Status();
+  response_2.data_["zzzz"] = "xxxx";
+  response_2.data_["stream_id"] = "2";
+
+  sendResponseForTest(response_2);
+
+  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200)),
+                 "unexpected timeout");
+
+  EXPECT_NE(response_decoder_callback_->response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->response_->getByKey("zzzz"), "xxxx");
+  EXPECT_EQ(response_decoder_callback_->response_->getByKey("stream_id"), "2");
+
+  response_decoder_callback_->complete_ = false;
+
+  FakeStreamCodecFactory::FakeResponse response_1;
+  response_1.protocol_ = "fake_fake_fake";
+  response_1.status_ = Status();
+  response_1.data_["zzzz"] = "yyyy";
+  response_1.data_["stream_id"] = "1";
+
+  sendResponseForTest(response_1);
+
+  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200)),
+                 "unexpected timeout");
+
+  EXPECT_NE(response_decoder_callback_->response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->response_->getByKey("zzzz"), "yyyy");
+  EXPECT_EQ(response_decoder_callback_->response_->getByKey("stream_id"), "1");
 
   cleanup();
 }

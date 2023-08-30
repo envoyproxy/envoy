@@ -1,16 +1,10 @@
 #pragma once
 
+#include <vector>
+
+#include "absl/strings/string_view.h"
+#include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
+
 // NOLINT(namespace-envoy)
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * Registers the Apple platform cert verifier API.
- */
-void register_apple_platform_cert_verifier();
-
-#ifdef __cplusplus
-}
-#endif
+envoy_cert_validation_result verify_cert(const std::vector<std::string>& certs,
+                                         absl::string_view hostname);

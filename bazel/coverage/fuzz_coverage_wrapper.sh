@@ -1,6 +1,4 @@
-#!/bin/bash
-
-set -ex
+#!/bin/bash -e
 
 TEST_BINARY=$1
 shift

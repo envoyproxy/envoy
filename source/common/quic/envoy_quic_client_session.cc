@@ -254,6 +254,11 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
     raiseConnectionEvent(Network::ConnectionEvent::ConnectedZeroRtt);
   }
 }
+void EnvoyQuicClientSession::OnServerPreferredAddressAvailable(
+    const quic::QuicSocketAddress& server_preferred_address) {
+  static_cast<EnvoyQuicClientConnection*>(connection())
+      ->probeAndMigrateToServerPreferredAddress(server_preferred_address);
+}
 
 } // namespace Quic
 } // namespace Envoy

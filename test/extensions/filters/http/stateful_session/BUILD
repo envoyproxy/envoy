@@ -30,6 +30,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "stateful_session_integration_test",
+    size = "large",
     srcs = [
         "stateful_session_integration_test.cc",
     ],

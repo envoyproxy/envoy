@@ -13,53 +13,111 @@
 #include "source/common/http/utility.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
-#include "contrib/golang/filters/http/source/common/dso/dso.h"
+#include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
+#include "contrib/golang/filters/http/source/stats.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
 
+enum class MetricType {
+  Counter = 0,
+  Gauge = 1,
+  Histogram = 2,
+  Max = 2,
+};
+
+class MetricStore {
+public:
+  MetricStore(Stats::ScopeSharedPtr scope) : scope_(scope) {}
+
+  static constexpr uint32_t kMetricTypeMask = 0x3;
+  static constexpr uint32_t kMetricIdIncrement = 0x4;
+
+  uint32_t nextCounterMetricId() { return next_counter_metric_id_ += kMetricIdIncrement; }
+  uint32_t nextGaugeMetricId() { return next_gauge_metric_id_ += kMetricIdIncrement; }
+  uint32_t nextHistogramMetricId() { return next_histogram_metric_id_ += kMetricIdIncrement; }
+
+  absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
+  absl::flat_hash_map<uint32_t, Stats::Gauge*> gauges_;
+  absl::flat_hash_map<uint32_t, Stats::Histogram*> histograms_;
+
+  Stats::ScopeSharedPtr scope_;
+
+private:
+  uint32_t next_counter_metric_id_ = static_cast<uint32_t>(MetricType::Counter);
+  uint32_t next_gauge_metric_id_ = static_cast<uint32_t>(MetricType::Gauge);
+  uint32_t next_histogram_metric_id_ = static_cast<uint32_t>(MetricType::Histogram);
+};
+
+using MetricStoreSharedPtr = std::shared_ptr<MetricStore>;
+
+struct httpConfigInternal;
+
 /**
  * Configuration for the HTTP golang extension filter.
  */
-class FilterConfig : Logger::Loggable<Logger::Id::http> {
+class FilterConfig : public std::enable_shared_from_this<FilterConfig>,
+                     Logger::Loggable<Logger::Id::http> {
 public:
-  FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config);
-  // TODO: delete config in Go
-  virtual ~FilterConfig() = default;
+  FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
+               Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
+               Server::Configuration::FactoryContext& context);
+  ~FilterConfig();
 
   const std::string& soId() const { return so_id_; }
   const std::string& soPath() const { return so_path_; }
   const std::string& pluginName() const { return plugin_name_; }
   uint64_t getConfigId();
+  GolangFilterStats& stats() { return stats_; }
+
+  void newGoPluginConfig();
+  CAPIStatus defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id);
+  CAPIStatus incrementMetric(uint32_t metric_id, int64_t offset);
+  CAPIStatus getMetric(uint32_t metric_id, uint64_t* value);
+  CAPIStatus recordMetric(uint32_t metric_id, uint64_t value);
 
 private:
   const std::string plugin_name_;
   const std::string so_id_;
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
+
+  GolangFilterStats stats_;
+
+  Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
+  // TODO(StarryVae): use rwlock.
+  Thread::MutexBasicLockable mutex_{};
+  MetricStoreSharedPtr metric_store_ ABSL_GUARDED_BY(mutex_);
+  httpConfigInternal* config_{nullptr};
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-class RoutePluginConfig : Logger::Loggable<Logger::Id::http> {
+class RoutePluginConfig : public std::enable_shared_from_this<RoutePluginConfig>,
+                          Logger::Loggable<Logger::Id::http> {
 public:
-  RoutePluginConfig(const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config)
-      : plugin_config_(config.config()) {
-    ENVOY_LOG(debug, "initilizing golang filter route plugin config, type_url: {}",
-              config.config().type_url());
-  };
-  // TODO: delete plugin config in Go
-  ~RoutePluginConfig() = default;
-  uint64_t getMergedConfigId(uint64_t parent_id, std::string so_id);
+  RoutePluginConfig(const std::string plugin_name,
+                    const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config);
+  ~RoutePluginConfig();
+  uint64_t getConfigId();
+  uint64_t getMergedConfigId(uint64_t parent_id);
 
 private:
+  const std::string plugin_name_;
   const ProtobufWkt::Any plugin_config_;
+
+  Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
-  uint64_t merged_config_id_{0};
+  // since these two fields are updated in worker threads, we need to protect them with a mutex.
+  uint64_t merged_config_id_ ABSL_GUARDED_BY(mutex_){0};
+  uint64_t cached_parent_id_ ABSL_GUARDED_BY(mutex_){0};
+
+  absl::Mutex mutex_;
+  httpConfig* config_{nullptr};
 };
 
 using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;
@@ -72,7 +130,7 @@ class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute&,
                        Server::Configuration::ServerFactoryContext&);
-  uint64_t getPluginConfigId(uint64_t parent_id, std::string plugin_name, std::string so_id) const;
+  uint64_t getPluginConfigId(uint64_t parent_id, std::string plugin_name) const;
 
   ~FilterConfigPerRoute() override { plugins_config_.clear(); }
 
@@ -85,8 +143,19 @@ enum class DestroyReason {
   Terminate,
 };
 
-enum class StringValue {
+enum class EnvoyValue {
   RouteName = 1,
+  FilterChainName,
+  Protocol,
+  ResponseCode,
+  ResponseCodeDetails,
+  AttemptCount,
+  DownstreamLocalAddress,
+  DownstreamRemoteAddress,
+  UpstreamLocalAddress,
+  UpstreamRemoteAddress,
+  UpstreamClusterName,
+  VirtualClusterName,
 };
 
 struct httpRequestInternal;
@@ -99,7 +168,7 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::http>,
                public AccessLog::Instance {
 public:
-  explicit Filter(FilterConfigSharedPtr config, Dso::DsoInstancePtr dynamic_lib)
+  explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib)
       : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this) {
   }
 
@@ -136,28 +205,43 @@ public:
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override;
+           const StreamInfo::StreamInfo& stream_info,
+           Envoy::AccessLog::AccessLogType access_log_type) override;
 
   void onStreamComplete() override {}
 
   CAPIStatus continueStatus(GolangStatus status);
 
-  CAPIStatus sendLocalReply(Http::Code response_code, absl::string_view body_text,
+  CAPIStatus sendLocalReply(Http::Code response_code, std::string body_text,
                             std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
-                            Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
+                            Grpc::Status::GrpcStatus grpc_status, std::string details);
 
-  CAPIStatus getHeader(absl::string_view key, GoString* goValue);
+  CAPIStatus sendPanicReply(absl::string_view details);
+
+  CAPIStatus getHeader(absl::string_view key, GoString* go_value);
   CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
-  CAPIStatus setHeader(absl::string_view key, absl::string_view value);
+  CAPIStatus setHeader(absl::string_view key, absl::string_view value, headerAction act);
   CAPIStatus removeHeader(absl::string_view key);
   CAPIStatus copyBuffer(Buffer::Instance* buffer, char* data);
   CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                              bufferAction action);
   CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
-  CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
+  CAPIStatus setTrailer(absl::string_view key, absl::string_view value, headerAction act);
+  CAPIStatus removeTrailer(absl::string_view key);
   CAPIStatus getStringValue(int id, GoString* value_str);
+  CAPIStatus getIntegerValue(int id, uint64_t* value);
+
+  CAPIStatus getDynamicMetadata(const std::string& filter_name, GoSlice* buf_slice);
+  CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
+  CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
+                                  int life_span, int stream_sharing);
+  CAPIStatus getStringFilterState(absl::string_view key, GoString* value_str);
 
 private:
+  bool hasDestroyed() {
+    Thread::LockGuard lock(mutex_);
+    return has_destroyed_;
+  };
   ProcessorState& getProcessorState();
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
@@ -180,8 +264,14 @@ private:
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
+  void setDynamicMetadataInternal(ProcessorState& state, std::string filter_name, std::string key,
+                                  const absl::string_view& buf);
+
+  void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
+                                 GoSlice* buf_slice);
+
   const FilterConfigSharedPtr config_;
-  Dso::DsoInstancePtr dynamic_lib_;
+  Dso::HttpFilterDsoPtr dynamic_lib_;
 
   Http::RequestOrResponseHeaderMap* headers_ ABSL_GUARDED_BY(mutex_){nullptr};
   Http::HeaderMap* trailers_ ABSL_GUARDED_BY(mutex_){nullptr};
@@ -218,6 +308,21 @@ struct httpRequestInternal : httpRequest {
   std::string strValue;
   httpRequestInternal(std::weak_ptr<Filter> f) { filter_ = f; }
   std::weak_ptr<Filter> weakFilter() { return filter_; }
+};
+
+struct httpConfigInternal : httpConfig {
+  std::weak_ptr<FilterConfig> config_;
+  httpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
+  std::weak_ptr<FilterConfig> weakFilterConfig() { return config_; }
+};
+
+class GoStringFilterState : public StreamInfo::FilterState::Object {
+public:
+  GoStringFilterState(absl::string_view value) : value_(value) {}
+  const std::string& value() const { return value_; }
+
+private:
+  const std::string value_;
 };
 
 } // namespace Golang

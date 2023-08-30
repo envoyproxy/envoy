@@ -7,10 +7,10 @@ concurrency:
 
 jobs:
   dependency-review:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - name: 'Checkout Repository'
       uses: actions/checkout@v3
     - name: 'Dependency Review'
-      uses: actions/dependency-review-action@c090f4e553673e6e505ea70d6a95362ee12adb94
+      uses: actions/dependency-review-action@f6fff72a3217f580d5afd49a46826795305b63c7

@@ -21,6 +21,7 @@ envoy_cc_test_library(
     deps = [
         ":config_test_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//source/extensions/config_subscription/rest:http_subscription_lib",
         "//test/config:v2_link_hacks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
@@ -34,7 +35,10 @@ envoy_cc_test(
         "example_configs_test_setup.sh",
         "//configs:example_configs",
     ],
-    env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
+    env = {
+        "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar",
+        "GODEBUG": "cgocheck=0",
+    },
     deps = [
         ":example_configs_test_lib",
     ],

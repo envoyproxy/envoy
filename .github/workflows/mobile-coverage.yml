@@ -1,0 +1,59 @@
+name: mobile_coverage
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
+  coverage:
+    if: ${{ needs.env.outputs.mobile_coverage == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: coverage
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Run coverage'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile
+        export BAZEL_BUILD_OPTION_LIST="--config=mobile-remote-ci-linux-coverage" \
+            PATH=/opt/llvm/bin:${PATH} \
+            COVERAGE_THRESHOLD=76
+        ../test/run_envoy_bazel_coverage.sh //test/common/... //test/cc/...
+    - name: 'Package coverage'
+      run: |
+        cd mobile
+        tar -czf coverage.tar.gz generated/coverage
+    - name: 'Upload report'
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage.tar.gz
+        path: mobile/coverage.tar.gz

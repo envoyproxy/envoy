@@ -39,7 +39,7 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                              envoy::service::metrics::v3::StreamMetricsResponse>>(
       grpc_metrics_streamer,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false),
-      sink_config.emit_tags_as_labels());
+      sink_config.emit_tags_as_labels(), sink_config.histogram_emit_mode());
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {

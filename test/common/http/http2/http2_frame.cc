@@ -284,12 +284,12 @@ Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
 
   auto payload_sequence = encoder.EncodeRepresentations(representations);
   ASSERT(payload_sequence->HasNext() || numberOfNameValuePairs == 0);
-  const size_t maxPayloadSize = 4 * 1024 * 1024;
+  // Concatenate all the payload segments to a single string.
   std::string payload;
-  if (payload_sequence->HasNext()) {
-    payload = payload_sequence->Next(maxPayloadSize);
+  const size_t maxPayloadSegmentSize = 4 * 1024 * 1024;
+  while (payload_sequence->HasNext()) {
+    absl::StrAppend(&payload, payload_sequence->Next(maxPayloadSegmentSize));
   }
-  ASSERT(!payload_sequence->HasNext());
 
   Http2Frame frame;
   frame.buildHeader(Type::Metadata, payload.size(), static_cast<uint8_t>(flags),

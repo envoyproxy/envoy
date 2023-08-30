@@ -111,7 +111,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
       return level_to_use.status();
     }
 
-    changeAllLogLevels(*level_to_use);
+    Logger::Context::changeAllLogLevels(*level_to_use);
     return absl::OkStatus();
   }
 
@@ -161,18 +161,6 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
   }
 
   return changeLogLevels(name_levels);
-}
-
-void LogsHandler::changeAllLogLevels(spdlog::level::level_enum level) {
-  if (!Logger::Context::useFineGrainLogger()) {
-    ENVOY_LOG(info, "change all log levels: level='{}'", spdlog::level::level_string_views[level]);
-    Logger::Registry::setLogLevel(level);
-  } else {
-    // Level setting with Fine-Grain Logger.
-    FINE_GRAIN_LOG(info, "change all log levels: level='{}'",
-                   spdlog::level::level_string_views[level]);
-    getFineGrainLogContext().setAllFineGrainLoggers(level);
-  }
 }
 
 absl::Status LogsHandler::changeLogLevels(

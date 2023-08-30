@@ -50,8 +50,7 @@ use(
     },
   ],
 )
-
-alias('retest', 'retry-azp')
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/versionchange.star")
 
 def _backport():
   github.issue_label('backport/review')

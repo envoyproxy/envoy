@@ -24,6 +24,8 @@ envoy_cc_test(
     deps = [
         "//contrib/hyperscan/matching/input_matchers/source:matcher_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -50,5 +52,6 @@ envoy_cc_benchmark_binary(
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )

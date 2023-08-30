@@ -63,11 +63,13 @@ public class JniLibrary {
    *                 callbacks.
    * @param explicitFlowControl, whether explicit flow control should be enabled
    *                             for the stream.
+   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
+   *     should be delivered sans end stream.
    * @return envoy_stream, with a stream handle and a success status, or a failure
    * status.
    */
   protected static native int startStream(long engine, long stream, JvmCallbackContext context,
-                                          boolean explicitFlowControl);
+                                          boolean explicitFlowControl, long minDeliverySize);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and
@@ -289,26 +291,6 @@ public class JniLibrary {
   public static native void callClearTestRootCertificateFromNative();
 
   /**
-   * Uses the provided fields to generate an Envoy bootstrap proto, then convert into a YAML string.
-   *
-   * Returns the config yaml.
-   *
-   */
-  public static native String createYaml(
-      String grpcStatsDomain, boolean adminInterfaceEnabled, long connectTimeoutSeconds,
-      long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
-      long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
-      boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
-      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
-      long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
-      long perTryIdleTimeoutSeconds, String appVersion, String appId,
-      boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
-      byte[][] statSinks, boolean enablePlatformCertificatesValidation,
-      boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards);
-
-  /**
    * Uses the provided fields to generate an Envoy bootstrap proto.
    * The returned pointer is "owned" by the caller until ownership is passed back to C++ via
    * runEngine.
@@ -317,16 +299,20 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      String grpcStatsDomain, boolean adminInterfaceEnabled, long connectTimeoutSeconds,
-      long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
+      String grpcStatsDomain, long connectTimeoutSeconds, long dnsRefreshSeconds,
+      long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      boolean enableHttp3, String http3ConnectionOptions, String http3ClientConnectionOptions,
+      byte[][] quicHints, boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
       long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
       long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
       long perTryIdleTimeoutSeconds, String appVersion, String appId,
-      boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
-      byte[][] statSinks, boolean enablePlatformCertificatesValidation,
-      boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards);
+      boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
+      boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsResourceName,
+      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsAuthenticationHeader,
+      String xdsAuthenticationToken, String xdsJwtToken, long xdsJwtTokenLifetime,
+      String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
+      String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
 }

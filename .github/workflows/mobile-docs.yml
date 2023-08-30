@@ -1,0 +1,52 @@
+name: mobile_docs
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
+  docs:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    timeout-minutes: 20
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Add safe directory
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+    - name: Generate docs
+      run: mobile/docs/build.sh
+    - name: Set up deploy key
+      if: github.ref == 'refs/heads/main'
+      uses: shimataro/ssh-key-action@v2.5.1
+      with:
+        key: ${{ secrets.ENVOY_MOBILE_WEBSITE_DEPLOY_KEY }}
+        known_hosts: unnecessary
+    - name: Publish docs
+      if: github.ref == 'refs/heads/main'
+      run: mobile/docs/publish.sh
+    - uses: actions/upload-artifact@v3
+      with:
+        name: docs
+        path: generated/docs

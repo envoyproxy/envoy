@@ -115,6 +115,11 @@ MockRouteEntry::MockRouteEntry() {
     return connect_config_.has_value() ? makeOptRef(connect_config_.value()) : absl::nullopt;
   }));
   ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(early_data_policy_));
+  path_matcher_ = std::make_shared<testing::NiceMock<MockPathMatcher>>();
+  ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
+  path_rewriter_ = std::make_shared<testing::NiceMock<MockPathRewriter>>();
+  ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(path_rewriter_));
+  ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
@@ -143,6 +148,7 @@ MockRoute::MockRoute() {
   ON_CALL(*this, decorator()).WillByDefault(Return(&decorator_));
   ON_CALL(*this, tracingConfig()).WillByDefault(Return(nullptr));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
 }
 MockRoute::~MockRoute() = default;
 
@@ -166,6 +172,12 @@ MockScopedRouteConfigProvider::MockScopedRouteConfigProvider()
   ON_CALL(*this, apiType()).WillByDefault(Return(ApiType::Delta));
 }
 MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
+
+MockScopeKeyBuilder::MockScopeKeyBuilder() {
+  ON_CALL(*this, computeScopeKey(_))
+      .WillByDefault(Invoke([](const Http::HeaderMap&) -> ScopeKeyPtr { return nullptr; }));
+}
+MockScopeKeyBuilder::~MockScopeKeyBuilder() = default;
 
 MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
   ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));

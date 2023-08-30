@@ -47,7 +47,7 @@ key:
   initialize();
   registerTestServerPorts({"http"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -85,7 +85,7 @@ TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateScopeNotMatch) {
     name: envoy.filters.http.on_demand
     )EOF");
 
-  const std::string scope_tmpl = R"EOF(
+  constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
 route_configuration_name: {}
 key:
@@ -94,7 +94,7 @@ key:
 )EOF";
   const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -135,7 +135,7 @@ TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdatePrimaryVirtualHostNotMatc
     name: envoy.filters.http.on_demand
     )EOF");
 
-  const std::string scope_tmpl = R"EOF(
+  constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
 route_configuration_name: {}
 key:
@@ -144,7 +144,7 @@ key:
 )EOF";
   const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -200,7 +200,7 @@ key:
   fragments:
     - string_key: bar
 )EOF";
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -255,7 +255,7 @@ key:
     - string_key: bar
 )EOF";
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -309,7 +309,7 @@ key:
   initialize();
   registerTestServerPorts({"http"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -628,7 +628,7 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
   cleanupUpstreamAndDownstream();
 }
 
-const char VhostTemplateAfterUpdate[] = R"EOF(
+constexpr absl::string_view VhostTemplateAfterUpdate = R"EOF(
 name: {}
 domains: [{}]
 routes:

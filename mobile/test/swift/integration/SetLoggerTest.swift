@@ -19,6 +19,10 @@ final class LoggerTests: XCTestCase {
     let testLoggerFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger"
     let config =
 """
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -82,8 +86,8 @@ static_resources:
       }
       .build()
 
-    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 1), .completed)
-    XCTAssertEqual(XCTWaiter.wait(for: [loggingExpectation], timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 10), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [loggingExpectation], timeout: 10), .completed)
 
     // Send a request to trigger the test filter which should log an event.
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",

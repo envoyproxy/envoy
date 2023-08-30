@@ -11,7 +11,7 @@ public:
   MockListenerManager();
   ~MockListenerManager() override;
 
-  MOCK_METHOD(bool, addOrUpdateListener,
+  MOCK_METHOD(absl::StatusOr<bool>, addOrUpdateListener,
               (const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                bool modifiable));
   MOCK_METHOD(void, createLdsApi,

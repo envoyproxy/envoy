@@ -17,6 +17,7 @@ ARN
 ASAN
 ASCII
 ASM
+ASN
 ASSERTed
 ASSERTs
 AST
@@ -29,11 +30,15 @@ BSON
 BPF
 Bdecoded
 Bencoded
+CIO
+DFP
+DOM
 GiB
 IPTOS
 Repick
 SION
 TRA
+Websockets
 abc
 abcd
 abd
@@ -160,6 +165,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+eslint
 freeifaddrs
 FUZZER
 FUZZERS
@@ -168,6 +174,7 @@ dereferencing
 differentially
 dnsresolvers
 endpos
+eps
 fo
 ghi
 golang
@@ -239,7 +246,10 @@ LEV
 LF
 LHS
 hls
+iframe
+ingressed
 integrations
+iouring
 jkl
 lang
 libsxg
@@ -286,6 +296,7 @@ OCSP
 OD
 ODCDS
 middlewildcard
+monostate
 mpd
 oghttp
 OID
@@ -433,10 +444,12 @@ UUIDs
 VC
 VCHAR
 VCL
+VFS
 VH
 VHDS
 VLOG
 VM
+VPN
 WAITFORONE
 WASM
 WAVM
@@ -469,6 +482,7 @@ acks
 acls
 addr
 agg
+AggregationTemporality
 alice
 alignas
 alignof
@@ -482,6 +496,8 @@ alls
 alphanumerics
 amongst
 anno
+anonymization
+anonymizing
 anys
 appmesh
 arg
@@ -618,6 +634,7 @@ cryptographic
 cryptographically
 cstate
 cstring
+ctad
 ctor
 ctrl
 customizations
@@ -749,6 +766,9 @@ gRPC
 gateway
 gcov
 genrule
+geolocation
+geoip
+Geoip
 getaddrinfo
 getaffinity
 gethostname
@@ -798,6 +818,7 @@ idx
 ifdef
 iff
 ified
+ifndef
 impl
 implementors
 impls
@@ -907,6 +928,7 @@ metatable
 microbenchmarks
 midp
 milli
+mimics
 misconfiguration
 misconfigured
 mixin
@@ -1143,10 +1165,12 @@ responder
 restarter
 resync
 ret
+retransmissions
 retransmitted
 retransmitting
 retriable
 retriggers
+retryable
 revalidated
 revalidation
 reverify
@@ -1187,6 +1211,7 @@ serv
 servercert
 setenv
 setsockopt
+sfixed
 sig
 sigaction
 sigactions
@@ -1196,6 +1221,7 @@ signalstack
 siloed
 sim
 sinked
+sint
 sizeof
 smatch
 snapshotted
@@ -1373,6 +1399,7 @@ versa
 versioned
 vhost
 viewable
+viewport
 vip
 virtualhost
 virtualize

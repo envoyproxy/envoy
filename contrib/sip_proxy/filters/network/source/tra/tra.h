@@ -3,7 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/any.h"

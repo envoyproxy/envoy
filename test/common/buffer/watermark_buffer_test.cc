@@ -243,13 +243,9 @@ TEST_F(WatermarkBufferTest, MoveOneByte) {
 }
 
 TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
-  os_fd_t pipe_fds[2] = {0, 0};
-#ifdef WIN32
+  os_fd_t fds[2] = {0, 0};
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  ASSERT_EQ(0, os_sys_calls.socketpair(AF_INET, SOCK_STREAM, 0, pipe_fds).return_value_);
-#else
-  ASSERT_EQ(0, pipe(pipe_fds));
-#endif
+  ASSERT_EQ(os_sys_calls.socketpair(ENVOY_DEFAULT_PIPE_TYPE, SOCK_STREAM, 0, fds).return_value_, 0);
 
   buffer_.add(TEN_BYTES, 10);
   buffer_.add(TEN_BYTES, 10);
@@ -257,7 +253,7 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   EXPECT_EQ(0, times_low_watermark_called_);
 
   int bytes_written_total = 0;
-  Network::IoSocketHandleImpl io_handle1(pipe_fds[1]);
+  Network::IoSocketHandleImpl io_handle1(fds[1]);
   while (bytes_written_total < 20) {
     Api::IoCallUint64Result result = io_handle1.write(buffer_);
     if (!result.ok()) {
@@ -271,7 +267,7 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   EXPECT_EQ(0, buffer_.length());
 
   int bytes_read_total = 0;
-  Network::IoSocketHandleImpl io_handle2(pipe_fds[0]);
+  Network::IoSocketHandleImpl io_handle2(fds[0]);
   while (bytes_read_total < 20) {
     Api::IoCallUint64Result result = io_handle2.read(buffer_, 20);
     bytes_read_total += result.return_value_;

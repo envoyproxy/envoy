@@ -214,7 +214,8 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
   }
 
   for (auto& tcp_client : tcp_clients_) {
-    tcp_client->waitForHalfClose();
+    // Ignore spurious events as any client can close in any order.
+    tcp_client->waitForHalfClose(true);
     tcp_client->close();
   }
 
@@ -302,8 +303,8 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeou
   IntegrationTcpClientPtr tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 2);
 
-  tcp_client_1->waitForHalfClose();
-  tcp_client_2->waitForHalfClose();
+  tcp_client_1->waitForHalfClose(true);
+  tcp_client_2->waitForHalfClose(true);
   assertOnDemandCounters(0, 0, 2);
   tcp_client_1->close();
   tcp_client_2->close();

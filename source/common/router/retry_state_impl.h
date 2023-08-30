@@ -122,21 +122,23 @@ private:
   Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   TimeSource& time_source_;
-  uint32_t retry_on_{};
-  uint32_t retries_remaining_{};
   DoRetryCallback backoff_callback_;
   Event::SchedulableCallbackPtr next_loop_callback_;
   Event::TimerPtr retry_timer_;
-  Upstream::ResourcePriority priority_;
   BackOffStrategyPtr backoff_strategy_;
   BackOffStrategyPtr ratelimited_backoff_strategy_{};
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
-  uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
+
+  // Keep small members (bools, enums and int32s) at the end of class, to reduce alignment overhead.
+  uint32_t retry_on_{};
+  uint32_t retries_remaining_{};
+  uint32_t host_selection_max_attempts_;
+  Upstream::ResourcePriority priority_;
   const bool auto_configured_for_http3_{};
 };
 

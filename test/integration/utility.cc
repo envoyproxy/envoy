@@ -21,6 +21,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
+#include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
@@ -28,9 +30,12 @@
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #endif
 
+#ifdef ENVOY_ENABLE_YAML
 #include "test/common/upstream/utility.h"
 #include "test/integration/ssl_utility.h"
+#endif
 #include "test/mocks/common.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -42,6 +47,14 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
+
+using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ClientHttp1HeaderValidator;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ClientHttp2HeaderValidator;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator;
+using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator;
+
 namespace {
 
 RawConnectionDriver::DoWriteCallback writeBufferCallback(Buffer::Instance& data) {
@@ -131,15 +144,21 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
                                                           Ssl::ContextManager& context_manager,
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
-  ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
-  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
+  ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
+  ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
   ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
+#ifdef ENVOY_ENABLE_YAML
   initializeUpstreamTlsContextConfig(
       Ssl::ClientSslTransportOptions().setAlpn(true).setSan(san_to_match).setSni("lyft.com"),
       *tls_context);
+#else
+  UNREFERENCED_PARAMETER(tls_context);
+  UNREFERENCED_PARAMETER(san_to_match);
+  RELEASE_ASSERT(0, "unsupported");
+#endif // ENVOY_ENABLE_YAML
 
   envoy::config::core::v3::TransportSocket message;
   message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
@@ -197,9 +216,14 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Network::TransportSocketOptionsConstSharedPtr options;
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp")),
-      time_system)};
+  Upstream::HostDescriptionConstSharedPtr host_description =
+      std::make_shared<Upstream::HostDescriptionImpl>(
+          cluster, "",
+          Network::Utility::resolveUrl(
+              fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
+          nullptr, envoy::config::core::v3::Locality().default_instance(),
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+          time_system);
 
   if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(type,
@@ -304,15 +328,74 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_->connect();
 }
 
+// This factory is needed to avoid dealing with the ServerFactoryContext, which is
+// problematic in dedicated threads for fake upstreams or test client.
+// UHV is needed in fake upstreams or test client for translation
+// of extended CONNECT to upgrade, which is done by the codecs.
+class FakeHeaderValidatorFactory : public Http::HeaderValidatorFactory {
+public:
+  FakeHeaderValidatorFactory(const HeaderValidatorConfig& config) : config_(config) {}
+
+  Http::ServerHeaderValidatorPtr
+  createServerHeaderValidator(Http::Protocol protocol, Http::HeaderValidatorStats& stats) override {
+    ConfigOverrides config_overrides;
+
+    switch (protocol) {
+    case Http::Protocol::Http3:
+    case Http::Protocol::Http2:
+      return std::make_unique<ServerHttp2HeaderValidator>(config_, protocol, stats,
+                                                          config_overrides);
+    case Http::Protocol::Http11:
+    case Http::Protocol::Http10:
+      return std::make_unique<ServerHttp1HeaderValidator>(config_, protocol, stats,
+                                                          config_overrides);
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  Http::ClientHeaderValidatorPtr
+  createClientHeaderValidator(Http::Protocol protocol, Http::HeaderValidatorStats& stats) override {
+    ConfigOverrides config_overrides;
+
+    switch (protocol) {
+    case Http::Protocol::Http3:
+    case Http::Protocol::Http2:
+      return std::make_unique<ClientHttp2HeaderValidator>(config_, protocol, stats,
+                                                          config_overrides);
+    case Http::Protocol::Http11:
+    case Http::Protocol::Http10:
+      return std::make_unique<ClientHttp1HeaderValidator>(config_, protocol, stats,
+                                                          config_overrides);
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+private:
+  const HeaderValidatorConfig config_;
+};
+
+Http::HeaderValidatorFactoryPtr
+IntegrationUtil::makeHeaderValidationFactory([[maybe_unused]] const HeaderValidatorConfig& config) {
+#ifdef ENVOY_ENABLE_UHV
+  return std::make_unique<FakeHeaderValidatorFactory>(config);
+#else
+  return nullptr;
+#endif
+}
+
 RawConnectionDriver::~RawConnectionDriver() = default;
 
-void RawConnectionDriver::waitForConnection() {
+testing::AssertionResult RawConnectionDriver::waitForConnection() {
   // TODO(mattklein123): Add a timeout and switch to events and waitFor().
   while (!callbacks_->connected() && !callbacks_->closed()) {
     Event::GlobalTimeSystem().timeSystem().realSleepDoNotUseWithoutScrutiny(
         std::chrono::milliseconds(10));
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
+  if (!callbacks_->connected()) {
+    return testing::AssertionFailure();
+  }
+  return testing::AssertionSuccess();
 }
 
 testing::AssertionResult RawConnectionDriver::run(Event::Dispatcher::RunType run_type,

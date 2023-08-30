@@ -1,0 +1,113 @@
+name: mobile_perf
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  sizecurrent:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    permissions:
+      contents: read
+      packages: read
+    name: size_current
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+    - uses: actions/checkout@v3
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Build test binary'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-release-clang \
+            //test/performance:test_binary_size
+    - uses: actions/upload-artifact@v3
+      with:
+        name: sizecurrent
+        path: mobile/bazel-bin/test/performance/test_binary_size
+
+  sizemain:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    permissions:
+      contents: read
+      packages: read
+    name: size_main
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: main
+    - name: Add safe directory
+      run: |
+        git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Build test binary'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile
+        ./bazelw build \
+            --config=mobile-remote-release-clang \
+            //test/performance:test_binary_size
+    - uses: actions/upload-artifact@v3
+      with:
+        name: sizemain
+        path: mobile/bazel-bin/test/performance/test_binary_size
+
+  sizecompare:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    needs:
+    - sizecurrent
+    - sizemain
+    permissions:
+      contents: read
+      packages: read
+    name: size_compare
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      with:
+        name: sizecurrent
+        path: dist/sizecurrent
+    - uses: actions/download-artifact@v3
+      with:
+        name: sizemain
+        path: dist/sizemain
+    - name: 'Strip and Zip binary'
+      run: |
+        ls -lh dist/
+        strip -s -o dist/main.stripped dist/sizemain/test_binary_size
+        strip -s -o dist/current.stripped dist/sizecurrent/test_binary_size
+        zip -9 dist/main.zip dist/main.stripped
+        zip -9 dist/current.zip dist/current.stripped
+    - name: 'Test size regression'
+      run: |
+        cd mobile
+        ./ci/test_size_regression.sh ../dist/main.zip ../dist/current.zip

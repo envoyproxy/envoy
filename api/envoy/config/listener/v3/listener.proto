@@ -53,7 +53,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -338,6 +338,17 @@ message Listener {
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.
   google.protobuf.UInt32Value tcp_backlog_size = 24;
+
+  // The maximum number of connections to accept from the kernel per socket
+  // event. Envoy may decide to close these connections after accepting them
+  // from the kernel e.g. due to load shedding, or other policies.
+  // If there are more than max_connections_to_accept_per_socket_event
+  // connections pending accept, connections over this threshold will be
+  // accepted in later event loop iterations.
+  // If no value is provided Envoy will accept all connections pending accept
+  // from the kernel.
+  google.protobuf.UInt32Value max_connections_to_accept_per_socket_event = 34
+      [(validate.rules).uint32 = {gt: 0}];
 
   // Whether the listener should bind to the port. A listener that doesn't
   // bind can only receive connections redirected from other listeners that set

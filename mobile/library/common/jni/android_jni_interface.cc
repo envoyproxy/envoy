@@ -13,6 +13,5 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_initialize(JNIEnv* env,
                                                                    jclass, // class
                                                                    jobject class_loader) {
   set_class_loader(env->NewGlobalRef(class_loader));
-  // At this point, we know Android APIs are available. Register cert chain validation JNI calls.
-  return register_platform_api(cert_validator_name, get_android_cert_validator_api());
+  return ENVOY_SUCCESS;
 }

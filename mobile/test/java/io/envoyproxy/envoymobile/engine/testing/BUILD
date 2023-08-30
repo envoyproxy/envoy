@@ -10,12 +10,13 @@ android_library(
     name = "testing",
     testonly = True,
     srcs = [
-        "QuicTestServer.java",
         "RequestScenario.java",
         "Response.java",
+        "TestJni.java",
     ],
     visibility = ["//test:__subpackages__"],
     deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
 )

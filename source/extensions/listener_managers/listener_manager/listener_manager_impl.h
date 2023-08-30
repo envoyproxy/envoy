@@ -48,9 +48,10 @@ public:
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryListImpl(
+  static Filter::NetworkFilterFactoriesList createNetworkFilterFactoryListImpl(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-      Configuration::FilterChainFactoryContext& filter_chain_factory_context);
+      Configuration::FilterChainFactoryContext& filter_chain_factory_context,
+      Filter::NetworkFilterConfigProviderManagerImpl& config_provider_manager);
 
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
@@ -78,10 +79,11 @@ public:
         *server_.stats().rootScope(), server_.listenerManager(),
         server_.messageValidationContext().dynamicValidationVisitor());
   }
-  std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
+  Filter::NetworkFilterFactoriesList createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
-    return createNetworkFilterFactoryListImpl(filters, filter_chain_factory_context);
+    return createNetworkFilterFactoryListImpl(filters, filter_chain_factory_context,
+                                              network_config_provider_manager_);
   }
   Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
@@ -110,6 +112,7 @@ public:
 private:
   Instance& server_;
   uint64_t next_listener_tag_{1};
+  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 
@@ -192,8 +195,9 @@ public:
   void inPlaceFilterChainUpdate(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
-                           const std::string& version_info, bool added_via_api) override;
+  absl::StatusOr<bool> addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                                           const std::string& version_info,
+                                           bool added_via_api) override;
   void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                     const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     ASSERT(lds_api_ == nullptr);

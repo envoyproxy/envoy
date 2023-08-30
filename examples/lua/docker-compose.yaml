@@ -1,10 +1,10 @@
-version: "3.8"
 services:
 
   proxy:
     build:
       context: .
-      dockerfile: Dockerfile-proxy
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-lua
     ports:
     - "${PORT_PROXY:-8000}:8000"
 

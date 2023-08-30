@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
 
   # $ docker run -ti -v $(pwd):/protos -v $(pwd)/stubs:/stubs grpc/go protoc --go_out=plugins=grpc:/stubs -I/protos /protos/kv.proto

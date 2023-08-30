@@ -44,6 +44,11 @@ public:
   virtual HttpTapConfigSharedPtr currentConfig() PURE;
 
   /**
+   * @return the http tap config.
+   */
+  virtual const envoy::extensions::filters::http::tap::v3::Tap& getTapConfig() const PURE;
+
+  /**
    * @return the filter stats.
    */
   virtual FilterStats& stats() PURE;
@@ -66,9 +71,13 @@ public:
   // FilterConfig
   HttpTapConfigSharedPtr currentConfig() override;
   FilterStats& stats() override { return stats_; }
+  const envoy::extensions::filters::http::tap::v3::Tap& getTapConfig() const override {
+    return tap_config_;
+  }
 
 private:
   FilterStats stats_;
+  const envoy::extensions::filters::http::tap::v3::Tap tap_config_;
 };
 
 /**
@@ -90,7 +99,8 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     HttpTapConfigSharedPtr config = config_->currentConfig();
-    tapper_ = config ? config->createPerRequestTapper(callbacks.streamId()) : nullptr;
+    tapper_ = config ? config->createPerRequestTapper(config_->getTapConfig(), callbacks.streamId())
+                     : nullptr;
   }
 
   // Http::StreamEncoderFilter
@@ -110,7 +120,8 @@ public:
   void log(const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override;
+           const StreamInfo::StreamInfo& stream_info,
+           AccessLog::AccessLogType access_log_type) override;
 
 private:
   FilterConfigSharedPtr config_;

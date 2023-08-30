@@ -99,10 +99,10 @@ using WrapperFields = ConstSingleton<WrapperFieldValues>;
 
 class RequestWrapper;
 
-absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
+absl::optional<CelValue> convertHeaderEntry(const ::Envoy::Http::HeaderEntry* header);
 absl::optional<CelValue>
 convertHeaderEntry(Protobuf::Arena& arena,
-                   Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
+                   ::Envoy::Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
 
 template <class T> class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
@@ -112,12 +112,12 @@ public:
       return {};
     }
     auto str = std::string(key.StringOrDie().value());
-    if (!Http::validHeaderString(str)) {
+    if (!::Envoy::Http::validHeaderString(str)) {
       // Reject key if it is an invalid header string
       return {};
     }
-    return convertHeaderEntry(
-        arena_, Http::HeaderUtility::getAllOfHeaderAsString(*value_, Http::LowerCaseString(str)));
+    return convertHeaderEntry(arena_, ::Envoy::Http::HeaderUtility::getAllOfHeaderAsString(
+                                          *value_, ::Envoy::Http::LowerCaseString(str)));
   }
   int size() const override { return ListKeys().value()->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
@@ -126,10 +126,11 @@ public:
       return &WrapperFields::get().Empty;
     }
     absl::flat_hash_set<absl::string_view> keys;
-    value_->iterate([&keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      keys.insert(header.key().getStringView());
-      return Http::HeaderMap::Iterate::Continue;
-    });
+    value_->iterate(
+        [&keys](const ::Envoy::Http::HeaderEntry& header) -> ::Envoy::Http::HeaderMap::Iterate {
+          keys.insert(header.key().getStringView());
+          return ::Envoy::Http::HeaderMap::Iterate::Continue;
+        });
     std::vector<CelValue> values;
     values.reserve(keys.size());
     for (const auto& key : keys) {
@@ -163,26 +164,27 @@ protected:
 
 class RequestWrapper : public BaseWrapper {
 public:
-  RequestWrapper(Protobuf::Arena& arena, const Http::RequestHeaderMap* headers,
+  RequestWrapper(Protobuf::Arena& arena, const ::Envoy::Http::RequestHeaderMap* headers,
                  const StreamInfo::StreamInfo& info)
       : BaseWrapper(arena), headers_(arena, headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const HeadersWrapper<Http::RequestHeaderMap> headers_;
+  const HeadersWrapper<::Envoy::Http::RequestHeaderMap> headers_;
   const StreamInfo::StreamInfo& info_;
 };
 
 class ResponseWrapper : public BaseWrapper {
 public:
-  ResponseWrapper(Protobuf::Arena& arena, const Http::ResponseHeaderMap* headers,
-                  const Http::ResponseTrailerMap* trailers, const StreamInfo::StreamInfo& info)
+  ResponseWrapper(Protobuf::Arena& arena, const ::Envoy::Http::ResponseHeaderMap* headers,
+                  const ::Envoy::Http::ResponseTrailerMap* trailers,
+                  const StreamInfo::StreamInfo& info)
       : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const HeadersWrapper<Http::ResponseHeaderMap> headers_;
-  const HeadersWrapper<Http::ResponseTrailerMap> trailers_;
+  const HeadersWrapper<::Envoy::Http::ResponseHeaderMap> headers_;
+  const HeadersWrapper<::Envoy::Http::ResponseTrailerMap> trailers_;
   const StreamInfo::StreamInfo& info_;
 };
 

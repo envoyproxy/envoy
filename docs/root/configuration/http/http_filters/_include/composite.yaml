@@ -21,7 +21,8 @@ static_resources:
               domains: ["*"]
               routes:
               # NOTE: by default, matching happens based on the gRPC route, and not on the incoming request path.
-              # Reference: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
+              # Reference:
+              # https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
               - match: {prefix: "/helloworld.Greeter"}
                 route: {cluster: grpc, timeout: 60s}
           http_filters:

@@ -4,8 +4,7 @@ import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol
-import io.envoyproxy.envoymobile.engine.testing.QuicTestServer
+import io.envoyproxy.envoymobile.engine.testing.TestJni
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
@@ -28,8 +27,8 @@ class SendDataTest {
 
   @Test
   fun `successful sending data`() {
-    QuicTestServer.startTestServer();
-    val port = QuicTestServer.getServerPort();
+    TestJni.startHttp2TestServer();
+    val port = TestJni.getServerPort();
 
     val expectation = CountDownLatch(1)
     val engine = EngineBuilder(Standard())
@@ -46,7 +45,6 @@ class SendDataTest {
       authority = "localhost:" + port,
       path = "/simple.txt"
     )
-      .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()
 
     val body = ByteBuffer.wrap(requestStringMatch.toByteArray(Charsets.UTF_8))
@@ -72,7 +70,7 @@ class SendDataTest {
     expectation.await(10, TimeUnit.SECONDS)
 
     engine.terminate()
-    QuicTestServer.shutdownTestServer();
+    TestJni.shutdownTestServer();
 
     assertThat(expectation.count).isEqualTo(0)
     assertThat(responseStatus).isEqualTo(200)

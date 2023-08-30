@@ -70,6 +70,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setCurves(const std::vector<std::string>& curves) {
+      curves_ = curves;
+      return *this;
+    }
+
     ServerSslOptions& setExpectClientEcdsaCert(bool expect_client_ecdsa_cert) {
       expect_client_ecdsa_cert_ = expect_client_ecdsa_cert;
       return *this;
@@ -124,6 +129,7 @@ public:
     bool ecdsa_cert_ocsp_staple_{false};
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
+    std::vector<std::string> curves_;
     bool expect_client_ecdsa_cert_{false};
     bool keylog_local_filter_{false};
     bool keylog_remote_filter_{false};
@@ -139,12 +145,16 @@ public:
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
+  // Sets up config with the provided bootstrap.
+  ConfigHelper(const Network::Address::IpVersion version,
+               const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
                const std::string& config = httpProxyConfig(false, false));
 
   static void
@@ -204,19 +214,23 @@ public:
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster
   buildStaticCluster(const std::string& name, int port, const std::string& address,
-                     const std::string& lb_policy = "ROUND_ROBIN");
+                     const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                         envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
-  static envoy::config::cluster::v3::Cluster
-  buildH1ClusterWithHighCircuitBreakersLimits(const std::string& name, int port,
-                                              const std::string& address,
-                                              const std::string& lb_policy = "ROUND_ROBIN");
+  static envoy::config::cluster::v3::Cluster buildH1ClusterWithHighCircuitBreakersLimits(
+      const std::string& name, int port, const std::string& address,
+      const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy);
 
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
-  buildCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
+  buildCluster(const std::string& name,
+               const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                   envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   static envoy::config::cluster::v3::Cluster
-  buildTlsCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
+  buildTlsCluster(const std::string& name,
+                  const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                      envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
@@ -373,9 +387,12 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls(bool use_alpn = false, bool http3 = false,
-                            absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
-                                alternate_protocol_cache_config = {});
+  void configureUpstreamTls(
+      bool use_alpn = false, bool http3 = false,
+      absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+          alternate_protocol_cache_config = {},
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+          configure_tls_context = nullptr);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
@@ -397,6 +414,10 @@ public:
                                bool http3 = false,
                                absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
                                    proxy_protocol_version = absl::nullopt);
+  // Given an HCM with the default config, set the matcher to be a connect matcher and enable
+  // CONNECT-UDP requests.
+  static void setConnectUdpConfig(HttpConnectionManager& hcm, bool terminate_connect,
+                                  bool http3 = false);
 
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
@@ -416,14 +437,13 @@ public:
   static envoy::config::core::v3::Http3ProtocolOptions
   http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                               size_t http3_max_stream_receive_window);
-
-private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(const HttpConnectionManager& hcm);
 
+private:
   // Load the first FilterType struct from the first listener into a parsed proto.
   template <class FilterType> bool loadFilter(const std::string& name, FilterType& filter) {
     RELEASE_ASSERT(!finalized_, "");
@@ -472,7 +492,7 @@ public:
 
   // Set CDS contents on filesystem.
   void setCds(const std::vector<envoy::config::cluster::v3::Cluster>& cluster);
-  const std::string& cds_path() const { return cds_path_; }
+  const std::string& cdsPath() const { return cds_path_; }
 
 private:
   const std::string cds_path_;
@@ -490,7 +510,7 @@ public:
   void setEdsAndWait(const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>&
                          cluster_load_assignments,
                      IntegrationTestServerStats& server_stats);
-  const std::string& eds_path() const { return eds_path_; }
+  const std::string& edsPath() const { return eds_path_; }
 
 private:
   const std::string eds_path_;

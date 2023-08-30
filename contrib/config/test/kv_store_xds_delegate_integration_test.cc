@@ -6,7 +6,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
-#include "source/common/config/xds_source_id.h"
+#include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -233,13 +233,41 @@ protected:
   }
 
   void shutdownAndRestartTestServer() {
+    // Shutdown the Envoy server.
+    absl::Notification shutdown_done;
+    Server::Instance& server = test_server_->server();
+    server.dispatcher().post([&server, &shutdown_done]() {
+      server.shutdown();
+      shutdown_done.Notify();
+    });
+    ASSERT_TRUE(shutdown_done.WaitForNotificationWithTimeout(absl::Seconds(5)));
     // Reset the test server.
     test_server_.reset();
+    // Reset the server init function, as we don't want xDS responses sent on restart (we want to
+    // use the values in the KV store instead).
     on_server_init_function_ = nullptr;
 
     // Set up a new Envoy, using the previous Envoy's configuration, and create the test server.
-    ConfigHelper helper(version_, *api_,
-                        MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+    ConfigHelper helper(version_, config_helper_.bootstrap());
+
+    // Close the connection between Envoy and the xDS FakeUpstreams.
+    closeConnection(sds_connection_);
+    closeConnection(rtds_connection_);
+    // Bring down the xDS FakeUpstreams.
+    getSdsUpstream().reset();
+    getRtdsUpstream().reset();
+
+    // Reset the xDS upstreams to new FakeUpstreams, since we'll re-establish a connection to xDS
+    // after the Envoy server gets re-created and the KV store loaded.
+    fake_upstreams_.pop_back(); // Removes the RTDS upstream.
+    fake_upstreams_.pop_back(); // Removes the SDS upstream.
+    // Adds the new SDS upstream.
+    fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
+        0, version_, configWithType(Http::CodecType::HTTP2), /*defer_initialization=*/true));
+    // Adds the new RTDS upstream.
+    fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
+        0, version_, configWithType(Http::CodecType::HTTP2), /*defer_initialization=*/true));
+
     std::vector<uint32_t> ports;
     std::vector<uint32_t> zero;
     for (auto& upstream : fake_upstreams_) {
@@ -257,13 +285,6 @@ protected:
     for (int i = 0; i < static_resources.listeners_size(); ++i) {
       named_ports.push_back(static_resources.listeners(i).name());
     }
-
-    // Simulate the upstream xDS servers going down.
-    closeConnection(sds_connection_);
-    closeConnection(rtds_connection_);
-    rtds_upstream_port_ = getRtdsUpstream()->localAddress()->ip()->port();
-    getSdsUpstream().reset();
-    getRtdsUpstream().reset();
 
     // Create and start the new Envoy.
     createGeneratedApiTestServer(bootstrap_path, named_ports, {false, true, false}, false,
@@ -356,7 +377,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   // Two runtime loads are expected, one for the admin layer and one for the RTDS layer.
   test_server_->waitForCounterGe("runtime.load_success", 2);
 
-  // Verify that the latest resource values are used by Envoy.
+  // Verify that the latest resource values in the KV store are used by Envoy.
   EXPECT_EQ(2, test_server_->counter("xds.kv_store.load_success")->value());
   EXPECT_EQ(0, test_server_->counter("xds.kv_store.resources_not_found")->value());
   EXPECT_EQ(0, test_server_->counter("xds.kv_store.resource_missing")->value());
@@ -366,12 +387,11 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("saz", getRuntimeKey("baz"));
 
-  // Reset the RTDS upstream to a FakeUpstream again, and re-establish the connection.
-  getRtdsUpstream() = std::make_unique<FakeUpstream>(rtds_upstream_port_, version_,
-                                                     configWithType(Http::CodecType::HTTP2));
+  // Start the FakeUpstream's listener and re-establish the connection with the RTDS upstream.
+  getRtdsUpstream()->initializeServer();
+  initXdsStream(*getRtdsUpstream(), rtds_connection_, rtds_stream_);
 
   // Send v2 of the RTDS layer.
-  initXdsStream(*getRtdsUpstream(), rtds_connection_, rtds_stream_);
   auto rtds_resource_v2 = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
           name: some_rtds_layer
           layer:
@@ -379,7 +399,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
             baz: jazz
   )EOF");
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"2", rtds_stream_.get());
+      Config::TypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"3", rtds_stream_.get());
 
   test_server_->waitForCounterGe("runtime.load_success", 3);
 

@@ -91,6 +91,8 @@ config:
       bearer_token: BearerToken
       oauth_hmac: OauthHMAC
       oauth_expires: OauthExpires
+      id_token: IdToken
+      refresh_token: RefreshToken
   authorization_endpoint: https://oauth.com/oauth/authorize/
   redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:

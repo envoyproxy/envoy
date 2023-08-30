@@ -62,7 +62,12 @@ public:
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
-        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
+
+        // `pack_as_bytes_` should be true when configured with an http service because there is no
+        // difference to where the body is written in http requests, and a value of false here will
+        // cause non UTF-8 body content to be changed when it doesn't need to.
+        pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
+
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -83,6 +88,7 @@ public:
         typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
                                            config.typed_metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
+        include_tls_session_(config.include_tls_session()),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -165,6 +171,7 @@ public:
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
   const Filters::Common::ExtAuthz::MatcherSharedPtr& requestHeaderMatchers() const {
@@ -218,6 +225,7 @@ private:
   const std::vector<std::string> typed_metadata_context_namespaces_;
 
   const bool include_peer_certificate_;
+  const bool include_tls_session_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
@@ -311,7 +319,7 @@ private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
-  bool isBufferFull() const;
+  bool isBufferFull(uint64_t num_bytes_processing) const;
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {

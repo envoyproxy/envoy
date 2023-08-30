@@ -22,7 +22,6 @@ public:
   explicit DateProviderImplBase(TimeSource& time_source) : time_source_(time_source) {}
 
 protected:
-  static DateFormatter date_formatter_;
   TimeSource& time_source_;
 };
 

@@ -320,6 +320,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       added_via_api_(added_via_api), workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      max_connections_to_accept_per_socket_event_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
+                                          Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -354,8 +357,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       transport_factory_context_(
           std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
               parent_.server_.serverFactoryContext(), parent_.server_.sslContextManager(),
-              listenerScope(), parent_.server_.clusterManager(), parent_.server_.stats(),
-              validation_visitor_)),
+              listenerScope(), parent_.server_.clusterManager(), validation_visitor_)),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
@@ -447,6 +449,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      max_connections_to_accept_per_socket_event_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
+                                          Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -616,7 +621,7 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_);
+        validation_visitor_, listener_factory_context_->processContext());
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
@@ -940,9 +945,15 @@ bool PerListenerFactoryContextImpl::isQuicListener() const {
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
 bool ListenerImpl::createNetworkFilterChain(
-    Network::Connection& connection,
-    const std::vector<Network::FilterFactoryCb>& filter_factories) {
-  return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+    Network::Connection& connection, const Filter::NetworkFilterFactoriesList& filter_factories) {
+  if (!Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories)) {
+    ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                     "Close socket and stop the iteration onAccept.");
+    missing_listener_config_stats_.network_extension_config_missing_.inc();
+    return false;
+  }
+
+  return true;
 }
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {

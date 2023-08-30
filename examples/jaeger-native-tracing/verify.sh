@@ -1,7 +1,6 @@
 #!/bin/bash -e
 
 export NAME=jaeger-native
-export DELAY=10
 export PORT_PROXY="${JAEGER_NATIVE_PORT_PROXY:-11000}"
 export PORT_UI="${JAEGER_NATIVE_PORT_UI:-11001}"
 

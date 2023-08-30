@@ -143,6 +143,8 @@ envoy_cc_library(
     deps = [
         ":macros",
         ":safe_memcpy_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -208,9 +210,11 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":base_logger_lib",
+        ":fmt_lib",
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
+        "//source/common/protobuf:protobuf",
     ] + select({
         "//bazel:android_logger": ["logger_impl_lib_android"],
         "//conditions:default": ["logger_impl_lib_standard"],
@@ -221,6 +225,10 @@ envoy_cc_library(
     name = "base_logger_lib",
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
+    external_deps = [
+        "abseil_strings",
+        "spdlog",
+    ],
 )
 
 envoy_cc_library(
@@ -449,6 +457,7 @@ envoy_cc_library(
         ":assert_lib",
         ":hash_lib",
         ":non_copyable",
+        "//envoy/common:exception_lib",
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
         "//source/common/singleton:const_singleton",
@@ -571,5 +580,20 @@ envoy_pch_library(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "inline_map",
+    hdrs = [
+        "inline_map.h",
+    ],
+    external_deps = [
+        "abseil_node_hash_set",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/common:utility_lib",
     ],
 )

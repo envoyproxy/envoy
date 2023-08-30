@@ -39,14 +39,6 @@ open class RequestHeaders : Headers {
   val retryPolicy: RetryPolicy? by lazy { RetryPolicy.from(this) }
 
   /**
-   * The protocol version to use for upstream requests.
-   */
-  val upstreamHttpProtocol: UpstreamHttpProtocol? by lazy {
-    value("x-envoy-mobile-upstream-protocol")?.firstOrNull()
-      ?.let { UpstreamHttpProtocol.enumValue(it) }
-  }
-
-  /**
    * Convert the headers back to a builder for mutation.
    *
    * @return RequestHeadersBuilder, The new builder.

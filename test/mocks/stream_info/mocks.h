@@ -79,11 +79,16 @@ public:
   MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
   MOCK_METHOD(OptRef<const UpstreamInfo>, upstreamInfo, (), (const));
   MOCK_METHOD(void, onRequestComplete, ());
+  MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, currentDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
   MOCK_METHOD(OptRef<const DownstreamTiming>, downstreamTiming, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
+  MOCK_METHOD(void, addBytesRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, bytesRetransmitted, (), (const));
+  MOCK_METHOD(void, addPacketsRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, packetsRetransmitted, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
@@ -125,8 +130,6 @@ public:
   MOCK_METHOD(Tracing::Reason, traceReason, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
   MOCK_METHOD(void, setConnectionID, (uint64_t));
-  MOCK_METHOD(void, setFilterChainName, (const absl::string_view));
-  MOCK_METHOD(const std::string&, filterChainName, (), (const));
   MOCK_METHOD(void, setAttemptCount, (uint32_t), ());
   MOCK_METHOD(absl::optional<uint32_t>, attemptCount, (), (const));
   MOCK_METHOD(const BytesMeterSharedPtr&, getUpstreamBytesMeter, (), (const));
@@ -145,6 +148,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
@@ -156,7 +160,6 @@ public:
   BytesMeterSharedPtr downstream_bytes_meter_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   std::string route_name_;
-  std::string filter_chain_name_;
   absl::optional<uint32_t> attempt_count_;
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;

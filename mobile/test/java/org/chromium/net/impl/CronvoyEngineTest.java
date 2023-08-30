@@ -45,7 +45,7 @@ public class CronvoyEngineTest {
 
   private static final String TEST_URL_PATH = "get/flowers";
 
-  private static org.chromium.net.impl.CronetUrlRequestContext cronvoyEngine;
+  private static org.chromium.net.impl.CronvoyUrlRequestContext cronvoyEngine;
 
   private final MockWebServer mockWebServer = new MockWebServer();
 
@@ -64,10 +64,10 @@ public class CronvoyEngineTest {
   @Before
   public void setUp() {
     if (cronvoyEngine == null) {
-      NativeCronetEngineBuilderImpl nativeCronetEngineBuilder =
-          new NativeCronetEngineBuilderImpl(ApplicationProvider.getApplicationContext());
+      NativeCronvoyEngineBuilderImpl nativeCronetEngineBuilder =
+          new NativeCronvoyEngineBuilderImpl(ApplicationProvider.getApplicationContext());
       nativeCronetEngineBuilder.setUserAgent("Cronvoy");
-      cronvoyEngine = new CronetUrlRequestContext(nativeCronetEngineBuilder);
+      cronvoyEngine = new CronvoyUrlRequestContext(nativeCronetEngineBuilder);
     }
   }
 
@@ -133,8 +133,19 @@ public class CronvoyEngineTest {
     mockWebServer.start();
     RequestScenario requestScenario = new RequestScenario().addResponseBuffers(13);
 
-    Response response = sendRequest(requestScenario);
+    UrlRequestCallbackTester<Response> urlRequestCallbackTester = new UrlRequestCallbackTester<>();
+    UrlRequestCallback testCallback = new UrlRequestCallback(
+        requestScenario.responseBody, urlRequestCallbackTester, requestScenario);
+    ExperimentalUrlRequest.Builder builder = cronvoyEngine.newUrlRequestBuilder(
+        mockWebServer.url(requestScenario.urlPath).toString(),
+        urlRequestCallbackTester.getWrappedUrlRequestCallback(testCallback),
+        Executors.newSingleThreadExecutor());
 
+    Response response = urlRequestCallbackTester.waitForResponse(builder.build());
+
+    // The response will come in 3 chunks. The 4th read is the final read and shouldn't trigger
+    // OnReadComplete() as no data is read.
+    assertThat(testCallback.getNumOnReadCompleteCalled()).isEqualTo(3);
     assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
     assertThat(response.getBodyAsString()).isEqualTo("hello, world");
     assertThat(response.getNbResponseChunks()).isEqualTo(3); // 5 bytes, 5 bytes, and 2 bytes
@@ -346,6 +357,7 @@ public class CronvoyEngineTest {
     private final AtomicInteger nbChunks = new AtomicInteger(0);
     private final AtomicInteger bufferLastRemaining = new AtomicInteger();
     private final RequestScenario requestScenario;
+    private int numOnReadCompleteCalled = 0;
 
     private UrlRequestCallback(List<ByteBuffer> responseBodyBuffers,
                                UrlRequestCallbackTester<Response> urlRequestCallbackTester,
@@ -355,6 +367,8 @@ public class CronvoyEngineTest {
       this.requestScenario = requestScenario;
       buffers = new ConcurrentLinkedQueue<>(responseBodyBuffers);
     }
+
+    public int getNumOnReadCompleteCalled() { return numOnReadCompleteCalled; }
 
     @Override
     public void onRedirectReceived(UrlRequest urlRequest, UrlResponseInfo info,
@@ -379,6 +393,7 @@ public class CronvoyEngineTest {
     @Override
     public void onReadCompleted(UrlRequest urlRequest, UrlResponseInfo info,
                                 ByteBuffer byteBuffer) {
+      numOnReadCompleteCalled++;
       ByteBuffer buffer = buffers.peek();
       if (byteBuffer != buffer) {
         throw new AssertionError("Can't happen...");

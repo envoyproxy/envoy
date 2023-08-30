@@ -1,17 +1,26 @@
+#include <memory>
 #include <string>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/mocks/network/connection.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-using testing::Eq;
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using testing::InSequence;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
@@ -41,19 +50,6 @@ createPrefixRoutes() {
   return prefix_routes;
 }
 
-TEST(PrefixRoutesTest, MissingCatchAll) {
-  Upstreams upstreams;
-  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
-  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
-
-  Runtime::MockLoader runtime_;
-
-  PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
-
-  std::string key("c:bar");
-  EXPECT_EQ(nullptr, router.upstreamPool(key));
-}
-
 TEST(PrefixRoutesTest, RoutedToCatchAll) {
   auto upstream_c = std::make_shared<ConnPool::MockInstance>();
 
@@ -70,7 +66,8 @@ TEST(PrefixRoutesTest, RoutedToCatchAll) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("c:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_c, router.upstreamPool(key, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
@@ -85,7 +82,118 @@ TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
 
   std::string key("ab:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
+}
+
+TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
+  auto upstream_catch_all = std::make_shared<ConnPool::MockInstance>();
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "catchAllEnv", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+  const std::string format =
+      "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
+
+  stream_info.filterState()->setData(
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
+  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_catchAllCluster", upstream_catch_all);
+
+  Runtime::MockLoader runtime_;
+  auto prefix_routes = createPrefixRoutes();
+  {
+    auto* route = prefix_routes.mutable_catch_all_route();
+    route->set_cluster("fake_catchAllCluster");
+    route->set_remove_prefix(true);
+    route->set_prefix("removeMe_");
+    route->set_key_formatter(format);
+  }
+  PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
+  std::string key("removeMe_catchAllKey");
+  EXPECT_EQ(upstream_catch_all,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
+  EXPECT_EQ("{catchAllKey}-catchAllEnv-subjectCN-{catchAllKey}", key);
+}
+
+TEST(PrefixRoutesTest, TestFormatterWithPrefixRoute) {
+  auto upstream_c = std::make_shared<ConnPool::MockInstance>();
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+  const std::string format =
+      "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
+
+  stream_info.filterState()->setData(
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
+  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterC", upstream_c);
+
+  Runtime::MockLoader runtime_;
+  auto prefix_routes = createPrefixRoutes();
+  {
+    auto* route = prefix_routes.mutable_routes()->Add();
+    route->set_prefix("abc");
+    route->set_cluster("fake_clusterC");
+    route->set_key_formatter(format);
+  }
+  PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
+  std::string key("abc:bar");
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
+  EXPECT_EQ("{abc:bar}-test-subjectCN-{abc:bar}", key);
+}
+
+TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
+  auto upstream_c = std::make_shared<ConnPool::MockInstance>();
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  const std::string format = "%FILTER_STATE(redisKey)%";
+
+  stream_info.filterState()->setData(
+      "randomKey", std::make_unique<Envoy::Router::StringAccessorImpl>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
+  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterC", upstream_c);
+
+  Runtime::MockLoader runtime_;
+  auto prefix_routes = createPrefixRoutes();
+  {
+    auto* route = prefix_routes.mutable_routes()->Add();
+    route->set_prefix("abc");
+    route->set_cluster("fake_clusterC");
+    route->set_key_formatter(format);
+  }
+  PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
+  std::string key("abc:bar");
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
+  EXPECT_EQ("abc:bar", key);
 }
 
 TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
@@ -103,7 +211,8 @@ TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("AB:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, RemovePrefix) {
@@ -127,7 +236,8 @@ TEST(PrefixRoutesTest, RemovePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
   EXPECT_EQ(":bar", key);
 }
 
@@ -143,7 +253,8 @@ TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
 
   std::string key("a:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_b, router.upstreamPool(key, stream_info)->upstream());
   EXPECT_EQ("a:bar", key);
 }
 
@@ -166,11 +277,13 @@ TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
 
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
   std::string key1("a:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key1)->upstream());
+  EXPECT_EQ(upstream_b, router.upstreamPool(key1, stream_info)->upstream());
 
   std::string key2("also_route_to_b:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key2)->upstream());
+  EXPECT_EQ(upstream_b, router.upstreamPool(key2, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, DuplicatePrefix) {

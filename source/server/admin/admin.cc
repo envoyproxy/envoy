@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -187,7 +186,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false),
-          stats_handler_.statsHandler(),
+          stats_handler_.statsHandler(false /* not active mode */),
           makeHandler("/stats/prometheus", "print server stats in prometheus format",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false,
                       {{ParamDescriptor::Type::Boolean, "usedonly",
@@ -241,17 +240,19 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
-                                                 Http::ServerConnectionCallbacks& callbacks) {
+                                                 Http::ServerConnectionCallbacks& callbacks,
+                                                 Server::OverloadManager& overload_manager) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),
-      maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+      maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+      overload_manager);
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
-                                         const std::vector<Network::FilterFactoryCb>&) {
+                                         const Filter::NetworkFilterFactoriesList&) {
   // Pass in the null overload manager so that the admin interface is accessible even when Envoy
   // is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
@@ -261,7 +262,8 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool) const {
+bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool,
+                                  const Http::FilterChainOptions&) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
   };

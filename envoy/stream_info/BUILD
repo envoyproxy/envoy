@@ -34,6 +34,8 @@ envoy_cc_library(
     hdrs = ["filter_state.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//envoy/config:typed_config_interface",
+        "//source/common/common:fmt_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
     ],
@@ -48,6 +50,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "uint64_accessor_interface",
+    hdrs = ["uint64_accessor.h"],
+    deps = [
+        ":filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stream_id_provider_interface",
     hdrs = ["stream_id_provider.h"],
+)
+
+envoy_cc_library(
+    name = "bool_accessor_interface",
+    hdrs = ["bool_accessor.h"],
+    deps = [
+        ":filter_state_interface",
+    ],
 )

@@ -12,9 +12,6 @@ constexpr absl::string_view JsonQuoteCloseBrace = "\"}";
 } // namespace
 
 namespace Envoy {
-
-using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
-
 namespace Server {
 
 StatsTextRender::StatsTextRender(const StatsParams& params)
@@ -32,6 +29,11 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
 
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
+  if (!histogram.used()) {
+    response.addFragments({name, ": No recorded values\n"});
+    return;
+  }
+
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::NoBuckets:
     response.addFragments({name, ": ", histogram.quantileSummary(), "\n"});
@@ -42,10 +44,27 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
   case Utility::HistogramBucketsMode::Disjoint:
     addDisjointBuckets(name, histogram, response);
     break;
+  case Utility::HistogramBucketsMode::Detailed:
+    response.addFragments({name, ":\n  totals="});
+    addDetail(histogram.detailedTotalBuckets(), response);
+    response.add("\n  intervals=");
+    addDetail(histogram.detailedIntervalBuckets(), response);
+    response.addFragments({"\n  summary=", histogram.quantileSummary(), "\n"});
+    break;
   }
 }
 
 void StatsTextRender::finalize(Buffer::Instance&) {}
+
+void StatsTextRender::addDetail(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                                Buffer::Instance& response) {
+  absl::string_view delim = "";
+  for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
+    response.addFragments(
+        {delim, absl::StrCat(bucket.lower_bound_, ",", bucket.width_, ":", bucket.count_)});
+    delim = ", ";
+  }
+}
 
 // Computes disjoint buckets as text and adds them to the response buffer.
 void StatsTextRender::addDisjointBuckets(const std::string& name,
@@ -126,9 +145,15 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
   switch (histogram_buckets_mode_) {
-  case Utility::HistogramBucketsMode::NoBuckets:
-    summarizeBuckets(name, histogram);
+  case Utility::HistogramBucketsMode::NoBuckets: {
+    ProtobufWkt::Struct computed_quantile;
+    ProtoMap& computed_quantile_fields = *computed_quantile.mutable_fields();
+    computed_quantile_fields["name"] = ValueUtil::stringValue(name);
+    populateQuantiles(histogram, "supported_quantiles",
+                      computed_quantile_fields["values"].mutable_list_value());
+    *histogram_array_->add_values() = ValueUtil::structValue(computed_quantile);
     break;
+  }
   case Utility::HistogramBucketsMode::Cumulative: {
     const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
     const std::vector<uint64_t>& interval_buckets = interval_statistics.computedBuckets();
@@ -145,6 +170,32 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
     collectBuckets(name, histogram, interval_buckets, cumulative_buckets);
     break;
   }
+  case Utility::HistogramBucketsMode::Detailed: {
+    std::vector<Stats::ParentHistogram::Bucket> buckets = histogram.detailedTotalBuckets();
+    ProtobufWkt::Struct histogram_obj;
+    ProtoMap& histogram_obj_fields = *histogram_obj.mutable_fields();
+    histogram_obj_fields["name"] = ValueUtil::stringValue(histogram.name());
+    populateQuantiles(histogram, "supported_percentiles",
+                      histogram_obj_fields["percentiles"].mutable_list_value());
+    populateDetail("totals", histogram.detailedTotalBuckets(), histogram_obj_fields);
+    populateDetail("intervals", histogram.detailedIntervalBuckets(), histogram_obj_fields);
+    *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
+    break;
+  }
+  }
+}
+
+void StatsJsonRender::populateDetail(absl::string_view name,
+                                     const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                                     ProtoMap& histogram_obj_fields) {
+  ProtobufWkt::ListValue* bucket_array = histogram_obj_fields[name].mutable_list_value();
+  for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
+    ProtobufWkt::Struct bucket_json;
+    ProtoMap& bucket_fields = *bucket_json.mutable_fields();
+    bucket_fields["lower_bound"] = ValueUtil::numberValue(bucket.lower_bound_);
+    bucket_fields["width"] = ValueUtil::numberValue(bucket.width_);
+    bucket_fields["count"] = ValueUtil::numberValue(bucket.count_);
+    *bucket_array->add_values() = ValueUtil::structValue(bucket_json);
   }
 }
 
@@ -154,17 +205,24 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
   if (histogram_array_->values_size() > 0) {
     ProtoMap& histograms_obj_container_fields = *histograms_obj_container_.mutable_fields();
     if (found_used_histogram_) {
-      ASSERT(histogram_buckets_mode_ == Utility::HistogramBucketsMode::NoBuckets);
-      ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
-      histograms_obj_fields["computed_quantiles"].set_allocated_list_value(
-          histogram_array_.release());
-      histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
+      if (histogram_buckets_mode_ == Utility::HistogramBucketsMode::NoBuckets) {
+        ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
+        histograms_obj_fields["computed_quantiles"].set_allocated_list_value(
+            histogram_array_.release());
+        histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
+      } else if (histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed) {
+        ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
+        histograms_obj_fields["details"].set_allocated_list_value(histogram_array_.release());
+        histograms_obj_container_fields["histograms"] = ValueUtil::structValue(histograms_obj_);
+      } else {
+        IS_ENVOY_BUG("reached unexpected buckets mode with found_used_histogram_ set");
+      }
     } else {
       ASSERT(histogram_buckets_mode_ != Utility::HistogramBucketsMode::NoBuckets);
       histograms_obj_container_fields["histograms"].set_allocated_list_value(
           histogram_array_.release());
     }
-    auto str = MessageUtil::getJsonStringFromMessageOrDie(
+    auto str = MessageUtil::getJsonStringFromMessageOrError(
         ValueUtil::structValue(histograms_obj_container_), false /* pretty */, true);
 
     // Protobuf json serialization can yield an empty string (printing an
@@ -177,38 +235,36 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
   response.add("]}");
 }
 
+void StatsJsonRender::populateVector(absl::string_view name, const std::vector<double>& values,
+                                     uint32_t multiplier, ProtoMap& histograms_obj_fields) {
+  ProtobufWkt::ListValue* array = histograms_obj_fields[name].mutable_list_value();
+
+  for (double value : values) {
+    *array->add_values() = ValueUtil::numberValue(value * multiplier);
+  }
+}
+
 // Summarizes the buckets in the specified histogram, collecting JSON objects.
 // Note, we do not flush this buffer to the network when it grows large, and
 // if this becomes an issue it should be possible to do, noting that we are
 // one or two levels nesting below the list of scalar stats due to the Envoy
 // stats json schema, where histograms are grouped together.
-void StatsJsonRender::summarizeBuckets(const std::string& name,
-                                       const Stats::ParentHistogram& histogram) {
+void StatsJsonRender::populateQuantiles(const Stats::ParentHistogram& histogram,
+                                        absl::string_view label,
+                                        ProtobufWkt::ListValue* computed_quantile_value_array) {
   if (!found_used_histogram_) {
     // It is not possible for the supported quantiles to differ across histograms, so it is ok
     // to send them once.
     Stats::HistogramStatisticsImpl empty_statistics;
-    ProtoMap& histograms_obj_fields = *histograms_obj_.mutable_fields();
-    ProtobufWkt::ListValue* supported_quantile_array =
-        histograms_obj_fields["supported_quantiles"].mutable_list_value();
-
-    for (double quantile : empty_statistics.supportedQuantiles()) {
-      *supported_quantile_array->add_values() = ValueUtil::numberValue(quantile * 100);
-    }
-
+    ProtoMap& fields = *histograms_obj_.mutable_fields();
+    populateVector(label, empty_statistics.supportedQuantiles(), 100 /* multiplier */, fields);
     found_used_histogram_ = true;
   }
 
-  ProtobufWkt::Struct computed_quantile;
-  ProtoMap& computed_quantile_fields = *computed_quantile.mutable_fields();
-  computed_quantile_fields["name"] = ValueUtil::stringValue(name);
-
-  ProtobufWkt::ListValue* computed_quantile_value_array =
-      computed_quantile_fields["values"].mutable_list_value();
   const Stats::HistogramStatistics& interval_statistics = histogram.intervalStatistics();
   const std::vector<double>& computed_quantiles = interval_statistics.computedQuantiles();
-  const std::vector<double>& cumulative_quantiles =
-      histogram.cumulativeStatistics().computedQuantiles();
+  const Stats::HistogramStatistics& histogram_stats = histogram.cumulativeStatistics();
+  const std::vector<double>& cumulative_quantiles = histogram_stats.computedQuantiles();
   const size_t min_size = std::min({computed_quantiles.size(), cumulative_quantiles.size(),
                                     interval_statistics.supportedQuantiles().size()});
   ASSERT(min_size == computed_quantiles.size());
@@ -226,7 +282,6 @@ void StatsJsonRender::summarizeBuckets(const std::string& name,
 
     *computed_quantile_value_array->add_values() = ValueUtil::structValue(computed_quantile_value);
   }
-  *histogram_array_->add_values() = ValueUtil::structValue(computed_quantile);
 }
 
 // Collects the buckets from the specified histogram, using either the

@@ -70,6 +70,9 @@ public:
     }
 
     configure(config);
+    mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+    const_cast<std::vector<AccessLog::InstanceSharedPtr>&>(config_->accessLogs())
+        .push_back(mock_access_logger_);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     for (uint32_t i = 0; i < connections; i++) {
@@ -160,6 +163,7 @@ public:
   // Saved api handle pointer. The pointer is assigned in setup() in most of the on demand cases.
   // In these cases, the mocked allocateOdCdsApi() takes the ownership.
   Upstream::MockOdCdsApiHandle* mock_odcds_api_handle_{};
+  std::shared_ptr<NiceMock<AccessLog::MockInstance>> mock_access_logger_;
 };
 
 TEST_F(TcpProxyTest, ExplicitCluster) {
@@ -956,10 +960,10 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
-// Test that intermediate log entry by field %DURATION%.
+// Test that intermediate log entry by field %ACCESS_LOG_TYPE%.
 TEST_F(TcpProxyTest, IntermediateLogEntry) {
-  auto config = accessLogConfig("%DURATION%");
-  config.mutable_access_log_flush_interval()->set_seconds(1);
+  auto config = accessLogConfig("%ACCESS_LOG_TYPE%");
+  config.mutable_access_log_options()->mutable_access_log_flush_interval()->set_seconds(1);
   config.mutable_idle_timeout()->set_seconds(0);
 
   auto* flush_timer = new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
@@ -970,13 +974,61 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
 
   // The timer will be enabled cyclically.
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(10);
+  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpPeriodic))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
+        EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
+                    testing::IsNull());
+      }));
   flush_timer->invokeCallback();
 
   // No valid duration until the connection is closed.
-  EXPECT_EQ(access_log_data_.value(), fmt::format("-"));
+  EXPECT_EQ(access_log_data_.value(), AccessLogType_Name(AccessLog::AccessLogType::TcpPeriodic));
+
+  filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(9);
+  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpPeriodic))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 19);
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                      ->bytesAtLastDownstreamPeriodicLog()
+                      ->wire_bytes_received,
+                  10);
+      }));
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  flush_timer->invokeCallback();
+
+  EXPECT_CALL(*mock_access_logger_, log(_, _, _, _, AccessLog::AccessLogType::TcpConnectionEnd));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
+
+  EXPECT_EQ(access_log_data_.value(),
+            AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd));
+}
+
+TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
+  auto config = accessLogConfig("%UPSTREAM_HOST% %ACCESS_LOG_TYPE%");
+  config.mutable_access_log_options()->set_flush_access_log_on_connected(true);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Default access log will only be flushed after the stream is closed.
+  // Passing the following check makes sure that the access log was flushed
+  // before the stream was closed.
+  EXPECT_EQ(access_log_data_.value(),
+            absl::StrCat("127.0.0.1:80 ",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected)));
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(access_log_data_.value(),
+            absl::StrCat("127.0.0.1:80 ",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd)));
 }
 
 TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
@@ -1356,6 +1408,18 @@ TEST_F(TcpProxyTest, UpstreamStartSecureTransport) {
   raiseEventUpstreamConnected(0);
   EXPECT_CALL(*upstream_connections_.at(0), startSecureTransport);
   filter_->startUpstreamSecureTransport();
+}
+
+TEST(PerConnectionCluster, ObjectFactory) {
+  const std::string name = "envoy.tcp_proxy.cluster";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string cluster = "per_connection_cluster";
+  auto object = factory->createFromBytes(cluster);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(cluster, object->serializeAsString());
 }
 
 } // namespace

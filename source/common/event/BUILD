@@ -5,6 +5,7 @@ load(
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_select_signal_trace",
 )
 
 licenses(["notice"])  # Apache 2
@@ -130,12 +131,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/signal:fatal_error_handler_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
-        ],
-    }),
+    ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 
 envoy_cc_library(

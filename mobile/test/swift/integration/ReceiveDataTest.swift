@@ -18,6 +18,10 @@ final class ReceiveDataTests: XCTestCase {
     let assertionResponseBody = "response_body"
     let config =
 """
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -65,7 +69,6 @@ static_resources:
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
-      .addUpstreamHttpProtocol(.http2)
       .build()
 
     let headersExpectation = self.expectation(description: "Run called with expected headers")

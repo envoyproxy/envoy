@@ -17,14 +17,16 @@ namespace CEL {
 
 class CELAccessLogExtensionFilter : public AccessLog::Filter {
 public:
-  CELAccessLogExtensionFilter(Extensions::Filters::Common::Expr::Builder&,
+  CELAccessLogExtensionFilter(Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr,
                               const google::api::expr::v1alpha1::Expr&);
 
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
                 const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseTrailerMap& response_trailers,
+                AccessLog::AccessLogType access_log_type) const override;
 
 private:
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
   const google::api::expr::v1alpha1::Expr parsed_expr_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
 };

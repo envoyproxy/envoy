@@ -282,7 +282,7 @@ typed_config:
     oauth_response.mutable_access_token()->set_value("bar");
     oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
 
-    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrDie(oauth_response));
+    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
     upstream_request_->encodeData(buffer, true);
 
     // We should get an immediate redirect back.
@@ -292,12 +292,38 @@ typed_config:
         validateHmac(response->headers(), headers.Host()->value().getStringView(), hmac_secret));
 
     EXPECT_EQ("302", response->headers().getStatusValue());
+    std::string hmac =
+        Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_hmac_);
+    std::string oauth_expires = Http::Utility::parseSetCookieValue(
+        response->headers(), default_cookie_names_.oauth_expires_);
 
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+    codec_client_->close();
+
+    // Now try sending the cookies back
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl headersWithCookie{
+        {":method", "GET"},
+        {":path", "/callback?code=foo&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+        {":scheme", "http"},
+        {"x-forwarded-proto", "http"},
+        {":authority", "authority"},
+        {"authority", "Bearer token"},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
+    };
+    auto encoder_decoder2 = codec_client_->startRequest(headersWithCookie, true);
+    response = std::move(encoder_decoder2.second);
+    response->waitForHeaders();
+    EXPECT_EQ("302", response->headers().getStatusValue());
+    EXPECT_EQ("http://traffic.example.com/not/_oauth",
+              response->headers().Location()->value().getStringView());
     RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
   }
 
-  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires"};
+  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken",
+                                          "RefreshToken"};
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"http"};
   FakeHttpConnectionPtr lds_connection_;
@@ -479,6 +505,28 @@ TEST_P(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
   };
   initialize();
   doAuthenticationFlow("token_secret", "hmac_secret");
+}
+
+// Verify the behavior when the callback param is missing the state query param.
+TEST_P(OauthIntegrationTest, MissingStateParam) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/callback"}, {":scheme", "http"}, {":authority", "authority"}};
+  auto encoder_decoder = codec_client_->startRequest(headers);
+
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // We should get an 401 back since the request looked like a redirect request but did not
+  // contain the state param.
+  response->waitForHeaders();
+  EXPECT_EQ("401", response->headers().getStatusValue());
 }
 
 } // namespace

@@ -11,6 +11,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/assert.h"
@@ -26,6 +27,9 @@
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+
+// The default limit of 80 KiB is the vanilla http_parser behaviour.
+inline constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 
 class ConnectionImpl;
 
@@ -56,6 +60,7 @@ public:
   // Http::Stream
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
+  CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
   // After this is called, for the HTTP/1 codec, the connection should be closed, i.e. no further
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
@@ -114,6 +119,11 @@ private:
    */
   void endEncode();
 
+  /**
+   * Encapsulates notification to various objects that the encode completed.
+   */
+  void notifyEncodeComplete();
+
   void encodeFormattedHeader(absl::string_view key, absl::string_view value,
                              HeaderKeyFormatterOptConstRef formatter);
 
@@ -121,6 +131,7 @@ private:
 
   absl::string_view details_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_;
+  CodecEventCallbacks* codec_callbacks_{nullptr};
 };
 
 /**
@@ -306,6 +317,8 @@ protected:
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
+  const uint32_t max_headers_kb_;
+  const uint32_t max_headers_count_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -443,8 +456,6 @@ private:
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
   Protocol protocol_{Protocol::Http11};
-  const uint32_t max_headers_kb_;
-  const uint32_t max_headers_count_;
 };
 
 /**
@@ -456,7 +467,8 @@ public:
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                           headers_with_underscores_action);
+                           headers_with_underscores_action,
+                       Server::OverloadManager& overload_manager);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
 protected:
@@ -515,6 +527,7 @@ private:
   void onBody(Buffer::Instance& data) override;
   void onResetStream(StreamResetReason reason) override;
   Status sendProtocolError(absl::string_view details) override;
+  Status sendOverloadError();
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
   HeaderMap& headersOrTrailers() override {
@@ -530,14 +543,15 @@ private:
   void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    auto headers = RequestHeaderMapImpl::create();
+    auto headers = RequestHeaderMapImpl::create(max_headers_kb_, max_headers_count_);
     headers->setFormatter(std::move(formatter));
     headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(
+          RequestTrailerMapImpl::create(max_headers_kb_, max_headers_count_));
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
@@ -547,6 +561,7 @@ private:
 
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
+  Status checkProtocolVersion(RequestHeaderMap& headers);
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
@@ -564,6 +579,7 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  Server::LoadShedPoint* abort_dispatch_{nullptr};
 };
 
 /**
@@ -633,14 +649,15 @@ private:
   void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    auto headers = ResponseHeaderMapImpl::create();
+    auto headers = ResponseHeaderMapImpl::create(max_headers_kb_, max_headers_count_);
     headers->setFormatter(std::move(formatter));
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
+      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
+          ResponseTrailerMapImpl::create(max_headers_kb_, max_headers_count_));
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
@@ -664,9 +681,6 @@ private:
   // detected while parsing the first trailer field (if trailers are enabled). The variant is reset
   // to null headers on message complete for assertion purposes.
   absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
-
-  // The default limit of 80 KiB is the vanilla http_parser behaviour.
-  static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 
   // True if the upstream connection is pointed at an HTTP/1.1 proxy, and
   // plaintext HTTP should be sent with fully qualified URLs.

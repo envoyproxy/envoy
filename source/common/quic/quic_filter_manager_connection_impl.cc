@@ -53,7 +53,7 @@ void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
 
-bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() {
+bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() const {
   // Quic doesn't support half close.
   return false;
 }
@@ -147,12 +147,7 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_
 
 void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_any_data) {
   if (!inDelayedClose()) {
-    if (close_type_during_initialize_.has_value()) {
-      ASSERT(!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"));
-      close(close_type_during_initialize_.value());
-      close_type_during_initialize_ = absl::nullopt;
-    }
+    ASSERT(!close_type_during_initialize_.has_value());
     return;
   }
   if (has_sent_any_data && delayed_close_timer_ != nullptr) {

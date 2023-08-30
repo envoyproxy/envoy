@@ -13,6 +13,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "codec_impl_test",
+    size = "large",
     srcs = ["codec_impl_test.cc"],
     external_deps = [
         "quiche_http2_adapter",
@@ -57,6 +58,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/server:overload_manager_mocks",
     ],
 )
 
@@ -146,6 +148,7 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
         "//test/common/http/http2:http2_frame",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -228,6 +231,7 @@ envoy_cc_fuzz_test(
         "//test/common/http/http2:http2_frame",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],

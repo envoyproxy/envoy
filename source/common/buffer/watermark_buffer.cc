@@ -67,6 +67,12 @@ void WatermarkBuffer::move(Instance& rhs, uint64_t length) {
   checkHighAndOverflowWatermarks();
 }
 
+void WatermarkBuffer::move(Instance& rhs, uint64_t length,
+                           bool reset_drain_trackers_and_accounting) {
+  OwnedImpl::move(rhs, length, reset_drain_trackers_and_accounting);
+  checkHighAndOverflowWatermarks();
+}
+
 SliceDataPtr WatermarkBuffer::extractMutableFrontSlice() {
   auto result = OwnedImpl::extractMutableFrontSlice();
   checkLowWatermark();

@@ -162,6 +162,7 @@ public:
       http_request_->cancel();
       http_request_ = nullptr;
     }
+    on_reset_called_ = true;
   }
 
   static ExportedFunctions exportedFunctions() {
@@ -314,6 +315,13 @@ private:
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
 
+  // Resumes the coroutine only if it is safe to do so.
+  void resumeCoroutine(int num_args, const std::function<void()>& yield_callback) {
+    if (!on_reset_called_) {
+      coroutine_.resume(num_args, yield_callback);
+    }
+  }
+
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
     // Headers/body/trailers wrappers do not survive any yields. The user can request them
@@ -332,6 +340,7 @@ private:
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
+  // Coroutine resumption MUST use resumeCoroutine.
   Filters::Common::Lua::Coroutine& coroutine_;
   Http::RequestOrResponseHeaderMap& headers_;
   bool end_stream_;
@@ -339,6 +348,7 @@ private:
   bool buffered_body_{};
   bool saw_body_{};
   bool return_duplicate_headers_{};
+  bool on_reset_called_{};
   Filter& filter_;
   FilterCallbacks& callbacks_;
   Http::HeaderMap* trailers_{};

@@ -25,6 +25,7 @@ public:
       : ActiveClient(parent, lifetime_stream_limit, concurrent_stream_limit),
         supports_early_data_(supports_early_data) {}
 
+  void initializeReadFilters() override {}
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }

@@ -6,6 +6,8 @@
 
 #include "source/common/singleton/threadsafe_singleton.h"
 
+#define ENVOY_DEFAULT_PIPE_TYPE AF_UNIX
+
 namespace Envoy {
 namespace Api {
 
@@ -21,6 +23,7 @@ public:
   SysCallSizeResult pwrite(os_fd_t fd, const void* buffer, size_t length,
                            off_t offset) const override;
   SysCallSizeResult pread(os_fd_t fd, void* buffer, size_t length, off_t offset) const override;
+  SysCallSizeResult send(os_fd_t socket, void* buffer, size_t length, int flags) override;
   SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) override;
   SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) override;
   SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen, int flags,
@@ -28,7 +31,7 @@ public:
   bool supportsMmsg() const override;
   bool supportsUdpGro() const override;
   bool supportsUdpGso() const override;
-  bool supportsIpTransparent() const override;
+  bool supportsIpTransparent(Network::Address::IpVersion version) const override;
   bool supportsMptcp() const override;
   SysCallIntResult close(os_fd_t fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;

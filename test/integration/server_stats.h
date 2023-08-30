@@ -47,6 +47,16 @@ public:
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
 
   /**
+   * Wait until a histogram has at least sample_count samples.
+   * @param name histogram name.
+   * @param sample_count the number of samples the histogram should at least
+   * have.
+   */
+  virtual void waitForNumHistogramSamplesGe(
+      const std::string& name, uint64_t sample_count,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+
+  /**
    * Wait for a gauge to >= a given value.
    * @param name gauge name.
    * @param value target value.

@@ -107,7 +107,8 @@ private:
     };
 
     // Note: pending_response_ is constructed with ResolutionStatus::Failure by default and
-    // __only__ changed to ResolutionStatus::Success if there is an ARES_SUCCESS reply.
+    // __only__ changed to ResolutionStatus::Success if there is an `ARES_SUCCESS` or `ARES_ENODATA`
+    // or `ARES_ENOTFOUND`reply.
     // In the dual_resolution case __any__ ARES_SUCCESS reply will result in a
     // ResolutionStatus::Success callback.
     PendingResponse pending_response_{ResolutionStatus::Failure, {}};
@@ -160,7 +161,6 @@ private:
     const DnsLookupFamily dns_lookup_family_;
     // Queried for at construction time.
     const AvailableInterfaces available_interfaces_;
-    const bool accept_nodata_;
   };
 
   struct AresOptions {

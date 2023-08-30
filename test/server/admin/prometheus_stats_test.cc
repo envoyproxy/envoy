@@ -3,6 +3,8 @@
 #include <vector>
 
 #include "source/common/stats/custom_stat_namespaces_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/prometheus_stats.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -51,12 +53,12 @@ protected:
                                            tag_extracted_name_storage.statName(), cluster_tags));
   }
 
-  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
+  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags,
+                Stats::Gauge::ImportMode import_mode = Stats::Gauge::ImportMode::Accumulate) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(name_storage.statName(),
-                                       tag_extracted_name_storage.statName(), cluster_tags,
-                                       Stats::Gauge::ImportMode::Accumulate));
+    gauges_.push_back(alloc_.makeGauge(
+        name_storage.statName(), tag_extracted_name_storage.statName(), cluster_tags, import_mode));
   }
 
   void addTextReadout(const std::string& name, const std::string& value,
@@ -79,6 +81,7 @@ protected:
     histogram->setTagExtractedName(name);
     histogram->setTags(cluster_tags);
     histogram->used_ = true;
+    histogram->hidden_ = false;
     return histogram;
   }
 
@@ -258,6 +261,51 @@ envoy_histogram1_sum{} 0
 envoy_histogram1_count{} 0
 )EOF";
 
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+// Replicate bug https://github.com/envoyproxy/envoy/issues/27173 which fails to
+// coalesce stats in different scopes with the same tag-extracted-name.
+TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  Stats::ThreadLocalStoreImpl store(alloc_);
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  store.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config));
+  Stats::StatName name = pool_.add("default.total_match_count");
+
+  Stats::ScopeSharedPtr scope1 = store.rootScope()->createScope("cluster.a");
+  counters_.push_back(Stats::CounterSharedPtr(&scope1->counterFromStatName(name)));
+
+  // To reproduce the problem from we will render
+  // cluster.a.default.total_match_count before we discover the existence of
+  // cluster.x.default.total_match_count. That will happen because "d" in
+  // "default" comes before "x" with
+  // https://github.com/envoyproxy/envoy/pull/24998
+  Stats::ScopeSharedPtr scope2 = store.rootScope()->createScope("cluster.x");
+  counters_.push_back(Stats::CounterSharedPtr(&scope2->counterFromStatName(name)));
+
+  constexpr absl::string_view expected_output =
+      R"EOF(# TYPE envoy_cluster_default_total_match_count counter
+envoy_cluster_default_total_match_count{envoy_cluster_name="a"} 0
+envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
+)EOF";
+
+  // Note: in the version of prometheus_stats_test.cc that works with the
+  // streaming GroupedStatsRequest, the test code is slightly different;
+  // it's based on the local 'store' object rather than being based on
+  // the counters_ member variable.
+  //    StatsParams params;
+  //    params.type_ = StatsType::Counters;
+  //    params.format_ = StatsFormat::Prometheus;
+  //    auto request = std::make_unique<GroupedStatsRequest>(store, params, custom_namespaces_);
+  //    EXPECT_EQ(expected_output, response(*request));
+  // This code is left here so that we can verify the bug is fixed if we decide to
+  // re-try the streaming Prometheus implementation.
+
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, textReadouts_, response, StatsParams(), custom_namespaces);
+  EXPECT_EQ(1, size);
   EXPECT_EQ(expected_output, response.toString());
 }
 
@@ -730,6 +778,56 @@ envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithHiddenGauge) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}},
+           Stats::Gauge::ImportMode::HiddenAccumulate);
+
+  StatsParams params;
+
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::Exclude;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::ShowOnly;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
+  {
+    Buffer::OwnedImpl response;
+    params.hidden_ = HiddenFlag::Include;
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, textReadouts_, response, params, custom_namespaces);
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+)EOF";
+    EXPECT_EQ(expected_output, response.toString());
+    EXPECT_EQ(1UL, size);
+  }
 }
 
 TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {

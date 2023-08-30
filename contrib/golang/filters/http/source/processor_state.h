@@ -59,6 +59,8 @@ enum class FilterState {
   WaitingTrailer,
   // Processing trailer in Go
   ProcessingTrailer,
+  // Log in Go
+  Log,
   // All done
   Done,
 };
@@ -73,6 +75,7 @@ enum class Phase {
   EncodeHeader,
   EncodeData,
   EncodeTrailer,
+  Log,
   Done,
 };
 
@@ -103,7 +106,7 @@ public:
 
   bool isProcessingInGo() {
     return state_ == FilterState::ProcessingHeader || state_ == FilterState::ProcessingData ||
-           state_ == FilterState::ProcessingTrailer;
+           state_ == FilterState::ProcessingTrailer || state_ == FilterState::Log;
   }
   bool isProcessingHeader() { return state_ == FilterState::ProcessingHeader; }
   Http::StreamFilterCallbacks* getFilterCallbacks() { return filter_callbacks_; };
@@ -154,6 +157,8 @@ public:
     do_end_stream_ = true;
   }
 
+  void log() { state_ = FilterState::Log; }
+
   bool handleHeaderGolangStatus(const GolangStatus status);
   bool handleDataGolangStatus(const GolangStatus status);
   bool handleTrailerGolangStatus(const GolangStatus status);
@@ -163,7 +168,8 @@ public:
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details) PURE;
 
-  std::string getRouteName() { return filter_callbacks_->streamInfo().getRouteName(); }
+  const StreamInfo::StreamInfo& streamInfo() const { return filter_callbacks_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return filter_callbacks_->streamInfo(); }
 
   void setEndStream(bool end_stream) { end_stream_ = end_stream; }
   bool getEndStream() { return end_stream_; }

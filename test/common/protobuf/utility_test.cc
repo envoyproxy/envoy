@@ -288,7 +288,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
 TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
   ProtobufWkt::Any source_any;
   source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
-  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrDie(source_any, true),
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any, true),
               testing::HasSubstr("@type"));
 }
 
@@ -298,13 +298,6 @@ TEST_F(ProtobufUtilityTest, JsonConvertOrErrorAnyWithUnknownMessageType) {
   source_any.set_value("asdf");
   EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any),
               HasSubstr("Failed to convert"));
-}
-
-TEST_F(ProtobufUtilityTest, JsonConvertOrDieAnyWithUnknownMessageType) {
-  ProtobufWkt::Any source_any;
-  source_any.set_type_url("type.googleapis.com/bad.type.url");
-  source_any.set_value("asdf");
-  EXPECT_DEATH(MessageUtil::getJsonStringFromMessageOrDie(source_any), "");
 }
 
 TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
@@ -1098,6 +1091,22 @@ value:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithErrorContent) {
+  envoy::test::Sensitive actual;
+  TestUtility::loadFromYaml(R"EOF(
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    # The target field is string but value here is int.
+    insensitive_string: 123
+    # The target field is int but value here is string.
+    insensitive_int: "abc"
+)EOF",
+                            actual);
+
+  EXPECT_NO_THROW(MessageUtil::redact(actual));
+}
+
 TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypeUrlTypedStruct) {
   TypeParam actual;
   TypeParam expected = actual;
@@ -1162,6 +1171,43 @@ insensitive_typed_struct:
                             expected);
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, SanitizeUTF8) {
+  {
+    absl::string_view original("already valid");
+    std::string sanitized = MessageUtil::sanitizeUtf8String(original);
+
+    EXPECT_EQ(sanitized, original);
+  }
+
+  {
+    // Create a string that isn't valid UTF-8, that contains multiple sections of
+    // invalid characters.
+    std::string original("valid_prefix");
+    original.append(1, char(0xc3));
+    original.append(1, char(0xc7));
+    original.append("valid_middle");
+    original.append(1, char(0xc4));
+    original.append("valid_suffix");
+
+    std::string sanitized = MessageUtil::sanitizeUtf8String(original);
+    EXPECT_EQ(absl::string_view("valid_prefix!!valid_middle!valid_suffix"), sanitized);
+    EXPECT_EQ(sanitized.length(), original.length());
+  }
+
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.service_sanitize_non_utf8_strings", "false"}});
+    std::string original("valid_prefix");
+    original.append(1, char(0xc3));
+    original.append(1, char(0xc7));
+    original.append("valid_suffix");
+
+    std::string non_sanitized = MessageUtil::sanitizeUtf8String(original);
+    EXPECT_EQ(non_sanitized, original);
+  }
 }
 
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {
@@ -1553,7 +1599,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
   ProtobufWkt::Struct json;
   TestUtility::jsonConvert(bootstrap, json);
   // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity check.
-  TestUtility::loadFromJson(MessageUtil::getJsonStringFromMessageOrDie(json, false), bootstrap);
+  TestUtility::loadFromJson(MessageUtil::getJsonStringFromMessageOrError(json, false), bootstrap);
   // Verify we don't do a camel case conversion.
   EXPECT_EQ("foo", json.fields()
                        .at("cluster_manager")
@@ -1672,6 +1718,52 @@ TEST(DurationUtilTest, OutOfRange) {
         std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
     duration.set_seconds(kMaxInt64Nanoseconds + 1);
     EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
+}
+
+TEST(DurationUtilTest, NoThrow) {
+  {
+    // In range test
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(5);
+    duration.set_nanos(10000000);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_TRUE(result.ok());
+    EXPECT_TRUE(result.value() == 5010);
+  }
+
+  // Below are out-of-range tests
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(-1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(-1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(1000000000);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds + 1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
   }
 }
 
@@ -2067,13 +2159,13 @@ INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
                                            ));
 
 TEST(StatusCode, Strings) {
-  int last_code = static_cast<int>(ProtobufUtil::StatusCode::kUnauthenticated);
+  int last_code = static_cast<int>(absl::StatusCode::kUnauthenticated);
   for (int i = 0; i < last_code; ++i) {
-    EXPECT_NE(MessageUtil::codeEnumToString(static_cast<ProtobufUtil::StatusCode>(i)), "");
+    EXPECT_NE(MessageUtil::codeEnumToString(static_cast<absl::StatusCode>(i)), "");
   }
-  ASSERT_EQ("UNKNOWN",
-            MessageUtil::codeEnumToString(static_cast<ProtobufUtil::StatusCode>(last_code + 1)));
-  ASSERT_EQ("OK", MessageUtil::codeEnumToString(ProtobufUtil::StatusCode::kOk));
+  ASSERT_EQ("UNKNOWN: ",
+            MessageUtil::codeEnumToString(static_cast<absl::StatusCode>(last_code + 1)));
+  ASSERT_EQ("OK", MessageUtil::codeEnumToString(absl::StatusCode::kOk));
 }
 
 TEST(TypeUtilTest, TypeUrlHelperFunction) {

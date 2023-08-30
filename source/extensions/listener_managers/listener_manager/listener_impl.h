@@ -34,7 +34,9 @@ constexpr absl::string_view ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG{
 /**
  * All missing listener config stats. @see stats_macros.h
  */
-#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER)                                                 \
+  COUNTER(extension_config_missing)                                                                \
+  COUNTER(network_extension_config_missing)
 
 /**
  * Struct definition for all missing listener config stats. @see stats_macros.h
@@ -377,6 +379,9 @@ public:
     return access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return max_connections_to_accept_per_socket_event_;
+  }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
@@ -396,7 +401,7 @@ public:
 
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
-                                const std::vector<Network::FilterFactoryCb>& factories) override;
+                                const Filter::NetworkFilterFactoriesList& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
@@ -485,6 +490,7 @@ private:
   const bool workers_started_;
   const uint64_t hash_;
   const uint32_t tcp_backlog_size_;
+  const uint32_t max_connections_to_accept_per_socket_event_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool ignore_global_conn_limit_;
 

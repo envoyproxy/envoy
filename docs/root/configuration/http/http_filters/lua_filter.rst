@@ -11,12 +11,6 @@ and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Beca
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
 <https://luajit.org/extensions.html>`_ for more details.
 
-.. note::
-
-  `moonjit <https://github.com/moonjit/moonjit/>`_ is a continuation of LuaJIT development, which
-  supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
-  by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
-
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
@@ -32,10 +26,12 @@ The design of the filter and Lua support at a high level is as follows:
 Currently supported high level features
 ---------------------------------------
 
-**NOTE:** It is expected that this list will expand over time as the filter is used in production.
-The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
-safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
-API.
+.. note::
+
+  It is expected that this list will expand over time as the filter is used in production.
+  The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
+  safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
+  API.
 
 * Inspection of headers, body, and trailers while streaming in either the request flow, response
   flow, or both.
@@ -153,7 +149,7 @@ Statistics
 ----------
 .. _config_http_filters_lua_stats:
 
-The lua filter outputs statistics in the *.lua.* namespace by default. When
+The lua filter outputs statistics in the ``.lua.`` namespace by default. When
 there are multiple lua filters configured in a filter chain, stats from
 individual filter instance/script can be tracked by providing a per filter
 :ref:`stat prefix
@@ -792,7 +788,7 @@ downstreamLocalAddress()
 
   streamInfo:downstreamLocalAddress()
 
-Returns the string representation of :repo:`downstream remote address <envoy/stream_info/stream_info.h>`
+Returns the string representation of :repo:`downstream local address <envoy/stream_info/stream_info.h>`
 used by the current request.
 
 downstreamDirectRemoteAddress()

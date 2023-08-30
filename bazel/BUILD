@@ -1,6 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("//bazel:utils.bzl", "json_data")
+load("@envoy_api//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
@@ -22,6 +22,18 @@ exports_files([
 sh_library(
     name = "volatile_env",
     srcs = ["volatile_env.sh"],
+)
+
+# Stamp derived from tree hash + dirty status if `BAZEL_VOLATILE_DIRTY`
+# is set, otherwise the git commit
+genrule(
+    name = "volatile-scm-hash",
+    outs = ["volatile-scm-hash.txt"],
+    cmd = """
+    grep BUILD_SCM_HASH bazel-out/volatile-status.txt > $@
+    """,
+    stamp = 1,
+    tags = ["no-remote-exec"],
 )
 
 genrule(
@@ -354,8 +366,35 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_envoy_mobile_stats_reporting",
+    values = {"define": "envoy_mobile_stats_reporting=disabled"},
+)
+
+config_setting(
+    name = "disable_yaml",
+    values = {"define": "envoy_yaml=disabled"},
+)
+
+# The goal here is to allow Envoy to build with this option but it is not yet
+# complete.  See https://github.com/envoyproxy/envoy/issues/27412
+config_setting(
+    name = "disable_exceptions",
+    values = {"define": "envoy_exceptions=disabled"},
+)
+
+config_setting(
+    name = "disable_full_protos",
+    values = {"define": "envoy_full_protos=disabled"},
+)
+
+config_setting(
     name = "disable_envoy_mobile_listener",
     values = {"define": "envoy_mobile_listener=disabled"},
+)
+
+config_setting(
+    name = "disable_http_datagrams",
+    values = {"define": "enable_http_datagrams=disabled"},
 )
 
 config_setting(
@@ -437,7 +476,6 @@ config_setting(
     name = "boringssl_fips",
     constraint_values = [
         "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
     ],
     values = {"define": "boringssl=fips"},
 )
@@ -604,9 +642,22 @@ config_setting(
     ],
 )
 
+selects.config_setting_group(
+    name = "android_opt",
+    match_all = [
+        ":opt_build",
+        ":android",
+    ],
+)
+
 config_setting(
     name = "android_logger",
     values = {"define": "logger=android"},
+)
+
+config_setting(
+    name = "android_system_helper",
+    values = {"define": "system-helper=android"},
 )
 
 config_setting(
@@ -657,6 +708,14 @@ selects.config_setting_group(
     match_all = [
         ":apple",
         ":dbg_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_opt",
+    match_all = [
+        ":opt_build",
+        ":apple",
     ],
 )
 
@@ -818,4 +877,13 @@ platform(
         "@platforms//os:ios",
         "@build_bazel_apple_support//constraints:device",
     ],
+)
+
+# A dependency required by python protobuf
+# Envoy does not have any C++ code that includes python.h so this dummy
+# target is enough. However if such code is added in the future when this
+# should be changed to alias "@system_python//:python_headers"
+cc_library(
+    name = "python_headers",
+    visibility = ["//visibility:public"],
 )

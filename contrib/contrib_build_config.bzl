@@ -21,6 +21,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.generic_proxy":                      "//contrib/generic_proxy/filters/network/source:config",
+    "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
 
     #
     # Sip proxy
@@ -71,4 +72,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.xds_delegates.kv_store":                            "//contrib/config/source:kv_store_xds_delegate",
+
+    #
+    # cluster specifier plugin
+    #
+
+    "envoy.router.cluster_specifier_plugin.golang":             "//contrib/golang/router/cluster_specifier/source:config",
 }

@@ -37,6 +37,8 @@ public:
     ConnectionReset,
     // Network is unreachable due to network settings.
     NetworkUnreachable,
+    // Invalid arguments passed in.
+    InvalidArgument,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
@@ -92,7 +94,7 @@ using IoCallSizeResult = IoCallResult<ssize_t>;
 using IoCallUint64Result = IoCallResult<uint64_t>;
 
 inline Api::IoCallUint64Result ioCallUint64ResultNoError() {
-  return IoCallUint64Result(0, IoErrorPtr(nullptr, [](IoError*) {}));
+  return {0, IoErrorPtr(nullptr, [](IoError*) {})};
 }
 
 } // namespace Api

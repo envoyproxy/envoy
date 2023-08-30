@@ -229,17 +229,19 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
     const Api::SysCallIntResult rc =
         Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-    RELEASE_ASSERT(!rc.return_value_, fmt::format("getifaddrs error: {}", rc.errno_));
-
-    // man getifaddrs(3)
-    for (const auto& interface_address : interface_addresses) {
-      if (!isLoopbackAddress(*interface_address.interface_addr_) &&
-          interface_address.interface_addr_->ip()->version() == version) {
-        ret = interface_address.interface_addr_;
-        if (ret->ip()->version() == Address::IpVersion::v6) {
-          ret = ret->ip()->ipv6()->addressWithoutScopeId();
+    if (rc.return_value_ != 0) {
+      ENVOY_LOG_MISC(debug, fmt::format("getifaddrs error: {}", rc.errno_));
+    } else {
+      // man getifaddrs(3)
+      for (const auto& interface_address : interface_addresses) {
+        if (!isLoopbackAddress(*interface_address.interface_addr_) &&
+            interface_address.interface_addr_->ip()->version() == version) {
+          ret = interface_address.interface_addr_;
+          if (ret->ip()->version() == Address::IpVersion::v6) {
+            ret = ret->ip()->ipv6()->addressWithoutScopeId();
+          }
+          break;
         }
-        break;
       }
     }
   }
@@ -392,7 +394,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
       sock.getSocketOption(opt_dst.level(), opt_dst.option(), &orig_addr, &addr_len).return_value_;
 
   if (status != 0) {
-    if (Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+    if (Api::OsSysCallsSingleton::get().supportsIpTransparent(*ipVersion)) {
       socklen_t flag_len = sizeof(int);
       int is_tp;
       status =
@@ -491,7 +493,9 @@ Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
                                                    proto_address.pipe().mode());
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
-    PANIC("internal address not supported"); // TODO(lambdai) fix.
+    return std::make_shared<Address::EnvoyInternalInstance>(
+        proto_address.envoy_internal_address().server_listener_name(),
+        proto_address.envoy_internal_address().endpoint_id());
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }

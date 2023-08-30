@@ -197,16 +197,18 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
 
   const auto& datasource = config.external_dns_table();
   bool data_source_loaded = false;
-  try {
+  TRY_NEEDS_AUDIT {
     // Data structure is deduced from the file extension. If the data is not read an exception
     // is thrown. If no table can be read, the filter will refer all queries to an external
     // DNS server, if configured, otherwise all queries will be responded to with Name Error.
     MessageUtil::loadFromFile(datasource.filename(), table,
                               ProtobufMessage::getNullValidationVisitor(), api_);
     data_source_loaded = true;
-  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
+  }
+  END_TRY catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Filesystem DNS Filter config update failure: {}", e.what());
   }
   return data_source_loaded;

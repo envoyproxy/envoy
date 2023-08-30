@@ -16,6 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -23,7 +24,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -51,85 +51,151 @@ void sendLocalReplyTestHelper(const bool& is_reset, StreamDecoderFilterCallbacks
 } // namespace
 
 TEST(HttpUtility, parseQueryString) {
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString("/hello"));
+  using vec = std::vector<std::string>;
+  using map = absl::btree_map<std::string, vec>;
 
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString("/hello?"));
+  auto input = "/hello";
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString(input));
+  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello"));
+  input = "/hello?";
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString(input));
+  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(map{}, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
-  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString("/hello?hello%26"));
-  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello%26"));
+  input = "/hello?hello";
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseAndDecodeQueryString(input));
+  auto expected = map{{"hello", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
-  EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
-            Utility::parseQueryString("/hello?hello=world"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
-            Utility::parseAndDecodeQueryString("/hello?hello=world"));
+  input = "/hello?hello%26";
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}), Utility::parseAndDecodeQueryString(input));
+  expected = map{{"hello%26", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  expected = map{{"hello&", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello="));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello="));
+  input = "/hello?hello=world";
+  EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}), Utility::parseAndDecodeQueryString(input));
+  expected = map{{"hello", vec{"world"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
-  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}),
-            Utility::parseQueryString("/hello?hello%26="));
-  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello%26="));
+  input = "/hello?hello=";
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseAndDecodeQueryString(input));
+  expected = map{{"hello", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello=&"));
+  input = "/hello?hello%26=";
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}), Utility::parseAndDecodeQueryString(input));
+  expected = map{{"hello%26", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  expected = map{{"hello&", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
-  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}),
-            Utility::parseQueryString("/hello?hello%26=&"));
-  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello%26=&"));
+  input = "/hello?hello=&";
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseAndDecodeQueryString(input));
+  expected = map{{"hello", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
+  input = "/hello?hello%26=&";
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString(input));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}), Utility::parseAndDecodeQueryString(input));
+  expected = map{{"hello%26", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  expected = map{{"hello&", vec{""}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
+
+  input = "/hello?hello=&hello2=world2";
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
-            Utility::parseQueryString("/hello?hello=&hello2=world2"));
+            Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
-            Utility::parseAndDecodeQueryString("/hello?hello=&hello2=world2"));
+            Utility::parseAndDecodeQueryString(input));
+  expected = map{{"hello", vec{""}}, {"hello2", vec{"world2"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
+  input = "/logging?name=admin&level=trace";
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
-            Utility::parseQueryString("/logging?name=admin&level=trace"));
+            Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
-            Utility::parseAndDecodeQueryString("/logging?name=admin&level=trace"));
+            Utility::parseAndDecodeQueryString(input));
+  expected = map{{"name", vec{"admin"}}, {"level", vec{"trace"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
+  input = "/hello?param_value_has_encoded_ampersand=a%26b";
   EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a%26b"}}),
-            Utility::parseQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
+            Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a&b"}}),
-            Utility::parseAndDecodeQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
+            Utility::parseAndDecodeQueryString(input));
+  expected = map{{"param_value_has_encoded_ampersand", vec{"a%26b"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  expected = map{{"param_value_has_encoded_ampersand", vec{"a&b"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
+  input = "/hello?params_has_encoded_%26=a%26b&ok=1";
   EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_%26", "a%26b"}, {"ok", "1"}}),
-            Utility::parseQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+            Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_&", "a&b"}, {"ok", "1"}}),
-            Utility::parseAndDecodeQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+            Utility::parseAndDecodeQueryString(input));
+  expected = map{{"params_has_encoded_%26", vec{"a%26b"}}, {"ok", vec{"1"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  expected = map{{"params_has_encoded_&", vec{"a&b"}}, {"ok", vec{"1"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
+  input = "/hello?params_%xy_%%yz=%xy%%yz";
   EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
-            Utility::parseQueryString("/hello?params_%xy_%%yz=%xy%%yz"));
+            Utility::parseQueryString(input));
   EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
-            Utility::parseAndDecodeQueryString("/hello?params_%xy_%%yz=%xy%%yz"));
+            Utility::parseAndDecodeQueryString(input));
+  expected = map{{"params_%xy_%%yz", vec{"%xy%%yz"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 
   // A sample of request path with query strings by Prometheus:
   // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
+  input = "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29";
   EXPECT_EQ(
       Utility::QueryParams(
           {{"filter",
             "%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
             "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"}}),
-      Utility::parseQueryString(
-          "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
-          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
+      Utility::parseQueryString(input));
   EXPECT_EQ(
       Utility::QueryParams(
           {{"filter", "(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|"
                       "rq_complete|rq_active|cx_active))|(server.version)"}}),
-      Utility::parseAndDecodeQueryString(
-          "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
-          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
+      Utility::parseAndDecodeQueryString(input));
+  expected = map{
+      {"filter",
+       vec{"%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+           "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  expected = map{
+      {"filter", vec{"(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|"
+                     "rq_complete|rq_active|cx_active))|(server.version)"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
+
+  // Requests with repeating keys
+  input = "/foo?a=1&b=2&a=3%264&a=5";
+  expected = map{{"a", vec{"1", "3%264", "5"}}, {"b", vec{"2"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseQueryString(input).data());
+  expected = map{{"a", vec{"1", "3&4", "5"}}, {"b", vec{"2"}}};
+  EXPECT_EQ(expected, Utility::QueryParamsMulti::parseAndDecodeQueryString(input).data());
 }
 
 TEST(HttpUtility, stripQueryString) {
@@ -155,44 +221,93 @@ TEST(HttpUtility, stripQueryString) {
 
 TEST(HttpUtility, replaceQueryString) {
   // Replace with nothing
+  auto params = Utility::QueryParamsMulti();
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/"), Utility::QueryParams()), "/");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/")), "/");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?"), Utility::QueryParams()), "/");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/?")), "/");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?x=0"), Utility::QueryParams()), "/");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/?x=0")), "/");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a"), Utility::QueryParams()), "/a");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/a")), "/a");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a/"), Utility::QueryParams()), "/a/");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/a/")), "/a/");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a/?y=5"), Utility::QueryParams()), "/a/");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/a/?y=5")), "/a/");
   // Replace with x=1
+  params = Utility::QueryParamsMulti::parseQueryString("/?x=1");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/"), Utility::QueryParams({{"x", "1"}})),
             "/?x=1");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/")), "/?x=1");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?"), Utility::QueryParams({{"x", "1"}})),
             "/?x=1");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/?")), "/?x=1");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?x=0"), Utility::QueryParams({{"x", "1"}})),
             "/?x=1");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/?x=0")), "/?x=1");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a?x=0"), Utility::QueryParams({{"x", "1"}})),
             "/a?x=1");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/a?x=0")), "/a?x=1");
   EXPECT_EQ(
       Utility::replaceQueryString(HeaderString("/a/?x=0"), Utility::QueryParams({{"x", "1"}})),
       "/a/?x=1");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/a/?x=0")), "/a/?x=1");
   // More replacements
+  params = Utility::QueryParamsMulti::parseQueryString("/?x=1&z=3");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo"),
                                         Utility::QueryParams({{"x", "1"}, {"z", "3"}})),
             "/foo?x=1&z=3");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/foo")), "/foo?x=1&z=3");
+  params = Utility::QueryParamsMulti::parseQueryString("/?x=1&y=5");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo?z=2"),
                                         Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
             "/foo?x=1&y=5");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/foo?z=2")), "/foo?x=1&y=5");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo?y=9"),
                                         Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
             "/foo?x=1&y=5");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/foo?y=9")), "/foo?x=1&y=5");
   // More path components
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?"),
                                         Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
             "/foo/bar?x=1&y=5");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/foo/bar?")), "/foo/bar?x=1&y=5");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?y=9&a=b"),
                                         Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
             "/foo/bar?x=1&y=5");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/foo/bar?y=9&a=b")), "/foo/bar?x=1&y=5");
+  params = Utility::QueryParamsMulti::parseQueryString("/?a=b&x=1&y=5");
   EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?y=11&z=7"),
                                         Utility::QueryParams({{"a", "b"}, {"x", "1"}, {"y", "5"}})),
             "/foo/bar?a=b&x=1&y=5");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/foo/bar?y=11&z=7")), "/foo/bar?a=b&x=1&y=5");
+  // Repeating keys
+  params = Utility::QueryParamsMulti::parseQueryString("/?a=b&x=1&a=5");
+  EXPECT_EQ(params.replaceQueryString(HeaderString("/foo/bar?y=11&z=7")), "/foo/bar?a=b&a=5&x=1");
+}
+
+TEST(HttpUtility, testQueryParamModification) {
+  auto params = Utility::QueryParamsMulti();
+  params.add("a", "1");
+  EXPECT_EQ(params.toString(), "?a=1");
+  params.add("a", "2");
+  EXPECT_EQ(params.toString(), "?a=1&a=2");
+  params.add("b", "3");
+  EXPECT_EQ(params.toString(), "?a=1&a=2&b=3");
+  params.add("c", "4");
+  EXPECT_EQ(params.toString(), "?a=1&a=2&b=3&c=4");
+  params.overwrite("b", "foo");
+  EXPECT_EQ(params.toString(), "?a=1&a=2&b=foo&c=4");
+  params.remove("b");
+  EXPECT_EQ(params.toString(), "?a=1&a=2&c=4");
+  params.overwrite("a", "bar");
+  EXPECT_EQ(params.toString(), "?a=bar&c=4");
+  params.add("a", "bar2");
+  EXPECT_EQ(params.toString(), "?a=bar&a=bar2&c=4");
+  params.remove("a");
+  EXPECT_EQ(params.toString(), "?c=4");
+  params.remove("c");
+  EXPECT_EQ(params.toString(), "");
 }
 
 TEST(HttpUtility, getResponseStatus) {
@@ -490,6 +605,26 @@ TEST(HttpUtility, updateAuthority) {
     EXPECT_EQ("dns.name", headers.get_(":authority"));
     EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
   }
+
+  // Test that we only append to x-forwarded-host if it is not already present.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.append_xfh_idempotent", "true"}});
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
+                                     {"x-forwarded-host", "host.com,dns.name"}};
+    Utility::updateAuthority(headers, "newhost.com", true);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.append_xfh_idempotent", "false"}});
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
+                                     {"x-forwarded-host", "host.com,dns.name"}};
+    Utility::updateAuthority(headers, "newhost.com", true);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name,dns.name", headers.get_("x-forwarded-host"));
+  }
 }
 
 TEST(HttpUtility, createSslRedirectPath) {
@@ -583,7 +718,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                   .value());
 
   // If the HCM value is present it will take precedence over the old value.
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   hcm_value.set_value(false);
   EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                    .override_stream_error_on_invalid_http_message()
@@ -603,7 +738,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  Protobuf::BoolValue hcm_value;
+  ProtobufWkt::BoolValue hcm_value;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
   // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
@@ -633,6 +768,59 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   hcm_value.set_value(false);
   EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
+}
+
+TEST(HttpUtility, UseBalsaParser) {
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  ProtobufWkt::BoolValue hcm_value;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+
+  // If Http1ProtocolOptions::use_balsa_parser has no value set, then behavior is controlled by the
+  // runtime flag.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
+
+  // Enable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
+  http1_options.mutable_use_balsa_parser()->set_value(true);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .use_balsa_parser_);
+
+  // Disable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
+  http1_options.mutable_use_balsa_parser()->set_value(false);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
+
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .use_balsa_parser_);
+}
+
+TEST(HttpUtility, AllowCustomMethods) {
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  ProtobufWkt::BoolValue hcm_value;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+
+  EXPECT_FALSE(http1_options.allow_custom_methods());
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                   .allow_custom_methods_);
+
+  http1_options.set_allow_custom_methods(true);
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
+                  .allow_custom_methods_);
 }
 
 TEST(HttpUtility, getLastAddressFromXFF) {
@@ -839,23 +1027,44 @@ TEST(HttpUtility, TestParseSetCookieWithQuotes) {
 }
 
 TEST(HttpUtility, TestMakeSetCookieValue) {
+  CookieAttributeRefVector ref_attributes;
   EXPECT_EQ("name=\"value\"; Max-Age=10",
-            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"",
-            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), false));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), false,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Max-Age=10; HttpOnly",
-            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), true));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), true,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; HttpOnly",
-            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), true));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), true,
+                                        ref_attributes));
 
   EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/",
-            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), false));
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), false,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Path=/",
-            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), false));
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), false,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/; HttpOnly",
-            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), true));
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), true,
+                                        ref_attributes));
   EXPECT_EQ("name=\"value\"; Path=/; HttpOnly",
-            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true));
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true,
+                                        ref_attributes));
+
+  std::vector<CookieAttribute> attributes;
+  attributes.push_back({"SameSite", "None"});
+  attributes.push_back({"Secure", ""});
+  attributes.push_back({"Partitioned", ""});
+  for (const auto& attribute : attributes) {
+    ref_attributes.push_back(attribute);
+  }
+
+  EXPECT_EQ("name=\"value\"; Path=/; SameSite=None; Secure; Partitioned; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true,
+                                        ref_attributes));
 }
 
 TEST(HttpUtility, SendLocalReply) {
@@ -1084,8 +1293,12 @@ TEST(HttpUtility, QueryParamsToString) {
 }
 
 TEST(HttpUtility, ResetReasonToString) {
-  EXPECT_EQ("connection failure",
-            Utility::resetReasonToString(Http::StreamResetReason::ConnectionFailure));
+  EXPECT_EQ("local connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::LocalConnectionFailure));
+  EXPECT_EQ("remote connection failure",
+            Utility::resetReasonToString(Http::StreamResetReason::RemoteConnectionFailure));
+  EXPECT_EQ("connection timeout",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectionTimeout));
   EXPECT_EQ("connection termination",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectionTermination));
   EXPECT_EQ("local reset", Utility::resetReasonToString(Http::StreamResetReason::LocalReset));
@@ -1139,6 +1352,32 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   // make sure that the callback was called (which means that the dynamic_cast worked.)
   ASSERT_TRUE(merged_cfg.has_value());
   EXPECT_EQ(2, merged_cfg.value().state_);
+}
+
+class BadConfig {
+public:
+  int state_;
+  void merge(const BadConfig& other) { state_ += other.state_; }
+};
+
+// Verify that merging result is empty as expected when the bad config is provided.
+TEST(HttpUtility, GetMergedPerFilterBadConfig) {
+  TestConfig testConfig;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+
+  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(_, _))
+      .WillOnce(Invoke([&](const std::string&,
+                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+        cb(testConfig);
+      }));
+
+  EXPECT_LOG_CONTAINS(
+      "debug", "Failed to retrieve the correct type of route specific filter config",
+      auto merged_cfg = Utility::getMergedPerFilterConfig<BadConfig>(
+          &filter_callbacks,
+          [&](BadConfig& base_cfg, const BadConfig& route_cfg) { base_cfg.merge(route_cfg); });
+      // Dynamic_cast failed, so merged_cfg is not set.
+      ASSERT_FALSE(merged_cfg.has_value()););
 }
 
 TEST(HttpUtility, CheckIsIpAddress) {
@@ -1799,6 +2038,66 @@ TEST(Utility, isSafeRequest) {
   request_headers.removeMethod();
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
 };
+
+TEST(Utility, isValidRefererValue) {
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("http://www.example.com")));
+  EXPECT_TRUE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/foo?bar=xyz")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("/resource.html")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("resource.html")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("foo/bar/resource.html")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("mal  formed/path/resource.html")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("htp:/www.malformed.com")));
+  EXPECT_FALSE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/?foo=bar#fragment")));
+  EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("foo=bar#fragment")));
+};
+TEST(HeaderIsValidTest, SchemeIsValid) {
+  EXPECT_TRUE(Utility::schemeIsValid("http"));
+  EXPECT_TRUE(Utility::schemeIsValid("https"));
+  EXPECT_TRUE(Utility::schemeIsValid("HtTP"));
+  EXPECT_TRUE(Utility::schemeIsValid("HtTPs"));
+
+  EXPECT_FALSE(Utility::schemeIsValid("htt"));
+  EXPECT_FALSE(Utility::schemeIsValid("httpss"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsHttp) {
+  EXPECT_TRUE(Utility::schemeIsHttp("http"));
+  EXPECT_TRUE(Utility::schemeIsHttp("htTp"));
+  EXPECT_FALSE(Utility::schemeIsHttp("https"));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+  EXPECT_TRUE(Utility::schemeIsHttp("http"));
+  EXPECT_FALSE(Utility::schemeIsHttp("htTp"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsHttps) {
+  EXPECT_TRUE(Utility::schemeIsHttps("https"));
+  EXPECT_TRUE(Utility::schemeIsHttps("htTps"));
+  EXPECT_FALSE(Utility::schemeIsHttps("http"));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+  EXPECT_TRUE(Utility::schemeIsHttps("https"));
+  EXPECT_FALSE(Utility::schemeIsHttps("htTps"));
+}
+
+TEST(HeaderIsValidTest, SchemeIsValidLegacy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
+
+  EXPECT_TRUE(Utility::schemeIsValid("http"));
+  EXPECT_TRUE(Utility::schemeIsValid("https"));
+
+  // These were not considered valid previously
+  EXPECT_FALSE(Utility::schemeIsValid("HtTP"));
+  EXPECT_FALSE(Utility::schemeIsValid("HtTPs"));
+
+  EXPECT_FALSE(Utility::schemeIsValid("htt"));
+  EXPECT_FALSE(Utility::schemeIsValid("httpss"));
+}
 
 } // namespace Http
 } // namespace Envoy

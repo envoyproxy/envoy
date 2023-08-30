@@ -24,6 +24,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "oauth_integration_test",
+    size = "large",
     srcs = ["oauth_integration_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
     deps = [

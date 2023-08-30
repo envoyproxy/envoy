@@ -17,18 +17,6 @@ def envoy_mobile_repositories():
     python_repos()
 
 def upstream_envoy_overrides():
-    # Workaround due to a Detekt version compatibility with protobuf: https://github.com/envoyproxy/envoy-mobile/issues/1869
-    http_archive(
-        name = "com_google_protobuf",
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy_mobile//bazel:protobuf.patch",
-        ],
-        sha256 = "d7371dc2d46fddac1af8cb27c0394554b068768fc79ecaf5be1a1863e8ff3392",
-        strip_prefix = "protobuf-3.16.0",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.16.0/protobuf-all-3.16.0.tar.gz"],
-    )
-
     # Workaround old NDK version breakages https://github.com/envoyproxy/envoy-mobile/issues/934
     http_archive(
         name = "com_github_libevent_libevent",
@@ -36,15 +24,6 @@ def upstream_envoy_overrides():
         strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
         sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
         build_file_content = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])""",
-    )
-
-    # This should be kept in sync with Envoy itself, we just need to apply this patch
-    # Remove this once https://boringssl-review.googlesource.com/c/boringssl/+/37804 is in master-with-bazel
-    http_archive(
-        name = "boringssl",
-        sha256 = "579cb415458e9f3642da0a39a72f79fdfe6dc9c1713b3a823f1e276681b9703e",
-        strip_prefix = "boringssl-648cbaf033401b7fe7acdce02f275b06a88aab5c",
-        urls = ["https://github.com/google/boringssl/archive/648cbaf033401b7fe7acdce02f275b06a88aab5c.tar.gz"],
     )
 
 def swift_repos():
@@ -79,17 +58,18 @@ def swift_repos():
 
     http_archive(
         name = "com_github_buildbuddy_io_rules_xcodeproj",
-        sha256 = "1e2f40eaee520093343528ac9a4a9180b0500cdd83b1e5e2a95abc8c541686e2",
-        url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/1.1.0/release.tar.gz",
+        sha256 = "d02932255ba3ffaab1859e44528c69988e93fa353fa349243e1ef5054bd1ba80",
+        url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/1.2.0/release.tar.gz",
     )
 
 def kotlin_repos():
     http_archive(
         name = "rules_java",
-        sha256 = "19462d64b1586c0d4ea0e87f9325be2514f0eb84e56dbf3245450451b3701581",
-        strip_prefix = "rules_java-43243982abc76390ef64be62379a1353f9011771",
-        # TODO(jpsim): Switch back to bazelbuild repo when https://github.com/bazelbuild/rules_java/issues/64 is fixed
-        url = "https://github.com/jpsim/rules_java/archive/43243982abc76390ef64be62379a1353f9011771.tar.gz",
+        sha256 = "241822bf5fad614e3e1c42431002abd9af757136fa590a6a7870c6e0640a82e3",
+        strip_prefix = "rules_java-6.4.0",
+        url = "https://github.com/bazelbuild/rules_java/archive/6.4.0.tar.gz",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
     )
 
     http_archive(
@@ -101,8 +81,8 @@ def kotlin_repos():
 
     http_archive(
         name = "io_bazel_rules_kotlin",
-        sha256 = "f033fa36f51073eae224f18428d9493966e67c27387728b6be2ebbdae43f140e",
-        urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v1.7.0-RC-3/rules_kotlin_release.tgz"],
+        sha256 = "01293740a16e474669aba5b5a1fe3d368de5832442f164e4fbfc566815a8bc3a",
+        urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v1.8/rules_kotlin_release.tgz"],
     )
 
     http_archive(

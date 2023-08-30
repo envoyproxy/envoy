@@ -8,7 +8,7 @@ export PORT_ADMIN="${KAFKA_PORT_ADMIN:-11101}"
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
 kafka_client () {
-    docker-compose run --rm kafka-client "$@"
+    "${DOCKER_COMPOSE[@]}" run --rm kafka-client "$@"
 }
 
 TOPIC="envoy-kafka-broker"

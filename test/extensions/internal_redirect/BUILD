@@ -10,6 +10,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "redirect_extension_integration_test",
+    size = "large",
     srcs = [
         "redirect_extension_integration_test.cc",
     ],

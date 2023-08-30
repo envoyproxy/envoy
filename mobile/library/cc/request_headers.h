@@ -7,7 +7,6 @@
 #include "request_headers_builder.h"
 #include "request_method.h"
 #include "retry_policy.h"
-#include "upstream_http_protocol.h"
 
 namespace Envoy {
 namespace Platform {
@@ -21,7 +20,6 @@ public:
   const std::string& authority() const;
   const std::string& path() const;
   absl::optional<RetryPolicy> retryPolicy() const;
-  absl::optional<UpstreamHttpProtocol> upstreamHttpProtocol() const;
 
   RequestHeadersBuilder toRequestHeadersBuilder() const;
 

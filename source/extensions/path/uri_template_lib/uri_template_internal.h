@@ -135,11 +135,6 @@ std::string toRegexPattern(const Variable& pattern);
 std::string toRegexPattern(const struct ParsedPathPattern& pattern);
 
 /**
- * Converts string_view to be used in re2::string_piece.
- */
-inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
-
-/**
  * Checks end of pattern to ensure glob operator is last.
  */
 absl::Status validateNoOperatorAfterTextGlob(const struct ParsedPathPattern& pattern);

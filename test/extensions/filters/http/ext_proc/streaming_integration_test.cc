@@ -8,6 +8,7 @@
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -42,9 +43,10 @@ protected:
   }
 
   void initializeConfig() {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     // This enables a built-in automatic upstream server.
     autonomous_upstream_ = true;
-
+    proto_config_.set_allow_mode_override(true);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Create a cluster for our gRPC server pointing to the address that is running the gRPC
       // server.
@@ -80,7 +82,7 @@ protected:
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
     // Make sure that we have control over when buffers will fill up.
@@ -139,6 +141,7 @@ protected:
   IntegrationStreamDecoderPtr client_response_;
   std::atomic<uint64_t> processor_request_hash_;
   std::atomic<uint64_t> processor_response_hash_;
+  TestScopedRuntime scoped_runtime_;
 };
 
 // Ensure that the test suite is run with all combinations the Envoy and Google gRPC clients.
@@ -673,13 +676,9 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
         ProcessingRequest header_resp;
         bool seen_response_headers = false;
 
-        // Reading from the stream, we might receive the response headers
-        // later if we execute the local reply after the filter executes.
-        const int num_reads_for_response_headers =
-            Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")
-                ? 2
-                : 1;
+        // Reading from the stream, we receive the response headers
+        // later due to executing the local reply after the filter executes.
+        const int num_reads_for_response_headers = 2;
         for (int i = 0; i < num_reads_for_response_headers; ++i) {
           if (stream->Read(&header_resp) && header_resp.has_response_headers()) {
             seen_response_headers = true;

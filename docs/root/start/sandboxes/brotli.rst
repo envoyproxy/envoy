@@ -30,9 +30,9 @@ Change to the ``examples/brotli`` directory and bring up the docker composition.
 
     $ pwd
     envoy/examples/brotli
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
     Name                 Command                        State          Ports
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     brotli_envoy-stats_1   /docker-entrypoint.sh /usr ... Up           0.0.0.0:10000->10000/tcp,:::10000->10000/tcp, 0.0.0.0:9901->9901/tcp,:::9901->9901/tcp, 0.0.0.0:9902->9902/tcp,:::9902->9902/tcp

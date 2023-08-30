@@ -57,6 +57,7 @@ envoy_cc_library(
     }),
     deps = [
         "//envoy/api:os_sys_calls_interface",
+        "//envoy/network:socket_interface",
         "//source/common/network:address_lib",
         "//source/common/singleton:threadsafe_singleton",
         "//third_party/android:android_lib",

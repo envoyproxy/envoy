@@ -65,7 +65,7 @@ public:
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
-  bool isHalfCloseEnabled() override { return enable_half_close_; }
+  bool isHalfCloseEnabled() const override { return enable_half_close_; }
   void close(ConnectionCloseType type) final;
   void close(ConnectionCloseType type, absl::string_view details) override {
     if (!details.empty()) {
@@ -75,7 +75,7 @@ public:
   }
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
-  void readDisable(bool disable) override;
+  ReadDisableStatus readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
   ConnectionInfoSetter& connectionInfoSetter() override {

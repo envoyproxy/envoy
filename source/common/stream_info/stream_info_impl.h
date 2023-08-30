@@ -151,6 +151,14 @@ struct StreamInfoImpl : public StreamInfo {
     return *upstream_info_;
   }
 
+  absl::optional<std::chrono::nanoseconds> currentDuration() const override {
+    if (!final_time_) {
+      return duration(time_source_.monotonicTime());
+    }
+
+    return requestComplete();
+  }
+
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(final_time_);
   }
@@ -176,6 +184,18 @@ struct StreamInfoImpl : public StreamInfo {
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
+
+  void addBytesRetransmitted(uint64_t bytes_retransmitted) override {
+    bytes_retransmitted_ += bytes_retransmitted;
+  }
+
+  uint64_t bytesRetransmitted() const override { return bytes_retransmitted_; }
+
+  void addPacketsRetransmitted(uint64_t packets_retransmitted) override {
+    packets_retransmitted_ += packets_retransmitted;
+  }
+
+  uint64_t packetsRetransmitted() const override { return packets_retransmitted_; }
 
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 
@@ -289,11 +309,6 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
-  void setFilterChainName(absl::string_view filter_chain_name) override {
-    filter_chain_name_ = std::string(filter_chain_name);
-  }
-
-  const std::string& filterChainName() const override { return filter_chain_name_; }
   void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
@@ -307,11 +322,7 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setUpstreamBytesMeter(const BytesMeterSharedPtr& upstream_bytes_meter) override {
-    // Accumulate the byte measurement from previous upstream request during a retry.
-    upstream_bytes_meter->addWireBytesSent(upstream_bytes_meter_->wireBytesSent());
-    upstream_bytes_meter->addWireBytesReceived(upstream_bytes_meter_->wireBytesReceived());
-    upstream_bytes_meter->addHeaderBytesSent(upstream_bytes_meter_->headerBytesSent());
-    upstream_bytes_meter->addHeaderBytesReceived(upstream_bytes_meter_->headerBytesReceived());
+    upstream_bytes_meter->captureExistingBytesMeter(*upstream_bytes_meter_);
     upstream_bytes_meter_ = upstream_bytes_meter;
   }
 
@@ -336,6 +347,8 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
+    bytes_retransmitted_ = info.bytesRetransmitted();
+    packets_retransmitted_ = info.packetsRetransmitted();
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a
@@ -368,9 +381,10 @@ struct StreamInfoImpl : public StreamInfo {
       stream_id_provider_ = std::make_shared<StreamIdProviderImpl>(std::move(id));
     }
     trace_reason_ = info.traceReason();
-    filter_chain_name_ = info.filterChainName();
     attempt_count_ = info.attemptCount();
     upstream_bytes_meter_ = info.getUpstreamBytesMeter();
+    bytes_sent_ = info.bytesSent();
+    is_shadow_ = info.isShadow();
   }
 
   void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
@@ -390,7 +404,11 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;
+
+private:
   absl::optional<uint32_t> response_code_;
+
+public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
@@ -425,13 +443,14 @@ private:
 
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};
+  uint64_t bytes_retransmitted_{};
+  uint64_t packets_retransmitted_{};
   uint64_t bytes_sent_{};
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   const Http::RequestHeaderMap* request_headers_{};
   StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
-  std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};

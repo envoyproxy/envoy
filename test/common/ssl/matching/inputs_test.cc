@@ -4,6 +4,7 @@
 #include "source/common/ssl/matching/inputs.h"
 
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -14,20 +15,18 @@ using testing::ReturnRef;
 
 TEST(Authentication, UriSanInput) {
   UriSanInput<Http::HttpMatchingData> input;
-  Network::ConnectionInfoSetterImpl connection_info_provider(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
-  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::Matching::HttpMatchingDataImpl data(stream_info);
 
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  connection_info_provider.setSslConnection(ssl);
+  stream_info.downstream_connection_info_provider_->setSslConnection(ssl);
 
   {
     std::vector<std::string> uri_sans;
@@ -36,7 +35,7 @@ TEST(Authentication, UriSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -46,7 +45,7 @@ TEST(Authentication, UriSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "foo");
   }
 
   {
@@ -56,27 +55,23 @@ TEST(Authentication, UriSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo,bar");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "foo,bar");
   }
 }
 
 TEST(Authentication, DnsSanInput) {
   DnsSanInput<Http::HttpMatchingData> input;
-  Network::ConnectionInfoSetterImpl connection_info_provider(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
-  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
-
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::Matching::HttpMatchingDataImpl data(stream_info);
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  connection_info_provider.setSslConnection(ssl);
-
+  stream_info.downstream_connection_info_provider_->setSslConnection(ssl);
   {
     std::vector<std::string> dns_sans;
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
@@ -84,7 +79,7 @@ TEST(Authentication, DnsSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -94,7 +89,7 @@ TEST(Authentication, DnsSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "foo");
   }
 
   {
@@ -104,26 +99,26 @@ TEST(Authentication, DnsSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo,bar");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "foo,bar");
   }
 }
 
 TEST(Authentication, SubjectInput) {
   SubjectInput<Http::HttpMatchingData> input;
-  Network::ConnectionInfoSetterImpl connection_info_provider(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
-  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::Matching::HttpMatchingDataImpl data(stream_info);
 
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  connection_info_provider.setSslConnection(ssl);
+  stream_info.downstream_connection_info_provider_->setSslConnection(ssl);
+  // connection_info_provider->setSslConnection(ssl);
   std::string subject;
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
 
@@ -131,7 +126,7 @@ TEST(Authentication, SubjectInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -139,7 +134,7 @@ TEST(Authentication, SubjectInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
+    EXPECT_EQ(absl::get<std::string>(result.data_), "foo");
   }
 }
 

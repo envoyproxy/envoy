@@ -19,6 +19,7 @@
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -82,7 +83,7 @@ public:
 /**
  * Base class for all LB implementations.
  */
-class LoadBalancerBase : public LoadBalancer {
+class LoadBalancerBase : public LoadBalancer, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   enum class HostAvailability { Healthy, Degraded };
 
@@ -221,6 +222,8 @@ public:
 
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
+  const StreamInfo::StreamInfo* requestStreamInfo() const override { return nullptr; }
+
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
   const HealthyAndDegradedLoad&
@@ -263,7 +266,7 @@ protected:
   // RoundRobinLoadBalancer, to index into auxiliary data structures specific to the LB for
   // a given host set selection.
   struct HostsSource {
-    enum class SourceType {
+    enum class SourceType : uint8_t {
       // All hosts in the host set.
       AllHosts,
       // All healthy hosts in the host set.
@@ -278,20 +281,27 @@ protected:
 
     HostsSource() = default;
 
+    // TODO(kbaichoo): plumb the priority parameter as uint8_t all the way from
+    // the config.
     HostsSource(uint32_t priority, SourceType source_type)
-        : priority_(priority), source_type_(source_type) {
+        : priority_(static_cast<uint8_t>(priority)), source_type_(source_type) {
+      ASSERT(priority <= 128, "Priority out of bounds.");
       ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts ||
              source_type == SourceType::DegradedHosts);
     }
 
+    // TODO(kbaichoo): plumb the priority parameter as uint8_t all the way from
+    // the config.
     HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
-        : priority_(priority), source_type_(source_type), locality_index_(locality_index) {
+        : priority_(static_cast<uint8_t>(priority)), source_type_(source_type),
+          locality_index_(locality_index) {
+      ASSERT(priority <= 128, "Priority out of bounds.");
       ASSERT(source_type == SourceType::LocalityHealthyHosts ||
              source_type == SourceType::LocalityDegradedHosts);
     }
 
     // Priority in PrioritySet.
-    uint32_t priority_{};
+    uint8_t priority_{};
 
     // How to index into HostSet for a given priority.
     SourceType source_type_{};
@@ -307,7 +317,7 @@ protected:
 
   struct HostsSourceHash {
     size_t operator()(const HostsSource& hs) const {
-      // This is only used for absl::node_hash_map keys, so we don't need a deterministic hash.
+      // This is only used for absl::flat_hash_map keys, so we don't need a deterministic hash.
       size_t hash = std::hash<uint32_t>()(hs.priority_);
       hash = 37 * hash + std::hash<size_t>()(static_cast<std::size_t>(hs.source_type_));
       hash = 37 * hash + std::hash<uint32_t>()(hs.locality_index_);
@@ -412,14 +422,6 @@ private:
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
-  // If locality weight aware routing is enabled.
-  const bool locality_weighted_balancing_{};
-
-  // Config for zone aware routing.
-  const uint32_t routing_enabled_;
-  const uint64_t min_cluster_size_;
-  const bool fail_traffic_on_panic_;
-
   struct PerPriorityState {
     // The percent of requests which can be routed to the local locality.
     uint64_t local_percent_to_route_{};
@@ -435,6 +437,15 @@ private:
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+
+  // Config for zone aware routing.
+  const uint64_t min_cluster_size_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t routing_enabled_;
+  const bool fail_traffic_on_panic_ : 1;
+
+  // If locality weight aware routing is enabled.
+  const bool locality_weighted_balancing_ : 1;
 
   friend class TestZoneAwareLoadBalancer;
 };
@@ -456,8 +467,7 @@ private:
  * This base class also supports unweighted selection which derived classes can use to customize
  * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase,
-                            Logger::Loggable<Logger::Id::upstream> {
+class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase {
 public:
   using SlowStartConfig = envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig;
 
@@ -484,8 +494,8 @@ protected:
 
   virtual void refresh(uint32_t priority);
 
-  bool isSlowStartEnabled();
-  bool noHostsAreInSlowStart();
+  bool isSlowStartEnabled() const;
+  bool noHostsAreInSlowStart() const;
 
   virtual void recalculateHostsInSlowStart(const HostVector& hosts_added);
 
@@ -496,27 +506,25 @@ protected:
   // overload.
   const uint64_t seed_;
 
-  double applyAggressionFactor(double time_factor);
-  double applySlowStartFactor(double host_weight, const Host& host);
+  double applySlowStartFactor(double host_weight, const Host& host) const;
 
 private:
   friend class EdfLoadBalancerBasePeer;
   virtual void refreshHostSource(const HostsSource& source) PURE;
-  virtual double hostWeight(const Host& host) PURE;
+  virtual double hostWeight(const Host& host) const PURE;
   virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
 
   // Scheduler for each valid HostsSource.
-  absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  absl::flat_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr member_update_cb_;
 
 protected:
   // Slow start related config
   const std::chrono::milliseconds slow_start_window_;
-  double aggression_{1.0};
   const absl::optional<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
   MonotonicTime latest_host_added_time_;
@@ -570,7 +578,7 @@ private:
     // index.
     peekahead_index_ = 0;
   }
-  double hostWeight(const Host& host) override {
+  double hostWeight(const Host& host) const override {
     if (!noHostsAreInSlowStart()) {
       return applySlowStartFactor(host.weight(), host);
     }
@@ -599,7 +607,7 @@ private:
   }
 
   uint64_t peekahead_index_{};
-  absl::node_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
+  absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
 /**
@@ -686,7 +694,7 @@ protected:
 
 private:
   void refreshHostSource(const HostsSource&) override {}
-  double hostWeight(const Host& host) override;
+  double hostWeight(const Host& host) const override;
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -705,8 +713,7 @@ private:
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
-class RandomLoadBalancer : public ZoneAwareLoadBalancerBase,
-                           Logger::Loggable<Logger::Id::upstream> {
+class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterLbStats& stats, Runtime::Loader& runtime,
@@ -757,10 +764,11 @@ public:
 
 private:
   const std::set<std::string> selector_keys_;
+  const std::set<std::string> fallback_keys_subset_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
-  const std::set<std::string> fallback_keys_subset_;
-  const bool single_host_per_subset_;
+  const bool single_host_per_subset_ : 1;
 };
 
 /**
@@ -770,10 +778,10 @@ class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
   LoadBalancerSubsetInfoImpl(
       const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
-      : enabled_(!subset_config.subset_selectors().empty()),
+      : default_subset_(subset_config.default_subset()),
         fallback_policy_(subset_config.fallback_policy()),
         metadata_fallback_policy_(subset_config.metadata_fallback_policy()),
-        default_subset_(subset_config.default_subset()),
+        enabled_(!subset_config.subset_selectors().empty()),
         locality_weight_aware_(subset_config.locality_weight_aware()),
         scale_locality_weight_(subset_config.scale_locality_weight()),
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
@@ -785,6 +793,9 @@ public:
       }
     }
   }
+  LoadBalancerSubsetInfoImpl()
+      : LoadBalancerSubsetInfoImpl(
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance()) {}
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
@@ -804,20 +815,23 @@ public:
   bool scaleLocalityWeight() const override { return scale_locality_weight_; }
   bool panicModeAny() const override { return panic_mode_any_; }
   bool listAsAny() const override { return list_as_any_; }
+  bool allowRedundantKeys() const override { return false; }
 
 private:
-  const bool enabled_;
+  const ProtobufWkt::Struct default_subset_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
       metadata_fallback_policy_;
-  const ProtobufWkt::Struct default_subset_;
-  std::vector<SubsetSelectorPtr> subset_selectors_;
-  const bool locality_weight_aware_;
-  const bool scale_locality_weight_;
-  const bool panic_mode_any_;
-  const bool list_as_any_;
+  const bool enabled_ : 1;
+  const bool locality_weight_aware_ : 1;
+  const bool scale_locality_weight_ : 1;
+  const bool panic_mode_any_ : 1;
+  const bool list_as_any_ : 1;
 };
+using DefaultLoadBalancerSubsetInfoImpl = ConstSingleton<LoadBalancerSubsetInfoImpl>;
 
 } // namespace Upstream
 } // namespace Envoy

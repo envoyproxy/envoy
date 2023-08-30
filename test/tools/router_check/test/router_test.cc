@@ -53,7 +53,7 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
       checktool.compareEntries(tests_filename_);
   EXPECT_EQ(test_results.size(), 1);
-  envoy::RouterCheckToolSchema::ValidationItemResult test_result = test_results[0];
+  const envoy::RouterCheckToolSchema::ValidationItemResult& test_result = test_results[0];
   std::string expected_result_str = R"pb(
       test_name: "ResponseHeaderMatches Failures"
       failure {

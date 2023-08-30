@@ -4,6 +4,10 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"
@@ -20,8 +24,17 @@ using ::testing::AssertionSuccess;
 
 XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {
   Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
+  Config::forceRegisterAdsConfigSubscriptionFactory();
+  Config::forceRegisterGrpcConfigSubscriptionFactory();
+  Config::forceRegisterDeltaGrpcConfigSubscriptionFactory();
+  Config::forceRegisterDeltaGrpcCollectionConfigSubscriptionFactory();
+  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
+  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
+  Config::forceRegisterGrpcMuxFactory();
+  Config::forceRegisterNewGrpcMuxFactory();
+
   override_builder_config_ = false;
-  expect_dns_ = false; // TODO(alyssawilk) debug.
+  expect_dns_ = false; // doesn't use DFP.
   create_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
 

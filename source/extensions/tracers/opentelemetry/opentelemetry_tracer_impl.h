@@ -32,11 +32,10 @@ public:
   Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
          Server::Configuration::TracerFactoryContext& context);
 
-  /**
-   * Implements the abstract Driver's startSpan operation.
-   */
+  // Tracing::Driver
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
-                             const std::string& operation_name, SystemTime start_time,
+                             const StreamInfo::StreamInfo& stream_info,
+                             const std::string& operation_name,
                              const Tracing::Decision tracing_decision) override;
 
 private:

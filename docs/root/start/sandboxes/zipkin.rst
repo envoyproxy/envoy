@@ -54,9 +54,9 @@ To build this sandbox example, and start the example services run the following 
 
     $ pwd
     envoy/examples/zipkin
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
                 Name                          Command             State            Ports
     -----------------------------------------------------------------------------------------------------------

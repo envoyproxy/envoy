@@ -39,7 +39,7 @@ envoy_cc_library(
     ],
     deps = [
         ":tracer_lib",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",

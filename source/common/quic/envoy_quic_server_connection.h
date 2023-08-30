@@ -27,12 +27,7 @@ public:
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
   void OnCanWrite() override;
 
-  bool deferSend() const { return defer_send_; }
-
   bool actuallyDeferSend() const { return defer_send_in_response_to_packets(); }
-
-private:
-  const bool defer_send_;
 };
 
 // An implementation that issues connection IDs with stable first 4 types.

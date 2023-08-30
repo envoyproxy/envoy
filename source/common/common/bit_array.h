@@ -74,7 +74,7 @@ public:
     // containing the element. We shift this to get have the element's bits
     // at bit 0, and then apply the mask which will capture all the bits
     // pertaining to this element.
-    return (LoadUnsignedWord(byte0) >> index_of_0th_bit) & mask_;
+    return (loadUnsignedWord(byte0) >> index_of_0th_bit) & mask_;
   }
 
   /**
@@ -109,7 +109,7 @@ public:
     // We then bitwise-or this to capture the value we're assigning to the
     // element.
     const uint64_t value_to_store =
-        ((LoadUnsignedWord(byte0) & mask_to_preserve) | (shifted_value & mask_to_write));
+        ((loadUnsignedWord(byte0) & mask_to_preserve) | (shifted_value & mask_to_write));
     storeUnsignedWord(byte0, value_to_store);
   }
 
@@ -132,7 +132,7 @@ private:
     safeMemcpyUnsafeDst(destination, &value);
   }
 
-  static inline uint64_t LoadUnsignedWord(const void* source) {
+  static inline uint64_t loadUnsignedWord(const void* source) {
     uint64_t destination;
     safeMemcpyUnsafeSrc(&destination, source);
     return destination;

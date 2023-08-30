@@ -93,9 +93,10 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const std::string response_body = message->bodyAsString();
 
   envoy::extensions::http_filters::oauth2::OAuthResponse response;
-  try {
+  TRY_NEEDS_AUDIT {
     MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
-  } catch (EnvoyException& e) {
+  }
+  END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(debug, "Error parsing response body, received exception: {}", e.what());
     ENVOY_LOG(debug, "Response body: {}", response_body);
     parent_->sendUnauthorizedResponse();

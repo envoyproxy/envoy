@@ -26,6 +26,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "integration_test",
+    size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.least_request"],
     deps = [

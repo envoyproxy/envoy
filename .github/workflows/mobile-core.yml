@@ -1,0 +1,52 @@
+name: mobile_core
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
+  unittests:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: unit_tests
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    timeout-minutes: 120
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu }}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Ensure no listener leaks
+      run: rm source/extensions/listener_managers/listener_manager/listener_manager_impl.h
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Run tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile
+        ./bazelw test \
+            --build_tests_only \
+            --action_env=LD_LIBRARY_PATH \
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            --define envoy_mobile_listener=disabled \
+            --config=mobile-remote-ci \
+            //test/common/...

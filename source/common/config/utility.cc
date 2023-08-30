@@ -27,25 +27,6 @@ std::string Utility::truncateGrpcStatusMessage(absl::string_view error_message) 
                      error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
 }
 
-void Utility::translateApiConfigSource(
-    const std::string& cluster, uint32_t refresh_delay_ms, const std::string& api_type,
-    envoy::config::core::v3::ApiConfigSource& api_config_source) {
-  // TODO(junr03): document the option to chose an api type once we have created
-  // stronger constraints around v2.
-  if (api_type == ApiType::get().Grpc) {
-    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    envoy::config::core::v3::GrpcService* grpc_service = api_config_source.add_grpc_services();
-    grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
-  } else {
-    ASSERT(api_type == ApiType::get().Rest);
-    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
-    api_config_source.add_cluster_names(cluster);
-  }
-
-  api_config_source.mutable_refresh_delay()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
-}
-
 Upstream::ClusterConstOptRef Utility::checkCluster(absl::string_view error_prefix,
                                                    absl::string_view cluster_name,
                                                    Upstream::ClusterManager& cm,
@@ -90,8 +71,14 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Ap
   }
 }
 
-void Utility::checkApiConfigSourceNames(
-    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+namespace {
+/**
+ * Check the grpc_services and cluster_names for API config sanity. Throws on error.
+ * @param api_config_source the config source to validate.
+ * @throws EnvoyException when an API config has the wrong number of gRPC
+ * services or cluster names, depending on expectations set by its API type.
+ */
+void checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC ||
        api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
@@ -126,6 +113,7 @@ void Utility::checkApiConfigSourceNames(
     }
   }
 }
+} // namespace
 
 void Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
                                   const std::string& cluster_name,
@@ -148,7 +136,7 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
           envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
     return;
   }
-  Utility::checkApiConfigSourceNames(api_config_source);
+  checkApiConfigSourceNames(api_config_source);
 
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -246,7 +234,7 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
     bool skip_cluster_check) {
-  Utility::checkApiConfigSourceNames(api_config_source);
+  checkApiConfigSourceNames(api_config_source);
 
   if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
       api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
@@ -263,13 +251,11 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
-  static const std::string struct_type =
-      ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
+  static const std::string struct_type = ProtobufWkt::Struct::default_instance().GetTypeName();
   static const std::string typed_struct_type =
-      xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+      xds::type::v3::TypedStruct::default_instance().GetTypeName();
   static const std::string legacy_typed_struct_type =
-      udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
-
+      udpa::type::v1::TypedStruct::default_instance().GetTypeName();
   if (!typed_config.value().empty()) {
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
@@ -279,33 +265,82 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       xds::type::v3::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
-      if (out_proto.GetDescriptor()->full_name() == struct_type) {
-        out_proto.CopyFrom(typed_struct.value());
+      if (out_proto.GetTypeName() == struct_type) {
+        out_proto.CheckTypeAndMergeFrom(typed_struct.value());
       } else {
         // The typed struct might match out_proto, or some earlier version, let
         // MessageUtil::jsonConvert sort this out.
+#ifdef ENVOY_ENABLE_YAML
         MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+#else
+        throw EnvoyException("Attempting to use JSON typed structs with JSON compiled out");
+#endif
       }
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
-      if (out_proto.GetDescriptor()->full_name() == struct_type) {
-        out_proto.CopyFrom(typed_struct.value());
+      if (out_proto.GetTypeName() == struct_type) {
+        out_proto.CheckTypeAndMergeFrom(typed_struct.value());
       } else {
         // The typed struct might match out_proto, or some earlier version, let
         // MessageUtil::jsonConvert sort this out.
+#ifdef ENVOY_ENABLE_YAML
         MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+#else
+        UNREFERENCED_PARAMETER(validation_visitor);
+        throw EnvoyException("Attempting to use legacy JSON structs with JSON compiled out");
+#endif
       }
     } // out_proto is expecting Struct, unpack directly
-    else if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
+    else if (type != struct_type || out_proto.GetTypeName() == struct_type) {
       MessageUtil::unpackTo(typed_config, out_proto);
     } else {
+#ifdef ENVOY_ENABLE_YAML
       ProtobufWkt::Struct struct_config;
       MessageUtil::unpackTo(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
+#else
+      throw EnvoyException("Attempting to use JSON structs with JSON compiled out");
+#endif
     }
   }
+}
+
+JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffStrategy(
+    absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
+    Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
+    absl::optional<const uint32_t> default_max_interval_ms) {
+  // BackoffStrategy config is specified
+  if (backoff != absl::nullopt) {
+    uint32_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(backoff.value(), base_interval);
+    uint32_t max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(backoff.value(), max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+    return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
+                                                                random);
+  }
+
+  // default_base_interval_ms must be greater than zero
+  if (default_base_interval_ms == 0) {
+    throw EnvoyException("default_base_interval_ms must be greater than zero");
+  }
+
+  // default maximum interval is specified
+  if (default_max_interval_ms != absl::nullopt) {
+    if (default_max_interval_ms.value() < default_base_interval_ms) {
+      throw EnvoyException(
+          "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");
+    }
+    return std::make_unique<JitteredExponentialBackOffStrategy>(
+        default_base_interval_ms, default_max_interval_ms.value(), random);
+  }
+  // use default base interval
+  return std::make_unique<JitteredExponentialBackOffStrategy>(
+      default_base_interval_ms, default_base_interval_ms * 10, random);
 }
 
 } // namespace Config

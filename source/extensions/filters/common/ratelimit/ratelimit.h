@@ -10,7 +10,7 @@
 #include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "absl/types/optional.h"
 
@@ -84,11 +84,14 @@ public:
    * @param domain specifies the rate limit domain.
    * @param descriptors specifies a list of descriptors to query.
    * @param parent_span source for generating an egress child span as part of the trace.
+   * @param stream_info supplies the stream info for the request.
+   * @param hits_addend supplies the number of hits to add to the rate limit counter.
    *
    */
   virtual void limit(RequestCallbacks& callbacks, const std::string& domain,
                      const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                     Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
+                     Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
+                     uint32_t hits_addend) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;

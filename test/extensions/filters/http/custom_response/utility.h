@@ -75,8 +75,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
               status_code: 299
-              host: "https://foo.example"
-              path: "/gateway_error"
+              uri: "https://foo.example/gateway_error"
               response_headers_to_add:
               - header:
                   key: "foo2"
@@ -95,8 +94,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
               status_code: 292
-              host: "https://host.with.route.with.header.matcher"
-              path: "/internal_server_error"
+              uri: "https://host.with.route.with.header.matcher/internal_server_error"
               response_headers_to_add:
               - header:
                   key: "foo3"
@@ -118,12 +116,37 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             name: 520_action
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
-              host: "https://global/storage"
-              path: "/internal_server_error"
+              uri: "https://global.storage/internal_server_error"
               response_headers_to_add:
               - header:
                   key: "foo3"
                   value: "x-bar3"
+  )EOF";
+
+constexpr absl::string_view kSinglePredicateConfig = R"EOF(
+  custom_response_matcher:
+    matcher_list:
+      matchers:
+        # Redirect to different upstream if the status code is one of 502.
+      - predicate:
+          single_predicate:
+            input:
+              name: "502_response"
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
+            value_match:
+              exact: "502"
+        on_match:
+          action:
+            name: gateway_error_action
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+              status_code: 299
+              uri: "https://foo.example/gateway_error"
+              response_headers_to_add:
+              - header:
+                  key: "foo2"
+                  value: "x-bar2"
   )EOF";
 
 // Helper methods and classes to modify the custom response config for tests.
@@ -218,11 +241,23 @@ class TestModifyRequestHeadersAction
 public:
   ~TestModifyRequestHeadersAction() override = default;
 
+  TestModifyRequestHeadersAction(
+      const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy&
+          redirect_policy) {
+    if (!redirect_policy.has_redirect_action()) {
+      throw EnvoyException("Expected redirect_action.");
+    }
+  }
+
+  // Modify the request headers before redirection to the error service, and
+  // potentially save information about the original response in the filter
+  // state on StreamInfo.
   void modifyRequestHeaders(
-      ::Envoy::Http::RequestHeaderMap& headers, Envoy::StreamInfo::StreamInfo&,
+      ::Envoy::Http::RequestHeaderMap& headers, const ::Envoy::Http::ResponseHeaderMap&,
+      Envoy::StreamInfo::StreamInfo&,
       const Extensions::Http::CustomResponse::RedirectPolicy& redirect_policy) override {
     headers.setCopy(::Envoy::Http::LowerCaseString("x-envoy-cer-backend"),
-                    redirect_policy.host().substr(8));
+                    redirect_policy.redirectAction()->host_redirect_);
   };
 };
 
@@ -240,8 +275,10 @@ public:
 
   std::unique_ptr<Extensions::Http::CustomResponse::ModifyRequestHeadersAction>
   createAction(const Protobuf::Message&,
+               const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy&
+                   redirect_policy,
                Envoy::Server::Configuration::ServerFactoryContext&) override {
-    return std::make_unique<TestModifyRequestHeadersAction>();
+    return std::make_unique<TestModifyRequestHeadersAction>(redirect_policy);
   }
 };
 

@@ -25,10 +25,10 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
+using absl::StatusCode;
 using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::util::MessageDifferencer;
-using Envoy::ProtobufUtil::StatusCode;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
@@ -1453,17 +1453,6 @@ TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingOKWithNotDeepProtoMess
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-}
-
-TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingFailedWithTooDeepProtoMessage) {
-  // If more than 64 deep, grpc response transcoder will fail.
-  auto response_message = createDeepStruct(65);
-  auto response_data = Grpc::Common::serializeToGrpcFrame(response_message);
-
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadGateway, _, _, _, _));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
-            filter_.encodeData(*response_data, false));
 }
 
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {

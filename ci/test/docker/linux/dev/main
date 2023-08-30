@@ -1,0 +1,85 @@
+>> BUILDX: install
+> docker run --rm --privileged tonistiigi/binfmt --install all
+> docker buildx rm multi-builder 2> /dev/null || :
+> docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
+>> LOGIN
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy.tar -t mocktest/repo-dev:MOCKSHA .
+>> PUSH: oci-archive:/non/existent/test/path/envoy.tar -> docker://docker.io/mocktest/repo-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy.tar docker://docker.io/mocktest/repo-dev:MOCKSHA
+>> TAG: mocktest/repo-dev:MOCKSHA -> mocktest/repo:dev-MOCKSHA
+> docker buildx imagetools create docker.io/mocktest/repo-dev:MOCKSHA --tag docker.io/mocktest/repo:dev-MOCKSHA
+>> TAG: mocktest/repo-dev:MOCKSHA -> mocktest/repo-dev:latest
+> docker buildx imagetools create docker.io/mocktest/repo-dev:MOCKSHA --tag docker.io/mocktest/repo-dev:latest
+>> TAG: mocktest/repo-dev:MOCKSHA -> mocktest/repo:dev
+> docker buildx imagetools create docker.io/mocktest/repo-dev:MOCKSHA --tag docker.io/mocktest/repo:dev
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD+PUSH: mocktest/repo-debug-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_PREFIX=dbg/ --sbom=false --provenance=false --push -t mocktest/repo-debug-dev:MOCKSHA .
+>> TAG: mocktest/repo-debug-dev:MOCKSHA -> mocktest/repo:debug-dev-MOCKSHA
+> docker buildx imagetools create docker.io/mocktest/repo-debug-dev:MOCKSHA --tag docker.io/mocktest/repo:debug-dev-MOCKSHA
+>> TAG: mocktest/repo-debug-dev:MOCKSHA -> mocktest/repo-debug-dev:latest
+> docker buildx imagetools create docker.io/mocktest/repo-debug-dev:MOCKSHA --tag docker.io/mocktest/repo-debug-dev:latest
+>> TAG: mocktest/repo-debug-dev:MOCKSHA -> mocktest/repo:debug-dev
+> docker buildx imagetools create docker.io/mocktest/repo-debug-dev:MOCKSHA --tag docker.io/mocktest/repo:debug-dev
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-contrib-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-contrib.tar -t mocktest/repo-contrib-dev:MOCKSHA .
+>> PUSH: oci-archive:/non/existent/test/path/envoy-contrib.tar -> docker://docker.io/mocktest/repo-contrib-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-contrib.tar docker://docker.io/mocktest/repo-contrib-dev:MOCKSHA
+>> TAG: mocktest/repo-contrib-dev:MOCKSHA -> mocktest/repo:contrib-dev-MOCKSHA
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-dev:MOCKSHA --tag docker.io/mocktest/repo:contrib-dev-MOCKSHA
+>> TAG: mocktest/repo-contrib-dev:MOCKSHA -> mocktest/repo-contrib-dev:latest
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-dev:MOCKSHA --tag docker.io/mocktest/repo-contrib-dev:latest
+>> TAG: mocktest/repo-contrib-dev:MOCKSHA -> mocktest/repo:contrib-dev
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-dev:MOCKSHA --tag docker.io/mocktest/repo:contrib-dev
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD+PUSH: mocktest/repo-contrib-debug-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_PREFIX=dbg/ --sbom=false --provenance=false --push -t mocktest/repo-contrib-debug-dev:MOCKSHA .
+>> TAG: mocktest/repo-contrib-debug-dev:MOCKSHA -> mocktest/repo:contrib-debug-dev-MOCKSHA
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-debug-dev:MOCKSHA --tag docker.io/mocktest/repo:contrib-debug-dev-MOCKSHA
+>> TAG: mocktest/repo-contrib-debug-dev:MOCKSHA -> mocktest/repo-contrib-debug-dev:latest
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-debug-dev:MOCKSHA --tag docker.io/mocktest/repo-contrib-debug-dev:latest
+>> TAG: mocktest/repo-contrib-debug-dev:MOCKSHA -> mocktest/repo:contrib-debug-dev
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-debug-dev:MOCKSHA --tag docker.io/mocktest/repo:contrib-debug-dev
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-distroless-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-distroless --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-distroless.tar -t mocktest/repo-distroless-dev:MOCKSHA .
+>> PUSH: oci-archive:/non/existent/test/path/envoy-distroless.tar -> docker://docker.io/mocktest/repo-distroless-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-distroless.tar docker://docker.io/mocktest/repo-distroless-dev:MOCKSHA
+>> TAG: mocktest/repo-distroless-dev:MOCKSHA -> mocktest/repo:distroless-dev-MOCKSHA
+> docker buildx imagetools create docker.io/mocktest/repo-distroless-dev:MOCKSHA --tag docker.io/mocktest/repo:distroless-dev-MOCKSHA
+>> TAG: mocktest/repo-distroless-dev:MOCKSHA -> mocktest/repo-distroless-dev:latest
+> docker buildx imagetools create docker.io/mocktest/repo-distroless-dev:MOCKSHA --tag docker.io/mocktest/repo-distroless-dev:latest
+>> TAG: mocktest/repo-distroless-dev:MOCKSHA -> mocktest/repo:distroless-dev
+> docker buildx imagetools create docker.io/mocktest/repo-distroless-dev:MOCKSHA --tag docker.io/mocktest/repo:distroless-dev
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-google-vrp-dev:MOCKSHA
+> docker buildx build --platform linux/amd64 -f ci/Dockerfile-envoy --target envoy-google-vrp --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-google-vrp.tar -t mocktest/repo-google-vrp-dev:MOCKSHA .
+>> PUSH: oci-archive:/non/existent/test/path/envoy-google-vrp.tar -> docker://docker.io/mocktest/repo-google-vrp-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-google-vrp.tar docker://docker.io/mocktest/repo-google-vrp-dev:MOCKSHA
+>> TAG: mocktest/repo-google-vrp-dev:MOCKSHA -> mocktest/repo:google-vrp-dev-MOCKSHA
+> docker buildx imagetools create docker.io/mocktest/repo-google-vrp-dev:MOCKSHA --tag docker.io/mocktest/repo:google-vrp-dev-MOCKSHA
+>> TAG: mocktest/repo-google-vrp-dev:MOCKSHA -> mocktest/repo-google-vrp-dev:latest
+> docker buildx imagetools create docker.io/mocktest/repo-google-vrp-dev:MOCKSHA --tag docker.io/mocktest/repo-google-vrp-dev:latest
+>> TAG: mocktest/repo-google-vrp-dev:MOCKSHA -> mocktest/repo:google-vrp-dev
+> docker buildx imagetools create docker.io/mocktest/repo-google-vrp-dev:MOCKSHA --tag docker.io/mocktest/repo:google-vrp-dev
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-tools-dev:MOCKSHA
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-tools --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-tools.tar -t mocktest/repo-tools-dev:MOCKSHA .
+>> PUSH: oci-archive:/non/existent/test/path/envoy-tools.tar -> docker://docker.io/mocktest/repo-tools-dev:MOCKSHA
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-tools.tar docker://docker.io/mocktest/repo-tools-dev:MOCKSHA
+>> TAG: mocktest/repo-tools-dev:MOCKSHA -> mocktest/repo:tools-dev-MOCKSHA
+> docker buildx imagetools create docker.io/mocktest/repo-tools-dev:MOCKSHA --tag docker.io/mocktest/repo:tools-dev-MOCKSHA
+>> TAG: mocktest/repo-tools-dev:MOCKSHA -> mocktest/repo-tools-dev:latest
+> docker buildx imagetools create docker.io/mocktest/repo-tools-dev:MOCKSHA --tag docker.io/mocktest/repo-tools-dev:latest
+>> TAG: mocktest/repo-tools-dev:MOCKSHA -> mocktest/repo:tools-dev
+> docker buildx imagetools create docker.io/mocktest/repo-tools-dev:MOCKSHA --tag docker.io/mocktest/repo:tools-dev

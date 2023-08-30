@@ -196,17 +196,50 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
 
   if (host_count > 0) {
-    // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
-    // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
-    // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
-    // in 100%. If 80% of hosts are healthy, that priority's health is still 100% (80%*1.4=112% and
-    // capped at 100%).
+    uint64_t healthy_weight = 0;
+    uint64_t degraded_weight = 0;
+    uint64_t total_weight = 0;
+    if (host_set.weightedPriorityHealth()) {
+      for (const auto& host : host_set.healthyHosts()) {
+        healthy_weight += host->weight();
+      }
+
+      for (const auto& host : host_set.degradedHosts()) {
+        degraded_weight += host->weight();
+      }
+
+      for (const auto& host : host_set.hosts()) {
+        total_weight += host->weight();
+      }
+
+      uint64_t excluded_weight = 0;
+      for (const auto& host : host_set.excludedHosts()) {
+        excluded_weight += host->weight();
+      }
+      ASSERT(total_weight >= excluded_weight);
+      total_weight -= excluded_weight;
+    } else {
+      healthy_weight = host_set.healthyHosts().size();
+      degraded_weight = host_set.degradedHosts().size();
+      total_weight = host_count;
+    }
+    // Each priority level's health is ratio of healthy hosts to total number of hosts in a
+    // priority multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if
+    // all hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which
+    // results in 100%. If 80% of hosts are healthy, that priority's health is still 100%
+    // (80%*1.4=112% and capped at 100%).
     per_priority_health.get()[priority] = std::min<uint32_t>(
-        100, (host_set.overprovisioningFactor() * host_set.healthyHosts().size() / host_count));
+        100, (host_set.overprovisioningFactor() * healthy_weight / total_weight));
 
     // We perform the same computation for degraded hosts.
     per_priority_degraded.get()[priority] = std::min<uint32_t>(
-        100, (host_set.overprovisioningFactor() * host_set.degradedHosts().size() / host_count));
+        100, (host_set.overprovisioningFactor() * degraded_weight / total_weight));
+
+    ENVOY_LOG(trace,
+              "recalculated priority state: priority level {}, healthy weight {}, total weight {}, "
+              "overprovision factor {}, healthy result {}, degraded result {}",
+              priority, healthy_weight, total_weight, host_set.overprovisioningFactor(),
+              per_priority_health.get()[priority], per_priority_degraded.get()[priority]);
   }
 
   // Now that we've updated health for the changed priority level, we need to calculate percentage
@@ -383,19 +416,19 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const absl::optional<LocalityLbConfig> locality_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
       local_priority_set_(local_priority_set),
-      locality_weighted_balancing_(locality_config.has_value() &&
-                                   locality_config->has_locality_weighted_lb_config()),
-      routing_enabled_(locality_config.has_value()
-                           ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                                 locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
-                           : 100),
       min_cluster_size_(locality_config.has_value()
                             ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                   locality_config->zone_aware_lb_config(), min_cluster_size, 6U)
                             : 6U),
+      routing_enabled_(locality_config.has_value()
+                           ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                 locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
+                           : 100),
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
-                                 : false) {
+                                 : false),
+      locality_weighted_balancing_(locality_config.has_value() &&
+                                   locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
@@ -889,11 +922,11 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
 }
 
-bool EdfLoadBalancerBase::isSlowStartEnabled() {
+bool EdfLoadBalancerBase::isSlowStartEnabled() const {
   return slow_start_window_ > std::chrono::milliseconds(0);
 }
 
-bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
+bool EdfLoadBalancerBase::noHostsAreInSlowStart() const {
   if (!isSlowStartEnabled()) {
     return true;
   }
@@ -963,35 +996,37 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   }
 }
 
-double EdfLoadBalancerBase::applyAggressionFactor(double time_factor) {
-  if (aggression_ == 1.0 || time_factor == 1.0) {
+namespace {
+double applyAggressionFactor(double time_factor, double aggression) {
+  if (aggression == 1.0 || time_factor == 1.0) {
     return time_factor;
   } else {
-    return std::pow(time_factor, 1.0 / aggression_);
+    return std::pow(time_factor, 1.0 / aggression);
   }
 }
+} // namespace
 
-double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) {
+double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) const {
   // We can reliably apply slow start weight only if `last_hc_pass_time` in host has been populated
   // either by active HC or by `member_update_cb_` in `EdfLoadBalancerBase`.
   if (host.lastHcPassTime() && host.coarseHealth() == Upstream::Host::Health::Healthy) {
     auto in_healthy_state_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         time_source_.monotonicTime() - host.lastHcPassTime().value());
     if (in_healthy_state_duration < slow_start_window_) {
-      aggression_ =
+      double aggression =
           aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
-      if (aggression_ <= 0.0 || std::isnan(aggression_)) {
+      if (aggression <= 0.0 || std::isnan(aggression)) {
         ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
                                      "aggression cannot be less than 0.0");
-        aggression_ = 1.0;
+        aggression = 1.0;
       }
 
-      ASSERT(aggression_ > 0.0);
+      ASSERT(aggression > 0.0);
       auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
                                                       in_healthy_state_duration.count())) /
                          slow_start_window_.count();
-      return host_weight *
-             std::max(applyAggressionFactor(time_factor), slow_start_min_weight_percent_);
+      return host_weight * std::max(applyAggressionFactor(time_factor, aggression),
+                                    slow_start_min_weight_percent_);
     } else {
       return host_weight;
     }
@@ -1000,7 +1035,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
   }
 }
 
-double LeastRequestLoadBalancer::hostWeight(const Host& host) {
+double LeastRequestLoadBalancer::hostWeight(const Host& host) const {
   // This method is called to calculate the dynamic weight as following when all load balancing
   // weights are not equal:
   //
@@ -1057,7 +1092,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
-    HostSharedPtr sampled_host = hosts_to_use[rand_idx];
+    const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];
 
     if (candidate_host == nullptr) {
 
@@ -1108,9 +1143,9 @@ SubsetSelectorImpl::SubsetSelectorImpl(
         LbSubsetSelectorFallbackPolicy fallback_policy,
     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
     bool single_host_per_subset)
-    : selector_keys_(selector_keys.begin(), selector_keys.end()), fallback_policy_(fallback_policy),
+    : selector_keys_(selector_keys.begin(), selector_keys.end()),
       fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()),
-      single_host_per_subset_(single_host_per_subset) {
+      fallback_policy_(fallback_policy), single_host_per_subset_(single_host_per_subset) {
 
   if (fallback_policy_ !=
       envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {

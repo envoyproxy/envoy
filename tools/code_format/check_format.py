@@ -252,7 +252,7 @@ class FormatChecker:
                     "{} environment variable to specify the path. Example:\n"
                     "    export {}=`which {}`\n"
                     "If you don't have {} installed, you can install it by:\n"
-                    "    go get -u github.com/bazelbuild/buildtools/{}".format(
+                    "    go install github.com/bazelbuild/buildtools/{}@latest".format(
                         path, name, var, var, name, name, name))
 
         check_bazel_tool('buildifier', self.config.buildifier_path, 'BUILDIFIER_BIN')
@@ -322,15 +322,13 @@ class FormatChecker:
         ]
 
     def allow_listed_for_raw_try(self, file_path):
-        # TODO(chaoqin-li1123): Exclude some important extensions from ALLOWLIST.
-        return file_path in self.config.paths["raw_try"]["include"] or file_path.startswith(
-            "./source/extensions")
+        return file_path in self.config.paths["raw_try"]["include"]
 
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
         # it is under tools/testdata subdirectory.
-
-        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) or file_path in self.config.paths["exception"]["exclude"] \
+        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) \
+            or (file_path.endswith('.cc') and file_path.startswith("./source/") and not file_path.startswith("./source/extensions/") and not file_path in self.config.paths["exception"]["include"]) \
             or self.is_in_subdir(file_path, 'tools/testdata')
 
     def allow_listed_for_build_urls(self, file_path):
@@ -551,7 +549,7 @@ class FormatChecker:
             report_error(
                 "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
             )
-        if not self.allow_listed_for_register_factory(file_path):
+        if file_path.startswith("mobile") and not self.allow_listed_for_register_factory(file_path):
             if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
                 report_error(
                     "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
@@ -624,7 +622,7 @@ class FormatChecker:
         if " try {" in line and file_path.startswith(
                 "./source") and not self.allow_listed_for_raw_try(file_path):
             report_error(
-                "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
+                "Don't use raw try, use TRY_ASSERT_MAIN_THREAD and CATCH if on the main thread otherwise don't use exceptions."
             )
         if "__attribute__((packed))" in line and file_path != "./envoy/common/platform.h":
             # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
@@ -722,12 +720,6 @@ class FormatChecker:
                     report_error(
                         "Don't introduce throws into exception-free files, use error "
                         + "statuses instead.")
-
-        if "lua_pushlightuserdata" in line:
-            report_error(
-                "Don't use lua_pushlightuserdata, since it can cause unprotected error in call to"
-                + "Lua API (bad light userdata pointer) on ARM64 architecture. See "
-                + "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
     def check_build_line(self, line, file_path, report_error):
         if "@bazel_tools" in line and not (self.is_starlark_file(file_path)
@@ -1068,7 +1060,7 @@ if __name__ == "__main__":
             if output:
                 error_messages.append(
                     "This change appears to add visibility rules. Please get senior maintainer "
-                    "approval to add an exemption to check_visibility tools/code_format/check_format.py"
+                    "approval to add an exemption to visibility_excludes in tools/code_format/config.yaml"
                 )
             output = subprocess.check_output(
                 "grep -r --include BUILD envoy_package source/extensions/*",

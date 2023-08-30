@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "source/common/http/http1/parser.h"
 
 #include "absl/base/attributes.h"
@@ -17,7 +19,7 @@ namespace Http1 {
 class BalsaParser : public Parser, public quiche::BalsaVisitorInterface {
 public:
   BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
-              bool enable_trailers);
+              bool enable_trailers, bool allow_custom_methods);
   ~BalsaParser() override = default;
 
   // Http1::Parser implementation
@@ -41,6 +43,7 @@ private:
   void OnHeaderInput(absl::string_view input) override;
   void OnHeader(absl::string_view key, absl::string_view value) override;
   void OnTrailerInput(absl::string_view input) override;
+  void OnTrailers(std::unique_ptr<quiche::BalsaHeaders> /*trailers*/) override{};
   void ProcessHeaders(const quiche::BalsaHeaders& headers) override;
   void ProcessTrailers(const quiche::BalsaHeaders& trailer) override;
   void OnRequestFirstLineInput(absl::string_view line_input, absl::string_view method_input,
@@ -51,6 +54,7 @@ private:
                                 absl::string_view reason_input) override;
   void OnChunkLength(size_t chunk_length) override;
   void OnChunkExtensionInput(absl::string_view input) override;
+  void OnInterimHeaders(std::unique_ptr<quiche::BalsaHeaders> headers) override;
   void HeaderDone() override;
   void ContinueHeaderDone() override;
   void MessageDone() override;
@@ -71,6 +75,7 @@ private:
 
   const MessageType message_type_ = MessageType::Request;
   ParserCallbacks* connection_ = nullptr;
+  const bool allow_custom_methods_ = false;
   bool first_byte_processed_ = false;
   bool headers_done_ = false;
   ParserStatus status_ = ParserStatus::Ok;

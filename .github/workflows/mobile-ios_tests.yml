@@ -1,0 +1,78 @@
+name: ios_tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
+  swifttests:
+    if: ${{ needs.env.outputs.mobile_ios_tests == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: swift_tests
+    runs-on: macos-12
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v3
+    - name: 'Install dependencies'
+      run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
+    - name: 'Run swift library tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # runs with the listener enabled due to IdleTimeoutTest not setting up a test backend.
+      run: |
+        cd mobile
+        ./bazelw test \
+            --experimental_ui_max_stdouterr_bytes=10485760 \
+            --config=ios \
+            --define envoy_mobile_listener=enabled \
+            --build_tests_only \
+            --config=mobile-remote-ci-macos \
+            //test/swift/...
+
+  objctests:
+    if: ${{ needs.env.outputs.mobile_ios_tests == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: c_and_objc_tests
+    runs-on: macos-12
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v3
+    - name: 'Install dependencies'
+      run: |
+        cd mobile
+        ./ci/mac_ci_setup.sh
+    - name: 'Run Objective-C library tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile
+        ./bazelw test \
+            --config=ios \
+            --build_tests_only \
+            --config=mobile-remote-ci-macos \
+            //test/objective-c/...  \
+            //test/cc/unit:envoy_config_test

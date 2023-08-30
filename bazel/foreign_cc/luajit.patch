@@ -1,5 +1,5 @@
 diff --git a/src/Makefile b/src/Makefile
-index e65b55e..f0a61dd 100644
+index 30d64be2..ae7ec875 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -27,7 +27,7 @@ NODOTABIVER= 51
@@ -36,13 +36,13 @@ index e65b55e..f0a61dd 100644
 @@ -212,7 +212,7 @@ TARGET_STCC= $(STATIC_CC)
  TARGET_DYNCC= $(DYNAMIC_CC)
  TARGET_LD= $(CROSS)$(CC)
- TARGET_AR= $(CROSS)ar rcus 2>/dev/null
+ TARGET_AR= $(CROSS)ar rcus
 -TARGET_STRIP= $(CROSS)strip
 +TARGET_STRIP?= $(CROSS)strip
  
  TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
  TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
-@@ -591,7 +591,7 @@ endif
+@@ -598,7 +598,7 @@ endif
  
  Q= @
  E= @echo
@@ -52,7 +52,7 @@ index e65b55e..f0a61dd 100644
  
  ##############################################################################
 diff --git a/src/msvcbuild.bat b/src/msvcbuild.bat
-index ae035dc..0e7eac9 100644
+index d323d8d4..2e08a3a1 100644
 --- a/src/msvcbuild.bat
 +++ b/src/msvcbuild.bat
 @@ -13,9 +13,7 @@
@@ -71,7 +71,7 @@ index ae035dc..0e7eac9 100644
  @set LJDLLNAME=lua51.dll
  @set LJLIBNAME=lua51.lib
 -@set BUILDTYPE=release
- @set ALL_LIB=lib_base.c lib_math.c lib_bit.c lib_string.c lib_table.c lib_io.c lib_os.c lib_package.c lib_debug.c lib_jit.c lib_ffi.c
+ @set ALL_LIB=lib_base.c lib_math.c lib_bit.c lib_string.c lib_table.c lib_io.c lib_os.c lib_package.c lib_debug.c lib_jit.c lib_ffi.c lib_buffer.c
  
 -%LJCOMPILE% host\minilua.c
 +%LJCOMPILE% /O2 host\minilua.c
@@ -131,7 +131,7 @@ index ae035dc..0e7eac9 100644
  @if errorlevel 1 goto :BAD
 diff --git a/build.py b/build.py
 new file mode 100755
-index 0000000..3eb74ff
+index 00000000..1201542c
 --- /dev/null
 +++ b/build.py
 @@ -0,0 +1,52 @@
@@ -149,7 +149,7 @@ index 0000000..3eb74ff
 +    shutil.copytree(src_dir, os.path.basename(src_dir))
 +    os.chdir(os.path.basename(src_dir))
 +
-+    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.6"
++    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.8"
 +    os.environ["DEFAULT_CC"] = os.environ.get("CC", "")
 +    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
 +    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
@@ -166,7 +166,7 @@ index 0000000..3eb74ff
 +      with open("clang-asan-blocklist.txt", "w") as f:
 +        f.write("fun:*\n")
 +
-+    os.system('make -j{} V=1 PREFIX="{}" install'.format(os.cpu_count(), args.prefix))
++    os.system('"{}" -j{} V=1 PREFIX="{}" install'.format(os.environ["MAKE"], os.cpu_count(), args.prefix))
 +
 +def win_main():
 +    src_dir = os.path.dirname(os.path.realpath(__file__))

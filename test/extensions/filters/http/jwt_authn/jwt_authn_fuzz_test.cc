@@ -24,6 +24,7 @@ namespace {
 using envoy::extensions::filters::http::jwt_authn::JwtAuthnFuzzInput;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
 using testing::NiceMock;
+using testing::Return;
 
 class MockJwksUpstream {
 public:
@@ -103,7 +104,7 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
   // just bail out.
   if (input.config().has_filter_state_rules()) {
     const auto& rules = input.config().filter_state_rules();
-    if (!rules.name().empty() && !rules.requires().empty()) {
+    if (!rules.name().empty() && !rules.requires_().empty()) {
       filter_callbacks.stream_info_.filter_state_->setData(
           rules.name(), std::make_unique<Router::StringAccessorImpl>(input.filter_state_selector()),
           StreamInfo::FilterState::StateType::ReadOnly,

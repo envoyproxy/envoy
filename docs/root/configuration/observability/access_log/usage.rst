@@ -187,6 +187,30 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%BYTES_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Body bytes retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
+%PACKETS_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Number of packets retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
 %PROTOCOL%
   HTTP
     Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
@@ -346,6 +370,8 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+.. _config_access_log_format_duration:
+
 %DURATION%
   HTTP/THRIFT
     Total duration in milliseconds of the request from the start time to the last byte out.
@@ -424,41 +450,52 @@ The following command operators are supported:
 
 .. _config_access_log_format_response_flags:
 
-%RESPONSE_FLAGS%
+%RESPONSE_FLAGS% / %RESPONSE_FLAGS_LONG%
   Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
-  the descriptions do not apply. Possible values are:
+  the descriptions do not apply. %RESPONSE_FLAGS% will outout a short string. %RESPONSE_FLAGS% will outout a Pascal case string.
+  Possible values are:
 
-  HTTP and TCP
-    * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
-    * **UF**: Upstream connection failure in addition to 503 response code.
-    * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
-    * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
-    * **NC**: Upstream cluster not found.
-    * **DT**: When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
-  HTTP only
-    * **DC**: Downstream connection termination.
-    * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
-    * **UT**: Upstream request timeout in addition to 504 response code.
-    * **LR**: Connection local reset in addition to 503 response code.
-    * **UR**: Upstream remote reset in addition to 503 response code.
-    * **UC**: Upstream connection termination in addition to 503 response code.
-    * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-    * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-    * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
-    * **UAEX**: The request was denied by the external authorization service.
-    * **RLSE**: The request was rejected because there was an error in rate limit service.
-    * **IH**: The request was rejected because it set an invalid value for a
-      :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
-    * **SI**: Stream idle timeout in addition to 408 or 504 response code.
-    * **DPE**: The downstream request had an HTTP protocol error.
-    * **UPE**: The upstream response had an HTTP protocol error.
-    * **UMSDR**: The upstream request reached max stream duration.
-    * **OM**: Overload Manager terminated the request.
-    * **DF**: The request was terminated due to DNS resolution failure.
+HTTP and TCP
 
-  UDP
-    Not implemented ("-").
+.. csv-table::
+  :header: Long name, Short name, Description
+  :widths: 1, 1, 3
+
+  **NoHealthyUpstream**, **UH**, No healthy upstream hosts in upstream cluster in addition to 503 response code.
+  **UpstreamConnectionFailure**, **UF**, Upstream connection failure in addition to 503 response code.
+  **UpstreamOverflow**, **UO**, Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
+  **NoRouteFound**, **NR**, No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code or no matching filter chain for a downstream connection.
+  **UpstreamRetryLimitExceeded**, **URX**, The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
+  **NoClusterFound**, **NC**, Upstream cluster not found.
+  **DurationTimeout**, **DT**, When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
+
+HTTP only
+
+.. csv-table::
+  :header: Long name, Short name, Description
+  :widths: 1, 1, 3
+
+  **DownstreamConnectionTermination**, **DC**, Downstream connection termination.
+  **FailedLocalHealthCheck**, **LH**, Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
+  **UpstreamRequestTimeout**, **UT**, Upstream request timeout in addition to 504 response code.
+  **LocalReset**, **LR**, Connection local reset in addition to 503 response code.
+  **UpstreamRemoteReset**, **UR**, Upstream remote reset in addition to 503 response code.
+  **UpstreamConnectionTermination**, **UC**, Upstream connection termination in addition to 503 response code.
+  **DelayInjected**, **DI**, The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+  **FaultInjected**, **FI**, The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+  **RateLimited**, **RL**, The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+  **UnauthorizedExternalService**, **UAEX**, The request was denied by the external authorization service.
+  **RateLimitServiceError**, **RLSE**, The request was rejected because there was an error in rate limit service.
+  **InvalidEnvoyRequestHeaders**, **IH**, The request was rejected because it set an invalid value for a :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
+  **StreamIdleTimeout**, **SI**, Stream idle timeout in addition to 408 or 504 response code.
+  **DownstreamProtocolError**, **DPE**, The downstream request had an HTTP protocol error.
+  **UpstreamProtocolError**, **UPE**, The upstream response had an HTTP protocol error.
+  **UpstreamMaxStreamDurationReached**, **UMSDR**, The upstream request reached max stream duration.
+  **OverloadManagerTerminated**, **OM**, Overload Manager terminated the request.
+  **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
+
+UDP
+  Not implemented ("-").
 
 %ROUTE_NAME%
   HTTP/TCP
@@ -888,6 +925,32 @@ The following command operators are supported:
   UDP
     Not implemented ("-").
 
+%DOWNSTREAM_LOCAL_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the peer certificate received from the downstream client to establish the
+    TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_LOCAL_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the peer certificate received from the downstream client to establish the
+    TLS connection.
+  UDP
+    Not implemented ("-").
+
 %DOWNSTREAM_LOCAL_URI_SAN%
   HTTP/TCP/THRIFT
     The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
@@ -1048,6 +1111,24 @@ The following command operators are supported:
 
 %FILTER_CHAIN_NAME%
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
+
+.. _config_access_log_format_access_log_type:
+
+%ACCESS_LOG_TYPE%
+  The type of the access log, which indicates when the access log was recorded. If a non-supported log (from the list below),
+  uses this substitution string, then the value will be an empty string.
+
+  * TcpUpstreamConnected - When TCP Proxy filter has successfully established an upstream connection.
+  * TcpPeriodic - On any TCP Proxy filter periodic log record.
+  * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
+  * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
+  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
+                                              indicating a successful HTTP tunnel.
+  * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
+  * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
+  * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
+  * UpstreamPeriodic - On any HTTP Router filter periodic log record.
+  * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

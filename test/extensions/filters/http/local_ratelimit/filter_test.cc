@@ -4,10 +4,11 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {

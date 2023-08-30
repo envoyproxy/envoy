@@ -6,7 +6,6 @@
 #include "request_headers.h"
 #include "request_method.h"
 #include "retry_policy.h"
-#include "upstream_http_protocol.h"
 
 namespace Envoy {
 namespace Platform {
@@ -27,7 +26,6 @@ public:
   RequestHeadersBuilder(RequestMethod request_method, absl::string_view url);
 
   RequestHeadersBuilder& addRetryPolicy(const RetryPolicy& retry_policy);
-  RequestHeadersBuilder& addUpstreamHttpProtocol(UpstreamHttpProtocol upstream_http_protocol);
   RequestHeadersBuilder& enableRequestCompression(CompressionAlgorithm algorithm);
 
   RequestHeaders build() const;

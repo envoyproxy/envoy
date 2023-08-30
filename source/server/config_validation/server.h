@@ -10,7 +10,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
@@ -93,12 +93,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  Runtime::Loader& runtime() override {
-    if (runtime_singleton_) {
-      return runtime_singleton_->instance();
-    }
-    return *runtime_;
-  }
+  Runtime::Loader& runtime() override { return *runtime_; }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}
@@ -174,7 +169,6 @@ private:
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Runtime::Loader> runtime_;
   Random::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;

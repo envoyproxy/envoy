@@ -15,6 +15,11 @@ envoy_proto_library(
 )
 
 envoy_proto_library(
+    name = "add_header_filter_proto",
+    srcs = ["add_header_filter.proto"],
+)
+
+envoy_proto_library(
     name = "test_listener_filter_proto",
     srcs = ["test_listener_filter.proto"],
 )
@@ -55,6 +60,7 @@ envoy_cc_test_library(
     name = "add_header_filter_config_lib",
     srcs = ["add_header_filter.cc"],
     deps = [
+        ":add_header_filter_proto_cc_proto",
         ":common_lib",
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -509,6 +515,31 @@ envoy_proto_library(
     srcs = [":set_is_terminal_filter_config.proto"],
 )
 
+envoy_cc_test_library(
+    name = "server_factory_context_filter_lib",
+    srcs = [
+        "server_factory_context_filter.cc",
+    ],
+    deps = [
+        ":server_factory_context_filter_config_proto_cc_proto",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/grpc:async_client_manager_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//source/common/grpc:typed_async_client_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/proto:helloworld_proto_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "server_factory_context_filter_config_proto",
+    srcs = [":server_factory_context_filter_config.proto"],
+    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
+)
+
 envoy_proto_library(
     name = "stop_and_continue_filter_config_proto",
     srcs = [":stop_and_continue_filter_config.proto"],
@@ -659,6 +690,18 @@ envoy_cc_test_library(
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "metadata_control_filter_lib",
+    srcs = ["metadata_control_filter.cc"],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",

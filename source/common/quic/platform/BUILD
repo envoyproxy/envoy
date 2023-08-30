@@ -55,6 +55,16 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
+    name = "quiche_time_utils_impl_lib",
+    srcs = ["quiche_time_utils_impl.cc"],
+    hdrs = ["quiche_time_utils_impl.h"],
+    external_deps = [
+        "abseil_base",
+        "abseil_time",
+    ],
+)
+
+envoy_quiche_platform_impl_cc_library(
     name = "quiche_logging_impl_lib",
     srcs = [
         "quiche_bug_tracker_impl.cc",
@@ -117,15 +127,6 @@ envoy_quiche_platform_impl_cc_library(
         "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_udp_socket_platform_impl_lib",
-    hdrs = select({
-        "//bazel:linux": ["quiche_udp_socket_platform_impl.h"],
-        "//conditions:default": [],
-    }),
-    tags = ["nofips"],
 )
 
 envoy_quiche_platform_impl_cc_library(

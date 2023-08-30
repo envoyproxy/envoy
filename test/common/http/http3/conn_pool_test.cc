@@ -94,7 +94,7 @@ public:
   MockQuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context)
-      : Quic::QuicClientTransportSocketFactory(move(config), factory_context) {}
+      : Quic::QuicClientTransportSocketFactory(std::move(config), factory_context) {}
 
   MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
 };
@@ -122,6 +122,9 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
 }
 
 TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
+  testing::NiceMock<Stats::MockStore> mock_store;
+  ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(*mock_store.rootScope()));
+
   MockQuicClientTransportSocketFactory factory{
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
       context_};
@@ -144,7 +147,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
-  EXPECT_CALL(context_.store_.counter_, inc());
+  EXPECT_CALL(mock_store.counter_, inc());
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(pool->newStream(decoder, callbacks,
                             {/*can_send_early_data_=*/false,
@@ -177,13 +180,7 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
                                                               {/*can_send_early_data_=*/false,
                                                                /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancellable);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
-    async_connect_callback->invokeCallback();
-  } else {
-    EXPECT_FALSE(async_connect_callback->enabled());
-    delete async_connect_callback;
-  }
+  async_connect_callback->invokeCallback();
 
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
@@ -195,11 +192,6 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
 }
 
 TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
-    return;
-  }
-
   initialize();
 
   MockResponseDecoder decoder;
@@ -227,10 +219,6 @@ TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {
 }
 
 TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")) {
-    return;
-  }
   initialize();
 
   MockResponseDecoder decoder;

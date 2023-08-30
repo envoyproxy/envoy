@@ -43,7 +43,7 @@ envoy_cc_library(
         "//envoy/network:address_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/thread_local:thread_local_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:hex_lib",

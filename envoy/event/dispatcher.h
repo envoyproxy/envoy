@@ -29,6 +29,8 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 namespace Event {
 
@@ -51,7 +53,7 @@ using DispatcherStatsPtr = std::unique_ptr<DispatcherStats>;
 /**
  * Callback invoked when a dispatcher post() runs.
  */
-using PostCb = std::function<void()>;
+using PostCb = absl::AnyInvocable<void()>;
 
 using PostCbSharedPtr = std::shared_ptr<PostCb>;
 
@@ -230,15 +232,13 @@ public:
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
    * @param runtime supplies the runtime for this server.
-   * @param bind_to_port controls whether the listener binds to a transport port or not.
-   * @param ignore_global_conn_limit controls whether the listener is limited by the global
-   * connection limit.
+   * @param listener_config configuration for the TCP listener to be created.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                               Network::TcpListenerCallbacks& cb,
-                                              Runtime::Loader& runtime, bool bind_to_port,
-                                              bool ignore_global_conn_limit) PURE;
+                                              Runtime::Loader& runtime,
+                                              const Network::ListenerConfig& listener_config) PURE;
 
   /**
    * Creates a logical udp listener on a specific port.

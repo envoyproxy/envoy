@@ -106,13 +106,14 @@ public:
   // Network::FilterChainFactory
   bool
   createNetworkFilterChain(Network::Connection& connection,
-                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
+                           const Filter::NetworkFilterFactoriesList& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager, bool) const override;
+  bool createFilterChain(Http::FilterChainManager& manager, bool,
+                         const Http::FilterChainOptions&) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                 Http::FilterChainManager&) const override {
     return false;
@@ -123,9 +124,15 @@ public:
     return request_id_extension_;
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override { return false; }
+  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+    return null_access_log_flush_interval_;
+  }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks) override;
+                                        Http::ServerConnectionCallbacks& callbacks,
+                                        Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
@@ -150,6 +157,7 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;
   }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override { return scope_key_builder_; }
   const std::string& serverName() const override { return Http::DefaultServerString::get(); }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -173,7 +181,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override;
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
-  Tracing::HttpTracerSharedPtr tracer() override { return nullptr; }
+  Tracing::TracerSharedPtr tracer() override { return nullptr; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
@@ -213,11 +221,12 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
+  Http::ServerHeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
     // TODO(yanavlasov): admin interface should use the default validator
     return nullptr;
   }
   bool appendXForwardedPort() const override { return false; }
+  bool addProxyProtocolConnectionState() const override { return true; }
 
 private:
   friend class AdminTestingPeer;
@@ -299,6 +308,16 @@ private:
   };
 
   /**
+   * Implementation of ScopeKeyBuilder that returns a null scope key.
+   */
+  struct NullScopeKeyBuilder : public Router::ScopeKeyBuilder {
+    NullScopeKeyBuilder() = default;
+    ~NullScopeKeyBuilder() override = default;
+
+    Router::ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const override { return nullptr; };
+  };
+
+  /**
    * Implementation of OverloadManager that is never overloaded. Using this instead of the real
    * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
    */
@@ -325,6 +344,7 @@ private:
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
       return tls_->getTyped<OverloadState>();
     }
+    LoadShedPoint* getLoadShedPoint(absl::string_view) override { return nullptr; }
 
     Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
 
@@ -395,12 +415,8 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::UdpListenerConfigOptRef udpListenerConfig() override {
-      return Network::UdpListenerConfigOptRef();
-    }
-    Network::InternalListenerConfigOptRef internalListenerConfig() override {
-      return Network::InternalListenerConfigOptRef();
-    }
+    Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -412,6 +428,9 @@ private:
       return empty_access_logs_;
     }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+      return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+    }
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
@@ -444,7 +463,7 @@ private:
       return std::chrono::milliseconds::zero();
     }
 
-    const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
+    const Filter::NetworkFilterFactoriesList& networkFilterFactories() const override {
       return empty_network_filter_factory_;
     }
 
@@ -452,12 +471,14 @@ private:
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
-    const std::vector<Network::FilterFactoryCb> empty_network_filter_factory_;
+    const Filter::NetworkFilterFactoriesList empty_network_filter_factory_;
   };
 
   Server::Instance& server_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  const bool flush_access_log_on_new_request_ = false;
+  const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;
   NullOverloadManager null_overload_manager_;
@@ -467,6 +488,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  NullScopeKeyBuilder scope_key_builder_;
   Server::ClustersHandler clusters_handler_;
   Server::ConfigDumpHandler config_dump_handler_;
   Server::InitDumpHandler init_dump_handler_;

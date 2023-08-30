@@ -11,8 +11,9 @@ import java.nio.ByteBuffer
  */
 internal class MockEnvoyHTTPStream(
   val callbacks: EnvoyHTTPCallbacks,
-  val explicitFlowControl: Boolean
-) : EnvoyHTTPStream(0, 0, callbacks, explicitFlowControl) {
+  val explicitFlowControl: Boolean,
+  val minDeliverySize: Long
+) : EnvoyHTTPStream(0, 0, callbacks, explicitFlowControl, minDeliverySize) {
   override fun sendHeaders(headers: MutableMap<String, MutableList<String>>?, endStream: Boolean) {}
 
   override fun sendData(data: ByteBuffer?, endStream: Boolean) {}

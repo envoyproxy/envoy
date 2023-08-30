@@ -225,45 +225,27 @@ This information is sent as metadata when flushing stats.
   // Swift
   builder.addAppId("com.mydomain.myapp)
 
-~~~~~~~~~~~~~~~~~~~~~
-``addVirtualCluster``
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
+``addNativeFilter``
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Add a virtual cluster config for Envoy Mobile's configuration.
-The configuration is expected as a JSON object.
-This functionality is used for stat segmentation.
+Add a C++ filter to the Envoy Mobile filter chain
 
 .. attention::
 
-    This API is non-ideal as it exposes lower-level internals of Envoy than desired by this project.
-    :issue:`#770 <770>` tracks enhancing this API.
+    This will only work if the C++ filter specified is linked into your Envoy Mobile build.
+    For C++ and Android testing, calling addNativeFilter and linking the Envoy library by adding the
+    library to ``envoy_build_config/extensions_build_config.bzl`` is sufficient.
+    For iOS, due to enthusiastic garbage collection, and for upstream CI, to catch bugs, you will
+    also need to forceRegister the filter in ``envoy_build_config/extension_registry.cc``
 
 **Example**::
 
   // Kotlin
-  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
+  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
 
   // Swift
-  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
-
-~~~~~~~~~~~~~~~~~~~~~~~~~
-``enableAdminInterface``
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Enable admin interface on 127.0.0.1:9901 address.
-
-.. attention::
-
-    Admin interface is intended to be used for development/debugging purposes only.
-    Enabling it in production may open your app to security vulnerabilities.
-
-**Example**::
-
-  // Kotlin
-  builder.enableAdminInterface()
-
-  // Swift
-  builder.enableAdminInterface()
+  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
 
 ~~~~~~~~~~~~~~~~~~~~~~
 ``setOnEngineRunning``
@@ -346,20 +328,6 @@ Defaults to ``NWPathMonitor``, but can be configured to use ``SCNetworkReachabil
 
   // Swift
   builder.setNetworkMonitoringMode(.pathMonitor)
-
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableHappyEyeballs``
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to true.
-
-**Example**::
-
-  // Kotlin
-  builder.enableHappyEyeballs(true)
-
-  // Swift
-  builder.enableHappyEyeballs(true)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableGzipDecompression``
@@ -526,6 +494,81 @@ Note that Envoy will fail to start up in debug mode if an unknown guard is speci
 
   // Swift
   builder.setRuntimeGuard("feature", true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setXds``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the Bootstrap configuration up with `xDS <https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads>`_
+to fetch dynamic configuration from an xDS management server. The xDS management server must
+support the ADS protocol. At this moment, only the State-of-the-World (SotW) xDS protocol is
+supported, not the Delta protocol. The Envoy Mobile client will communicate with the configured
+xDS management server over gRPC.
+
+Use the XdsBuilder class to configure the xDS for the Envoy Mobile engine.  For example, the
+`addRuntimeDiscoveryService()` method can be used to configure the
+`Runtime Discovery Service (RTDS) <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto>`_
+and the `addClusterDiscoveryService()` method to configure the
+`Cluster Discovery Service (CDS) <https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cds>`_.
+
+Parameters:
+xds_builder
+
+**Example**::
+
+  // Kotlin
+  val xdsBuilder = new XdsBuilder(address = "my_xds_server.com", port = 443)
+                       .addRuntimeDiscoveryService("my_rtds_resource")
+                       .addClusterDiscoveryService()
+  builder.setXds(xdsBuilder)
+
+  // Swift
+  var xdsBuilder = XdsBuilder(address: "my_xds_server.com", port: 443)
+                       .addRuntimeDiscoveryService("my_rtds_resource")
+                       .addClusterDiscoveryService()
+  builder.setXds(xdsBuilder)
+
+  // C++
+  XdsBuilder xds_builder(/*address=*/"my_xds_server.com", /*port=*/443);
+  xds_builder.addRuntimeDiscoveryService("my_rtds_resource")
+      .addClusterDiscoveryService();
+  builder.setXds(std::move(xds_builder));
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeId``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.id field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeId(nodeId = "my_test_node")
+
+  // Swift
+  builder.setNodeID("my_test_node")
+
+  // C++
+  builder.setNodeId("my_test_node")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeLocality``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.locality field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeLocality(region = "us-west-1", zone = "some_zone", subZone = "some_sub_zone")
+
+  // Swift
+  builder.setNodeLocality(region: "us-west-1", zone: "some_zone", subZone: "some_sub_zone")
+
+  // C++
+  builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone");
 
 ----------------------
 Advanced configuration

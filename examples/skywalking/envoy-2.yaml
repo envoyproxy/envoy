@@ -59,7 +59,7 @@ static_resources:
             address:
               socket_address:
                 address: service-2
-                port_value: 8000
+                port_value: 8080
   - name: skywalking
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN

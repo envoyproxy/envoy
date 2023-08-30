@@ -13,6 +13,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "ssl_socket_test",
+    size = "large",
     srcs = [
         "ssl_certs_test.h",
         "ssl_socket_test.cc",
@@ -25,7 +26,6 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    shard_count = 4,
     deps = [
         ":test_private_key_method_provider_test_lib",
         "//envoy/network:transport_socket_interface",
@@ -95,7 +95,6 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",

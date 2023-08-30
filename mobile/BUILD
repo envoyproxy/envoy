@@ -3,6 +3,7 @@ load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_framework_import
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load(
     "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:defs.bzl",
+    "project_options",
     "top_level_targets",
     "xcode_schemes",
     "xcodeproj",
@@ -105,6 +106,10 @@ xcodeproj(
     bazel_path = "./bazelw",
     build_mode = "bazel",
     project_name = "Envoy",
+    project_options = project_options(
+        indent_width = 2,
+        tab_width = 2,
+    ),
     scheme_autogeneration_mode = "auto",  # Switch to "all" to generate schemes for all deps
     schemes = [
         xcode_schemes.scheme(
@@ -142,6 +147,12 @@ xcodeproj(
             ]),
         ),
         xcode_schemes.scheme(
+            name = "Swift C++ Interop Tests",
+            test_action = xcode_schemes.test_action([
+                "//test/swift/cxx:test",
+            ]),
+        ),
+        xcode_schemes.scheme(
             name = "Objective-C Library",
             build_action = xcode_schemes.build_action(["//library/objective-c:envoy_engine_objc_lib"]),
             test_action = xcode_schemes.test_action(["//test/objective-c:envoy_bridge_utility_test"]),
@@ -166,6 +177,7 @@ xcodeproj(
         # Tests
         "//experimental/swift:quic_stream_test",
         "//test/objective-c:envoy_bridge_utility_test",
+        "//test/swift/cxx:test",
         "//test/swift/integration:test",
         "//test/swift/stats:test",
         "//test/swift:test",

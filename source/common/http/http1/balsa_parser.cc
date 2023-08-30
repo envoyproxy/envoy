@@ -23,7 +23,14 @@ constexpr absl::string_view kColonSlashSlash = "://";
 // Response must start with "HTTP".
 constexpr char kResponseFirstByte = 'H';
 
-// TODO(#18819): Add flag to support custom methods.
+// Allowed characters for field names according to Section 5.1
+// and for methods according to Section 9.1 of RFC 9110:
+// https://www.rfc-editor.org/rfc/rfc9110.html
+constexpr absl::string_view kValidCharacters =
+    "!#$%&'*+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz|~";
+constexpr absl::string_view::iterator kValidCharactersBegin = kValidCharacters.begin();
+constexpr absl::string_view::iterator kValidCharactersEnd = kValidCharacters.end();
+
 bool isFirstCharacterOfValidMethod(char c) {
   static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
                                                    'N', 'O', 'P', 'R', 'S', 'T', 'U'};
@@ -33,7 +40,16 @@ bool isFirstCharacterOfValidMethod(char c) {
   return std::binary_search(begin, end, c);
 }
 
-bool isMethodValid(absl::string_view method) {
+// TODO(#21245): Skip method validation altogether when UHV method validation is
+// enabled.
+bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
+  if (allow_custom_methods) {
+    return !method.empty() &&
+           std::all_of(method.begin(), method.end(), [](absl::string_view::value_type c) {
+             return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
+           });
+  }
+
   static constexpr absl::string_view kValidMethods[] = {
       "ACL",       "BIND",    "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
       "HEAD",      "LINK",    "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
@@ -46,7 +62,7 @@ bool isMethodValid(absl::string_view method) {
   return std::binary_search(begin, end, method);
 }
 
-// This method is crafted to match the URL validation behavior of the http-parser library.
+// This function is crafted to match the URL validation behavior of the http-parser library.
 bool isUrlValid(absl::string_view url, bool is_connect) {
   if (url.empty()) {
     return false;
@@ -119,18 +135,27 @@ bool isVersionValid(absl::string_view version_input) {
   return regex->match(version_input);
 }
 
+bool isHeaderNameValid(absl::string_view name) {
+  return std::all_of(name.begin(), name.end(), [](absl::string_view::value_type c) {
+    return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
+  });
+}
+
 } // anonymous namespace
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
-                         bool enable_trailers)
-    : message_type_(type), connection_(connection) {
+                         bool enable_trailers, bool allow_custom_methods)
+    : message_type_(type), connection_(connection), allow_custom_methods_(allow_custom_methods) {
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
   http_validation_policy.disallow_header_continuation_lines = true;
   http_validation_policy.require_header_colon = true;
-  http_validation_policy.disallow_multiple_content_length = false;
+  http_validation_policy.disallow_multiple_content_length = true;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
+  http_validation_policy.validate_transfer_encoding = false;
+  http_validation_policy.require_content_length_if_body_required = false;
+  http_validation_policy.disallow_invalid_header_characters_in_response = true;
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
@@ -155,11 +180,13 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
-    if (message_type_ == MessageType::Request && !isFirstCharacterOfValidMethod(*slice)) {
+    if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
+        !isFirstCharacterOfValidMethod(*slice)) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_METHOD";
       return 0;
-    } else if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
+    }
+    if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_CONSTANT";
       return 0;
@@ -260,7 +287,7 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-  if (!isMethodValid(method_input)) {
+  if (!isMethodValid(method_input, allow_custom_methods_)) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_METHOD";
     return;
@@ -303,6 +330,8 @@ void BalsaParser::OnChunkLength(size_t chunk_length) {
 }
 
 void BalsaParser::OnChunkExtensionInput(absl::string_view /*input*/) {}
+
+void BalsaParser::OnInterimHeaders(std::unique_ptr<BalsaHeaders> /*headers*/) {}
 
 void BalsaParser::HeaderDone() {
   if (status_ == ParserStatus::Error) {
@@ -349,6 +378,9 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
   case BalsaFrameEnums::INVALID_HEADER_CHARACTER:
     error_message_ = "header value contains invalid chars";
     break;
+  case BalsaFrameEnums::MULTIPLE_CONTENT_LENGTH_KEYS:
+    error_message_ = "HPE_UNEXPECTED_CONTENT_LENGTH";
+    break;
   default:
     error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
   }
@@ -367,8 +399,13 @@ void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& heade
     }
 
     absl::string_view key = key_value.first;
-    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
+    if (!isHeaderNameValid(key)) {
+      status_ = ParserStatus::Error;
+      error_message_ = "HPE_INVALID_HEADER_TOKEN";
+      return;
+    }
 
+    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
     if (status_ == ParserStatus::Error) {
       return;
     }

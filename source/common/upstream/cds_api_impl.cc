@@ -49,7 +49,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   for (const auto& [cluster_name, _] : all_existing_clusters.warming_clusters_) {
     UNREFERENCED_PARAMETER(_);
     // Do not add the cluster twice when the cluster is both active and warming.
-    if (all_existing_clusters.active_clusters_.count(cluster_name) == 0) {
+    if (!all_existing_clusters.active_clusters_.contains(cluster_name)) {
       *to_remove_repeated.Add() = cluster_name;
     }
   }

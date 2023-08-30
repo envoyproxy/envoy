@@ -20,6 +20,7 @@ public:
                     bool end_stream) PURE;
   // Idempotent close. Return true if it actually closed.
   virtual bool close() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
@@ -31,6 +32,7 @@ public:
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) PURE;
   virtual void onGrpcError(Grpc::Status::GrpcStatus error) PURE;
   virtual void onGrpcClose() PURE;
+  virtual void logGrpcStreamInfo() PURE;
 };
 
 class ExternalProcessorClient {

@@ -15,6 +15,7 @@ envoy_cc_library(
         "crc16.cc",
         "crc16.h",
     ],
+    deps = ["@com_google_absl//absl/strings"],
 )
 
 envoy_cc_library(

@@ -64,6 +64,15 @@ public:
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
+      return quic::HttpDatagramSupport::kRfc;
+    }
+#endif
+    return quic::HttpDatagramSupport::kNone;
+  }
+
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
   // quic::ProofHandler
@@ -81,6 +90,9 @@ public:
 
   // Notify any registered connection pool when new streams are available.
   void OnCanCreateNewOutgoingStream(bool) override;
+
+  void OnServerPreferredAddressAvailable(
+      const quic::QuicSocketAddress& server_preferred_address) override;
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 

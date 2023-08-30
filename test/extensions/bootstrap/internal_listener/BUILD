@@ -27,6 +27,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "internal_listener_registry_test",
+    size = "large",
     srcs = ["internal_listener_registry_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [
@@ -37,6 +38,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "internal_listener_integration_test",
+    size = "large",
     srcs = [
         "internal_listener_integration_test.cc",
     ],
@@ -66,6 +68,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "active_internal_listener_test",
+    size = "large",
     srcs = ["active_internal_listener_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [

@@ -2,11 +2,11 @@
 
 #include "test/integration/integration.h"
 
-#include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
 #include "library/common/types/c_types.h"
+#include "test_engine_builder.h"
 
 namespace Envoy {
 
@@ -29,7 +29,7 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
 
 // Creates a default bootstrap config from the EngineBuilder.
 // Only used to build the Engine if `override_builder_config_` is set to true.
-std::string defaultConfig();
+envoy::config::bootstrap::v3::Bootstrap defaultConfig();
 
 // A base class for Envoy Mobile client integration tests which interact with Envoy through the
 // Http::Client class.
@@ -38,8 +38,7 @@ std::string defaultConfig();
 // into a test lib.
 class BaseClientIntegrationTest : public BaseIntegrationTest {
 public:
-  BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
-                            const std::string& bootstrap_config = defaultConfig());
+  BaseClientIntegrationTest(Network::Address::IpVersion ip_version);
   virtual ~BaseClientIntegrationTest() = default;
   // Note: This class does not inherit from testing::Test and so this TearDown() method
   // does not override testing::Test::TearDown(). As a result, it will not be called
@@ -51,13 +50,7 @@ protected:
   virtual void initialize() override;
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
-  // helpers to access protected functions in the friend class
-  void setOverrideConfigForTests(Platform::EngineBuilder builder, std::string config) {
-    builder.setOverrideConfigForTests(config);
-  }
-  void setAdminAddressPathForTests(Platform::EngineBuilder& builder, std::string admin) {
-    builder.setAdminAddressPathForTests(admin);
-  }
+
   // Converts TestRequestHeaderMapImpl to Envoy::Platform::RequestHeadersSharedPtr
   Envoy::Platform::RequestHeadersSharedPtr
   envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
@@ -82,11 +75,13 @@ protected:
   Platform::EngineSharedPtr engine_;
   Thread::ThreadPtr envoy_thread_;
   bool explicit_flow_control_ = false;
+  uint64_t min_delivery_size_ = 10;
   bool expect_dns_ = true;
   bool override_builder_config_ = false;
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;
-  Platform::EngineBuilder builder_;
+  TestEngineBuilder builder_;
+  envoy_final_stream_intel last_stream_final_intel_;
 };
 
 } // namespace Envoy

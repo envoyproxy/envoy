@@ -58,16 +58,17 @@ public:
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
-    Http::Matching::HttpMatchingDataImpl data(info.downstreamAddressProvider());
+    Http::Matching::HttpMatchingDataImpl data(info);
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
-    if (result.data_) {
-      if (!result.data_.value().empty()) {
-        descriptor_entry = {descriptor_key_, result.data_.value()};
-      }
-      return true;
+    if (absl::holds_alternative<absl::monostate>(result.data_)) {
+      return false;
     }
-    return false;
+    const std::string& str = absl::get<std::string>(result.data_);
+    if (!str.empty()) {
+      descriptor_entry = {descriptor_key_, str};
+    }
+    return true;
   }
 
 private:
@@ -279,7 +280,7 @@ QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
-    ProtobufMessage::ValidationVisitor& validator)
+    Server::Configuration::CommonFactoryContext& context)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
   for (const auto& action : config.actions()) {
@@ -309,6 +310,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kExtension: {
+      ProtobufMessage::ValidationVisitor& validator = context.messageValidationVisitor();
       auto* factory = Envoy::Config::Utility::getFactory<RateLimit::DescriptorProducerFactory>(
           action.extension());
       if (!factory) {
@@ -328,7 +330,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
           action.extension().typed_config(), validator, *factory);
       RateLimit::DescriptorProducerPtr producer =
-          factory->createDescriptorProducerFromProto(*message, validator);
+          factory->createDescriptorProducerFromProto(*message, context);
       if (producer) {
         actions_.emplace_back(std::move(producer));
       } else {
@@ -396,11 +398,11 @@ RateLimitPolicyImpl::RateLimitPolicyImpl()
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
-    ProtobufMessage::ValidationVisitor& validator)
+    Server::Configuration::CommonFactoryContext& context)
     : RateLimitPolicyImpl() {
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit, validator));
+        new RateLimitPolicyEntryImpl(rate_limit, context));
     uint64_t stage = rate_limit_policy_entry->stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
     rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);

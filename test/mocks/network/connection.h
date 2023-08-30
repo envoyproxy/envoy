@@ -55,16 +55,16 @@ public:
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));                                  \
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));                               \
   MOCK_METHOD(void, enableHalfClose, (bool enabled));                                              \
-  MOCK_METHOD(bool, isHalfCloseEnabled, ());                                                       \
+  MOCK_METHOD(bool, isHalfCloseEnabled, (), (const));                                              \
   MOCK_METHOD(void, close, (ConnectionCloseType type));                                            \
   MOCK_METHOD(void, close, (ConnectionCloseType type, absl::string_view details));                 \
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());                                                 \
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const));                                        \
   MOCK_METHOD(uint64_t, id, (), (const));                                                          \
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));                                    \
   MOCK_METHOD(bool, initializeReadFilters, ());                                                    \
   MOCK_METHOD(std::string, nextProtocol, (), (const));                                             \
   MOCK_METHOD(void, noDelay, (bool enable));                                                       \
-  MOCK_METHOD(void, readDisable, (bool disable));                                                  \
+  MOCK_METHOD(ReadDisableStatus, readDisable, (bool disable));                                     \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
   MOCK_METHOD(ConnectionInfoSetter&, connectionInfoSetter, ());                                    \

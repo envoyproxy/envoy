@@ -40,7 +40,8 @@ public:
   absl::StatusOr<BucketId> generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
                                             Server::Configuration::FactoryContext& factory_context,
                                             RateLimitQuotaValidationVisitor& visitor) const;
-  RateLimitQuotaBucketSettings bucketSettings() const { return setting_; }
+
+  const RateLimitQuotaBucketSettings& bucketSettings() const { return setting_; }
 
 private:
   RateLimitQuotaBucketSettings setting_;

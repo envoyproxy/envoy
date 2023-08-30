@@ -31,6 +31,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "decompressor_filter_integration_test",
+    size = "large",
     srcs = [
         "decompressor_filter_integration_test.cc",
     ],

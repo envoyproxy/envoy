@@ -68,6 +68,7 @@ public:
   const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
+  const LowerCaseString CacheStatus{"cache-status"};
   const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString ConnectAcceptEncoding{"connect-accept-encoding"};
@@ -141,6 +142,7 @@ public:
 
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
+  const LowerCaseString CapsuleProtocol{"capsule-protocol"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
@@ -245,6 +247,7 @@ public:
   struct {
     const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
+    const std::string ConnectUdp{"connect-udp"};
   } UpgradeValues;
 
   struct {

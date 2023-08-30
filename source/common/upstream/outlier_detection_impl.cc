@@ -477,10 +477,14 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
                              envoy::data::cluster::v3::OutlierEjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(MaxEjectionPercentRuntime, config_.maxEjectionPercent()));
-  double ejected_percent = 100.0 * ejections_active_helper_.value() / host_monitors_.size();
+  double ejected_percent = 100.0 * (ejections_active_helper_.value() + 1) / host_monitors_.size();
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
-  if (ejected_percent < max_ejection_percent) {
+  bool should_eject = (ejected_percent <= max_ejection_percent);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_mep_on_first_eject")) {
+    should_eject = (ejections_active_helper_.value() == 0) || should_eject;
+  }
+  if (should_eject) {
     if (type == envoy::data::cluster::v3::CONSECUTIVE_5XX ||
         type == envoy::data::cluster::v3::SUCCESS_RATE) {
       // Deprecated counter, preserving old behaviour until it's removed.
@@ -593,7 +597,7 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
     FALLTHRU;
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
-    IS_ENVOY_BUG("unexpected non-consecutive errorr");
+    IS_ENVOY_BUG("unexpected non-consecutive error");
     return;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
     stats_.ejections_consecutive_5xx_.inc(); // Deprecated
@@ -801,9 +805,13 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
     event.mutable_eject_consecutive_event();
   }
 
-  const auto json =
-      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
-                                                   /* always_print_primitive_fields */ true);
+  std::string json;
+#ifdef ENVOY_ENABLE_YAML
+  json = MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                      /* always_print_primitive_fields */ true);
+#else
+  IS_ENVOY_BUG("attempting outlier logging with JSON support removed");
+#endif
   file_->write(fmt::format("{}\n", json));
 }
 
@@ -815,9 +823,13 @@ void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
 
   event.set_action(envoy::data::cluster::v3::UNEJECT);
 
-  const auto json =
-      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
-                                                   /* always_print_primitive_fields */ true);
+  std::string json;
+#ifdef ENVOY_ENABLE_YAML
+  json = MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                      /* always_print_primitive_fields */ true);
+#else
+  IS_ENVOY_BUG("attempting outlier logging with JSON support removed");
+#endif
   file_->write(fmt::format("{}\n", json));
 }
 

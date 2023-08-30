@@ -96,7 +96,7 @@ static_resources:
                                                   Platform::null_device_path));
 }
 
-const char VhostTemplate[] = R"EOF(
+constexpr absl::string_view VhostTemplate = R"EOF(
 name: {}
 domains: [{}]
 routes:
@@ -253,7 +253,7 @@ public:
       const std::vector<std::string>& removed, const std::string& version, FakeStreamPtr& stream,
       const std::vector<std::string>& aliases, const std::vector<std::string>& unresolved_aliases) {
     auto response = createDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-        Config::TypeUrl::get().VirtualHost, added_or_updated, removed, version, aliases);
+        Config::TypeUrl::get().VirtualHost, added_or_updated, removed, version, aliases, {});
     for (const auto& unresolved_alias : unresolved_aliases) {
       auto* resource = response.add_resources();
       resource->set_name(unresolved_alias);

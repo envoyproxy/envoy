@@ -7,7 +7,8 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/header_map.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
@@ -64,6 +65,11 @@ public:
    * limits
    */
   virtual bool isAboveWriteBufferHighWatermark() const PURE;
+
+  /**
+   * @returns the stream info object associated with this stream.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 class RawAsyncRequestCallbacks {

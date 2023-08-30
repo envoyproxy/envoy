@@ -20,6 +20,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "matcher_data_lib",
+    srcs = [
+        "matcher_data.h",
+    ],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/common/types:c_types_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "managed_types_lib",
     srcs = [
         "managed_envoy_headers.h",

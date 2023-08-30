@@ -38,6 +38,15 @@ protected:
     return std::make_unique<StatsRequest>(store_, params);
   }
 
+  std::unique_ptr<StatsRequest> makeHiddenRequest(HiddenFlag hidden, StatsFormat format,
+                                                  StatsType type) {
+    StatsParams params;
+    params.hidden_ = hidden;
+    params.type_ = type;
+    params.format_ = format;
+    return std::make_unique<StatsRequest>(store_, params);
+  }
+
   // Executes a request, counting the chunks that were generated.
   uint32_t iterateChunks(StatsRequest& request, bool drain = true,
                          Http::Code expect_code = Http::Code::OK) {
@@ -145,6 +154,27 @@ TEST_F(StatsRequestTest, ManyStatsSmallChunkSizeNoDrain) {
 TEST_F(StatsRequestTest, OneStatUsedOnly) {
   store_.rootScope()->counterFromStatName(makeStatName("foo"));
   EXPECT_EQ(0, iterateChunks(*makeRequest(true, StatsFormat::Text, StatsType::All)));
+}
+
+TEST_F(StatsRequestTest, OneStatHiddenExclude) {
+  store_.rootScope()->gaugeFromStatName(makeStatName("foo"),
+                                        Stats::Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(
+      0, iterateChunks(*makeHiddenRequest(HiddenFlag::Exclude, StatsFormat::Text, StatsType::All)));
+}
+
+TEST_F(StatsRequestTest, OneStatHiddenShowOnly) {
+  store_.rootScope()->gaugeFromStatName(makeStatName("foo"),
+                                        Stats::Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(1, iterateChunks(
+                   *makeHiddenRequest(HiddenFlag::ShowOnly, StatsFormat::Text, StatsType::All)));
+}
+
+TEST_F(StatsRequestTest, OneStatHiddenInclude) {
+  store_.rootScope()->gaugeFromStatName(makeStatName("foo"),
+                                        Stats::Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(
+      1, iterateChunks(*makeHiddenRequest(HiddenFlag::Include, StatsFormat::Text, StatsType::All)));
 }
 
 TEST_F(StatsRequestTest, OneStatJson) {

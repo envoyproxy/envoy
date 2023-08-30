@@ -149,6 +149,8 @@ typed_config:
     // Add a reverse filter for reversing payload prior to UDP proxy
     config_helper_.addListenerFilter(R"EOF(
 name: test.udp_listener.reverse
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
 )EOF");
 
     BaseIntegrationTest::initialize();

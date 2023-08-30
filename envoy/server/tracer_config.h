@@ -3,7 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -52,7 +52,7 @@ public:
    *       That is why the return type has been changed to std::shared_ptr<> instead of a more
    *       idiomatic std::unique_ptr<>.
    *
-   * @param config supplies the proto configuration for the HttpTracer
+   * @param config supplies the proto configuration for the Tracer
    * @param context supplies the factory context
    */
   virtual Tracing::DriverSharedPtr createTracerDriver(const Protobuf::Message& config,

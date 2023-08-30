@@ -34,14 +34,14 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     render_ = std::make_unique<StatsTextRender>(params_);
     break;
 #ifdef ENVOY_ADMIN_HTML
+  case StatsFormat::ActiveHtml:
   case StatsFormat::Html: {
     auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
-    html_render->setSubmitOnChange(true);
-    html_render->tableBegin(response_);
-    html_render->urlHandler(response_, url_handler_fn_(), params_.query_);
-    html_render->tableEnd(response_);
-    html_render->startPre(response_);
+    html_render->setupStatsPage(url_handler_fn_(), params_, response_);
     render_ = std::move(html_render);
+    if (params_.format_ == StatsFormat::ActiveHtml) {
+      return Http::Code::OK;
+    }
     break;
   }
 #endif
@@ -180,6 +180,14 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
 template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     if (params_.used_only_ && !stat->used()) {
+      return true;
+    }
+
+    if (params_.hidden_ == HiddenFlag::Exclude && stat->hidden()) {
+      return true;
+    }
+
+    if (params_.hidden_ == HiddenFlag::ShowOnly && !stat->hidden()) {
       return true;
     }
 

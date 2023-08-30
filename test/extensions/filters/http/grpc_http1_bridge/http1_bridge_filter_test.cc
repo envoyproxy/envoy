@@ -11,7 +11,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

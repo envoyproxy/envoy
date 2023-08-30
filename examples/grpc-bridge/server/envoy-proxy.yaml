@@ -47,5 +47,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: kv-backend-service
+                address: grpc-server
                 port_value: 8081

@@ -260,7 +260,7 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
     EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _))
         .WillOnce(Return(ByMove(std::make_unique<RpcRequestImpl>())));
 
-    EXPECT_CALL(callback, onDecodingSuccess(_));
+    EXPECT_CALL(callback, onDecodingSuccess(_, _));
     decoder.decode(buffer);
   }
 }
@@ -320,7 +320,7 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
     EXPECT_CALL(*raw_serializer, deserializeRpcResponse(_, _))
         .WillOnce(Return(ByMove(std::move(response))));
 
-    EXPECT_CALL(callback, onDecodingSuccess(_));
+    EXPECT_CALL(callback, onDecodingSuccess(_, _));
     decoder.decode(buffer);
   }
 }
@@ -340,7 +340,7 @@ TEST(RequestEncoderTest, RequestEncoderTest) {
     DubboRequest request(createDubboRequst(false));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
-    EXPECT_CALL(callback, onEncodingSuccess(_, true));
+    EXPECT_CALL(callback, onEncodingSuccess(_));
 
     encoder.encode(request, callback);
   }
@@ -350,7 +350,7 @@ TEST(RequestEncoderTest, RequestEncoderTest) {
     DubboRequest request(createDubboRequst(true));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
-    EXPECT_CALL(callback, onEncodingSuccess(_, false));
+    EXPECT_CALL(callback, onEncodingSuccess(_));
 
     encoder.encode(request, callback);
   }
@@ -373,7 +373,7 @@ TEST(ResponseEncoderTest, ResponseEncoderTest) {
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
 
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _));
-    EXPECT_CALL(callback, onEncodingSuccess(_, false));
+    EXPECT_CALL(callback, onEncodingSuccess(_));
 
     encoder.encode(response, callback);
   }

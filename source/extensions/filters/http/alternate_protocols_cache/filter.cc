@@ -38,6 +38,7 @@ Filter::Filter(const FilterConfigSharedPtr& config, Event::Dispatcher& dispatche
     : cache_(config->getAlternateProtocolCache(dispatcher)), time_source_(config->timeSource()) {}
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+
   if (!cache_) {
     return Http::FilterHeadersStatus::Continue;
   }

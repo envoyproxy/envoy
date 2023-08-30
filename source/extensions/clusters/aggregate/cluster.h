@@ -39,13 +39,9 @@ using ClusterSetConstSharedPtr = std::shared_ptr<const ClusterSet>;
 
 class Cluster : public Upstream::ClusterImplBase {
 public:
-  Cluster(Server::Configuration::ServerFactoryContext& server_context,
-          const envoy::config::cluster::v3::Cluster& cluster,
+  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
-          Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
-          Random::RandomGenerator& random,
-          Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
+          Upstream::ClusterFactoryContext& context);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -74,7 +70,8 @@ public:
                                const ClusterSetConstSharedPtr& clusters);
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterAddOrUpdate(absl::string_view cluster_name,
+                            Upstream::ThreadLocalClusterCommand& get_cluster) override;
   void onClusterRemoval(const std::string& cluster_name) override;
 
   // Upstream::LoadBalancer
@@ -143,12 +140,11 @@ private:
 struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
   AggregateLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
   // Upstream::LoadBalancerFactory
-  Upstream::LoadBalancerPtr create() override {
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
     return std::make_unique<AggregateClusterLoadBalancer>(
         cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
         cluster_.clusters_);
   }
-  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
 
   const Cluster& cluster_;
 };
@@ -171,14 +167,12 @@ public:
   ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.aggregate") {}
 
 private:
-  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(
-      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
-      Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+      Upstream::ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(ClusterFactory);

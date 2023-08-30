@@ -36,6 +36,12 @@ MockStream::MockStream() : connection_info_provider_(nullptr, nullptr) {
   ON_CALL(*this, setAccount(_))
       .WillByDefault(Invoke(
           [this](Buffer::BufferMemoryAccountSharedPtr account) -> void { account_ = account; }));
+
+  ON_CALL(*this, registerCodecEventCallbacks(_))
+      .WillByDefault(Invoke([this](CodecEventCallbacks* codec_callbacks) -> CodecEventCallbacks* {
+        std::swap(codec_callbacks, codec_callbacks_);
+        return codec_callbacks;
+      }));
 }
 
 MockStream::~MockStream() {

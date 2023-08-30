@@ -38,8 +38,7 @@ void IoSocketError::deleteIoError(Api::IoError* err) {
 }
 
 Api::IoCallUint64Result IoSocketError::ioResultSocketInvalidAddress() {
-  return Api::IoCallUint64Result(
-      0, Api::IoErrorPtr(getIoSocketInvalidAddressInstance(), [](IoError*) {}));
+  return {0, Api::IoErrorPtr(getIoSocketInvalidAddressInstance(), [](IoError*) {})};
 }
 
 Api::IoError::IoErrorCode IoSocketError::errorCodeFromErrno(int sys_errno) {
@@ -66,6 +65,8 @@ Api::IoError::IoErrorCode IoSocketError::errorCodeFromErrno(int sys_errno) {
     return IoErrorCode::ConnectionReset;
   case SOCKET_ERROR_NETUNREACH:
     return IoErrorCode::NetworkUnreachable;
+  case SOCKET_ERROR_INVAL:
+    return IoErrorCode::InvalidArgument;
   default:
     ENVOY_LOG_MISC(debug, "Unknown error code {} details {}", sys_errno, errorDetails(sys_errno));
     return IoErrorCode::UnknownError;

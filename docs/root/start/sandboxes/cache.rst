@@ -43,9 +43,9 @@ Change to the ``examples/cache`` directory.
 
     $ pwd
     envoy/examples/cache
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
            Name                      Command            State                   Ports
     ---------------------------------------------------------------------------------------------------

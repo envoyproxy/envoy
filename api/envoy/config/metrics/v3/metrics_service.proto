@@ -19,6 +19,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Metrics service]
 
+// HistogramEmitMode is used to configure which metric types should be emitted for histograms.
+enum HistogramEmitMode {
+  // Emit Histogram and Summary metric types.
+  SUMMARY_AND_HISTOGRAM = 0;
+
+  // Emit only Summary metric types.
+  SUMMARY = 1;
+
+  // Emit only Histogram metric types.
+  HISTOGRAM = 2;
+}
+
 // Metrics Service is configured as a built-in ``envoy.stat_sinks.metrics_service`` :ref:`StatsSink
 // <envoy_v3_api_msg_config.metrics.v3.StatsSink>`. This opaque configuration will be used to create
 // Metrics Service.
@@ -34,6 +46,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //           transport_api_version: V3
 //
 // [#extension: envoy.stat_sinks.metrics_service]
+// [#next-free-field: 6]
 message MetricsServiceConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.metrics.v2.MetricsServiceConfig";
@@ -55,4 +68,7 @@ message MetricsServiceConfig {
   // and the tag extracted name will be used instead of the full name, which may contain values used by the tag
   // extractor or additional tags added during stats creation.
   bool emit_tags_as_labels = 4;
+
+  // Specify which metrics types to emit for histograms. Defaults to SUMMARY_AND_HISTOGRAM.
+  HistogramEmitMode histogram_emit_mode = 5 [(validate.rules).enum = {defined_only: true}];
 }

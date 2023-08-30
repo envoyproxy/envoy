@@ -94,7 +94,8 @@ void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
   CommandSplitter::SplitRequestPtr split =
-      splitter_.makeRequest(std::move(value), request, callbacks_->connection().dispatcher());
+      splitter_.makeRequest(std::move(value), request, callbacks_->connection().dispatcher(),
+                            callbacks_->connection().streamInfo());
   if (split) {
     // The splitter can immediately respond and destroy the pending request. Only store the handle
     // if the request is still alive.
@@ -103,8 +104,12 @@ void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
 }
 
 void ProxyFilter::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
+    ENVOY_LOG(trace, "new connection to redis proxy filter");
+  }
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    ENVOY_LOG(trace, "connection to redis proxy filter closed");
     while (!pending_requests_.empty()) {
       if (pending_requests_.front().request_handle_ != nullptr) {
         pending_requests_.front().request_handle_->cancel();
@@ -209,10 +214,11 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
 }
 
 Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
-  try {
+  TRY_NEEDS_AUDIT {
     decoder_->decode(data);
     return Network::FilterStatus::Continue;
-  } catch (Common::Redis::ProtocolError&) {
+  }
+  END_TRY catch (Common::Redis::ProtocolError&) {
     config_->stats_.downstream_cx_protocol_error_.inc();
     Common::Redis::RespValue error;
     error.type(Common::Redis::RespType::Error);

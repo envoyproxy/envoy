@@ -56,6 +56,7 @@ envoy_extension_cc_mock(
 
 envoy_extension_cc_test(
     name = "gcp_authn_filter_integration_test",
+    size = "large",
     srcs = ["gcp_authn_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [

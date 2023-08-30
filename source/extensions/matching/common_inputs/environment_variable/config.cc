@@ -24,7 +24,7 @@ Config::createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
     return [s = std::string(value)]() { return std::make_unique<Input>(s); };
   }
 
-  return []() { return std::make_unique<Input>(absl::nullopt); };
+  return []() { return std::make_unique<Input>(absl::monostate()); };
 }
 
 /**

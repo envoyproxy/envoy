@@ -11,27 +11,36 @@
 namespace Envoy {
 namespace StreamInfo {
 
+const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info) {
+  return toString(stream_info, true);
+}
+
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
+  return toString(stream_info, false);
+}
+
+const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, bool use_long_name) {
   // We don't expect more than 4 flags are set. Relax to 16 since the vector is allocated on stack
   // anyway.
-  absl::InlinedVector<absl::string_view, 16> flag_strings;
-  for (const auto& [flag_string, flag] : ALL_RESPONSE_STRING_FLAGS) {
+  absl::InlinedVector<absl::string_view, 16> flag_strings_vec;
+  for (const auto& [flag_strings, flag] : ALL_RESPONSE_STRINGS_FLAGS) {
     if (stream_info.hasResponseFlag(flag)) {
-      flag_strings.push_back(flag_string);
+      flag_strings_vec.push_back(use_long_name ? flag_strings.long_string_
+                                               : flag_strings.short_string_);
     }
   }
-  if (flag_strings.empty()) {
+  if (flag_strings_vec.empty()) {
     return std::string(NONE);
   }
-  return absl::StrJoin(flag_strings, ",");
+  return absl::StrJoin(flag_strings_vec, ",");
 }
 
 absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
   static_assert(ResponseFlag::LastFlag == 0x4000000,
-                "A flag has been added. Add the new flag to ALL_RESPONSE_STRING_FLAGS.");
+                "A flag has been added. Add the new flag to ALL_RESPONSE_STRINGS_FLAGS.");
   absl::flat_hash_map<std::string, ResponseFlag> res;
-  for (auto [str, flag] : ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
-    res.emplace(str, flag);
+  for (auto [flag_strings, flag] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+    res.emplace(flag_strings.short_string_, flag);
   }
   return res;
 }

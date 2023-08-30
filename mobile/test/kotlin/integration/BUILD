@@ -161,6 +161,24 @@ envoy_mobile_jni_kt_test(
 )
 
 envoy_mobile_jni_kt_test(
+    name = "receive_data_delivery_limits_test",
+    srcs = [
+        "ReceiveDataWithDeliveryLimitsTest.kt",
+    ],
+    exec_properties = {
+        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
+    native_deps = [
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_jni_kt_test(
     name = "receive_error_test",
     srcs = [
         "ReceiveErrorTest.kt",

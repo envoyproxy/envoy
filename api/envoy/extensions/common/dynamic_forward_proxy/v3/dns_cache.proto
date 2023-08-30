@@ -139,7 +139,6 @@ message DnsCacheConfig {
   // and are then retried using the standard refresh rates. Defaults to 5s if not set.
   google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gt {}}];
 
-  // [#not-implemented-hide:]
   // Configuration to flush the DNS cache to long term storage.
   config.common.key_value.v3.KeyValueStoreConfig key_value_config = 13;
 }

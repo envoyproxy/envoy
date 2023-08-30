@@ -31,17 +31,23 @@ TEST_P(TcpAsyncClientIntegrationTest, SingleRequest) {
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   test_server_->waitForCounterEq("test_network_async_tcp_filter.on_new_connection", 1);
-
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_connect_ms", 1);
   ASSERT_TRUE(tcp_client->write(request, true));
-
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_tx_bytes_total", request.size());
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
   ASSERT_TRUE(fake_upstream_connection->write(response, true));
   test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
-
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_rx_bytes_total", response.size());
   ASSERT_TRUE(tcp_client->waitForData(response.size()));
   tcp_client->close();
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy_local", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+  test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
 }
 
 TEST_P(TcpAsyncClientIntegrationTest, MultipleRequestFrames) {

@@ -1456,7 +1456,12 @@ void Context::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& call
 void Context::log(const Http::RequestHeaderMap* request_headers,
                   const Http::ResponseHeaderMap* response_headers,
                   const Http::ResponseTrailerMap* response_trailers,
-                  const StreamInfo::StreamInfo& stream_info) {
+                  const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+  // `log` may be called multiple times due to mid-request logging -- we only want to run on the
+  // last call.
+  if (!stream_info.requestComplete().has_value()) {
+    return;
+  }
   if (!in_vm_context_created_) {
     // If the request is invalid then onRequestHeaders() will not be called and neither will
     // onCreate() in cases like sendLocalReply who short-circuits envoy
@@ -1551,7 +1556,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       // We are in a reentrant call, so defer.
       wasm()->addAfterVmCallAction([this] {
         network_read_filter_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
+            Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_downstream_close");
       });
     }
     return WasmResult::Ok;
@@ -1560,7 +1565,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       // We are in a reentrant call, so defer.
       wasm()->addAfterVmCallAction([this] {
         network_write_filter_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
+            Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_upstream_close");
       });
     }
     return WasmResult::Ok;

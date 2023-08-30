@@ -365,7 +365,7 @@ resources:
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
   lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 
-  std::string response2_basic = R"EOF(
+  constexpr absl::string_view response2_basic = R"EOF(
 version_info: '1'
 resources:
 - "@type": type.googleapis.com/envoy.config.listener.v3.Listener

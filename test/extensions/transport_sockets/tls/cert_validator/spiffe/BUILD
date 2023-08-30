@@ -33,6 +33,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "spiffe_validator_integration_test",
+    size = "large",
     srcs = [
         "spiffe_validator_integration_test.cc",
         "spiffe_validator_integration_test.h",

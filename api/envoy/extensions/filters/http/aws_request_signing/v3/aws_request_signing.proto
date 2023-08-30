@@ -64,3 +64,12 @@ message AwsRequestSigning {
   // When applied, all headers that start with "x-envoy" and headers "foo" and "bar" will not be signed.
   repeated type.matcher.v3.StringMatcher match_excluded_headers = 5;
 }
+
+message AwsRequestSigningPerRoute {
+  // Override the global configuration of the filter with this new config.
+  // This overrides the entire message of AwsRequestSigning and not at field level.
+  AwsRequestSigning aws_request_signing = 1;
+
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
+}

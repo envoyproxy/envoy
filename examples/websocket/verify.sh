@@ -24,10 +24,10 @@ openssl pkcs12 -export -passout pass: -out certs/output.pkcs12 -inkey certs/key.
 bring_up_example
 
 run_log "Interact with web socket ws -> ws"
-"${DOCKER_COMPOSE}" run client-ws "${PORT_PROXY0}" ws ws
+"${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY0}" ws ws
 
 run_log "Interact with web socket wss -> wss"
-"${DOCKER_COMPOSE}" run client-ws "${PORT_PROXY1}" wss wss
+"${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY1}" wss wss
 
 run_log "Interact with web socket wss passthrough"
-"${DOCKER_COMPOSE}" run client-ws "${PORT_PROXY2}" wss wss
+"${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY2}" wss wss

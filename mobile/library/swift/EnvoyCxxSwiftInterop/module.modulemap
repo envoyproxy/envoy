@@ -1,0 +1,4 @@
+module EnvoyCxxSwiftInterop {
+    header "cxx_swift_interop.h"
+    requires cplusplus
+}

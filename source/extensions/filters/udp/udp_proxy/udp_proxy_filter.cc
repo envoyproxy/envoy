@@ -17,7 +17,10 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
   for (const auto& entry : config_->allClusterNames()) {
     Upstream::ThreadLocalCluster* cluster = config->clusterManager().getThreadLocalCluster(entry);
     if (cluster != nullptr) {
-      onClusterAddOrUpdate(*cluster);
+      Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+        return *cluster;
+      };
+      onClusterAddOrUpdate(cluster->info()->name(), command);
     }
   }
 
@@ -30,14 +33,17 @@ UdpProxyFilter::~UdpProxyFilter() {
   if (!config_->proxyAccessLogs().empty()) {
     fillProxyStreamInfo();
     for (const auto& access_log : config_->proxyAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value());
+      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value(),
+                      AccessLog::AccessLogType::NotSet);
     }
   }
 }
 
-void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  auto cluster_name = cluster.info()->name();
+void UdpProxyFilter::onClusterAddOrUpdate(absl::string_view cluster_name,
+                                          Upstream::ThreadLocalClusterCommand& get_cluster) {
   ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster_name);
+
+  auto& cluster = get_cluster();
   ASSERT((!cluster_infos_.contains(cluster_name)) ||
          &cluster_infos_[cluster_name]->cluster_ != &cluster);
 
@@ -297,7 +303,8 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_session_stats_.value());
+      access_log->log(nullptr, nullptr, nullptr, udp_session_stats_.value(),
+                      AccessLog::AccessLogType::NotSet);
     }
   }
 }
@@ -389,17 +396,15 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   //       set. We allow the OS to select the right IP based on outbound routing rules if
   //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
   const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
-  if (!use_original_src_ip_ && !skip_connect_) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_proxy_connect")) {
-      Api::SysCallIntResult rc = socket_->ioHandle().connect(host_->address());
-      if (SOCKET_FAILURE(rc.return_value_)) {
-        ENVOY_LOG(debug, "cannot connect: ({}) {}", rc.errno_, errorDetails(rc.errno_));
-        cluster_.cluster_stats_.sess_tx_errors_.inc();
-        return;
-      }
+  if (!use_original_src_ip_ && !connected_) {
+    Api::SysCallIntResult rc = socket_->ioHandle().connect(host_->address());
+    if (SOCKET_FAILURE(rc.return_value_)) {
+      ENVOY_LOG(debug, "cannot connect: ({}) {}", rc.errno_, errorDetails(rc.errno_));
+      cluster_.cluster_stats_.sess_tx_errors_.inc();
+      return;
     }
 
-    skip_connect_ = true;
+    connected_ = true;
   }
   Api::IoCallUint64Result rc =
       Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip, *host_->address());

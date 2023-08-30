@@ -32,7 +32,8 @@ TEST_P(AdminInstanceTest, ClustersJsonAndText) {
       .WillByDefault(Return(9.0));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
-  ON_CALL(*cluster.info_, edsServiceName()).WillByDefault(Return("potato_launcher"));
+  static const std::string mock_eds_service_name = "potato_launcher";
+  ON_CALL(*cluster.info_, edsServiceName()).WillByDefault(ReturnRef(mock_eds_service_name));
 
   Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
   auto host = std::make_shared<NiceMock<Upstream::MockHost>>();

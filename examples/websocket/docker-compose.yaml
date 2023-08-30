@@ -1,10 +1,10 @@
-version: "3.8"
 services:
 
   client-ws:
     build:
       context: .
-      dockerfile: Dockerfile-websocat-client
+      dockerfile: ../shared/websocket/Dockerfile
+      target: websocket-client
     network_mode: host
     restart: "no"
     deploy:
@@ -13,35 +13,41 @@ services:
   proxy-ws:
     build:
       context: .
-      dockerfile: Dockerfile-proxy-ws
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./envoy-ws.yaml
     ports:
     - "${PORT_PROXY0:-10000}:10000"
 
   proxy-wss-wss:
     build:
       context: .
-      dockerfile: Dockerfile-proxy-wss
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./envoy-wss.yaml
     ports:
     - "${PORT_PROXY1:-20000}:10000"
 
   proxy-wss-passthrough:
     build:
       context: .
-      dockerfile: Dockerfile-proxy-wss-passthrough
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./envoy-wss-passthrough.yaml
     ports:
     - "${PORT_PROXY2:-30000}:10000"
 
   service-ws:
     build:
       context: .
-      dockerfile: Dockerfile-websocat
+      dockerfile: ../shared/websocket/Dockerfile
     hostname: service-ws
     command: -E ws-listen:0.0.0.0:80 literalreply:'[ws] HELO'
 
   service-wss:
     build:
       context: .
-      dockerfile: Dockerfile-websocat
+      dockerfile: ../shared/websocket/Dockerfile
     hostname: service-wss
     command: wss-listen:0.0.0.0:443 literalreply:"[wss] HELO" --pkcs12-der /certs/output.pkcs12
     volumes:

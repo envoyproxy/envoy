@@ -1,19 +1,21 @@
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
-def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], module_name = None, sdk_frameworks = [], srcs = []):
+def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], module_name = None, sdk_frameworks = [], srcs = [], testonly = False):
     native.objc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = envoy_mobile_copts("@envoy") + ["-ObjC++", "-std=c++17", "-Wno-shorten-64-to-32"],
+        copts = ["-ObjC++", "-std=c++17", "-Wno-shorten-64-to-32"],
+        defines = envoy_mobile_defines("@envoy"),
         module_name = module_name,
         sdk_frameworks = sdk_frameworks,
         visibility = visibility,
         data = data,
         deps = deps,
+        testonly = testonly,
     )
 
 # Macros providing a way to easily/consistently define Swift/ObjC unit test targets.
@@ -32,7 +34,7 @@ def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], m
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], repository = "", visibility = [], flaky = False):
+def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags = [], repository = "", visibility = [], flaky = False):
     test_lib_name = name + "_lib"
     swift_library(
         name = test_lib_name,
@@ -51,6 +53,7 @@ def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], reposit
         data = data,
         deps = [test_lib_name],
         minimum_os_version = MINIMUM_IOS_VERSION,
+        size = size,
         tags = tags,
         visibility = visibility,
         flaky = flaky,
@@ -75,3 +78,15 @@ def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = [], visibili
         visibility = visibility,
         flaky = flaky,
     )
+
+def envoy_mobile_swift_copts(enable_cxx_interop):
+    if enable_cxx_interop:
+        return [
+            "-enable-experimental-cxx-interop",
+            "-Xcc",
+            "-std=c++17",
+            "-Xcc",
+            "-Wno-deprecated-declarations",
+        ]
+    else:
+        return []

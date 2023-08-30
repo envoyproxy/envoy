@@ -33,13 +33,15 @@ import "C"
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/utils"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
 var (
@@ -47,15 +49,49 @@ var (
 	configCache        = &sync.Map{} // uint64 -> *anypb.Any
 )
 
+func configFinalize(c *httpConfig) {
+	c.Finalize()
+}
+
+func createConfig(c *C.httpConfig) *httpConfig {
+	config := &httpConfig{
+		config: c,
+	}
+	// NP: make sure httpConfig will be deleted.
+	runtime.SetFinalizer(config, configFinalize)
+
+	return config
+}
+
 //export envoyGoFilterNewHttpPluginConfig
-func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64 {
-	buf := utils.BytesToSlice(configPtr, configLen)
+func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
+	if !api.CgoCheckDisabled() {
+		cAPI.HttpLog(api.Error, "The Envoy Golang filter requires the `GODEBUG=cgocheck=0` environment variable set.")
+		return 0
+	}
+
+	buf := utils.BytesToSlice(uint64(c.config_ptr), uint64(c.config_len))
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
 
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
-	if httpFilterConfigParser != nil {
-		configCache.Store(configNum, httpFilterConfigParser.Parse(&any))
+
+	name := utils.BytesToString(uint64(c.plugin_name_ptr), uint64(c.plugin_name_len))
+	configParser := getHttpFilterConfigParser(name)
+	if configParser != nil {
+		var parsedConfig interface{}
+		var err error
+		if c.is_route_config == 1 {
+			parsedConfig, err = configParser.Parse(&any, nil)
+		} else {
+			http_config := createConfig(c)
+			parsedConfig, err = configParser.Parse(&any, http_config)
+		}
+		if err != nil {
+			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
+			return 0
+		}
+		configCache.Store(configNum, parsedConfig)
 	} else {
 		configCache.Store(configNum, &any)
 	}
@@ -69,8 +105,11 @@ func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
 }
 
 //export envoyGoFilterMergeHttpPluginConfig
-func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 {
-	if httpFilterConfigParser != nil {
+func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint64) uint64 {
+	name := utils.BytesToString(namePtr, nameLen)
+	configParser := getHttpFilterConfigParser(name)
+
+	if configParser != nil {
 		parent, ok := configCache.Load(parentId)
 		if !ok {
 			panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
@@ -80,7 +119,7 @@ func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 
 			panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
 		}
 
-		new := httpFilterConfigParser.Merge(parent, child)
+		new := configParser.Merge(parent, child)
 		configNum := atomic.AddUint64(&configNumGenerator, 1)
 		configCache.Store(configNum, new)
 		return configNum

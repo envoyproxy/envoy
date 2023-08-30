@@ -33,11 +33,8 @@ namespace Upstream {
  */
 class LogicalDnsCluster : public ClusterImplBase {
 public:
-  LogicalDnsCluster(Server::Configuration::ServerFactoryContext& server_context,
-                    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                    Network::DnsResolverSharedPtr dns_resolver,
-                    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
+  LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
 
   ~LogicalDnsCluster() override;
 
@@ -84,11 +81,9 @@ public:
   LogicalDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.logical_dns") {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
-      Server::Configuration::ServerFactoryContext& server_context,
-      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(LogicalDnsClusterFactory);

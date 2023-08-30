@@ -1,0 +1,9 @@
+>> LOGIN
+>> BUILD: mocktest/repo-legacy:v1.73.0
+> docker build --platform windows/amd64 -f ci/Dockerfile-envoy-windows --build-arg BUILD_OS=mcr.microsoft.com/windows/fakecore --build-arg BUILD_TAG=ltsc1992 -t mocktest/repo-legacy:v1.73.0 .
+>> PUSH: mocktest/repo-legacy:v1.73.0
+> docker push mocktest/repo-legacy:v1.73.0
+>> TAG: mocktest/repo-legacy:v1.73.0 -> mocktest/repo-legacy:v1.73-latest
+> docker tag mocktest/repo-legacy:v1.73.0 mocktest/repo-legacy:v1.73-latest
+>> PUSH: mocktest/repo-legacy:v1.73-latest
+> docker push mocktest/repo-legacy:v1.73-latest

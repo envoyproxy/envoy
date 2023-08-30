@@ -1,0 +1,50 @@
+name: mobile_asan
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  env:
+    if: ${{ github.repository == 'envoyproxy/envoy' }}
+    uses: ./.github/workflows/_env.yml
+    permissions:
+      contents: read
+      statuses: write
+
+  asan:
+    if: ${{ needs.env.outputs.mobile_asan == 'true' }}
+    needs: env
+    permissions:
+      contents: read
+      packages: read
+    name: asan
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
+    timeout-minutes: 180
+    container:
+      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+    - uses: actions/checkout@v3
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: 'Run tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile
+        ./bazelw test \
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            --config=mobile-remote-ci-linux-asan \
+            //test/common/...

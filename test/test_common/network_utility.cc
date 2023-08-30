@@ -15,8 +15,6 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/runtime/runtime_impl.h"
 
-#include "test/test_common/utility.h"
-
 namespace Envoy {
 namespace Network {
 namespace Test {

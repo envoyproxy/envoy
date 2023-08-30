@@ -181,6 +181,9 @@ public:
    * @return the read policy the proxy should use.
    */
   virtual ReadPolicy readPolicy() const PURE;
+
+  virtual bool connectionRateLimitEnabled() const PURE;
+  virtual uint32_t connectionRateLimitPerSec() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -233,14 +236,10 @@ public:
 };
 
 // A struct representing a Redis transaction.
+
 struct Transaction {
   Transaction(Network::ConnectionCallbacks* connection_cb) : connection_cb_(connection_cb) {}
-  ~Transaction() {
-    if (connection_established_) {
-      client_->close();
-      connection_established_ = false;
-    }
-  }
+  ~Transaction() { close(); }
 
   void start() { active_ = true; }
 
@@ -248,7 +247,9 @@ struct Transaction {
     active_ = false;
     key_.clear();
     if (connection_established_) {
-      client_->close();
+      for (auto& client : clients_) {
+        client->close();
+      }
       connection_established_ = false;
     }
     should_close_ = false;
@@ -257,9 +258,18 @@ struct Transaction {
   bool active_{false};
   bool connection_established_{false};
   bool should_close_{false};
+
+  // The key which represents the transaction hash slot.
   std::string key_;
-  ClientPtr client_;
+  // clients_[0] represents the main connection, clients_[1..n] are for
+  // the mirroring policies.
+  std::vector<ClientPtr> clients_;
   Network::ConnectionCallbacks* connection_cb_;
+
+  // This index represents the current client on which traffic is being sent to.
+  // When sending to the main redis server it will be 0, and when sending to one of
+  // the mirror servers it will be 1..n.
+  uint32_t current_client_idx_{0};
 };
 
 class NoOpTransaction : public Transaction {

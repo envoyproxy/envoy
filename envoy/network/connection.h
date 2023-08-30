@@ -84,6 +84,13 @@ class Connection : public Event::DeferredDeletable,
 public:
   enum class State { Open, Closing, Closed };
 
+  enum class ReadDisableStatus {
+    NoTransition,
+    StillReadDisabled,
+    TransitionedToReadEnabled,
+    TransitionedToReadDisabled
+  };
+
   /**
    * Callback function for when bytes have been sent by a connection.
    * @param bytes_sent supplies the number of bytes written to the connection.
@@ -131,7 +138,7 @@ public:
   /**
    * @return true if half-close semantics are enabled, false otherwise.
    */
-  virtual bool isHalfCloseEnabled() PURE;
+  virtual bool isHalfCloseEnabled() const PURE;
 
   /**
    * Close the connection.
@@ -149,7 +156,7 @@ public:
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
    */
-  virtual Event::Dispatcher& dispatcher() PURE;
+  virtual Event::Dispatcher& dispatcher() const PURE;
 
   /**
    * @return uint64_t the unique local ID of this connection.
@@ -179,6 +186,7 @@ public:
    * enabled again if there is data still in the input buffer it will be re-dispatched through
    * the filter chain.
    * @param disable supplies TRUE is reads should be disabled, FALSE if they should be enabled.
+   * @return status enum indicating the outcome of calling readDisable on the underlying socket.
    *
    * Note that this function reference counts calls. For example
    * readDisable(true);  // Disables data
@@ -186,7 +194,7 @@ public:
    * readDisable(false);  // Notes the connection is blocked by one source
    * readDisable(false);  // Marks the connection as unblocked, so resumes reading.
    */
-  virtual void readDisable(bool disable) PURE;
+  virtual ReadDisableStatus readDisable(bool disable) PURE;
 
   /**
    * Set if Envoy should detect TCP connection close when readDisable(true) is called.

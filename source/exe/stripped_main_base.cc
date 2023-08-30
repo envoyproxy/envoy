@@ -129,10 +129,10 @@ void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_gen
                                                                options_.socketMode());
         }
         END_TRY
-        catch (Server::HotRestartDomainSocketInUseException& ex) {
+        CATCH(Server::HotRestartDomainSocketInUseException & ex, {
           // No luck, try again.
           ENVOY_LOG_MISC(debug, "dynamic base id: {}", ex.what());
-        }
+        });
       }
 
       if (restarter == nullptr) {

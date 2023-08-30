@@ -13,10 +13,10 @@ Double proxy (with ``mTLS`` encryption)
    :ref:`openssl <start_sandboxes_setup_openssl>`
         Generate ``SSL`` keys and certificates.
 
-This sandbox demonstrates a basic "double proxy" configuration, in which a simple Flask app
+This sandbox demonstrates a basic "double proxy" configuration, in which a simple ``aiohttp`` app
 connects to a PostgreSQL database, with two Envoy proxies in between.
 
-``Envoy (front)`` -> ``Flask`` -> ``Envoy (postgres-front)`` -> ``Envoy (postgres-back)`` -> ``PostgreSQL``
+``Envoy (front)`` -> ``aiohttp`` -> ``Envoy (postgres-front)`` -> ``Envoy (postgres-back)`` -> ``PostgreSQL``
 
 This type of setup is common in a service mesh where Envoy acts as a "sidecar" between individual services.
 
@@ -159,9 +159,9 @@ This will load the required keys and certificates into the frontend and backend 
 
    $ pwd
    envoy/examples/double-proxy
-   $ docker-compose pull
-   $ docker-compose up --build -d
-   $ docker-compose ps
+   $ docker compose pull
+   $ docker compose up --build -d
+   $ docker compose ps
 
           Name                                      Command                State              Ports
    -------------------------------------------------------------------------------------------------------------
@@ -171,10 +171,10 @@ This will load the required keys and certificates into the frontend and backend 
    double-proxy_proxy-postgres-backend_1    /docker-entrypoint.sh /usr ... Up           10000/tcp
    double-proxy_proxy-postgres-frontend_1   /docker-entrypoint.sh /usr ... Up           10000/tcp
 
-Step 6: Check the flask app can connect to the database
-*******************************************************
+Step 6: Check the ``aiohttp`` app can connect to the database
+*************************************************************
 
-Checking the response at http://localhost:10000, you should see the output from the Flask app:
+Checking the response at http://localhost:10000, you should see the output from the ``aiohttp`` app:
 
 .. code-block:: console
 

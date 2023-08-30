@@ -34,22 +34,11 @@ final class RequestHeadersBuilderTests: XCTestCase {
     XCTAssertEqual("/mock", headers.path)
   }
 
-  func testAddsH1ToHeaders() {
-    let headers = RequestHeadersBuilder(method: .post, scheme: "https",
+  func testHttpScheme() {
+    let headers = RequestHeadersBuilder(method: .post, scheme: "http",
                                         authority: "envoyproxy.io", path: "/mock")
-        .addUpstreamHttpProtocol(.http1)
         .build()
-    XCTAssertEqual(["http1"], headers.value(forName: "x-envoy-mobile-upstream-protocol"))
-    XCTAssertEqual(.http1, headers.upstreamHttpProtocol)
-  }
-
-  func testAddsH2ToHeaders() {
-    let headers = RequestHeadersBuilder(method: .post, scheme: "https",
-                                        authority: "envoyproxy.io", path: "/mock")
-        .addUpstreamHttpProtocol(.http2)
-        .build()
-    XCTAssertEqual(["http2"], headers.value(forName: "x-envoy-mobile-upstream-protocol"))
-    XCTAssertEqual(.http2, headers.upstreamHttpProtocol)
+    XCTAssertEqual(["http"], headers.value(forName: ":scheme"))
   }
 
   func testJoinsHeaderValuesWithTheSameKey() {
@@ -84,12 +73,9 @@ final class RequestHeadersBuilderTests: XCTestCase {
   func testCannotPubliclyRemoveHeadersWithRestrictedPrefix() {
     let headers = RequestHeadersBuilder(method: .post, scheme: "https",
                                         authority: "envoyproxy.io", path: "/mock")
-      .addUpstreamHttpProtocol(.http2)
       .remove(name: ":path")
-      .remove(name: "x-envoy-mobile-upstream-protocol")
       .build()
     XCTAssertEqual(["/mock"], headers.value(forName: ":path"))
-    XCTAssertEqual(["http2"], headers.value(forName: "x-envoy-mobile-upstream-protocol"))
   }
 
   func testCanInternallySetHeadersWithRestrictedPrefix() {
@@ -148,12 +134,6 @@ final class RequestHeadersBuilderTests: XCTestCase {
   func testConvertingRequestMethodToStringAndBackCreatesTheSameRequestMethod() {
     for method in RequestMethod.allCases {
       XCTAssertEqual(method, RequestMethod(stringValue: method.stringValue))
-    }
-  }
-
-  func testConvertingHttpProtocolToStringAndBackCreatesTheSameHttpProtocol() {
-    for httpProtocol in UpstreamHttpProtocol.allCases {
-      XCTAssertEqual(httpProtocol, UpstreamHttpProtocol(stringValue: httpProtocol.stringValue))
     }
   }
 }

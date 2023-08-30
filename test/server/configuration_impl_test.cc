@@ -20,7 +20,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/printf.h"
@@ -38,11 +37,13 @@ namespace {
 
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
-  std::vector<Network::FilterFactoryCb> factories;
+  Filter::NetworkFilterFactoriesList factories;
   ReadyWatcher watcher;
   Network::FilterFactoryCb factory = [&](Network::FilterManager&) -> void { watcher.ready(); };
-  factories.push_back(factory);
-  factories.push_back(factory);
+  factories.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(factory));
+  factories.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(factory));
 
   EXPECT_CALL(watcher, ready()).Times(2);
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(true));
@@ -51,7 +52,7 @@ TEST(FilterChainUtility, buildFilterChain) {
 
 TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
   Network::MockConnection connection;
-  std::vector<Network::FilterFactoryCb> factories;
+  Filter::NetworkFilterFactoriesList factories;
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(false));
   EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), false);
 }
@@ -61,14 +62,14 @@ protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
         cluster_manager_factory_(
-            server_context_, server_.admin(), server_.runtime(), server_.stats(),
-            server_.threadLocal(),
+            server_context_, server_.stats(), server_.threadLocal(), server_.httpContext(),
             [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-            server_.sslContextManager(), server_.dispatcher(), server_.localInfo(),
-            server_.secretManager(), server_.messageValidationContext(), *api_,
-            server_.httpContext(), server_.grpcContext(), server_.routerContext(),
-            server_.accessLogManager(), server_.singletonManager(), server_.options(),
-            server_.quic_stat_names_, server_) {}
+            server_.sslContextManager(), server_.secretManager(), server_.quic_stat_names_,
+            server_) {
+    ON_CALL(server_context_.api_, threadFactory())
+        .WillByDefault(
+            Invoke([this]() -> Thread::ThreadFactory& { return api_->threadFactory(); }));
+  }
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;

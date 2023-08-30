@@ -22,6 +22,7 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -64,7 +65,7 @@ public:
   void setupMatcher(std::string action, std::string on_no_match_action) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
-    const std::string matcher_yaml = R"EOF(
+    constexpr absl::string_view matcher_yaml = R"EOF(
 matcher_list:
   matchers:
   - predicate:
@@ -111,7 +112,7 @@ on_no_match:
       name: none
       action: {}
 )EOF";
-    const std::string shadow_matcher_yaml = R"EOF(
+    constexpr absl::string_view shadow_matcher_yaml = R"EOF(
 matcher_list:
   matchers:
   - predicate:
@@ -172,24 +173,23 @@ on_no_match:
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  RoleBasedAccessControlFilterTest()
-      : provider_(std::make_shared<Network::Address::Ipv4Instance>(80),
-                  std::make_shared<Network::Address::Ipv4Instance>(80)){};
+  RoleBasedAccessControlFilterTest() = default;
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
     req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
 
-    provider_.setLocalAddress(address_);
-    ON_CALL(connection_, connectionInfoProvider()).WillByDefault(ReturnRef(provider_));
+    ON_CALL(connection_.stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
   }
 
   void setRequestedServerName(std::string server_name) {
     requested_server_name_ = server_name;
     ON_CALL(connection_, requestedServerName()).WillByDefault(Return(requested_server_name_));
 
-    provider_.setRequestedServerName(server_name);
-    ON_CALL(connection_, connectionInfoProvider()).WillByDefault(ReturnRef(provider_));
+    req_info_.downstream_connection_info_provider_->setRequestedServerName(server_name);
+    ON_CALL(connection_.stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
   }
 
   void checkAccessLogMetadata(LogResult expected) {
@@ -233,7 +233,6 @@ on_no_match:
   std::unique_ptr<RoleBasedAccessControlFilter> filter_;
 
   Network::Address::InstanceConstSharedPtr address_;
-  Network::ConnectionInfoSetterImpl provider_;
   std::string requested_server_name_;
   Http::TestRequestHeaderMapImpl headers_;
   Http::TestRequestTrailerMapImpl trailers_;

@@ -18,6 +18,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::StrictMock;
 
 namespace Envoy {

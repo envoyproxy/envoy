@@ -23,8 +23,10 @@ ProtocolConstraints::ProtocolConstraints(
 ProtocolConstraints::ReleasorProc
 ProtocolConstraints::incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame) {
   ++outbound_frames_;
+  stats_.outbound_frames_active_.set(outbound_frames_);
   if (is_outbound_flood_monitored_control_frame) {
     ++outbound_control_frames_;
+    stats_.outbound_control_frames_active_.set(outbound_control_frames_);
   }
   return is_outbound_flood_monitored_control_frame ? control_frame_buffer_releasor_
                                                    : frame_buffer_releasor_;
@@ -33,11 +35,13 @@ ProtocolConstraints::incrementOutboundFrameCount(bool is_outbound_flood_monitore
 void ProtocolConstraints::releaseOutboundFrame() {
   ASSERT(outbound_frames_ >= 1);
   --outbound_frames_;
+  stats_.outbound_frames_active_.set(outbound_frames_);
 }
 
 void ProtocolConstraints::releaseOutboundControlFrame() {
   ASSERT(outbound_control_frames_ >= 1);
   --outbound_control_frames_;
+  stats_.outbound_control_frames_active_.set(outbound_control_frames_);
   releaseOutboundFrame();
 }
 

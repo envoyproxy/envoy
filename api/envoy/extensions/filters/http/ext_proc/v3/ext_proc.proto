@@ -5,10 +5,10 @@ package envoy.extensions.filters.http.ext_proc.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/duration.proto";
-
-import "xds/annotations/v3/status.proto";
+import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -18,7 +18,6 @@ option java_outer_classname = "ExtProcProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3;ext_procv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: External Processing Filter]
 // External Processing Filter
@@ -52,16 +51,15 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * Whether subsequent HTTP requests are transmitted synchronously or whether they are
 //   sent asynchronously.
 // * To modify request or response trailers if they already exist
-// * To add request or response trailers where they are not present
 //
 // The filter supports up to six different processing steps. Each is represented by
 // a gRPC stream message that is sent to the external processor. For each message, the
 // processor must send a matching response.
 //
 // * Request headers: Contains the headers from the original HTTP request.
-// * Request body: Sent in a single message if the BUFFERED or BUFFERED_PARTIAL
-//   mode is chosen, in multiple messages if the STREAMED mode is chosen, and not
-//   at all otherwise.
+// * Request body: Delivered if they are present and sent in a single message if
+//   the BUFFERED or BUFFERED_PARTIAL mode is chosen, in multiple messages if the
+//   STREAMED mode is chosen, and not at all otherwise.
 // * Request trailers: Delivered if they are present and if the trailer mode is set
 //   to SEND.
 // * Response headers: Contains the headers from the HTTP response. Keep in mind
@@ -74,7 +72,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // By default, the processor sends only the request and response headers messages.
 // This may be changed to include any of the six steps by changing the processing_mode
 // setting of the filter configuration, or by setting the mode_override of any response
-// from the external processor. This way, a processor may, for example, use information
+// from the external processor. The latter is only enabled if allow_mode_override is
+// set to true. This way, a processor may, for example, use information
 // in the request header to determine whether the message body must be examined, or whether
 // the proxy should simply stream it straight through.
 //
@@ -94,12 +93,16 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`
 // messages, and the server must reply with
 // :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`.
-
-// [#next-free-field: 10]
+//
+// Stats about each gRPC call are recorded in a :ref:`dynamic filter state
+// <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
+// name.
+//
+// [#next-free-field: 16]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
-  config.core.v3.GrpcService grpc_service = 1;
+  config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
 
   // By default, if the gRPC stream cannot be established, or if it is closed
   // prematurely with an error, the filter will fail. Specifically, if the
@@ -139,13 +142,17 @@ message ExternalProcessor {
   repeated string response_attributes = 6;
 
   // Specifies the timeout for each individual message sent on the stream and
-  // when the filter is running in synchronous mode. Whenever
-  // the proxy sends a message on the stream that requires a response, it will
-  // reset this timer, and will stop processing and return an error (subject
-  // to the processing mode) if the timer expires before a matching response
-  // is received. There is no timeout when the filter is running in asynchronous
-  // mode. Default is 200 milliseconds.
-  google.protobuf.Duration message_timeout = 7;
+  // when the filter is running in synchronous mode. Whenever the proxy sends
+  // a message on the stream that requires a response, it will reset this timer,
+  // and will stop processing and return an error (subject to the processing mode)
+  // if the timer expires before a matching response is received. There is no
+  // timeout when the filter is running in asynchronous mode. Zero is a valid
+  // config which means the timer will be triggered immediately. If not
+  // configured, default is 200 milliseconds.
+  google.protobuf.Duration message_timeout = 7 [(validate.rules).duration = {
+    lte {seconds: 3600}
+    gte {}
+  }];
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured *ext_proc* filters in an HTTP filter chain.
@@ -163,6 +170,64 @@ message ExternalProcessor {
   // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
   // field to true in the same response.
   config.common.mutation_rules.v3.HeaderMutationRules mutation_rules = 9;
+
+  // Specify the upper bound of
+  // :ref:`override_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.override_message_timeout>`
+  // If not specified, by default it is 0, which will effectively disable the ``override_message_timeout`` API.
+  google.protobuf.Duration max_message_timeout = 10 [(validate.rules).duration = {
+    lte {seconds: 3600}
+    gte {}
+  }];
+
+  // Prevents clearing the route-cache when the
+  // :ref:`clear_route_cache <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.clear_route_cache>`
+  // field is set in an external processor response.
+  bool disable_clear_route_cache = 11;
+
+  // Allow headers matching the ``forward_rules`` to be forwarded to the external processing server.
+  // If not set, all headers are forwarded to the external processing server.
+  HeaderForwardingRules forward_rules = 12;
+
+  // Additional metadata to be added to the filter state for logging purposes. The metadata
+  // will be added to StreamInfo's filter state under the namespace corresponding to the
+  // ext_proc filter name.
+  google.protobuf.Struct filter_metadata = 13;
+
+  // If ``allow_mode_override`` is set to true, the filter config :ref:`processing_mode
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+  // can be overridden by the response message from the external processing server
+  // :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
+  // If not set, ``mode_override`` API in the response message will be ignored.
+  bool allow_mode_override = 14;
+
+  // If set to true, ignore the
+  // :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
+  // message in an external processor response. In such case, no local reply will be sent.
+  // Instead, the stream to the external processor will be closed. There will be no
+  // more external processing for this stream from now on.
+  bool disable_immediate_response = 15;
+}
+
+// The HeaderForwardingRules structure specifies what headers are
+// allowed to be forwarded to the external processing server.
+//
+// This works as below:
+//
+//   1. If neither ``allowed_headers`` nor ``disallowed_headers`` is set, all headers are forwarded.
+//   2. If both ``allowed_headers`` and ``disallowed_headers`` are set, only headers in the
+//      ``allowed_headers`` but not in the ``disallowed_headers`` are forwarded.
+//   3. If ``allowed_headers`` is set, and ``disallowed_headers`` is not set, only headers in
+//      the ``allowed_headers`` are forwarded.
+//   4. If ``disallowed_headers`` is set, and ``allowed_headers`` is not set, all headers except
+//      headers in the ``disallowed_headers`` are forwarded.
+message HeaderForwardingRules {
+  // If set, specifically allow any header in this list to be forwarded to the external
+  // processing server. This can be overridden by the below ``disallowed_headers``.
+  type.matcher.v3.ListStringMatcher allowed_headers = 1;
+
+  // If set, specifically disallow any header in this list to be forwarded to the external
+  // processing server. This overrides the above ``allowed_headers`` if a header matches both.
+  type.matcher.v3.ListStringMatcher disallowed_headers = 2;
 }
 
 // Extra settings that may be added to per-route configuration for a

@@ -13,8 +13,8 @@ namespace Matching {
  */
 class HttpMatchingDataImpl : public HttpMatchingData {
 public:
-  explicit HttpMatchingDataImpl(const Network::ConnectionInfoProvider& connection_info_provider)
-      : connection_info_provider_(connection_info_provider) {}
+  explicit HttpMatchingDataImpl(const StreamInfo::StreamInfo& stream_info)
+      : stream_info_(stream_info) {}
 
   static absl::string_view name() { return "http"; }
 
@@ -50,12 +50,14 @@ public:
     return makeOptRefFromPtr(response_trailers_);
   }
 
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+
   const Network::ConnectionInfoProvider& connectionInfoProvider() const override {
-    return connection_info_provider_;
+    return stream_info_.downstreamAddressProvider();
   }
 
 private:
-  const Network::ConnectionInfoProvider& connection_info_provider_;
+  const StreamInfo::StreamInfo& stream_info_;
   const RequestHeaderMap* request_headers_{};
   const ResponseHeaderMap* response_headers_{};
   const RequestTrailerMap* request_trailers_{};
@@ -66,7 +68,8 @@ using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
 
 struct HttpFilterActionContext {
   const std::string& stat_prefix_;
-  Server::Configuration::FactoryContext& factory_context_;
+  OptRef<Server::Configuration::FactoryContext> factory_context_;
+  OptRef<Server::Configuration::ServerFactoryContext> server_factory_context_;
 };
 } // namespace Matching
 } // namespace Http

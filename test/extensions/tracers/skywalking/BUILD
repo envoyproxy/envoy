@@ -85,6 +85,7 @@ envoy_extension_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
     ],
 )

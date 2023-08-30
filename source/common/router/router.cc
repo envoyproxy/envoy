@@ -51,7 +51,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   OptRef<const Network::Connection> connection) {
-  if (downstream_headers.getSchemeValue() == Http::Headers::get().SchemeValues.Http) {
+  if (Http::Utility::schemeIsHttp(downstream_headers.getSchemeValue())) {
     return true;
   }
   if (connection.has_value() && !connection->ssl()) {
@@ -78,14 +78,14 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
 }
 
 void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure) {
-  if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+  if (Http::Utility::schemeIsValid(headers.getSchemeValue())) {
     return;
   }
   // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
   // this path should only occur if a buggy filter has removed the :scheme
   // header. In that case best-effort set from X-Forwarded-Proto.
   absl::string_view xfp = headers.getForwardedProtoValue();
-  if (Http::HeaderUtility::schemeIsValid(xfp)) {
+  if (Http::Utility::schemeIsValid(xfp)) {
     headers.setScheme(xfp);
     return;
   }
@@ -423,16 +423,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
          &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
-          std::string new_path;
+          std::string new_uri;
           if (request_headers.Path()) {
-            new_path = direct_response->newPath(request_headers);
+            new_uri = direct_response->newUri(request_headers);
           }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
               direct_response->responseCode() == Http::Code::Created ||
               Http::CodeUtility::is3xx(enumToInt(direct_response->responseCode()));
-          if (!new_path.empty() && add_location) {
-            response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+          if (!new_uri.empty() && add_location) {
+            response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },
@@ -547,14 +547,18 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // `host_` returns a string_view so doing this should be safe.
     absl::string_view sni_value = parsed_authority.host_;
 
-    if (should_set_sni && upstream_http_protocol_options.value().auto_sni()) {
+    if (should_set_sni && upstream_http_protocol_options.value().auto_sni() &&
+        !callbacks_->streamInfo().filterState()->hasDataWithName(
+            Network::UpstreamServerName::key())) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
           std::make_unique<Network::UpstreamServerName>(sni_value),
           StreamInfo::FilterState::StateType::Mutable);
     }
 
-    if (upstream_http_protocol_options.value().auto_san_validation()) {
+    if (upstream_http_protocol_options.value().auto_san_validation() &&
+        !callbacks_->streamInfo().filterState()->hasDataWithName(
+            Network::UpstreamSubjectAltNames::key())) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamSubjectAltNames::key(),
           std::make_unique<Network::UpstreamSubjectAltNames>(
@@ -724,9 +728,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
               .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_);
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
-        options.setFilterConfig(config_);
-      }
+      options.setFilterConfig(config_);
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
         // without waiting.
@@ -767,18 +769,21 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     factory = &config_.router_context_.genericConnPoolFactory();
   }
 
-  bool should_tcp_proxy = false;
-
+  using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol;
+  UpstreamProtocol upstream_protocol = UpstreamProtocol::HTTP;
   if (route_entry_->connectConfig().has_value()) {
     auto method = downstream_headers_->getMethodValue();
-    should_tcp_proxy = (method == Http::Headers::get().MethodValues.Connect);
-
-    // Allow POST for proxying raw TCP if it is configured.
-    if (!should_tcp_proxy && route_entry_->connectConfig()->allow_post()) {
-      should_tcp_proxy = (method == Http::Headers::get().MethodValues.Post);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+        Http::HeaderUtility::isConnectUdp(*downstream_headers_)) {
+      upstream_protocol = UpstreamProtocol::UDP;
+    } else if (method == Http::Headers::get().MethodValues.Connect ||
+               (route_entry_->connectConfig()->allow_post() &&
+                method == Http::Headers::get().MethodValues.Post)) {
+      // Allow POST for proxying raw TCP if it is configured.
+      upstream_protocol = UpstreamProtocol::TCP;
     }
   }
-  return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
+  return factory->createGenericConnPool(thread_local_cluster, upstream_protocol, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }
 
@@ -971,9 +976,7 @@ void Filter::maybeDoShadowing() {
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled())
                        .setIsShadow(true);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
-      options.setFilterConfig(config_);
-    }
+    options.setFilterConfig(config_);
     config_.shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                   options);
   }
@@ -1337,7 +1340,9 @@ void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host
 StreamInfo::ResponseFlag
 Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
-  case Http::StreamResetReason::ConnectionFailure:
+  case Http::StreamResetReason::LocalConnectionFailure:
+  case Http::StreamResetReason::RemoteConnectionFailure:
+  case Http::StreamResetReason::ConnectionTimeout:
     return StreamInfo::ResponseFlag::UpstreamConnectionFailure;
   case Http::StreamResetReason::ConnectionTermination:
     return StreamInfo::ResponseFlag::UpstreamConnectionTermination;
@@ -1395,17 +1400,7 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   // the complexity until someone asks for it.
   retry_state_.reset();
 
-  // We coalesce 1xx headers here, to prevent encoder filters and HCM from having to worry
-  // about this. This is done in the router filter, rather than UpstreamRequest, since we want to
-  // potentially coalesce across retries and multiple upstream requests in the future, even though
-  // we currently don't support retry after 1xx.
-  // It's plausible that this functionality might need to move to HCM in the future for internal
-  // redirects, but we would need to maintain the "only call encode1xxHeaders() once"
-  // invariant.
-  if (!downstream_1xx_headers_encoded_) {
-    downstream_1xx_headers_encoded_ = true;
-    callbacks_->encode1xxHeaders(std::move(headers));
-  }
+  callbacks_->encode1xxHeaders(std::move(headers));
 }
 
 void Filter::resetAll() {
@@ -1568,6 +1563,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   callbacks_->streamInfo().setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.copy_response_code_to_downstream_stream_info")) {
+    callbacks_->streamInfo().setResponseCode(response_code);
+  }
 
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
   // Router::Filter we'll need to find a better location for this work. One possibility is to
@@ -1744,7 +1744,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   const auto& policy = route_entry_->internalRedirectPolicy();
   // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(downstream_headers, callbacks_->connection());
-  const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
+  const bool target_is_http = Http::Utility::schemeIsHttp(absolute_url.scheme());
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: incorrect scheme for {}", *callbacks_,
                      redirect_url);
@@ -1945,7 +1945,7 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& 
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
     // buffer safe requests with body which is not common.
-    setRetryShadownBufferLimit(0);
+    setRetryShadowBufferLimit(0);
   }
   return retry_state;
 }

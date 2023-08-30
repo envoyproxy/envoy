@@ -7,7 +7,6 @@
 #include <Security/SecTrust.h>
 
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
-#include "library/common/main_interface.h"
 #include "openssl/ssl.h"
 
 // NOLINT(namespace-envoy)
@@ -35,7 +34,7 @@ CFMutableArrayRef CreateTrustPolicies() {
 // Returns a new CFMutableArrayRef containing the specified certificates
 // in the form expected by Security.framework and Keychain Services, or
 // NULL on failure.
-CFMutableArrayRef CreateSecCertificateArray(const envoy_data* certs, uint8_t num_certs) {
+CFMutableArrayRef CreateSecCertificateArray(const std::vector<std::string>& certs) {
   CFMutableArrayRef cert_array =
       CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
 
@@ -43,8 +42,9 @@ CFMutableArrayRef CreateSecCertificateArray(const envoy_data* certs, uint8_t num
     return NULL;
   }
 
-  for (uint8_t i = 0; i < num_certs; ++i) {
-    CFDataRef cert_data = CFDataCreate(kCFAllocatorDefault, certs[i].bytes, certs[i].length);
+  for (absl::string_view cert : certs) {
+    CFDataRef cert_data = CFDataCreate(
+        kCFAllocatorDefault, reinterpret_cast<const uint8_t*>(cert.data()), cert.length());
     if (!cert_data) {
       CFRelease(cert_array);
       return NULL;
@@ -70,15 +70,15 @@ envoy_cert_validation_result make_result(envoy_status_t status, uint8_t tls_aler
   return result;
 }
 
-static envoy_cert_validation_result verify_cert(const envoy_data* certs, uint8_t num_certs,
-                                                const char* hostname) {
+envoy_cert_validation_result verify_cert(const std::vector<std::string>& certs,
+                                         absl::string_view /*hostname*/) {
   CFArrayRef trust_policies = CreateTrustPolicies();
   if (!trust_policies) {
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
                        "validation couldn't be conducted.");
   }
 
-  CFMutableArrayRef cert_array = CreateSecCertificateArray(certs, num_certs);
+  CFMutableArrayRef cert_array = CreateSecCertificateArray(certs);
   if (!cert_array) {
     return make_result(ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
                        "validation couldn't be conducted.");
@@ -103,18 +103,3 @@ static envoy_cert_validation_result verify_cert(const envoy_data* certs, uint8_t
   }
   return make_result(ENVOY_SUCCESS, 0, "");
 }
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void register_apple_platform_cert_verifier() {
-  envoy_cert_validator* api = (envoy_cert_validator*)safe_malloc(sizeof(envoy_cert_validator));
-  api->validate_cert = verify_cert;
-  api->validation_cleanup = NULL;
-  register_platform_api("platform_cert_validator", api);
-}
-
-#ifdef __cplusplus
-}
-#endif

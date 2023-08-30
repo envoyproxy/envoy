@@ -10,6 +10,6 @@ do
   ports=("${PORT_PROXY0}" "${PORT_PROXY1}")
   port=${ports[$RANDOM % ${#ports[@]} ]}
 
-  curl -v "localhost:${port}/service"
+  curl -v "localhost:${port}/service/load"
   ((counter++))
 done

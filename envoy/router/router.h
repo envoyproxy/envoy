@@ -23,7 +23,7 @@
 #include "envoy/router/path_matcher.h"
 #include "envoy/router/path_rewriter.h"
 #include "envoy/tcp/conn_pool.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
@@ -87,12 +87,12 @@ public:
   virtual Http::Code responseCode() const PURE;
 
   /**
-   * Returns the redirect path based on the request headers.
+   * Returns the redirect URI based on the request headers.
    * @param headers supplies the request headers.
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
    *         or an empty string otherwise.
    */
-  virtual std::string newPath(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Returns the response body to send with direct responses.
@@ -610,6 +610,7 @@ public:
 
 class RateLimitPolicy;
 class Config;
+class CommonConfig;
 
 /**
  * Virtual host definition.
@@ -636,7 +637,7 @@ public:
   /**
    * @return const Config& the RouteConfiguration that owns this virtual host.
    */
-  virtual const Config& routeConfig() const PURE;
+  virtual const CommonConfig& routeConfig() const PURE;
 
   /**
    * @return bool whether to include the request count header in upstream requests.
@@ -1199,6 +1200,14 @@ public:
   virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
+   * Check if the filter is disabled for this route.
+   * @param config_name supplies the name of the filter config in the HTTP filter chain. This name
+   * may be different from the filter extension qualified name.
+   * @return true if the filter is disabled for this route, false otherwise.
+   */
+  virtual bool filterDisabled(absl::string_view config_name) const PURE;
+
+  /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
    * hierarchy(Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
@@ -1271,9 +1280,50 @@ enum class RouteEvalStatus {
 using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteEvalStatus)>;
 
 /**
+ * Shared part of the route configuration. This class contains interfaces that needn't depend on
+ * router matcher. Then every virtualhost could keep a reference to the CommonConfig. When the
+ * entire route config is destroyed, the part of CommonConfig will still live until all
+ * virtualhosts are destroyed.
+ */
+class CommonConfig {
+public:
+  virtual ~CommonConfig() = default;
+
+  /**
+   * Return a list of headers that will be cleaned from any requests that are not from an internal
+   * (RFC1918) source.
+   */
+  virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
+
+  /**
+   * @return const std::string the RouteConfiguration name.
+   */
+  virtual const std::string& name() const PURE;
+
+  /**
+   * @return whether router configuration uses VHDS.
+   */
+  virtual bool usesVhds() const PURE;
+
+  /**
+   * @return bool whether most specific header mutations should take precedence. The default
+   * evaluation order is route level, then virtual host level and finally global connection
+   * manager level.
+   */
+  virtual bool mostSpecificHeaderMutationsWins() const PURE;
+
+  /**
+   * @return uint32_t The maximum bytes of the response direct response body size. The default value
+   * is 4096.
+   * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
+   */
+  virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
+};
+
+/**
  * The router configuration.
  */
-class Config : public Rds::Config {
+class Config : public Rds::Config, public CommonConfig {
 public:
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
@@ -1305,36 +1355,6 @@ public:
   virtual RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
-
-  /**
-   * Return a list of headers that will be cleaned from any requests that are not from an internal
-   * (RFC1918) source.
-   */
-  virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
-
-  /**
-   * @return const std::string the RouteConfiguration name.
-   */
-  virtual const std::string& name() const PURE;
-
-  /**
-   * @return whether router configuration uses VHDS.
-   */
-  virtual bool usesVhds() const PURE;
-
-  /**
-   * @return bool whether most specific header mutations should take precedence. The default
-   * evaluation order is route level, then virtual host level and finally global connection
-   * manager level.
-   */
-  virtual bool mostSpecificHeaderMutationsWins() const PURE;
-
-  /**
-   * @return uint32_t The maximum bytes of the response direct response body size. The default value
-   * is 4096.
-   * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
-   */
-  virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
@@ -1375,6 +1395,11 @@ public:
    * @return optionally returns the host for the connection pool.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
+
+  /**
+   * @return returns if the connection pool was iniitalized successfully.
+   */
+  virtual bool valid() const PURE;
 };
 
 /**
@@ -1503,6 +1528,11 @@ using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
  */
 class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
 public:
+  /*
+   * Protocol used by the upstream sockets.
+   */
+  enum class UpstreamProtocol { HTTP, TCP, UDP };
+
   ~GenericConnPoolFactory() override = default;
 
   /*
@@ -1510,7 +1540,8 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                        GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

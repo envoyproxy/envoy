@@ -7,6 +7,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/timespan.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/async_tcp_client.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
@@ -17,7 +19,9 @@
 namespace Envoy {
 namespace Tcp {
 
-class AsyncTcpClientImpl : public AsyncTcpClient, public Network::ConnectionCallbacks {
+class AsyncTcpClientImpl : public AsyncTcpClient,
+                           public Network::ConnectionCallbacks,
+                           public Logger::Loggable<Logger::Id::client> {
 public:
   AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
                      Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -25,13 +29,15 @@ public:
 
   ~AsyncTcpClientImpl() override;
 
-  void close() override;
+  void close(Network::ConnectionCloseType type) override;
 
   /**
    * @return true means a host is successfully picked from a Cluster.
    * This doesn't mean the connection is established.
    */
   bool connect() override;
+
+  void onConnectTimeout();
 
   void setAsyncTcpClientCallbacks(AsyncTcpClientCallbacks& callbacks) override;
 
@@ -77,10 +83,17 @@ private:
     }
   }
 
+  void disableConnectTimeout();
+  void reportConnectionDestroy(Network::ConnectionEvent event);
+
   Event::Dispatcher& dispatcher_;
   Network::ClientConnectionPtr connection_;
   Upstream::ThreadLocalCluster& thread_local_cluster_;
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::LoadBalancerContext* context_;
+  Stats::TimespanPtr conn_connect_ms_;
+  Stats::TimespanPtr conn_length_ms_;
+  Event::TimerPtr connect_timer_;
   AsyncTcpClientCallbacks* callbacks_{};
   bool disconnected_{true};
   bool enable_half_close_{false};

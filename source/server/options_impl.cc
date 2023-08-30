@@ -36,16 +36,12 @@ std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
 
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
-                         spdlog::level::level_enum default_log_level,
-                         absl::string_view listener_manager)
-    : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level,
-                  listener_manager) {}
+                         spdlog::level::level_enum default_log_level)
+    : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level) {}
 
 OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
-                         spdlog::level::level_enum default_log_level,
-                         absl::string_view listener_manager)
-    : listener_manager_(listener_manager) {
+                         spdlog::level::level_enum default_log_level) {
   std::string log_levels_string = fmt::format("Log levels: {}", allowedLogLevels());
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
@@ -165,25 +161,24 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       false, "string", cmd);
 
   cmd.setExceptionHandling(false);
+
+  std::function failure_function = [&](TCLAP::ArgException& e) {
+    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
+    END_TRY
+    CATCH(const TCLAP::ExitException&, {
+      // failure() has already written an informative message to stderr, so all that's left to do
+      // is throw our own exception with the original message.
+      throw MalformedArgvException(e.what());
+    });
+  };
+
   TRY_ASSERT_MAIN_THREAD {
     cmd.parse(args);
     count_ = cmd.getArgList().size();
   }
   END_TRY
-  catch (TCLAP::ArgException& e) {
-    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
-    END_TRY
-    catch (const TCLAP::ExitException&) {
-      // failure() has already written an informative message to stderr, so all that's left to do
-      // is throw our own exception with the original message.
-      throw MalformedArgvException(e.what());
-    }
-  }
-  catch (const TCLAP::ExitException& e) {
-    // parse() throws an ExitException with status 0 after printing the output for --help and
-    // --version.
-    throw NoServingException();
-  }
+  MULTI_CATCH(
+      TCLAP::ArgException & e, { failure_function(e); }, { throw NoServingException(); });
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
@@ -198,6 +193,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   log_format_ = log_format.getValue();
+  log_format_set_ = log_format.isSet();
   log_format_escaped_ = log_format_escaped.getValue();
   enable_fine_grain_logging_ = enable_fine_grain_logging.getValue();
 
@@ -446,8 +442,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
                          const std::string& service_zone, spdlog::level::level_enum log_level)
     : log_level_(log_level), service_cluster_(service_cluster), service_node_(service_node),
-      service_zone_(service_zone),
-      listener_manager_(Config::ServerExtensionValues::get().DEFAULT_LISTENER) {}
+      service_zone_(service_zone) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {

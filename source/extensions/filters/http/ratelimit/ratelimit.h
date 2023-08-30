@@ -119,16 +119,20 @@ class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& config)
-      : vh_rate_limits_(config.vh_rate_limits()) {}
+      : vh_rate_limits_(config.vh_rate_limits()), domain_(config.domain()) {}
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
   virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
 
+  std::string domain() const { return domain_; }
+
 private:
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
+
+  const std::string domain_;
 };
 
 /**
@@ -175,6 +179,7 @@ private:
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
+  std::string getDomain();
 
   Http::Context& httpContext() { return config_->httpContext(); }
 

@@ -35,7 +35,7 @@ TEST_F(TransportSocketOptionsImplTest, SharedFilterState) {
   filter_state_.setData(
       "random_key_has_effect", std::make_unique<UpstreamServerName>("www.example.com"),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+      StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
   auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
   EXPECT_EQ(1, objects.size());
@@ -108,7 +108,7 @@ TEST_F(TransportSocketOptionsImplTest, FilterStateHashable) {
   filter_state_.setData("hashable", std::make_shared<HashableObj>(),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain,
-                        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
   TestTransportSocketFactory factory;
   std::vector<uint8_t> keys;
@@ -120,7 +120,7 @@ TEST_F(TransportSocketOptionsImplTest, FilterStateNonHashable) {
   filter_state_.setData("non-hashable", std::make_shared<NonHashableObj>(),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain,
-                        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
   TestTransportSocketFactory factory;
   std::vector<uint8_t> keys;

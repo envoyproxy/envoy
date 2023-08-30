@@ -26,6 +26,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "reverse_bridge_integration_test",
+    size = "large",
     srcs = ["reverse_bridge_integration_test.cc"],
     extension_names = ["envoy.filters.http.grpc_http1_reverse_bridge"],
     deps = [

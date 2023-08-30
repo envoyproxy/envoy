@@ -5,6 +5,9 @@ import os
 import subprocess as sp
 import sys
 
+# Workaround for https://github.com/bazelbuild/rules_python/issues/1221
+sys.path += [os.path.dirname(__file__)]
+
 import tap2pcap
 
 # Validate that the tapped trace when run through tap2cap | tshark matches

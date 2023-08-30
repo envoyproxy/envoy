@@ -18,3 +18,4 @@
    curves.<curve>, Counter, Total successful TLS connections that used ECDHE curve <curve>
    sigalgs.<sigalg>, Counter, Total successful TLS connections that used signature algorithm <sigalg>
    versions.<version>, Counter, Total successful TLS connections that used protocol version <version>
+   was_key_usage_invalid, Counter, Total successful TLS connections that used an `invalid keyUsage extension <https://github.com/google/boringssl/blob/6f13380d27835e70ec7caf807da7a1f239b10da6/ssl/internal.h#L3117>`_. (This is not avaiable in BoringSSL FIPS yet due to `issue #28246 <https://github.com/envoyproxy/envoy/issues/28246>`_)

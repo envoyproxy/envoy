@@ -84,7 +84,7 @@ private:
                      data.length());
       parent_.read_callbacks_->connection().write(data, end_stream);
       if (end_stream) {
-        parent_.client_->close();
+        parent_.client_->close(Network::ConnectionCloseType::NoFlush);
       }
     }
 

@@ -10,7 +10,6 @@ import androidx.test.core.app.ApplicationProvider
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.Custom
 import io.envoyproxy.envoymobile.Engine
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
