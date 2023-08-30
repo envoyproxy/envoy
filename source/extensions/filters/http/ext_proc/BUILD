@@ -19,6 +19,12 @@ envoy_cc_library(
         "ext_proc.h",
         "processor_state.h",
     ],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     deps = [
         ":client_interface",
         ":mutation_utils_lib",
@@ -36,18 +42,30 @@ envoy_cc_library(
         "@com_google_absl//absl/strings:str_format",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
-        "@com_google_cel_cpp//parser",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
-    ],
+    ] + select(
+        {
+            "//bazel:windows_x86_64": [],
+            "//conditions:default": [
+                "@com_google_cel_cpp//parser",
+            ],
+        },
+    ),
 )
 
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     deps = [
         ":client_lib",
         ":ext_proc",

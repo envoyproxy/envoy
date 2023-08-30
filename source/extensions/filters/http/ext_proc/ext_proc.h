@@ -27,8 +27,6 @@
 #include "source/extensions/filters/http/ext_proc/client.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
-#include "parser/parser.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -124,7 +122,7 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
-class FilterConfig {
+class FilterConfig : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout,
