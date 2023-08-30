@@ -304,6 +304,9 @@ public:
    */
   static bool useFineGrainLogger();
 
+  // Change the log level for all loggers (fine grained or otherwise) to the level provided.
+  static void changeAllLogLevels(spdlog::level::level_enum level);
+
   static void enableFineGrainLogger();
   static void disableFineGrainLogger();
 

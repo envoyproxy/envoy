@@ -14,7 +14,7 @@ FilterConfigImpl::FilterConfigImpl(
     ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
-      stats_(Filter::generateStats(stats_prefix, scope)) {}
+      stats_(Filter::generateStats(stats_prefix, scope)), tap_config_(proto_config) {}
 
 HttpTapConfigSharedPtr FilterConfigImpl::currentConfig() {
   return currentConfigHelper<HttpTapConfig>();

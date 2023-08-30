@@ -82,6 +82,7 @@ stages:
     parameters:
       cacheTestResults: ${{ parameters.cacheTestResults }}
       runBuild: variables['RUN_BUILD']
+      tmpfsDockerDisabled: true
 
 - stage: linux_arm64
   displayName: Linux arm64
@@ -97,6 +98,7 @@ stages:
       timeoutBuild: 180
       pool: envoy-arm-large
       runBuild: variables['RUN_BUILD']
+      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
 - stage: check
   displayName: Checks (Linux x64)
