@@ -117,10 +117,11 @@ paths:
     - source/common/network/socket_impl.cc
     - source/common/ssl/tls_certificate_config_impl.cc
     - source/common/formatter/http_specific_formatter.cc
+    - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
-    - source/common/formatter/substitution_formatter.cc
+    - source/common/formatter/substitution_formatter.h
     - source/common/formatter/substitution_format_utility.cc
-    - source/common/formatter/substitution_format_string.cc
+    - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/stats/tag_producer_impl.cc
     - source/common/http/http2/codec_impl.cc
@@ -318,7 +319,7 @@ paths:
     - source/common/common/utility.cc
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.cc
-    - source/common/formatter/substitution_formatter.cc
+    - source/common/formatter/substitution_formatter.h
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/version/version.cc

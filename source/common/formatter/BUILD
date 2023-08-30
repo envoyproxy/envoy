@@ -13,7 +13,6 @@ envoy_cc_library(
     srcs = [
         "http_specific_formatter.cc",
         "stream_info_formatter.cc",
-        "substitution_formatter.cc",
     ],
     hdrs = [
         "http_specific_formatter.h",
@@ -44,7 +43,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "substitution_format_string_lib",
-    srcs = ["substitution_format_string.cc"],
     hdrs = ["substitution_format_string.h"],
     deps = [
         ":substitution_formatter_lib",

@@ -57,6 +57,7 @@ type HttpCAPI interface {
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
 	HttpIncrementMetric(c unsafe.Pointer, metricId uint32, offset int64)
 	HttpGetMetric(c unsafe.Pointer, metricId uint32) uint64
+	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
 }
 
 type NetworkCAPI interface {

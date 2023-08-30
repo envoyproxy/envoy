@@ -20,6 +20,31 @@
 namespace Envoy {
 namespace Upstream {
 
+namespace {
+
+/**
+ * Iterates all the selectors and finds the first one that match_criteria contains all the keys
+ * of the selector. Returns nullptr if no selector matches, otherwise returns sub match criteria
+ * that contains only the keys of the selector.
+ */
+Router::MetadataMatchCriteriaConstPtr
+filterCriteriaBySelectors(const std::vector<SubsetSelectorPtr>& subset_selectors,
+                          const Router::MetadataMatchCriteria* match_criteria) {
+  if (match_criteria != nullptr) {
+    for (const auto& selector : subset_selectors) {
+      const auto& selector_keys = selector->selectorKeys();
+      auto sub_match_criteria = match_criteria->filterMatchCriteria(selector_keys);
+      if (sub_match_criteria != nullptr &&
+          sub_match_criteria->metadataMatchCriteria().size() == selector_keys.size()) {
+        return sub_match_criteria;
+      }
+    }
+  }
+  return nullptr;
+}
+
+} // namespace
+
 using HostPredicate = std::function<bool(const Host&)>;
 
 LegacyChildLoadBalancerCreatorImpl::LegacyChildLoadBalancerCreatorImpl(
@@ -115,7 +140,8 @@ SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set), child_lb_creator_(std::move(child_lb)),
       locality_weight_aware_(subsets.localityWeightAware()),
-      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
+      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
+      allow_redundant_keys_(subsets.allowRedundantKeys()) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
@@ -304,20 +330,35 @@ SubsetLoadBalancer::getMetadataFallbackList(LoadBalancerContext* context) const 
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* context) {
   if (context) {
+    LoadBalancerContext* actual_used_context = context;
+    std::unique_ptr<LoadBalancerContextWrapper> actual_used_context_wrapper;
+
+    if (allow_redundant_keys_) {
+      // If redundant keys are allowed then we can filter the metadata match criteria by the
+      // selectors first to reduce the redundant keys.
+      auto actual_used_criteria =
+          filterCriteriaBySelectors(subset_selectors_, context->metadataMatchCriteria());
+      if (actual_used_criteria != nullptr) {
+        actual_used_context_wrapper =
+            std::make_unique<LoadBalancerContextWrapper>(context, std::move(actual_used_criteria));
+        actual_used_context = actual_used_context_wrapper.get();
+      }
+    }
+
     bool host_chosen;
-    HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
+    HostConstSharedPtr host = tryChooseHostFromContext(actual_used_context, host_chosen);
     if (host_chosen) {
       // Subset lookup succeeded, return this result even if it's nullptr.
       return host;
     }
     // otherwise check if there is fallback policy configured for given route metadata
     absl::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
-        tryFindSelectorFallbackParams(context);
+        tryFindSelectorFallbackParams(actual_used_context);
     if (selector_fallback_params &&
         selector_fallback_params->get().fallback_policy_ !=
             envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       // return result according to configured fallback policy
-      return chooseHostForSelectorFallbackPolicy(*selector_fallback_params, context);
+      return chooseHostForSelectorFallbackPolicy(*selector_fallback_params, actual_used_context);
     }
   }
 
