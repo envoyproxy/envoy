@@ -39,6 +39,7 @@ public:
   }
 
 private:
+  std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager_;
   std::unique_ptr<
       Envoy::Filter::DynamicFilterConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>
       provider_;
