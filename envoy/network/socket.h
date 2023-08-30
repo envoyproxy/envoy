@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -163,6 +164,21 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 #endif
 
 /**
+ * Interface representing a single filter chain info.
+ */
+class FilterChainInfo {
+public:
+  virtual ~FilterChainInfo() = default;
+
+  /**
+   * @return the name of this filter chain.
+   */
+  virtual absl::string_view name() const PURE;
+};
+
+using FilterChainInfoConstSharedPtr = std::shared_ptr<const FilterChainInfo>;
+
+/**
  * Interfaces for providing a socket's various addresses. This is split into a getters interface
  * and a getters + setters interface. This is so that only the getters portion can be overridden
  * in certain cases.
@@ -232,6 +248,11 @@ public:
    * @return roundTripTime of the connection
    */
   virtual const absl::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
+
+  /**
+   * @return the filter chain info provider backing this socket.
+   */
+  virtual OptRef<const FilterChainInfo> filterChainInfo() const PURE;
 };
 
 class ConnectionInfoSetter : public ConnectionInfoProvider {
@@ -298,6 +319,11 @@ public:
    * @param  milliseconds of round trip time of previous connection
    */
   virtual void setRoundTripTime(std::chrono::milliseconds round_trip_time) PURE;
+
+  /**
+   * @param filter_chain_info the filter chain info provider backing this socket.
+   */
+  virtual void setFilterChainInfo(FilterChainInfoConstSharedPtr filter_chain_info) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;
