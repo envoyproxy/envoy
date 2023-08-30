@@ -1,5 +1,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+
 #include "source/extensions/filters/http/jwt_authn/extractor.h"
+
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/test_common/utility.h"
 
@@ -24,12 +26,12 @@ public:
   void SetUp() override { setUp(ExampleConfig); }
 
   void setUp(const std::string& config_str) {
-      TestUtility::loadFromYaml(config_str, config_);
-      JwtProviderList providers;
-      for (const auto& it : config_.providers()) {
-          providers.emplace_back(&it.second);
-      }
-      extractor_ = Extractor::create(providers);
+    TestUtility::loadFromYaml(config_str, config_);
+    JwtProviderList providers;
+    for (const auto& it : config_.providers()) {
+        providers.emplace_back(&it.second);
+    }
+    extractor_ = Extractor::create(providers);
   }
 
   JwtAuthentication config_;
@@ -53,6 +55,7 @@ TEST_F(ExtractorRuntimeGuardTest,
   EXPECT_EQ(tokens[0]->token(), std::string(GoodToken));
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
 }
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
