@@ -443,9 +443,7 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  // TODO(alyssawilk) debug this and all other disabled Netlog tests
-  @Ignore("Netlog not implemented")
-  // Tests that NetLog contains events emitted by all live CronetEngines.
+  // Unlike Cronet, Cronvoy will log all events emitted to the last log file requested.
   public void testNetLogContainEventsFromAllLiveEngines() throws Exception {
     Context context = getContext();
     File directory = new File(PathUtils.getDataDirectory());
@@ -472,12 +470,8 @@ public class CronetUrlRequestContextTest {
     cronetEngine2.stopNetLog();
     assertTrue(file1.exists());
     assertTrue(file2.exists());
-    // Make sure both files contain the two requests made separately using
-    // different engines.
-    assertTrue(containsStringInNetLog(file1, mUrl404));
-    assertTrue(containsStringInNetLog(file1, mUrl500));
-    assertTrue(containsStringInNetLog(file2, mUrl404));
-    assertTrue(containsStringInNetLog(file2, mUrl500));
+    assertTrue(containsStringInNetLog(file2, NativeTestServer.getNotFoundPath()));
+    assertTrue(containsStringInNetLog(file2, NativeTestServer.getInternalErrorPath()));
     assertTrue(file1.delete());
     assertTrue(file2.delete());
   }
@@ -485,8 +479,7 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
-  // Tests that NetLog contains events emitted by all live CronetEngines.
+  // Unlike Cronet, Cronvoy will log all events emitted to the last log file requested.
   public void testBoundedFileNetLogContainEventsFromAllLiveEngines() throws Exception {
     Context context = getContext();
     File directory = new File(PathUtils.getDataDirectory());
@@ -521,15 +514,15 @@ public class CronetUrlRequestContextTest {
 
     assertTrue(logFile1.exists());
     assertTrue(logFile2.exists());
-    assertTrue(logFile1.length() != 0);
+
+    BufferedReader logReader = new BufferedReader(new FileReader(logFile2));
+    String logLine;
+    logReader.close();
+
     assertTrue(logFile2.length() != 0);
 
-    // Make sure both files contain the two requests made separately using
-    // different engines.
-    assertTrue(containsStringInNetLog(logFile1, mUrl404));
-    assertTrue(containsStringInNetLog(logFile1, mUrl500));
-    assertTrue(containsStringInNetLog(logFile2, mUrl404));
-    assertTrue(containsStringInNetLog(logFile2, mUrl500));
+    assertTrue(containsStringInNetLog(logFile2, NativeTestServer.getNotFoundPath()));
+    assertTrue(containsStringInNetLog(logFile2, NativeTestServer.getInternalErrorPath()));
 
     FileUtils.recursivelyDeleteFile(netLogDir1, FileUtils.DELETE_ALL);
     assertFalse(netLogDir1.exists());
@@ -658,7 +651,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testNetLogAfterShutdown() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -684,7 +676,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogAfterShutdown() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
     TestUrlRequestCallback callback = new TestUrlRequestCallback();

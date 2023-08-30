@@ -172,6 +172,9 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
   @Override
   public void shutdown() {
     synchronized (mLock) {
+      if (mEngine == null) {
+        return; // Already shut down.
+      }
       checkHaveAdapter();
       if (mActiveRequestCount.get() != 0) {
         throw new IllegalStateException("Cannot shutdown with active requests.");
@@ -200,34 +203,37 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
   }
 
   @Override
-  public void startNetLogToFile(String fileName, boolean logAll) {
-    mCronvoyLogger.setNetLogToFile(fileName);
+  public void startNetLogToFile(String fileName, boolean logAll) throws IllegalStateException {
     synchronized (mLock) {
+      if (mEngine == null) {
+        throw new IllegalStateException("Engine is shut down.");
+      }
+      mCronvoyLogger.setNetLogToFile(fileName);
       // Turn up logging
       if (logAll) {
         mLogLevel = EnvoyEngine.LogLevel.TRACE;
       } else {
         mLogLevel = EnvoyEngine.LogLevel.DEBUG;
       }
-      if (mEngine != null) {
-        mEngine.setLogLevel(mLogLevel);
-      }
+      mEngine.setLogLevel(mLogLevel);
     }
   }
 
   @Override
-  public void startNetLogToDisk(String dirPath, boolean logAll, int maxSize) {
-    mCronvoyLogger.setNetLogToDisk(dirPath, maxSize);
+  public void startNetLogToDisk(String dirPath, boolean logAll, int maxSize)
+      throws IllegalStateException {
     synchronized (mLock) {
+      if (mEngine == null) {
+        throw new IllegalStateException("Engine is shut down.");
+      }
+      mCronvoyLogger.setNetLogToDisk(dirPath, maxSize);
       // Turn up logging
       if (logAll) {
         mLogLevel = EnvoyEngine.LogLevel.TRACE;
       } else {
         mLogLevel = EnvoyEngine.LogLevel.DEBUG;
       }
-      if (mEngine != null) {
-        mEngine.setLogLevel(mLogLevel);
-      }
+      mEngine.setLogLevel(mLogLevel);
     }
   }
 
