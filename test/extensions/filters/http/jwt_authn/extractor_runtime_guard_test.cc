@@ -29,7 +29,7 @@ public:
     TestUtility::loadFromYaml(config_str, config_);
     JwtProviderList providers;
     for (const auto& it : config_.providers()) {
-        providers.emplace_back(&it.second);
+      providers.emplace_back(&it.second);
     }
     extractor_ = Extractor::create(providers);
   }
