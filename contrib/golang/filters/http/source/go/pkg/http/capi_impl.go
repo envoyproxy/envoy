@@ -32,7 +32,6 @@ package http
 */
 import "C"
 import (
-	"errors"
 	"reflect"
 	"runtime"
 	"strings"
@@ -62,37 +61,21 @@ const (
 
 type httpCApiImpl struct{}
 
-// When the status means unexpected stage when invoke C API,
+// Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
 // panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
-	case C.CAPIFilterIsGone,
-		C.CAPIFilterIsDestroy,
-		C.CAPINotInGo,
-		C.CAPIInvalidPhase:
-		panic(capiStatusToStr(status))
-	}
-}
-
-func capiStatusToStr(status C.CAPIStatus) string {
-	switch status {
+	case C.CAPIOK:
+		return
 	case C.CAPIFilterIsGone:
-		return errRequestFinished
+		panic(errRequestFinished)
 	case C.CAPIFilterIsDestroy:
-		return errFilterDestroyed
+		panic(errFilterDestroyed)
 	case C.CAPINotInGo:
-		return errNotInGo
+		panic(errNotInGo)
 	case C.CAPIInvalidPhase:
-		return errInvalidPhase
-	case C.CAPIValueNotFound:
-		return errValueNotFound
-	case C.CAPIInternalFailure:
-		return errInternalFailure
-	case C.CAPISerializationFailure:
-		return errSerializationFailure
+		panic(errInvalidPhase)
 	}
-
-	return "unknown status"
 }
 
 func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
@@ -339,31 +322,6 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 	}
 
 	return strings.Clone(value)
-}
-
-func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (string, error) {
-	r := (*httpRequest)(rr)
-	var value string
-	var rc int
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.sema.Add(1)
-	res := C.envoyGoFilterHttpGetStringProperty(unsafe.Pointer(r.req), unsafe.Pointer(&key),
-		unsafe.Pointer(&value), (*C.int)(unsafe.Pointer(&rc)))
-	if res == C.CAPIYield {
-		atomic.AddInt32(&r.waitingOnEnvoy, 1)
-		r.sema.Wait()
-		res = C.CAPIStatus(rc)
-	} else {
-		r.sema.Done()
-		handleCApiStatus(res)
-	}
-
-	if res == C.CAPIOK {
-		return strings.Clone(value), nil
-	}
-
-	return "", errors.New(capiStatusToStr(res))
 }
 
 func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
