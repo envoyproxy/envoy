@@ -363,6 +363,36 @@ Specify whether to enable transparent response Brotli decompression. Defaults to
 Default values from the `brotli decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
 are used.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableHttp3``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable HTTP/3. Defaults to false. Only available when the Envoy Mobile build has HTTP/3 included.
+
+**Example**::
+
+  // Kotlin
+  builder.enableHttp3(true)
+
+  // Swift
+  builder.enableHttp3(true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addQuicHint``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a host port pair that's known to support QUIC. Defaults to false. Only available when HTTP/3 is enabled.
+It can be called multiple times to append a list of QUIC hints.
+This allows HTTP/3 to be used for the first request to the hosts, thus saving a TCP round trip.
+
+**Example**::
+
+  // Kotlin
+  builder.addQuicHint("www.example.com", 443)
+
+  // Swift
+  builder.addQuicHint("www.example.com", 443)
+
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableSocketTagging``
 ~~~~~~~~~~~~~~~~~~~~~~~
