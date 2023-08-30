@@ -24,9 +24,11 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     filter_config_provider_manager_ =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
             server_factory_context);
+    std::cout << "created filter config provider manager" << std::endl;
     provider_ = filter_config_provider_manager_->createDynamicFilterConfigProvider(
         config_discovery, composite_action.dynamic_config().name(), server_factory_context,
         factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
+    std::cout << "created dynamic filter config provider" << std::endl;
     return [this]() -> Matcher::ActionPtr {
       auto config_value = provider_->config();
       if (!config_value.has_value()) {
