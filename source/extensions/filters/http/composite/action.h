@@ -39,7 +39,8 @@ public:
   }
 
 private:
-  std::unique_ptr<Envoy::Filter::DynamicFilterConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>
+  std::unique_ptr<
+      Envoy::Filter::DynamicFilterConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>
       provider_;
 };
 
