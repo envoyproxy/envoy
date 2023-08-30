@@ -118,7 +118,7 @@ public:
                bool skip_cluster_check));
 };
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 MATCHER_P(ProtoBufferEq, expected, "") {
   typename std::remove_const<decltype(expected)>::type proto;
   if (!proto.ParseFromString(arg->toString())) {
