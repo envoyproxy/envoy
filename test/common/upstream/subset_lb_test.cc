@@ -2036,11 +2036,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsets) {
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(666));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(666));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(667));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(667));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context));
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1334));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1334));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
 }
 
@@ -2105,11 +2105,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(666));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(666));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(667));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(667));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context));
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1334));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1334));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
 
   envoy::config::core::v3::Locality local_locality;

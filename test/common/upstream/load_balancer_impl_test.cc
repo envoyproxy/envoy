@@ -1381,10 +1381,10 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareZonesMismatched) {
 
   // Expect zone-aware routing still enabled even though there is no upstream host in zone B
   // Since zone A has no residual, we should always pick an upstream from zone C.
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(4999));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(4999));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 }
@@ -1732,19 +1732,20 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareNoMatchingZones) {
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3332));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3332));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3333));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3333));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(6665));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(6665));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(6666));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(6666));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
       .WillOnce(Return(0))
       .WillOnce(Return(9998)); // Rounding error: 3333 * 3 = 9999 != 10000
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
@@ -1916,35 +1917,44 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareEmptyLocalities) {
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(832));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(832));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr));
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(833));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(833));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2498)); // rounding error
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(2498)); // rounding error
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2499));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(2499));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3331));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3331));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][1], lb_->chooseHost(nullptr));
   EXPECT_EQ(6U, stats_.lb_zone_routing_cross_zone_.value());
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3332));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3332));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(7U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(4997)); // rounding error
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(4997)); // rounding error
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(8U, stats_.lb_zone_routing_cross_zone_.value());
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(4998)); // wrap around
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(4998)); // wrap around
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(9U, stats_.lb_zone_routing_cross_zone_.value());
 }

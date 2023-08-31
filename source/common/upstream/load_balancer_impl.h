@@ -395,7 +395,7 @@ private:
    * upstream locality. See LocalityPercentages for more details. The ordering of localities
    * matches the ordering of upstream localities in the input upstream_hosts_per_locality.
    */
-  std::unique_ptr<absl::FixedArray<LocalityPercentages>>
+  absl::FixedArray<LocalityPercentages>
   calculateLocalityPercentages(const HostsPerLocality& local_hosts_per_locality,
                                const HostsPerLocality& upstream_hosts_per_locality);
 

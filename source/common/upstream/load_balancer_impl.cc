@@ -496,9 +496,8 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // If we have lower percent of hosts in the local cluster in the same locality,
   // we can push all of the requests directly to upstream cluster in the same locality.
   if (upstreamHostsPerLocality.hasLocalLocality() &&
-      locality_percentages->at(0).upstream_percentage > 0 &&
-      locality_percentages->at(0).upstream_percentage >=
-          locality_percentages->at(0).local_percentage) {
+      locality_percentages[0].upstream_percentage > 0 &&
+      locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) {
     state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
     return;
   }
@@ -509,11 +508,11 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // For example, if local percentage is 20% and upstream is 10%
   // we can route only 50% of requests directly.
   // Local percent can be 0% if there are no upstream hosts in the local locality.
-  state.local_percent_to_route_ = upstreamHostsPerLocality.hasLocalLocality() &&
-                                          locality_percentages->at(0).local_percentage > 0
-                                      ? locality_percentages->at(0).upstream_percentage * 10000 /
-                                            locality_percentages->at(0).local_percentage
-                                      : 0;
+  state.local_percent_to_route_ =
+      upstreamHostsPerLocality.hasLocalLocality() && locality_percentages[0].local_percentage > 0
+          ? locality_percentages[0].upstream_percentage * 10000 /
+                locality_percentages[0].local_percentage
+          : 0;
 
   // Local locality does not have additional capacity (we have already routed what we could).
   // Now we need to figure out how much traffic we can route cross locality and to which exact
@@ -534,7 +533,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   state.residual_capacity_.resize(num_upstream_localities);
   for (uint64_t i = 0; i < num_upstream_localities; ++i) {
     uint64_t last_residual_capacity = i > 0 ? state.residual_capacity_[i - 1] : 0;
-    LocalityPercentages this_locality_percentages = locality_percentages->at(i);
+    LocalityPercentages this_locality_percentages = locality_percentages[i];
     if (i == 0 && upstreamHostsPerLocality.hasLocalLocality()) {
       // This is a local locality, we have already routed what we could.
       state.residual_capacity_[i] = last_residual_capacity;
@@ -635,7 +634,7 @@ bool LoadBalancerBase::isHostSetInPanic(const HostSet& host_set) const {
   return false;
 }
 
-std::unique_ptr<absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>>
+absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>
 ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     const HostsPerLocality& local_hosts_per_locality,
     const HostsPerLocality& upstream_hosts_per_locality) {
@@ -677,7 +676,7 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     percentages[i] = LocalityPercentages{local_percentage, upstream_percentage};
   }
 
-  return std::make_unique<absl::FixedArray<LocalityPercentages>>(std::move(percentages));
+  return percentages;
 }
 
 uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& host_set) const {
@@ -703,8 +702,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   // push to the local locality, check if we can push to local locality on current iteration.
   // If there aren't any local hosts in the local locality,
   // then state.local_percent_to_route_ is 0 and there's no need to check.
-  if (state.local_percent_to_route_ > 0 &&
-      random_.random() % 10000 < state.local_percent_to_route_) {
+  if (random_.random() % 10000 < state.local_percent_to_route_) {
     stats_.lb_zone_routing_sampled_.inc();
     return 0;
   }
