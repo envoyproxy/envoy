@@ -142,12 +142,15 @@ TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
 
   GrpcServiceConfigWithHashKey config_with_hash_key_a = GrpcServiceConfigWithHashKey(grpc_service);
   GrpcServiceConfigWithHashKey config_with_hash_key_b = GrpcServiceConfigWithHashKey(grpc_service);
-  GrpcServiceConfigWithHashKey config_with_hash_key_c = GrpcServiceConfigWithHashKey(grpc_service_c);
+  GrpcServiceConfigWithHashKey config_with_hash_key_c =
+      GrpcServiceConfigWithHashKey(grpc_service_c);
   EXPECT_TRUE(config_with_hash_key_a == config_with_hash_key_b);
   EXPECT_FALSE(config_with_hash_key_a == config_with_hash_key_c);
 
-  EXPECT_EQ(config_with_hash_key_a.getPreComputedHash(), config_with_hash_key_b.getPreComputedHash());
-  EXPECT_NE(config_with_hash_key_a.getPreComputedHash(), config_with_hash_key_c.getPreComputedHash());
+  EXPECT_EQ(config_with_hash_key_a.getPreComputedHash(),
+            config_with_hash_key_b.getPreComputedHash());
+  EXPECT_NE(config_with_hash_key_a.getPreComputedHash(),
+            config_with_hash_key_c.getPreComputedHash());
 }
 
 TEST_F(AsyncClientManagerImplTest, RawAsyncClientCache) {
