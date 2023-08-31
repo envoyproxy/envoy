@@ -19,8 +19,15 @@ public:
   class UdpForwardingContext {
   public:
     using ForwardEntry = std::pair<const Network::Address::Instance*, Network::UdpListenerConfig*>;
+
+    // Returns the address and UdpListenerConfig associated with the given address.
+    // The addresses are not necessarily identical, as e.g. the listener might be listening on
+    // 0.0.0.0.
     absl::optional<ForwardEntry>
     getListenerForDestination(const Network::Address::Instance& address);
+
+    // Registers a UdpListenerConfig and address into the map, to be matched using
+    // getListenerForDestination for UDP packet forwarding.
     void registerListener(const Network::Address::Instance& address,
                           Network::UdpListenerConfig& listener_config);
 
