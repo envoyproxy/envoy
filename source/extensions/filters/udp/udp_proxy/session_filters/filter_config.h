@@ -19,8 +19,6 @@ namespace SessionFilters {
  */
 class NamedUdpSessionFilterConfigFactory : public Envoy::Config::TypedFactory {
 public:
-  ~NamedUdpSessionFilterConfigFactory() override = default;
-
   /**
    * Create a particular UDP session filter factory implementation. If the implementation is
    * unable to produce a factory with the provided parameters, it should throw an EnvoyException
