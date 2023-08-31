@@ -182,4 +182,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   public void setProxySettings(String host, int port) {
     JniLibrary.setProxySettings(engineHandle, host, port);
   }
+
+  @Override
+  public void setLogLevel(LogLevel log_level) {
+    JniLibrary.setLogLevel(log_level.ordinal());
+  }
 }
