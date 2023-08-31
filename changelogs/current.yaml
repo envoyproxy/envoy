@@ -52,6 +52,13 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: healthcheck
+  change: |
+    The default behavior of unejecting outlier-detection-ejected host on successful active health checking can
+    be disabled by setting :ref:`outlier_detection.successful_active_health_check_uneject_host
+    <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
+    to ``false``. This new configuration flag is a substitute for the removed runtime option
+    ``envoy.reloadable_features_successful_active_health_check_uneject_host``.
 - area: aws signer
   change: |
     fixed a bug where expiration timestamp on task roles failed to validate. This causes failure of credential caching which
@@ -81,6 +88,12 @@ removed_config_or_runtime:
 - area: quic
   change: |
     Removed ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` and legacy code paths.
+- area: healthcheck
+  change: |
+    Removed ``envoy.reloadable_features_successful_active_health_check_uneject_host`` runtime option and
+    substituted it with :ref:`outlier_detection.successful_active_health_check_uneject_host
+    <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
+    outlier detection configuration flag.
 
 new_features:
 - area: access_log
