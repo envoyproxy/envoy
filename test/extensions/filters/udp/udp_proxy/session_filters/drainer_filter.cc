@@ -1,8 +1,8 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter_config.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
+#include "source/extensions/filters/udp/udp_proxy/session_filters/filter_config.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.validate.h"
