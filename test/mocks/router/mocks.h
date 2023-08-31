@@ -626,6 +626,7 @@ public:
               (Upstream::ClusterManager&, const RouteEntry&, Http::Protocol,
                Upstream::LoadBalancerContext*));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
+  MOCK_METHOD(bool, valid, (), (const));
 };
 
 class MockUpstreamToDownstream : public UpstreamToDownstream {

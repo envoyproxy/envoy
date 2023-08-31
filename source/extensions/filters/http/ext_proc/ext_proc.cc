@@ -653,19 +653,26 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-    // We won't be sending anything more to the stream after we
-    // receive this message.
-    ENVOY_LOG(debug, "Sending immediate response");
-    // TODO(tyxia) For immediate response case here and below, logging is needed because
-    // `onFinishProcessorCalls` is called after `closeStream` below.
-    // Investigate to see if we can switch the order of those two so that the logging here can be
-    // avoided.
-    logGrpcStreamInfo();
-    processing_complete_ = true;
-    closeStream();
-    onFinishProcessorCalls(Grpc::Status::Ok);
-    sendImmediateResponse(response->immediate_response());
-    processing_status = absl::OkStatus();
+    if (config_->disableImmediateResponse()) {
+      ENVOY_LOG(debug, "Filter has disable_immediate_response configured. "
+                       "Treat the immediate response message as spurious response.");
+      processing_status =
+          absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
+    } else {
+      // We won't be sending anything more to the stream after we
+      // receive this message.
+      ENVOY_LOG(debug, "Sending immediate response");
+      // TODO(tyxia) For immediate response case here and below, logging is needed because
+      // `onFinishProcessorCalls` is called after `closeStream` below.
+      // Investigate to see if we can switch the order of those two so that the logging here can be
+      // avoided.
+      logGrpcStreamInfo();
+      processing_complete_ = true;
+      closeStream();
+      onFinishProcessorCalls(Grpc::Status::Ok);
+      sendImmediateResponse(response->immediate_response());
+      processing_status = absl::OkStatus();
+    }
     break;
   default:
     // Any other message is considered spurious

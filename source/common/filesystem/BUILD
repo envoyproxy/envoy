@@ -24,6 +24,7 @@ envoy_cc_win32_library(
     include_prefix = "source/common/filesystem",
     strip_include_prefix = "win32",
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:fmt_lib",
     ],

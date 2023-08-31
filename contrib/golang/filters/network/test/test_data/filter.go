@@ -23,22 +23,8 @@ func (f *SimpleFilterFactory) CreateFilter(cb api.ConnectionCallback) api.Downst
 	return &SimpleFilter{}
 }
 
-type SimpleFilter struct{}
-
-func (f *SimpleFilter) OnNewConnection() api.FilterStatus {
-	panic("implement me")
-}
-
-func (f *SimpleFilter) OnData(buffer []byte, endOfStream bool) api.FilterStatus {
-	panic("implement me")
-}
-
-func (f *SimpleFilter) OnEvent(event api.ConnectionEvent) {
-	panic("implement me")
-}
-
-func (f *SimpleFilter) OnWrite(buffer []byte, endOfStream bool) api.FilterStatus {
-	panic("implement me")
+type SimpleFilter struct {
+	api.EmptyDownstreamFilter
 }
 
 func main() {

@@ -313,6 +313,9 @@ public:
   uint64_t enforcingLocalOriginSuccessRate() const { return enforcing_local_origin_success_rate_; }
   uint64_t maxEjectionTimeMs() const { return max_ejection_time_ms_; }
   uint64_t maxEjectionTimeJitterMs() const { return max_ejection_time_jitter_ms_; }
+  bool successfulActiveHealthCheckUnejectHost() const {
+    return successful_active_health_check_uneject_host_;
+  }
 
 private:
   const uint64_t interval_ms_;
@@ -337,6 +340,7 @@ private:
   const uint64_t enforcing_local_origin_success_rate_;
   const uint64_t max_ejection_time_ms_;
   const uint64_t max_ejection_time_jitter_ms_;
+  const bool successful_active_health_check_uneject_host_;
 
   static constexpr uint64_t DEFAULT_INTERVAL_MS = 10000;
   static constexpr uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;

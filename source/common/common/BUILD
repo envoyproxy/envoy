@@ -457,6 +457,7 @@ envoy_cc_library(
         ":assert_lib",
         ":hash_lib",
         ":non_copyable",
+        "//envoy/common:exception_lib",
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
         "//source/common/singleton:const_singleton",

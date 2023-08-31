@@ -14,7 +14,7 @@ AdminInstanceTest::AdminInstanceTest()
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   admin_.startHttpListener(access_logs, address_out_path_,
                            Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,

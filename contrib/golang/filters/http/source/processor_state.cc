@@ -260,6 +260,8 @@ std::string ProcessorState::stateStr() {
     return "WaitingTrailer";
   case FilterState::ProcessingTrailer:
     return "ProcessingTrailer";
+  case FilterState::Log:
+    return "Log";
   case FilterState::Done:
     return "Done";
   default:
@@ -283,6 +285,9 @@ Phase ProcessorState::state2Phase() {
   case FilterState::ProcessingTrailer:
     phase = Phase::DecodeTrailer;
     break;
+  case FilterState::Log:
+    phase = Phase::Log;
+    break;
   // decode Done state means encode header phase, encode done state means done phase
   case FilterState::Done:
     phase = Phase::EncodeHeader;
@@ -305,6 +310,8 @@ std::string ProcessorState::phaseStr() {
     return "EncodeData";
   case Phase::EncodeTrailer:
     return "EncodeTrailer";
+  case Phase::Log:
+    return "Log";
   default:
     return "unknown";
   }

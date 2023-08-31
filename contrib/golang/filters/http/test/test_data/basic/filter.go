@@ -456,5 +456,9 @@ func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 	}
 }
 
+func (f *filter) OnLog() {
+	api.LogError("call log in OnLog")
+}
+
 func (f *filter) OnDestroy(reason api.DestroyReason) {
 }

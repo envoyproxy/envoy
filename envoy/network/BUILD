@@ -11,6 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "address_interface",
     hdrs = ["address.h"],
+    deps = [
+        "//envoy/common:base_includes",
+        "//envoy/common:pure_lib",
+    ],
 )
 
 envoy_cc_library(

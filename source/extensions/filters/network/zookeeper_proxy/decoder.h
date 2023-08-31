@@ -62,8 +62,8 @@ enum class AddWatchMode { Persistent, PersistentRecursive };
 
 enum class CreateFlags {
   Persistent,
-  PersistentSequential,
   Ephemeral,
+  PersistentSequential,
   EphemeralSequential,
   Container,
   PersistentWithTtl,

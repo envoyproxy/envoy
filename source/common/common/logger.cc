@@ -7,8 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/exception.h"
-
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
 
@@ -202,6 +200,19 @@ bool Context::useFineGrainLogger() {
     return current_context->enable_fine_grain_logging_;
   }
   return false;
+}
+
+void Context::changeAllLogLevels(spdlog::level::level_enum level) {
+  if (!useFineGrainLogger()) {
+    ENVOY_LOG_MISC(info, "change all log levels: level='{}'",
+                   spdlog::level::level_string_views[level]);
+    Registry::setLogLevel(level);
+  } else {
+    // Level setting with Fine-Grain Logger.
+    FINE_GRAIN_LOG(info, "change all log levels: level='{}'",
+                   spdlog::level::level_string_views[level]);
+    getFineGrainLogContext().setAllFineGrainLoggers(level);
+  }
 }
 
 void Context::enableFineGrainLogger() {
