@@ -321,6 +321,7 @@ public:
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> connection() override;
 
   // UpstreamManager
   void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) override;
@@ -362,7 +363,8 @@ public:
   // RequestDecoderCallback
   void onDecodingSuccess(RequestPtr request, ExtendedOptions options) override;
   void onDecodingFailure() override;
-  void writeToConnection(Buffer::Instance& data) override;
+  void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> connection() override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
@@ -377,7 +379,7 @@ public:
     // If these is bound upstream connection, clean it up.
     if (upstream_manager_ != nullptr) {
       upstream_manager_->cleanUp(true);
-      connection().dispatcher().deferredDelete(std::move(upstream_manager_));
+      downstreamConnection().dispatcher().deferredDelete(std::move(upstream_manager_));
       upstream_manager_ = nullptr;
     }
   }
@@ -386,7 +388,7 @@ public:
 
   void sendReplyDownstream(Response& response, ResponseEncoderCallback& callback);
 
-  Network::Connection& connection() {
+  Network::Connection& downstreamConnection() {
     ASSERT(callbacks_ != nullptr);
     return callbacks_->connection();
   }

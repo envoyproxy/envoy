@@ -15,10 +15,7 @@ namespace FormatString {
 const Network::FilterChain*
 ActionImpl::get(const Server::Configuration::FilterChainsByName& filter_chains_by_name,
                 const StreamInfo::StreamInfo& info) const {
-  const std::string name = formatter_->format(*Http::StaticEmptyHeaders::get().request_headers,
-                                              *Http::StaticEmptyHeaders::get().response_headers,
-                                              *Http::StaticEmptyHeaders::get().response_trailers,
-                                              info, "", AccessLog::AccessLogType::NotSet);
+  const std::string name = formatter_->formatWithContext({}, info);
   const auto chain_match = filter_chains_by_name.find(name);
   if (chain_match != filter_chains_by_name.end()) {
     return chain_match->second.get();

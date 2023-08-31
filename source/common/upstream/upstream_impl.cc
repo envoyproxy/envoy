@@ -1092,6 +1092,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       http_filter_config_provider_manager_(
           Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
               server_context)),
+      network_filter_config_provider_manager_(
+          createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
@@ -1225,7 +1227,23 @@ ClusterInfoImpl::ClusterInfoImpl(
   filter_factories_.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
+    const bool is_terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  upstream filter #{}:", i);
+
+    if (proto_config.has_config_discovery()) {
+      if (proto_config.has_typed_config()) {
+        throw EnvoyException("Only one of typed_config or config_discovery can be used");
+      }
+
+      ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
+      filter_factories_.push_back(
+          network_filter_config_provider_manager_->createDynamicFilterConfigProvider(
+              proto_config.config_discovery(), proto_config.name(), server_context,
+              upstream_context_, factory_context.clusterManager(), is_terminal, "network",
+              nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
@@ -1234,8 +1252,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, upstream_context_);
-    filter_factories_.push_back(network_config_provider_manager_.createStaticFilterConfigProvider(
-        callback, proto_config.name()));
+    filter_factories_.push_back(
+        network_filter_config_provider_manager_->createStaticFilterConfigProvider(
+            callback, proto_config.name()));
   }
 
   if (http_protocol_options_) {
@@ -1776,6 +1795,16 @@ std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::get
         thresholds.retry_budget(), min_retry_concurrency, default_retry_concurrency);
   }
   return std::make_pair(budget_percent, min_retry_concurrency);
+}
+
+SINGLETON_MANAGER_REGISTRATION(upstream_network_filter_config_provider_manager);
+
+std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+ClusterInfoImpl::createSingletonUpstreamNetworkFilterConfigProviderManager(
+    Server::Configuration::ServerFactoryContext& context) {
+  return context.singletonManager().getTyped<UpstreamNetworkFilterConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(upstream_network_filter_config_provider_manager),
+      [] { return std::make_shared<Filter::UpstreamNetworkFilterConfigProviderManagerImpl>(); });
 }
 
 ResourceManagerImplPtr

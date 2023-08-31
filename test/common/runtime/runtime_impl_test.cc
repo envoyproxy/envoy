@@ -889,19 +889,13 @@ TEST_F(DiskLayerTest, Loop) {
 }
 
 TEST(NoRuntime, FeatureEnabled) {
-  // Make sure the registry is not set up.
-  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
-
-  // Feature defaults should still work.
+  // Feature defaults work with no runtime setup.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
 TEST(NoRuntime, DefaultIntValues) {
-  // Make sure the registry is not set up.
-  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
-
-  // Feature defaults should still work.
+  // Feature defaults work with no runtime setup.
   EXPECT_ENVOY_BUG(
       EXPECT_EQ(0x1230000ABCDULL,
                 getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL)),

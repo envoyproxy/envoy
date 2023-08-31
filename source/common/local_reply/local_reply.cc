@@ -37,8 +37,8 @@ public:
               const Http::ResponseTrailerMap& response_trailers,
               const StreamInfo::StreamInfo& stream_info, std::string& body,
               absl::string_view& content_type) const {
-    body = formatter_->format(request_headers, response_headers, response_trailers, stream_info,
-                              body, AccessLog::AccessLogType::NotSet);
+    body = formatter_->formatWithContext(
+        {&request_headers, &response_headers, &response_trailers, body}, stream_info);
     content_type = content_type_;
   }
 
