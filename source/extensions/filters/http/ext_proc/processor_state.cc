@@ -282,10 +282,9 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
       Buffer::OwnedImpl chunk_data;
-      const auto queued_chunk = dequeueStreamingChunk(false, chunk_data);
+      auto queued_chunk = dequeueStreamingChunk(false, chunk_data);
       ENVOY_BUG(queued_chunk, "Bad partial body callback state");
-      auto& chunk = std::move(*queued_chunk);
-
+      auto chunk = std::move(*queued_chunk);
       if (common_response.has_header_mutation()) {
         if (headers_ != nullptr) {
           ENVOY_LOG(debug, "Applying header mutations to buffered body message");
@@ -319,8 +318,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
 
       // If anything else is left on the queue, inject it too
       Buffer::OwnedImpl leftover_data;
-      while (const auto leftover_chunk = dequeueStreamingChunk(false, leftover_data)) {
-        auto& chunk = std::move(*leftover_chunk);
+      while (auto leftover_chunk = dequeueStreamingChunk(false, leftover_data)) {
+        auto chunk = std::move(*leftover_chunk);
         if (leftover_data.length() > 0) {
           ENVOY_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
                     leftover_data.length());
@@ -383,9 +382,9 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 void ProcessorState::clearAsyncState() {
   onFinishProcessorCall(Grpc::Status::Aborted);
   Buffer::OwnedImpl chunk_data;
-  while (const auto queued_chunk = dequeueStreamingChunk(false, chunk_data)) {
-    auto& chunk = std::move(*queued_chunk);
-    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->length);
+  while (auto queued_chunk = dequeueStreamingChunk(false, chunk_data)) {
+    auto chunk = std::move(*queued_chunk);
+    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk_data.length());
     injectDataToFilterChain(chunk_data, chunk->end_stream);
     chunk_data.drain(chunk_data.length());
   }
