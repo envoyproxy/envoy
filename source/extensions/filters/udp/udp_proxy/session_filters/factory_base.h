@@ -13,11 +13,10 @@ template <class ConfigProto> class FactoryBase : public NamedUdpSessionFilterCon
 public:
   FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
-                                             stats_prefix, context);
+                                             context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -32,7 +31,6 @@ protected:
 private:
   virtual FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
 
   const std::string name_;
