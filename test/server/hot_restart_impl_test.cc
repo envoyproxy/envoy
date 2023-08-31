@@ -38,7 +38,7 @@ public:
     EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce(InvokeWithoutArgs([this]() {
       return Api::SysCallPtrResult{buffer_.data(), 0};
     }));
-    // We bind two sockets, from both ends (parent and child), totalling four sockets to be bound.
+    // We bind two sockets, from both ends (parent and child), totaling four sockets to be bound.
     // The socket for child->parent RPCs, and the socket for parent->child UDP forwarding
     // in support of QUIC during hot restart.
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
@@ -47,7 +47,7 @@ public:
     hot_restart_ = std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0);
     hot_restart_->drainParentListeners();
 
-    // We close both sockets, both ends, totalling 4.
+    // We close both sockets, both ends, totaling 4.
     EXPECT_CALL(os_sys_calls_, close(_)).Times(4);
   }
 
