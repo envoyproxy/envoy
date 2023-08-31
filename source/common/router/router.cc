@@ -1564,6 +1564,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   callbacks_->streamInfo().setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().ViaUpstream);
 
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.copy_response_code_to_downstream_stream_info")) {
+    callbacks_->streamInfo().setResponseCode(response_code);
+  }
+
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
   // Router::Filter we'll need to find a better location for this work. One possibility is to
   // provide finalizeResponseHeaders functions on the Router::Config and VirtualHost interfaces.
