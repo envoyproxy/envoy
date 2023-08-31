@@ -779,6 +779,7 @@ TEST(Context, FilterStateAttributes) {
   ProtobufWkt::DoubleValue v;
   v.set_value(1.0);
   cel_state->setValue(v.SerializeAsString());
+  EXPECT_TRUE(cel_state->serializeAsString().has_value());
   const std::string cel_key = "cel_state_key";
   filter_state.setData(cel_key, cel_state, StreamInfo::FilterState::StateType::ReadOnly);
 
@@ -801,6 +802,10 @@ TEST(Context, FilterStateAttributes) {
     ASSERT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMap());
     auto& map = *value.value().MapOrDie();
+    EXPECT_FALSE(map[CelValue::CreateInt64(5)].has_value());
+    EXPECT_EQ(0, map.size());
+    EXPECT_TRUE(map.empty());
+    EXPECT_EQ(0, map.ListKeys().value()->size());
     auto ip = map[CelValue::CreateStringView(ip_string)];
     EXPECT_TRUE(ip.has_value());
     EXPECT_TRUE(ip->IsString());
@@ -809,6 +814,8 @@ TEST(Context, FilterStateAttributes) {
     EXPECT_TRUE(port.has_value());
     EXPECT_TRUE(port->IsInt64());
     EXPECT_EQ(6666, port->Int64OrDie());
+    auto other = map[CelValue::CreateStringView(address_key)];
+    EXPECT_FALSE(other.has_value());
   }
 }
 
