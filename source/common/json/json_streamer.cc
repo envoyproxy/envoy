@@ -7,121 +7,165 @@
 namespace Envoy {
 namespace Json {
 
+// To ensure the streamer is being used correctly, we use assertions to enforce
+// that only the topmost map/array in the stack is being written to. To make
+// this easier to do from the Level classes, we provider Streamer::topLevel() as
+// a member function, but this is only needed when compiled for debug.
+//
+// We only compile Streamer::topLevel in debug to avoid having it be a coverage
+// gap. However, assertions fail to compile in release mode if they reference
+// non-existent functions or member variables, so we only compile the assertions
+// in debug mode.
+#ifdef NDEBUG
+#define ASSERT_THIS_IS_TOP_LEVEL                                                                   \
+  do {                                                                                             \
+  } while (0)
+#define ASSERT_LEVELS_EMPTY                                                                        \
+  do {                                                                                             \
+  } while (0)
+#else
+#define ASSERT_THIS_IS_TOP_LEVEL ASSERT(streamer_.topLevel() == this)
+#define ASSERT_LEVELS_EMPTY ASSERT(levels_.empty())
+#endif
+
 Streamer::Level::Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
-    : streamer_(streamer), closer_(closer), is_first_(true) {
-  streamer_.addNoCopy(opener);
+    : streamer_(streamer), closer_(closer) {
+  streamer_.addConstantString(opener);
+#ifndef NDEBUG
+  streamer_.push(this);
+#endif
 }
 
-Streamer::Level::~Level() { streamer_.addNoCopy(closer_); }
-
-Streamer::Map& Streamer::newMap() {
-  auto map = std::make_unique<Map>(*this);
-  Map& ret = *map;
-  levels_.push(std::move(map));
-  return ret;
+Streamer::Level::~Level() {
+  streamer_.addConstantString(closer_);
+#ifndef NDEBUG
+  streamer_.pop(this);
+#endif
 }
 
-void Streamer::mapEntries(const Map::Entries& entries) {
-  /*  if (!levels_.empty()) {
-    levels_.top()->newEntry();
-    }*/
-  std::make_unique<Map>(*this)->newEntries(entries);
+Streamer::MapPtr Streamer::makeRootMap() {
+  ASSERT_LEVELS_EMPTY;
+  return std::make_unique<Map>(*this);
 }
 
-void Streamer::arrayEntries(const Array::Strings& strings) {
-  /*  if (!levels_.empty()) {
-    levels_.top()->newEntry();
-    }*/
-  std::make_unique<Array>(*this)->newEntries(strings);
+Streamer::MapPtr Streamer::Level::addMap() {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  return std::make_unique<Map>(streamer_);
 }
 
-Streamer::Array& Streamer::newArray() {
-  auto array = std::make_unique<Array>(*this);
-  Array& ret = *array;
-  levels_.push(std::move(array));
-  return ret;
+Streamer::ArrayPtr Streamer::Level::addArray() {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  return std::make_unique<Array>(streamer_);
 }
 
-void Streamer::pop(Level& level) {
-  ASSERT(levels_.top().get() == &level);
+void Streamer::Level::addNumber(double number) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  streamer_.addNumber(number);
+}
+
+void Streamer::Level::addNumber(uint64_t number) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  streamer_.addNumber(number);
+}
+
+void Streamer::Level::addNumber(int64_t number) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  streamer_.addNumber(number);
+}
+
+void Streamer::Level::addString(absl::string_view str) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
+  streamer_.addSanitized("\"", str, "\"");
+}
+
+#ifndef NDEBUG
+void Streamer::pop(Level* level) {
+  ASSERT(levels_.top() == level);
   levels_.pop();
 }
 
-void Streamer::clear() {
-  while (!levels_.empty()) {
-    levels_.pop();
-  }
-  flush();
-}
+void Streamer::push(Level* level) { levels_.push(level); }
+#endif
 
-void Streamer::Level::newEntry() {
+void Streamer::Level::nextField() {
   if (is_first_) {
     is_first_ = false;
   } else {
-    streamer_.addNoCopy(",");
+    streamer_.addConstantString(",");
   }
 }
 
-void Streamer::Map::newKey(absl::string_view name) {
-  newEntry();
-  streamer_.addFragments({"\"", name, "\":"});
+void Streamer::Map::nextField() {
+  if (expecting_value_) {
+    expecting_value_ = false;
+  } else {
+    Level::nextField();
+  }
 }
 
-void Streamer::Map::newEntries(const Entries& entries) {
+void Streamer::Map::addKey(absl::string_view key) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  ASSERT(!expecting_value_);
+  nextField();
+  streamer_.addSanitized("\"", key, "\":");
+  expecting_value_ = true;
+}
+
+void Streamer::Map::addEntries(const Entries& entries) {
   for (const NameValue& entry : entries) {
-    newEntry();
-    streamer_.addFragments({"\"", entry.first, "\":", entry.second});
+    addKey(entry.first);
+    addValue(entry.second);
   }
 }
 
-void Streamer::Array::newEntries(const Strings& entries) {
-  for (absl::string_view str : entries) {
-    newEntry();
-    streamer_.addCopy(str);
+void Streamer::Level::addValue(const Value& value) {
+  switch (value.index()) {
+  case 0:
+    addString(absl::get<absl::string_view>(value));
+    break;
+  case 1:
+    addNumber(absl::get<double>(value));
+    break;
+  case 2:
+    addNumber(absl::get<uint64_t>(value));
+    break;
+  case 3:
+    addNumber(absl::get<int64_t>(value));
+    break;
+  default:
+    IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
+    break;
   }
 }
 
-void Streamer::addCopy(absl::string_view str) {
-  addNoCopy(str);
-  flush();
+void Streamer::Array::addEntries(const Entries& values) {
+  for (const Value& value : values) {
+    addValue(value);
+  }
 }
 
-void Streamer::addDouble(double number) {
+void Streamer::addNumber(double number) {
   if (std::isnan(number)) {
-    addNoCopy("null");
+    response_.addFragments({"null"});
   } else {
-    addCopy(absl::StrFormat("%g", number));
+    response_.addFragments({absl::StrFormat("%.15g", number)});
   }
 }
 
-std::string Streamer::number(double number) {
-  if (std::isnan(number)) {
-    return "null";
-  } else {
-    return absl::StrFormat("%g", number);
-  }
-}
+void Streamer::addNumber(uint64_t number) { response_.addFragments({absl::StrCat(number)}); }
 
-std::string Streamer::quote(absl::string_view str) {
-  return absl::StrCat("\"", str, "\"");
-}
+void Streamer::addNumber(int64_t number) { response_.addFragments({absl::StrCat(number)}); }
 
-void Streamer::flush() {
-  response_.addFragments(fragments_);
-  fragments_.clear();
-}
-
-void Streamer::addFragments(const Array::Strings& src) {
-  if (fragments_.empty()) {
-    response_.addFragments(src);
-  } else {
-    fragments_.insert(fragments_.end(), src.begin(), src.end());
-    flush();
-  }
-}
-
-void Streamer::addSanitized(absl::string_view token) {
-  addFragments({"\"", Json::sanitize(buffer_, token), "\""});
+void Streamer::addSanitized(absl::string_view prefix, absl::string_view str,
+                            absl::string_view suffix) {
+  absl::string_view sanitized = Json::sanitize(sanitize_buffer_, str);
+  response_.addFragments({prefix, sanitized, suffix});
 }
 
 } // namespace Json

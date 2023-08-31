@@ -58,7 +58,7 @@ public:
   }
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::UpstreamHttpFactoryContext&) override {
+                               Server::Configuration::UpstreamFactoryContext&) override {
     created_ = true;
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
@@ -85,7 +85,7 @@ public:
   }
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::CommonFactoryContext&) override {
+                               Server::Configuration::UpstreamFactoryContext&) override {
     created_ = true;
     return [](Network::FilterManager&) -> void {};
   }
@@ -275,17 +275,17 @@ public:
 // HTTP upstream filter test
 class HttpUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          NamedHttpFilterFactoryCb, Server::Configuration::UpstreamHttpFactoryContext,
+          NamedHttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
           UpstreamHttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
           Server::Configuration::UpstreamHttpFilterConfigFactory,
-          Server::Configuration::MockUpstreamHttpFactoryContext> {
+          Server::Configuration::MockUpstreamFactoryContext> {
 public:
   const std::string getFilterType() const override { return "http"; }
   const std::string getConfigReloadCounter() const override {
-    return "extension_config_discovery.http_filter.foo.config_reload";
+    return "extension_config_discovery.upstream_http_filter.foo.config_reload";
   }
   const std::string getConfigFailCounter() const override {
-    return "extension_config_discovery.http_filter.foo.config_fail";
+    return "extension_config_discovery.upstream_http_filter.foo.config_fail";
   }
 };
 
@@ -309,10 +309,10 @@ public:
 // Network upstream filter test
 class NetworkUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          Network::FilterFactoryCb, Server::Configuration::CommonFactoryContext,
+          Network::FilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
           UpstreamNetworkFilterConfigProviderManagerImpl, TestNetworkFilterFactory,
           Server::Configuration::NamedUpstreamNetworkFilterConfigFactory,
-          Server::Configuration::MockFactoryContext> {
+          Server::Configuration::MockUpstreamFactoryContext> {
 public:
   const std::string getFilterType() const override { return "upstream_network"; }
   const std::string getConfigReloadCounter() const override {

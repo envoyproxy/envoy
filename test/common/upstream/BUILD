@@ -84,10 +84,6 @@ envoy_cc_test(
     name = "cluster_manager_impl_test",
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
-    args = [
-        # Force creation of c-ares DnsResolverImpl when running test on macOS.
-        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
-    ],
     external_deps = [
         "abseil_optional",
     ],
@@ -276,6 +272,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

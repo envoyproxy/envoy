@@ -102,7 +102,7 @@ public:
   /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
    * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
-   * default value of 0s will be returned.
+   * default value of 15s will be returned.
    */
   static std::chrono::milliseconds
   configSourceInitialFetchTimeout(const envoy::config::core::v3::ConfigSource& config_source);

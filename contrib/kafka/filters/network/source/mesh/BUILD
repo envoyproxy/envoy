@@ -237,6 +237,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/common:exception_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg_cc_proto",
@@ -252,6 +253,8 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/common:pure_lib",
+        "@com_google_absl//absl/strings",
         envoy_external_dep_path("librdkafka"),
     ],
 )

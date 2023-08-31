@@ -908,10 +908,16 @@ void DownstreamFilterManager::sendLocalReply(
       !filter_manager_callbacks_.informationalHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
 
+    if (auto cb = filter_manager_callbacks_.downstreamCallbacks(); cb.has_value()) {
+      // The initial route maybe never be set or the cached route maybe cleared by the filters.
+      // This will force route refreshment if there is not a cached route to avoid potential
+      // route refreshment in the response filter chain.
+      cb->route(nullptr);
+    }
+
     // We only prepare a local reply to execute later if we're actively
     // invoking filters to avoid re-entrant in filters.
-    if (avoid_reentrant_filter_invocation_during_local_reply_ &&
-        (state_.filter_call_state_ & FilterCallState::IsDecodingMask)) {
+    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                       grpc_status, details);
     } else {

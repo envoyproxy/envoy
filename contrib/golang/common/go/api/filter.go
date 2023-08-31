@@ -29,6 +29,11 @@ type (
 		PassThroughStreamDecoderFilter
 		PassThroughStreamEncoderFilter
 	}
+
+	// EmptyDownstreamFilter provides the no-op implementation of the DownstreamFilter interface
+	EmptyDownstreamFilter struct{}
+	// EmptyUpstreamFilter provides the no-op implementation of the UpstreamFilter interface
+	EmptyUpstreamFilter struct{}
 )
 
 // request
@@ -74,16 +79,21 @@ type StreamFilter interface {
 	StreamDecoderFilter
 	// response stream
 	StreamEncoderFilter
+	// log when the request is finished
+	OnLog()
 	// destroy filter
 	OnDestroy(DestroyReason)
-	// TODO add more for stream complete and log phase
+	// TODO add more for stream complete
+}
+
+func (*PassThroughStreamFilter) OnLog() {
 }
 
 func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 }
 
 type StreamFilterConfigParser interface {
-	Parse(any *anypb.Any) (interface{}, error)
+	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
@@ -157,6 +167,21 @@ type DownstreamFilter interface {
 	OnWrite(buffer []byte, endOfStream bool) FilterStatus
 }
 
+func (*EmptyDownstreamFilter) OnNewConnection() FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyDownstreamFilter) OnData(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyDownstreamFilter) OnEvent(event ConnectionEvent) {
+}
+
+func (*EmptyDownstreamFilter) OnWrite(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
 type UpstreamFilter interface {
 	// Called when a connection is available to process a request/response.
 	OnPoolReady(cb ConnectionCallback)
@@ -166,6 +191,19 @@ type UpstreamFilter interface {
 	OnData(buffer []byte, endOfStream bool)
 	// Callback for connection events.
 	OnEvent(event ConnectionEvent)
+}
+
+func (*EmptyUpstreamFilter) OnPoolReady(cb ConnectionCallback) {
+}
+
+func (*EmptyUpstreamFilter) OnPoolFailure(poolFailureReason PoolFailureReason, transportFailureReason string) {
+}
+
+func (*EmptyUpstreamFilter) OnData(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyUpstreamFilter) OnEvent(event ConnectionEvent) {
 }
 
 type ConnectionCallback interface {
@@ -204,4 +242,40 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+type MetricType uint32
+
+const (
+	Counter   MetricType = 0
+	Gauge     MetricType = 1
+	Histogram MetricType = 2
+)
+
+type ConfigCallbacks interface {
+	// Define a metric, for different MetricType, name must be different,
+	// for same MetricType, the same name will share a metric.
+	DefineCounterMetric(name string) CounterMetric
+	DefineGaugeMetric(name string) GaugeMetric
+	// TODO Histogram
+}
+
+type ConfigCallbackHandler interface {
+	ConfigCallbacks
+}
+
+type CounterMetric interface {
+	Increment(offset int64)
+	Get() uint64
+	Record(value uint64)
+}
+
+type GaugeMetric interface {
+	Increment(offset int64)
+	Get() uint64
+	Record(value uint64)
+}
+
+// TODO
+type HistogramMetric interface {
 }

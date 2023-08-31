@@ -287,6 +287,7 @@ TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
  http codes. (this happens in http router).
 */
 TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -357,6 +358,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
  Tests scenario when active health check clears the FAILED_OUTLIER_CHECK flag.
 */
 TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -483,8 +485,10 @@ TEST_F(OutlierDetectorImplTest, ConnectSuccessWithOptionalHTTP_OK) {
  * code.
  */
 TEST_F(OutlierDetectorImplTest, ExternalOriginEventsNonSplit) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(60));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
+  addHosts({"tcp://127.0.0.2:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
                                                               dispatcher_, runtime_, time_system_,
@@ -510,6 +514,7 @@ TEST_F(OutlierDetectorImplTest, ExternalOriginEventsNonSplit) {
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaNonHttpCodes) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -588,6 +593,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaNonHttpCodes) {
  * values.
  */
 TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -680,6 +686,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
  * Test passing of optional HTTP code with Result:: LOCAL_ORIGIN_TIMEOUT
  */
 TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(35));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({
       "tcp://127.0.0.1:80",
@@ -754,6 +761,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
  * should cause the host to be ejected again.
  */
 TEST_F(OutlierDetectorImplTest, LargeNumberOfTimeouts) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({
       "tcp://127.0.0.1:80",
@@ -811,6 +819,7 @@ TEST_F(OutlierDetectorImplTest, LargeNumberOfTimeouts) {
  * Set of tests to verify ejecting and unejecting nodes when local/connect failures are reported.
  */
 TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"}, true);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -925,6 +934,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
  * This will also ensure that the stats counters end up with the expected values.
  */
 TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1014,6 +1024,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
 // Test mapping of Non-Http codes to Http. This happens when split between external and local
 // origin errors is turned off.
 TEST_F(OutlierDetectorImplTest, BasicFlowNonHttpCodesExternalOrigin) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1059,6 +1070,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowNonHttpCodesExternalOrigin) {
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({
       "tcp://127.0.0.1:80",
@@ -1165,6 +1177,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
 // Test verifies that EXT_ORIGIN_REQUEST_FAILED and EXT_ORIGIN_REQUEST_SUCCESS cancel
 // each other in split mode.
 TEST_F(OutlierDetectorImplTest, ExternalOriginEventsWithSplit) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"}, true);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1191,6 +1204,7 @@ TEST_F(OutlierDetectorImplTest, ExternalOriginEventsWithSplit) {
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({
       "tcp://127.0.0.1:80",
@@ -1303,6 +1317,7 @@ TEST_F(OutlierDetectorImplTest, EmptySuccessRate) {
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({
       "tcp://127.0.0.1:80",
@@ -1423,6 +1438,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({
       "tcp://127.0.0.1:80",
@@ -1528,6 +1544,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
 }
 
 TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1566,7 +1583,7 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
                                                               event_logger_, random_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(1));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(60));
 
   loadRq(hosts_[0], 4, 500);
 
@@ -1586,8 +1603,9 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
 }
 
 TEST_F(OutlierDetectorImplTest, NotEnforcing) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(35));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
-  addHosts({"tcp://127.0.0.1:80"});
+  addHosts({"tcp://127.0.0.1:80", "tcp://127.0.0.1:81", "tcp://127.0.0.1:82"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
                                                               dispatcher_, runtime_, time_system_,
@@ -1637,7 +1655,7 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
                                                               event_logger_, random_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(1));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(50));
 
   loadRq(hosts_[0], 4, 500);
 
@@ -1718,6 +1736,7 @@ TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
 }
 
 TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1782,7 +1801,27 @@ max_ejection_time_jitter: 13s
   EXPECT_FALSE(hosts_[2]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 }
 
+TEST_F(OutlierDetectorImplTest, MaxEjectionPercentageSingleHost) {
+  // Single host should not be ejected with a max ejection percent <100% .
+  const std::string yaml = R"EOF(
+max_ejection_percent: 90
+max_ejection_time_jitter: 13s
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection_;
+  TestUtility::loadFromYaml(yaml, outlier_detection_);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+
+  addHosts({"tcp://127.0.0.2:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_, random_));
+
+  loadRq(hosts_[0], 5, 500);
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
 TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1820,6 +1859,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
   // Setup base ejection time to 10 secs.
   ON_CALL(runtime_.snapshot_, getInteger(BaseEjectionTimeMsRuntime, _))
       .WillByDefault(Return(10000UL));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1992,6 +2032,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
   // Setup max ejection time to 30 secs.
   ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionTimeMsRuntime, _))
       .WillByDefault(Return(300000UL));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -2085,6 +2126,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
       .WillByDefault(Return(10000UL));
   ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionTimeMsRuntime, _))
       .WillByDefault(Return(305000UL));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -2207,6 +2249,7 @@ TEST_F(OutlierDetectorImplTest, EjectionTimeJitterIsInRange) {
   // Setup max_ejection_time_jitter time to 10 secs.
   ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionTimeJitterMsRuntime, _))
       .WillByDefault(Return(10000UL));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   // Add host.
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
@@ -2235,6 +2278,7 @@ TEST_F(OutlierDetectorImplTest, EjectionTimeJitterIsInRange) {
 // Test verifies that jitter is 0 when the
 // max_ejection_time_jitter configuration is absent.
 TEST_F(OutlierDetectorImplTest, EjectionTimeJitterIsZeroWhenNotConfigured) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   // Add host with empty configurations. Max_eject_time_jitter will
   // default to 0.
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));

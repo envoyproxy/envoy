@@ -1,4 +1,6 @@
 #include <cstddef>
+#include <string>
+#include <utility>
 
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
@@ -1200,8 +1202,10 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jlong connect_time
                       jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
                       jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
-                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
+                      jstring http3_connection_options, jstring http3_client_connection_options,
+                      jobjectArray quic_hints, jboolean enable_gzip_decompression,
+                      jboolean enable_brotli_decompression, jboolean enable_socket_tagging,
+                      jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
                       jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
@@ -1234,6 +1238,12 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jlong connect_time
   builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
 #ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(enable_http3 == JNI_TRUE);
+  builder.setHttp3ConnectionOptions(getCppString(env, http3_connection_options));
+  builder.setHttp3ClientConnectionOptions(getCppString(env, http3_client_connection_options));
+  auto hints = javaObjectArrayToStringPairVector(env, quic_hints);
+  for (std::pair<std::string, std::string>& entry : hints) {
+    builder.addQuicHint(entry.first, stoi(entry.second));
+  }
 #endif
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
@@ -1278,7 +1288,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
     jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
-    jboolean enable_http3, jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
+    jboolean enable_http3, jstring http3_connection_options,
+    jstring http3_client_connection_options, jobjectArray quic_hints,
+    jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
     jboolean enable_socket_tagging, jboolean enable_interface_binding,
     jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
@@ -1298,6 +1310,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max, dns_query_timeout_seconds,
       dns_min_refresh_seconds, dns_preresolve_hostnames, enable_dns_cache,
       dns_cache_save_interval_seconds, enable_drain_post_dns_refresh, enable_http3,
+      http3_connection_options, http3_client_connection_options, quic_hints,
       enable_gzip_decompression, enable_brotli_decompression, enable_socket_tagging,
       enable_interface_binding, h2_connection_keepalive_idle_interval_milliseconds,
       h2_connection_keepalive_timeout_seconds, max_connections_per_host, stats_flush_seconds,

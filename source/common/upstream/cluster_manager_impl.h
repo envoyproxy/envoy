@@ -374,6 +374,8 @@ public:
     return common_lb_config_pool_->getObject(common_lb_config);
   }
 
+  Config::EdsResourcesCacheOptRef edsResourcesCache() override;
+
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 

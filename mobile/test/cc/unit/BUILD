@@ -25,3 +25,14 @@ envoy_cc_test(
         "@envoy_build_config//:extension_registry",
     ],
 )
+
+envoy_cc_test(
+    name = "fetch_client_test",
+    srcs = ["fetch_client_test.cc"],
+    repository = "@envoy",
+    deps = [
+        "//examples/cc/fetch_client:fetch_client_lib",
+        "@envoy_build_config//:extension_registry",
+        "@envoy_build_config//:test_extensions",
+    ],
+)
