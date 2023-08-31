@@ -31,7 +31,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
 
   // TODO(refactor) move unshared variables into their specific methods.
   private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
-  private final EnvoyLogger mEnvoyLogger = null;
   private final EnvoyEventTracker mEnvoyEventTracker = null;
   private String mGrpcStatsDomain = null;
   private int mConnectTimeoutSeconds = 30;
@@ -105,12 +104,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return new CronvoyUrlRequestContext(this);
   }
 
-  EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning) {
-    AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, mEnvoyLogger,
+  EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning, EnvoyLogger envoyLogger,
+                           String logLevel) {
+    AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger,
                                                      mEnvoyEventTracker, mEnableProxying);
     AndroidJniLibrary.load(getContext());
     AndroidNetworkMonitor.load(getContext(), engine);
-    engine.runWithConfig(createEnvoyConfiguration(), getLogLevel());
+    engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;
   }
 
