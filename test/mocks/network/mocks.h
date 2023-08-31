@@ -240,6 +240,16 @@ public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
+class MockFilterChainInfo : public FilterChainInfo {
+public:
+  MockFilterChainInfo();
+
+  // Network::FilterChainInfo
+  MOCK_METHOD(absl::string_view, name, (), (const));
+
+  std::string filter_chain_name_{"mock"};
+};
+
 class MockFilterChainManager : public FilterChainManager {
 public:
   MockFilterChainManager();

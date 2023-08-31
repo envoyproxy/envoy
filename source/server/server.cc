@@ -676,12 +676,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
-  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.remove_runtime_singleton", true)) {
-    runtime_ = std::move(runtime_ptr);
-  } else {
-    runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
-  }
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+
   initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
 
@@ -994,12 +990,7 @@ void InstanceImpl::terminate() {
   FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
-Runtime::Loader& InstanceImpl::runtime() {
-  if (runtime_singleton_) {
-    return runtime_singleton_->instance();
-  }
-  return *runtime_;
-}
+Runtime::Loader& InstanceImpl::runtime() { return *runtime_; }
 
 void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");

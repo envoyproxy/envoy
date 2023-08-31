@@ -121,10 +121,6 @@ TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(FilterIntegrationTest, AddBodyToRequestAndWaitForIt) {
-  // Make sure one end to end test verifies the old path with runtime singleton,
-  // to check for regressions.
-  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "false");
-
   prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");

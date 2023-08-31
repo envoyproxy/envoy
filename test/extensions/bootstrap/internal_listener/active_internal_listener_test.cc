@@ -186,7 +186,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
 TEST_F(ActiveInternalListenerTest, StopListener) {
   addListener();
   EXPECT_CALL(*generic_listener_, onDestroy());
-  internal_listener_->shutdownListener();
+  internal_listener_->shutdownListener({});
 }
 
 TEST_F(ActiveInternalListenerTest, PausedListenerAcceptNewSocket) {

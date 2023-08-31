@@ -29,7 +29,7 @@ public:
   bool end_stream = false;
   // True if the chunk was actually sent to the gRPC stream
   bool delivered = false;
-  Buffer::OwnedImpl data;
+  uint32_t length = 0;
 };
 using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
@@ -41,8 +41,9 @@ public:
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
   void push(Buffer::Instance& data, bool end_stream, bool delivered);
-  absl::optional<QueuedChunkPtr> pop(bool undelivered_only);
-  const QueuedChunk& consolidate(bool delivered);
+  absl::optional<QueuedChunkPtr> pop(bool undelivered_only, Buffer::OwnedImpl& out_data);
+  const QueuedChunk& consolidate();
+  Buffer::OwnedImpl& receivedData() { return received_data_; }
 
 private:
   // If we are in either streaming mode, store chunks that we received here,
@@ -52,6 +53,8 @@ private:
   std::deque<QueuedChunkPtr> queue_;
   // The total size of chunks in the queue.
   uint32_t bytes_enqueued_{};
+  // The received data that had not been sent to downstream/upstream.
+  Buffer::OwnedImpl received_data_;
 };
 
 class ProcessorState : public Logger::Loggable<Logger::Id::ext_proc> {
@@ -139,16 +142,17 @@ public:
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
   virtual uint32_t bufferLimit() const PURE;
 
+  ChunkQueue& chunkQueue() { return chunk_queue_; }
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream, bool delivered);
   // If the queue has chunks, return the head of the queue.
-  absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only) {
-    return chunk_queue_.pop(undelivered_only);
+  absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only,
+                                                       Buffer::OwnedImpl& out_data) {
+    // we should return both chunk, and the corresponding data as well here.
+    return chunk_queue_.pop(undelivered_only, out_data);
   }
   // Consolidate all the chunks on the queue into a single one and return a reference.
-  const QueuedChunk& consolidateStreamedChunks(bool delivered) {
-    return chunk_queue_.consolidate(delivered);
-  }
+  const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
 

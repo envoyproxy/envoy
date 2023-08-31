@@ -254,8 +254,11 @@ public:
   }
 
   void init(const HostURLMetadataMap& host_metadata,
-            const HostURLMetadataMap& failover_host_metadata) {
-    EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+            const HostURLMetadataMap& failover_host_metadata, bool use_actual_subset_info = false) {
+
+    if (!use_actual_subset_info) {
+      EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+    }
 
     configureHostSet(host_metadata, host_set_);
     if (!failover_host_metadata.empty()) {
@@ -282,9 +285,11 @@ public:
             : absl::nullopt,
         common_config_);
 
-    lb_ = std::make_shared<SubsetLoadBalancer>(subset_info_, std::move(child_lb_creator),
-                                               priority_set_, nullptr, stats_, *scope_, runtime_,
-                                               random_, simTime());
+    lb_ = std::make_shared<SubsetLoadBalancer>(
+        use_actual_subset_info ? static_cast<const LoadBalancerSubsetInfo&>(*actual_subset_info_)
+                               : static_cast<const LoadBalancerSubsetInfo&>(subset_info_),
+        std::move(child_lb_creator), priority_set_, nullptr, stats_, *scope_, runtime_, random_,
+        simTime());
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -585,7 +590,12 @@ public:
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
+  // Mock subset info is used for testing most logic.
   NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
+  // Actual subset info is used for testing actual subset config parsing and behavior.
+  std::unique_ptr<LoadBalancerSubsetInfoImplBase<
+      envoy::extensions::load_balancing_policies::subset::v3::Subset>>
+      actual_subset_info_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::config::cluster::v3::Cluster::RingHashLbConfig ring_hash_lb_config_;
   envoy::config::cluster::v3::Cluster::MaglevLbConfig maglev_lb_config_;
@@ -2302,6 +2312,111 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackMatchesTopLevelOne) {
   EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_key));
   EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
   EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
+}
+
+TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
+  // Yaml config for subset load balancer.
+  const std::string yaml = R"EOF(
+  subset_selectors:
+  - keys:
+    - A
+    fallback_policy: NO_FALLBACK
+  - keys:
+    - A
+    - B
+    fallback_policy: NO_FALLBACK
+  - keys:
+    - A
+    - B
+    - C
+    fallback_policy: NO_FALLBACK
+  - keys:
+    - A
+    - D
+    fallback_policy: NO_FALLBACK
+  - keys:
+    - version
+    - stage
+    fallback_policy: NO_FALLBACK
+  fallback_policy: NO_FALLBACK
+  allow_redundant_keys: true
+  )EOF";
+
+  envoy::extensions::load_balancing_policies::subset::v3::Subset subset_proto_config;
+  TestUtility::loadFromYaml(yaml, subset_proto_config);
+
+  actual_subset_info_ = std::make_unique<LoadBalancerSubsetInfoImplBase<
+      envoy::extensions::load_balancing_policies::subset::v3::Subset>>(subset_proto_config);
+
+  // Add hosts initial hosts.
+  init({{"tcp://127.0.0.1:80", {{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-0"}, {"D", "D-V-0"}}},
+        {"tcp://127.0.0.1:81", {{"A", "A-V-1"}, {"B", "B-V-1"}, {"C", "C-V-1"}, {"D", "D-V-1"}}},
+        {"tcp://127.0.0.1:82", {{"A", "A-V-2"}, {"B", "B-V-2"}, {"C", "C-V-2"}, {"D", "D-V-2"}}},
+        {"tcp://127.0.0.1:83", {{"A", "A-V-3"}, {"B", "B-V-3"}, {"C", "C-V-3"}, {"D", "D-V-3"}}},
+        {"tcp://127.0.0.1:84", {{"A", "A-V-4"}, {"B", "B-V-4"}, {"C", "C-V-4"}, {"D", "D-V-4"}}},
+        {"tcp://127.0.0.1:85", {{"version", "1.0"}, {"stage", "dev"}}},
+        {"tcp://127.0.0.1:86", {{"version", "1.0"}, {"stage", "canary"}}}},
+       {}, true);
+
+  TestLoadBalancerContext context_empty(
+      std::initializer_list<std::map<std::string, std::string>::value_type>{});
+  context_empty.matches_.reset();
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_empty));
+
+  // Request metadata is same with {version, stage}.
+  // version, stage will be kept and host 6 will be selected.
+  TestLoadBalancerContext context_v_s_0({{"version", "1.0"}, {"stage", "canary"}});
+  EXPECT_EQ(host_set_.hosts_[6], lb_->chooseHost(&context_v_s_0));
+
+  // Request metadata is superset of {version, stage}. The redundant key will be ignored.
+  // version, stage will be kept and host 5 will be selected.
+  TestLoadBalancerContext context_v_s_1({{"version", "1.0"}, {"stage", "dev"}, {"redundant", "X"}});
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context_v_s_1));
+
+  // Request metadata is superset of {version, stage}. The redundant key will be ignored.
+  // But one of value not match, so no host will be selected.
+  TestLoadBalancerContext context_v_s_2(
+      {{"version", "1.0"}, {"stage", "prod"}, {"redundant", "X"}});
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_v_s_2));
+
+  // Request metadata is same with {A, B, C} and is superset of selectors {A}, {A, B}.
+  // All A, B, C will be kept and host 0 will be selected.
+  TestLoadBalancerContext context_0({{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-0"}});
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_0));
+
+  // Request metadata is same with {A, B, C} and is superset of selectors {A}, {A, B}.
+  // All A, B, C will be kept But one of value not match, so no host will be selected.
+  TestLoadBalancerContext context_1({{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-X"}});
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_1));
+
+  // Request metadata is superset of selectors {A}, {A, B} {A, B, C}, {A, D}, the longest win.
+  // A, B, C will be kept and D will be ignored, so host 1 will be selected.
+  TestLoadBalancerContext context_2(
+      {{"A", "A-V-1"}, {"B", "B-V-1"}, {"C", "C-V-1"}, {"D", "D-V-X"}});
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_2));
+
+  // Request metadata is superset of selectors {A}, {A, B} {A, B, C}, {A, D}, the longest win.
+  // A, B, C will be kept and D will be ignored, but one of value not match, so no host will be
+  // selected.
+  TestLoadBalancerContext context_3(
+      {{"A", "A-V-1"}, {"B", "B-V-1"}, {"C", "C-V-X"}, {"D", "D-V-X"}});
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_3));
+
+  // Request metadata is superset of selectors {A}, {A, B}, {A, D}, the longest and first win.
+  // Only A, B will be kept and D will be ignored, so host 2 will be selected.
+  TestLoadBalancerContext context_4({{"A", "A-V-2"}, {"B", "B-V-2"}, {"D", "D-V-X"}});
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_4));
+
+  // Request metadata is superset of selectors {A}, {A, B}, {A, D}, the longest and first win.
+  // Only A, B will be kept and D will be ignored, but one of value not match, so no host will be
+  // selected.
+  TestLoadBalancerContext context_5({{"A", "A-V-3"}, {"B", "B-V-X"}, {"D", "D-V-3"}});
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_5));
+
+  // Request metadata is superset of selectors {A}, {A, D}, the longest win.
+  // Only A, D will be kept and C will be ignored, so host 3 will be selected.
+  TestLoadBalancerContext context_6({{"A", "A-V-3"}, {"C", "C-V-X"}, {"D", "D-V-3"}});
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_6));
 }
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAnyFallbackPerSelector) {
