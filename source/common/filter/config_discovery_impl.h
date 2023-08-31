@@ -89,16 +89,6 @@ public:
                            // Extend the lifetime of TLS by capturing main_config_, because
                            // otherwise, the callback to clear TLS worker content is not executed.
                            [main_config = main_config_]() {
-                             if (main_config == nullptr) {
-                               std::cout << "main config is nuil"
-                                         << "\n";
-                               return;
-                             }
-                             if (main_config->tls_ == nullptr) {
-                               std::cout << "main_config->tls_ is nuil"
-                                         << "\n";
-                               return;
-                             }
                              // Explicitly delete TLS on the main thread.
                              main_config->tls_.reset();
                              // Explicitly clear the last config instance here in case it has its

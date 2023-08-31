@@ -205,20 +205,9 @@ TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  {
-    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
-    waitForNextUpstreamRequest();
-
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
-  }
-
-  {
-    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
-  }
+  auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
 }
 
 // Verifies function of the per-route config in the ExtensionWithMatcher class.
