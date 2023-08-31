@@ -86,7 +86,8 @@ private:
   void generateHistogramDetail(const std::string& name, const Stats::ParentHistogram& histogram);
   void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
                               Json::Streamer::Map& map);
-  void populateBucketsTerse(const std::vector<Stats::ParentHistogram::Bucket>& buckets);
+  void populateBucketsTerse(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                            Json::Streamer::Map& map);
   void renderHistogramStart();
   void populateSupportedPercentiles(Json::Streamer::Map& map);
   void populatePercentiles(const Stats::ParentHistogram& histogram, Json::Streamer::Map& map);

@@ -188,11 +188,10 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
 void StatsJsonRender::populateSupportedPercentiles(Json::Streamer::Map& map) {
   Stats::HistogramStatisticsImpl empty_statistics;
   std::vector<double> supported = empty_statistics.supportedQuantiles();
-  std::vector<Json::Streamer::Value> views(supported.size());
-  for (uint32_t i = 0, n = supported.size(); i < n; ++i) {
-    views[i] = supported[i] * 100;
+  Json::Streamer::ArrayPtr array = map.addArray();
+  for (double value : supported) {
+    array->addNumber(100 * value);
   }
-  map.addArray()->addEntries(views);
 }
 
 void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogram,
@@ -210,10 +209,10 @@ void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogra
 
 void StatsJsonRender::renderHistogramStart() {
   histograms_initialized_ = true;
-  json_->histogram_map1_ = json_->stats_array_->addMap();
-  json_->histogram_map1_->addKey("histograms");
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Detailed:
+    json_->histogram_map1_ = json_->stats_array_->addMap();
+    json_->histogram_map1_->addKey("histograms");
     json_->histogram_map2_ = json_->histogram_map1_->addMap();
     json_->histogram_map2_->addKey("supported_percentiles");
     populateSupportedPercentiles(*json_->histogram_map2_);
@@ -221,24 +220,22 @@ void StatsJsonRender::renderHistogramStart() {
     json_->histogram_array_ = json_->histogram_map2_->addArray();
     break;
   case Utility::HistogramBucketsMode::Combined: {
-    // 'Combined' histogram mode results in a stat of type
-    // 'supported_percentiles' being created once, covering all
-    // histograms. All other histograms are emitted at the same logical level
-    // as counter, gauges, or text readouts, simplifying the hierarchy, but
-    // making the 'combined' mode work somewhat different from the others.
+    // In combined mode, two new top-level map entries are placed at the
+    // same level as the 'stats' array that contains counters, gauges, and
+    // histograms. The first is 'supported_histograms' which shows all the
+    // percentile values being calculated for each histogram.
     //
-    // Both the single 'supported_percentiles'.
-    Json::Streamer::Map& map = json_streamer_.newMap();
-    map.newKey("supported_percentiles");
-    populateSupportedPercentiles();
-    json_streamer_.pop(map);
-    json_stats_array_->newEntry();
-    json_histogram_map1_ = json_streamer_.newMap();
-    json_streamer_.addNoCopy("\"histograms\":");
-    json_histogram_array_ = json_streamer_.newArray();
+    // First we must close the 'stats' array.
+    json_->stats_array_.reset();
+    json_->stats_map_->addKey("supported_percentiles");
+    populateSupportedPercentiles(*json_->stats_map_);
+    json_->stats_map_->addKey("histograms");
+    json_->histogram_array_ = json_->stats_map_->addArray();
     break;
   }
   case Utility::HistogramBucketsMode::NoBuckets:
+    json_->histogram_map1_ = json_->stats_array_->addMap();
+    json_->histogram_map1_->addKey("histograms");
     json_->histogram_map2_ = json_->histogram_map1_->addMap();
     json_->histogram_map2_->addKey("supported_quantiles");
     populateSupportedPercentiles(*json_->histogram_map2_);
@@ -247,6 +244,8 @@ void StatsJsonRender::renderHistogramStart() {
     break;
   case Utility::HistogramBucketsMode::Cumulative:
   case Utility::HistogramBucketsMode::Disjoint:
+    json_->histogram_map1_ = json_->stats_array_->addMap();
+    json_->histogram_map1_->addKey("histograms");
     json_->histogram_array_ = json_->histogram_map1_->addArray();
     break;
   }
@@ -259,12 +258,16 @@ void StatsJsonRender::generateHistogramDetail(const std::string& name,
   Json::Streamer::MapPtr map = json_->histogram_array_->addMap();
   map->addEntries({{"name", name}});
   if (histogram_buckets_mode_ == Utility::HistogramBucketsMode::Combined) {
-    map.newKey("totals");
-    populateBucketsTerse(histogram.detailedTotalBuckets());
-    map.newKey("intervals");
-    populateBucketsTerse(histogram.detailedIntervalBuckets());
+    map->addKey("totals");
+    populateBucketsTerse(histogram.detailedTotalBuckets(), *map);
+    map->addKey("intervals");
+    populateBucketsTerse(histogram.detailedIntervalBuckets(), *map);
+    map->addKey("percentiles");
     std::vector<double> totals = histogram.cumulativeStatistics().computedQuantiles();
-    map.newEntries({{"percentiles", absl::StrCat("[", absl::StrJoin(totals, ","), "]")}});
+    Json::Streamer::ArrayPtr array = map->addArray();
+    for (double value : totals) {
+      array->addNumber(value);
+    }
   } else {
     map->addKey("totals");
     populateBucketsVerbose(histogram.detailedTotalBuckets(), *map);
@@ -285,28 +288,11 @@ void StatsJsonRender::populateBucketsVerbose(
 }
 
 void StatsJsonRender::populateBucketsTerse(
-    const std::vector<Stats::ParentHistogram::Bucket>& buckets) {
-  Json::Streamer::Array& buckets_array = json_streamer_.newArray();
+    const std::vector<Stats::ParentHistogram::Bucket>& buckets, Json::Streamer::Map& map) {
+  Json::Streamer::ArrayPtr buckets_array = map.addArray();
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
-    buckets_array.newEntry();
-    Json::Streamer::Array& array = json_streamer_.newArray();
-    array.newEntries({Json::Streamer::number(bucket.lower_bound_),
-                      Json::Streamer::number(bucket.width_),
-                      Json::Streamer::number(bucket.count_)});
-    json_streamer_.pop(array);
+    buckets_array->addArray()->addEntries({bucket.lower_bound_, bucket.width_, bucket.count_});
   }
-  json_streamer_.pop(buckets_array);
-}
-
-void StatsJsonRender::populateBucketsVerbose(
-    const std::vector<Stats::ParentHistogram::Bucket>& buckets) {
-  Json::Streamer::Array& buckets_array = json_streamer_.newArray();
-  for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
-    json_streamer_.mapEntries({{"lower_bound", Json::Streamer::number(bucket.lower_bound_)},
-                               {"width", Json::Streamer::number(bucket.width_)},
-                               {"count", Json::Streamer::number(bucket.count_)}});
-  }
-  json_streamer_.pop(buckets_array);
 }
 
 // Since histograms are buffered (see above), the finalize() method generates
