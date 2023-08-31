@@ -66,7 +66,15 @@ public:
   DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
       : response_(SrvResponse{host, port, priority, weight}) {}
 
-  const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
+  const AddrInfoResponse addrInfo() const {
+    const AddrInfoResponse& addrInfoResponse = absl::get<AddrInfoResponse>(response_);
+    // DNS TTL range is [0, 2^31 - 1], [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181)
+    const std::chrono::seconds::rep ttlCount =
+        std::min(std::chrono::seconds::rep(INT_MAX),
+                 std::max(addrInfoResponse.ttl_.count(), std::chrono::seconds::rep(0)));
+
+    return AddrInfoResponse{addrInfoResponse.address_, std::chrono::seconds(ttlCount)};
+  }
 
   const SrvResponse& srv() const { return absl::get<SrvResponse>(response_); }
 

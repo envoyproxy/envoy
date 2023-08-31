@@ -47,6 +47,15 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: dns
+  change: |
+    Fixed a bug where when respect_dns_ttl was set to true, c-ares dns resolver only considered address record for ttl calculation
+    while ignoring CNAME records TTL. Now when respect_dns_ttl is set to true minimum of all TTL records is considered.
+- area: dns
+  change: |
+    Fixed a bug where dns response was not always conforming [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181) for TTL values.
+    Previously a malicious user could add a TTL greater than 2^31 - 1, and with c-ares library using 32 bit signed int data type
+    would overflow and send a negative TTL.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
