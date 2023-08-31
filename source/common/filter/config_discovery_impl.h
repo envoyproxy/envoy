@@ -83,6 +83,7 @@ public:
         default_configuration_(std::move(default_config)){};
 
   ~DynamicFilterConfigProviderImpl() override {
+    std::cout<<"Destroying DynamicFilterConfigProviderImpl"<<std::endl;
     auto& tls = main_config_->tls_;
     if (!tls->isShutdown()) {
       tls->runOnAllThreads([](OptRef<ThreadLocalConfig> tls) { tls->config_ = {}; },
