@@ -11,7 +11,7 @@ namespace Server {
 ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
                                  Network::ConnectionSocketPtr&& socket,
                                  bool hand_off_restored_destination_connections)
-    : Network::ListenerFilterManagerImplBase(), listener_(listener), socket_(std::move(socket)),
+    : listener_(listener), socket_(std::move(socket)),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       iter_(accept_filters_.end()),
       stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(

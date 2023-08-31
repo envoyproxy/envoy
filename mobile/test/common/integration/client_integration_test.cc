@@ -24,10 +24,19 @@ public:
   void SetUp() override {
     setUpstreamCount(config_helper_.bootstrap().static_resources().clusters_size());
     // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
-    setUpstreamProtocol(Http::CodecType::HTTP1);
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
+  }
+
+  void createEnvoy() override {
+    BaseClientIntegrationTest::createEnvoy();
+    // Allow last minute addition of QUIC hints. This is done lazily as it must be done after
+    // upstreams are created.
+    if (add_quic_hints_) {
+      auto address = fake_upstreams_[0]->localAddress();
+      builder_.addQuicHint(address->ip()->addressAsString(), address->ip()->port());
+    }
   }
 
   void TearDown() override { BaseClientIntegrationTest::TearDown(); }
@@ -37,6 +46,7 @@ public:
 
 protected:
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
+  bool add_quic_hints_ = false;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
@@ -44,7 +54,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 void ClientIntegrationTest::basicTest() {
-
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
                                    std::to_string(request_data.length()));
@@ -73,13 +82,17 @@ void ClientIntegrationTest::basicTest() {
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 2);
   ASSERT_EQ(cc_.on_complete_calls, 1);
-  ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+  }
 }
 
 TEST_P(ClientIntegrationTest, Basic) {
   initialize();
   basicTest();
   ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+  // HTTP/1
+  ASSERT_EQ(1, last_stream_final_intel_.upstream_protocol);
 }
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
@@ -181,6 +194,43 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   ASSERT_EQ(cc_.status, "400");
   ASSERT_EQ(cc_.on_data_calls, 1);
   ASSERT_EQ(cc_.on_complete_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, BasicHttp2) {
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  builder_.enablePlatformCertificatesValidation(true);
+
+  upstream_tls_ = true;
+
+  initialize();
+
+  default_request_headers_.setScheme("https");
+
+  basicTest();
+  // HTTP/2
+  ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
+}
+
+// Do HTTP/3 without doing the alt-svc-over-HTTP/2 dance.
+TEST_P(ClientIntegrationTest, DISABLED_Http3WithQuicHints) {
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  builder_.enablePlatformCertificatesValidation(true);
+  upstream_tls_ = true;
+  add_quic_hints_ = true;
+
+  initialize();
+  default_request_headers_.setScheme("https");
+  basicTest();
+  // HTTP/3
+  ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
 }
 
 TEST_P(ClientIntegrationTest, BasicHttps) {

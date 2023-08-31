@@ -13,6 +13,7 @@
 
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "benchmark/benchmark.h"
@@ -41,8 +42,9 @@ private:
 };
 
 class NullRouterImpl : public Router {
-  RouteSharedPtr upstreamPool(std::string&) override { return nullptr; }
-  void setReadFilterCallback(Network::ReadFilterCallbacks*) override{};
+  RouteSharedPtr upstreamPool(std::string&, const StreamInfo::StreamInfo&) override {
+    return nullptr;
+  }
 };
 
 class CommandLookUpSpeedTest {
@@ -63,13 +65,13 @@ public:
     for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
       Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
       makeBulkStringArray(*request, {command, "hello"});
-      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
+      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
     }
 
     for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
       Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
       makeBulkStringArray(*request, {command, "hello"});
-      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
+      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
     }
   }
 
@@ -78,6 +80,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<MockFaultManager> fault_manager_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   CommandSplitter::InstanceImpl splitter_{
       RouterPtr{router_},
       *store_.rootScope(),

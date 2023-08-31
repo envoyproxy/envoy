@@ -65,10 +65,9 @@ HttpFilterDsoImpl::HttpFilterDsoImpl(const std::string dso_name) : HttpFilterDso
       envoy_go_filter_go_request_sema_dec_, handler_, dso_name, "envoyGoRequestSemaDec");
 }
 
-GoUint64 HttpFilterDsoImpl::envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
-                                                             GoUint64 p3) {
+GoUint64 HttpFilterDsoImpl::envoyGoFilterNewHttpPluginConfig(httpConfig* p0) {
   ASSERT(envoy_go_filter_new_http_plugin_config_ != nullptr);
-  return envoy_go_filter_new_http_plugin_config_(p0, p1, p2, p3);
+  return envoy_go_filter_new_http_plugin_config_(p0);
 }
 
 GoUint64 HttpFilterDsoImpl::envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1,

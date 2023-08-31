@@ -104,7 +104,7 @@ public:
       : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
   struct DualInfo {
-    DualInfo(Server::Configuration::UpstreamHttpFactoryContext& context)
+    DualInfo(Server::Configuration::UpstreamFactoryContext& context)
         : init_manager(context.initManager()), scope(context.scope()) {}
     DualInfo(Server::Configuration::FactoryContext& context)
         : init_manager(context.initManager()), scope(context.scope()) {}
@@ -122,9 +122,10 @@ public:
                                              context.getServerFactoryContext());
   }
 
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message& proto_config, const std::string& stats_prefix,
-      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+  Envoy::Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(
             proto_config, context.getServerFactoryContext().messageValidationVisitor()),
