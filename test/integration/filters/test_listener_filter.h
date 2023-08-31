@@ -86,11 +86,14 @@ class TestQuicListenerFilter : public Network::QuicListenerFilter {
 public:
   class TestStringFilterState : public Router::StringAccessorImpl {
   public:
-    explicit TestStringFilterState(std::string value) : Router::StringAccessorImpl(value) {}
+    TestStringFilterState(std::string value) : Router::StringAccessorImpl(value) {}
     static const absl::string_view key() { return "test.filter_state.string"; }
   };
 
-  explicit TestQuicListenerFilter(std::string added_value) : added_value_(added_value) {}
+  explicit TestQuicListenerFilter(std::string added_value, bool allow_server_migration,
+                                  bool allow_client_migration)
+      : added_value_(added_value), allow_server_migration_(allow_server_migration),
+        allow_client_migration_(allow_client_migration) {}
 
   // Network::QuicListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
@@ -102,15 +105,22 @@ public:
   }
   bool isCompatibleWithServerPreferredAddress(
       const quic::QuicSocketAddress& /*server_preferred_address*/) const override {
-    return true;
+    return allow_server_migration_;
   }
   Network::FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& /*new_address*/,
-                                             Network::Connection& /*connection*/) override {
+                                             Network::Connection& connection) override {
+    if (allow_client_migration_) {
+      return Network::FilterStatus::Continue;
+    }
+    connection.close(Network::ConnectionCloseType::NoFlush,
+                     "Migration to a new address which is not compatible with this filter.");
     return Network::FilterStatus::StopIteration;
   }
 
 private:
   const std::string added_value_;
+  const bool allow_server_migration_;
+  const bool allow_client_migration_;
 };
 
 #endif

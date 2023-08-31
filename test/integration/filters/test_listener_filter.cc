@@ -96,10 +96,14 @@ public:
     const auto& message = MessageUtil::downcastAndValidate<
         const test::integration::filters::TestQuicListenerFilterConfig&>(
         proto_config, context.messageValidationVisitor());
-    return [listener_filter_matcher, added_value = message.added_value()](
+    return [listener_filter_matcher, added_value = message.added_value(),
+            allow_server_migration = message.allow_server_migration(),
+            allow_client_migration = message.allow_client_migration()](
                Network::QuicListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(listener_filter_matcher,
-                                     std::make_unique<TestQuicListenerFilter>(added_value));
+      filter_manager.addAcceptFilter(
+          listener_filter_matcher,
+          std::make_unique<TestQuicListenerFilter>(added_value, allow_server_migration,
+                                                   allow_client_migration));
     };
   }
 

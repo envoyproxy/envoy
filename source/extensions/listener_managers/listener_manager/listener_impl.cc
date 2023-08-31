@@ -708,11 +708,11 @@ void ListenerImpl::createListenerFilterFactories() {
       if (udp_listener_config_->listener_factory_->isTransportConnectionless()) {
         udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
             config_.listener_filters(), *listener_factory_context_);
-        break;
+      } else {
+        // This is a QUIC listener.
+        quic_listener_filter_factories_ = parent_.factory_->createQuicListenerFilterFactoryList(
+            config_.listener_filters(), *listener_factory_context_);
       }
-      // This is a QUIC listener.
-      quic_listener_filter_factories_ = parent_.factory_->createQuicListenerFilterFactoryList(
-          config_.listener_filters(), *listener_factory_context_);
       break;
     }
     case Network::Socket::Type::Stream:

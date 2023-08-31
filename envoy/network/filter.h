@@ -427,15 +427,20 @@ public:
    * Called before connection creation.
    * @return false if the given preferred address is incomplatible with this filter and the listener
    * shouldn't advertise the given preferred address. I.e. onAccept() would have behaved differently
-   * if the connection socket's destination address is the preferred address.
+   * if the connection socket's destination address were the preferred address.
    */
   virtual bool isCompatibleWithServerPreferredAddress(
       const quic::QuicSocketAddress& server_preferred_address) const PURE;
 
   /**
-   * Called when the connection has migrated a different peer address. Check if the connection
-   * migration is compatible with this listener filter. If not close the connection and returne
-   * `FilterStatus::StopIteration`.
+   * Called after the peer has migrated to a different address. Check if the connection
+   * migration is compatible with this listener filter. If not, close the connection and return
+   * `FilterStatus::StopIteration`. An alternative approach is to disable active migration on the
+   * given connection during connection creation. But peer address change is inevitable given NAT
+   * rebinding is more frequent than TCP, and such passive address change is indistinguishable from
+   * active migration. So there is no way to completely disable connection migration. disable client
+   * connection migration.
+   * @param new_address the address the peer has migrated to.
    * @param connection the connection just migrated.
    * @return status used by the filter manager to manage further filter iteration.
    */
@@ -469,9 +474,9 @@ public:
 };
 
 /**
- * This function is used to wrap the creation of a listener filter chain for new sockets as they are
- * created. Filter factories create the lambda at configuration initialization time, and then they
- * are used at runtime.
+ * This function is used to wrap the creation of a QUIC listener filter chain for new connections.
+ * Filter factories create the lambda at configuration initialization time, and then they are used
+ * at runtime.
  * @param filter_manager supplies the filter manager for the listener to install filters to.
  * Typically the function will install a single filter, but it's technically possibly to install
  * more than one if desired.

@@ -18,12 +18,6 @@ enum class ListenerMatcherType { NULLMATCHER, ANYMATCHER, NOTANYMATCHER };
 
 constexpr absl::string_view EcdsClusterName = "ecds_cluster";
 constexpr absl::string_view Ecds2ClusterName = "ecds2_cluster";
-constexpr absl::string_view expected_types[] = {
-    "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
-    "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
-    "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
-    "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
-    "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
 class ListenerExtensionDiscoveryIntegrationTestBase : public Grpc::GrpcClientIntegrationParamTest,
                                                       public HttpIntegrationTest {
@@ -230,6 +224,13 @@ public:
 class ListenerExtensionDiscoveryIntegrationTest
     : public ListenerExtensionDiscoveryIntegrationTestBase {
 public:
+  static constexpr absl::string_view expected_types[] = {
+      "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
+
   ListenerExtensionDiscoveryIntegrationTest()
       : ListenerExtensionDiscoveryIntegrationTestBase(Http::CodecType::HTTP1,
                                                       config_helper_.baseConfig(), "foo"),
@@ -782,6 +783,15 @@ namespace {
 class QuicListenerExtensionDiscoveryIntegrationTest
     : public ListenerExtensionDiscoveryIntegrationTestBase {
 public:
+  static constexpr absl::string_view expected_types[] = {
+      "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
+
   QuicListenerExtensionDiscoveryIntegrationTest()
       : ListenerExtensionDiscoveryIntegrationTestBase(Http::CodecType::HTTP3,
                                                       ConfigHelper::quicHttpProxyConfig(), "foo") {}
@@ -800,31 +810,14 @@ public:
         rate_limit, matcher, second_connection);
   }
 
-  /*
-Network::ClientConnectionPtr makeClientConnectionWithOptions(
-    uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options)  override {
-  // Setting socket options is not supported for HTTP3.
-  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
-      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
-  Network::Address::InstanceConstSharedPtr local_addr =
-      Network::Test::getCanonicalLoopbackAddress(version_);
-  auto& quic_transport_socket_factory_ref =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*quic_transport_socket_factory_);
-  return Quic::createQuicNetworkConnection(
-      *quic_connection_persistent_info_, quic_transport_socket_factory_ref.getCryptoConfig(),
-     quic::QuicServerId(
-          quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
-          static_cast<uint16_t>(port)),
-      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, *stats_store_.rootScope(),
-      options, nullptr, connection_id_generator_);
-}
-*/
-
   void sendXdsResponse(const std::string& name, const std::string& version,
-                       const std::string& filter_state_value, bool ttl = false,
+                       const std::string& filter_state_value, bool allow_server_migration = false,
+                       bool allow_client_migration = false, bool ttl = false,
                        bool second_connection = false) {
     auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
     configuration.set_added_value(filter_state_value);
+    configuration.set_allow_server_migration(allow_server_migration);
+    configuration.set_allow_client_migration(allow_client_migration);
     sendXdsResponseWithTypedConfig(name, version, configuration, ttl, second_connection);
   }
 
@@ -853,15 +846,45 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, EcdsBasicSuccess) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   testRouterHeaderOnlyRequestAndResponse();
-  codec_client_->close();
   std::string log = waitForAccessLog(access_log_name_, 0);
   EXPECT_THAT(log, testing::HasSubstr("200 \"abc\""));
 
-  // Send 2nd config update to have listener filter drain 3 bytes of data.
-  sendXdsResponse(filter_name_, "v2", "def");
+  // Change to a new port, and connection should fail.
+  Network::Address::InstanceConstSharedPtr local_addr =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+  dynamic_cast<Quic::EnvoyQuicClientConnection*>(
+      dynamic_cast<Quic::EnvoyQuicClientSession&>(codec_client_->rawConnection()).connection())
+      ->switchConnectionSocket(Quic::createConnectionSocket(
+          codec_client_->rawConnection().connectionInfoProvider().remoteAddress(), local_addr,
+          nullptr));
+  Envoy::IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_EQ("QUIC_NO_ERROR with details: Closed by application with reason: Migration to a new "
+            "address which is not compatible with this filter.",
+            codec_client_->connection()->transportFailureReason());
+
+  // Send 2nd config update to config the filter to add "def" in filter state
+  // and allow connection migration.
+  sendXdsResponse(filter_name_, "v2", "def", /*allow_server_migration=*/false,
+                  /*allow_client_migration*/ true);
   test_server_->waitForCounterGe(
       "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 2);
   testRouterHeaderOnlyRequestAndResponse();
+  log = waitForAccessLog(access_log_name_, 1);
+  EXPECT_THAT(log, testing::HasSubstr("200 \"def\""));
+  // Change to a new port, and connection shouldn't fail.
+  local_addr = Network::Test::getCanonicalLoopbackAddress(version_);
+  dynamic_cast<Quic::EnvoyQuicClientConnection*>(
+      dynamic_cast<Quic::EnvoyQuicClientSession&>(codec_client_->rawConnection()).connection())
+      ->switchConnectionSocket(Quic::createConnectionSocket(
+          codec_client_->rawConnection().connectionInfoProvider().remoteAddress(), local_addr,
+          nullptr));
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   log = waitForAccessLog(access_log_name_, 1);
   EXPECT_THAT(log, testing::HasSubstr("200 \"def\""));
   codec_client_->close();
@@ -893,7 +916,7 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefaul
   auto codec = std::make_unique<IntegrationCodecClient>(
       *dispatcher_, random_, std::move(conn), host_description, downstream_protocol_, true);
   EXPECT_TRUE(codec->disconnected());
-  EXPECT_EQ("QUIC_NO_ERROR with details: Closed by application",
+  EXPECT_EQ("QUIC_NO_ERROR with details: Closed by application with reason: no filter chain found",
             codec->connection()->transportFailureReason());
   // The extension_config_missing stats counter increases by 1.
   test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
@@ -905,6 +928,52 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefaul
   codec_client_->close();
   std::string log = waitForAccessLog(access_log_name_, 0);
   EXPECT_THAT(log, testing::HasSubstr("200 \"abc\""));
+}
+
+TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, ConfigDump) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(/*apply_without_warming=*/false);
+  useAccessLog(fmt::format("%RESPONSE_CODE% %FILTER_STATE({})%",
+                           TestQuicListenerFilter::TestStringFilterState::key()));
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send 1st config update to have listener filter add "abc" in filter state.
+  sendXdsResponse(filter_name_, "v1", "abc", /*allow_server_migration=*/false,
+                  /*allow_client_migration*/ true);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 1);
+
+  // Verify ECDS config dump are working correctly.
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
+  EXPECT_EQ("application/json", contentType(response));
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  size_t index = 0;
+  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+    index++;
+  }
+
+  // Validate we can parse as proto.
+  envoy::admin::v3::ConfigDump config_dump;
+  TestUtility::loadFromJson(response->body(), config_dump);
+  EXPECT_EQ(7u, config_dump.configs_size());
+
+  // With /config_dump, the response has the format: EcdsConfigDump.
+  envoy::admin::v3::EcdsConfigDump ecds_config_dump;
+  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  EXPECT_EQ("v1", ecds_config_dump.ecds_filters(0).version_info());
+  envoy::config::core::v3::TypedExtensionConfig filter_config;
+  EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
+  EXPECT_EQ(filter_name_, filter_config.name());
+  test::integration::filters::TestQuicListenerFilterConfig listener_config;
+  filter_config.typed_config().UnpackTo(&listener_config);
+  EXPECT_EQ("abc", listener_config.added_value());
+  EXPECT_FALSE(listener_config.allow_server_migration());
+  EXPECT_TRUE(listener_config.allow_client_migration());
 }
 
 } // namespace

@@ -227,6 +227,25 @@ public:
               (const Network::ListenerFilterMatcherSharedPtr&, Network::ListenerFilterPtr&));
 };
 
+class MockQuicListenerFilter : public QuicListenerFilter {
+public:
+  MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
+  MOCK_METHOD(bool, shouldAdvertiseServerPreferredAddress, (const quic::QuicSocketAddress&),
+              (const));
+  MOCK_METHOD(Network::FilterStatus, onPeerAddressChanged,
+              (const quic::QuicSocketAddress&, Network::Connection&));
+};
+
+class MockQuicListenerFilterManager : public QuicListenerFilterManager {
+public:
+  MOCK_METHOD(void, addAcceptFilter,
+              (const Network::ListenerFilterMatcherSharedPtr&, QuicListenerFilterPtr&&));
+  MOCK_METHOD(bool, shouldAdvertiseServerPreferredAddress, (const quic::QuicSocketAddress&),
+              (const));
+
+  MOCK_METHOD(void, onPeerAddressChanged, (const quic::QuicSocketAddress&, Connection&));
+};
+
 class MockFilterChain : public DrainableFilterChain {
 public:
   MockFilterChain();

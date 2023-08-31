@@ -140,7 +140,7 @@ struct Harness {
     auto connection = std::make_unique<EnvoyQuicServerConnection>(
         quic::test::TestConnectionId(), srv_addr_, cli_addr_, *connection_helper_, *alarm_factory_,
         &writer_, false, quic::ParsedQuicVersionVector{quic_version_}, std::move(connection_socket),
-        generator_);
+        generator_, nullptr);
 
     auto decrypter = std::make_unique<FuzzDecrypter>(quic::Perspective::IS_SERVER);
     auto encrypter = std::make_unique<FuzzEncrypter>(quic::Perspective::IS_SERVER);
