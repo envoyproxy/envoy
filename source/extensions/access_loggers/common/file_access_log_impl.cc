@@ -17,8 +17,10 @@ void FileAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                             const Http::ResponseTrailerMap& response_trailers,
                             const StreamInfo::StreamInfo& stream_info,
                             AccessLog::AccessLogType access_log_type) {
-  log_file_->write(formatter_->format(request_headers, response_headers, response_trailers,
-                                      stream_info, absl::string_view(), access_log_type));
+  log_file_->write(
+      formatter_->formatWithContext({&request_headers, &response_headers, &response_trailers,
+                                     absl::string_view(), access_log_type},
+                                    stream_info));
 }
 
 } // namespace File
