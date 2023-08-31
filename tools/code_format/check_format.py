@@ -161,10 +161,12 @@ class FormatChecker:
         for line_number, line in enumerate(self.read_lines(path)):
             if line_number == 0 and path.endswith(".h"):
                 if line == "":
-                    error_message = "%s:%d: %s" % (path, line_number + 1, "the first line is empty for header files")
+                    error_message = "%s:%d: %s" % (
+                        path, line_number + 1, "the first line is empty for header files")
                     continue
                 elif line.find("#pragma once") == -1:
-                    error_message = "%s:%d: %s" % (path, line_number + 1, "#pragma once missed for header files")
+                    error_message = "%s:%d: %s" % (
+                        path, line_number + 1, "#pragma once missed for header files")
                     output_lines.append("#pragma once")
                     output_lines.append("")
             if line.find("// clang-format off") != -1:
