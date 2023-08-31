@@ -64,6 +64,7 @@ private:
 class DrainerUdpSessionReadFilterConfigFactory : public FactoryBase<ReadDrainerConfig> {
 public:
   DrainerUdpSessionReadFilterConfigFactory() : FactoryBase("test.udp_session.drainer_read") {}
+  ~DrainerUdpSessionReadFilterConfigFactory() override = default;
 
 private:
   FilterFactoryCb
@@ -110,6 +111,7 @@ private:
 class DrainerUdpSessionWriteFilterConfigFactory : public FactoryBase<WriteDrainerConfig> {
 public:
   DrainerUdpSessionWriteFilterConfigFactory() : FactoryBase("test.udp_session.drainer_write") {}
+  ~DrainerUdpSessionWriteFilterConfigFactory() override = default;
 
 private:
   FilterFactoryCb
@@ -141,6 +143,7 @@ public:
 class DrainerUdpSessionFilterConfigFactory : public FactoryBase<DrainerConfig> {
 public:
   DrainerUdpSessionFilterConfigFactory() : FactoryBase("test.udp_session.drainer") {}
+  ~DrainerUdpSessionFilterConfigFactory() override = default;
 
 private:
   FilterFactoryCb
