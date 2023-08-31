@@ -101,6 +101,7 @@ fi
 
 if [[ -n "${ENVOY_DOCKER_PULL}" ]]; then
     time docker pull "${ENVOY_BUILD_IMAGE}"
+    time docker create "${ENVOY_BUILD_IMAGE}"
 fi
 
 
