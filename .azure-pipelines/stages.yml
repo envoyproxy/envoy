@@ -56,7 +56,8 @@ stages:
   displayName: Environment
   jobs:
   - template: env.yml
-
+    with:
+      authGCP: $(GcpServiceAccountKey)
 
 - stage: prechecks
   displayName: Prechecks
