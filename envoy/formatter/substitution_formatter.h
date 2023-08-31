@@ -107,42 +107,6 @@ private:
   AccessLog::AccessLogType log_type_{AccessLog::AccessLogType::NotSet};
 };
 
-/**
- * Interface for substitution formatter.
- * Formatters provide a complete substitution output line for the given headers/trailers/stream.
- * This is specilization of FormatterBase for HTTP and backwards compatibliity.
- */
-template <> class FormatterBase<HttpFormatterContext> {
-public:
-  virtual ~FormatterBase() = default;
-
-  /**
-   * Return a formatted substitution line.
-   * @param context supplies the formatter context.
-   * @param stream_info supplies the stream info.
-   * @param local_reply_body supplies the local reply body.
-   * @return std::string string containing the complete formatted substitution line.
-   */
-  virtual std::string format(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& response_headers,
-                             const Http::ResponseTrailerMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info,
-                             absl::string_view local_reply_body,
-                             AccessLog::AccessLogType access_log_type) const PURE;
-
-  /**
-   * Return a formatted substitution line.
-   * @param context supplies the formatter context.
-   * @param stream_info supplies the stream info.
-   * @return std::string string containing the complete formatted substitution line.
-   */
-  virtual std::string formatWithContext(const HttpFormatterContext& context,
-                                        const StreamInfo::StreamInfo& stream_info) const {
-    return format(context.requestHeaders(), context.responseHeaders(), context.responseTrailers(),
-                  stream_info, context.localReplyBody(), context.accessLogType());
-  }
-};
-
 using Formatter = FormatterBase<HttpFormatterContext>;
 using FormatterPtr = std::unique_ptr<Formatter>;
 using FormatterConstSharedPtr = std::shared_ptr<const Formatter>;
