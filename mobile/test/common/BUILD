@@ -1,5 +1,5 @@
-load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_yaml")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
+load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_yaml")
 
 licenses(["notice"])  # Apache 2
 
@@ -18,7 +18,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "engine_test",
-    srcs = envoy_select_enable_yaml(["engine_test.cc"], "@envoy"),
+    srcs = envoy_select_enable_yaml(
+        ["engine_test.cc"],
+        "@envoy",
+    ),
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
@@ -30,7 +33,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "main_interface_test",
-    srcs = envoy_select_enable_yaml(["main_interface_test.cc"], "@envoy"),
+    srcs = envoy_select_enable_yaml(
+        ["main_interface_test.cc"],
+        "@envoy",
+    ),
     repository = "@envoy",
     deps = [
         "//library/common:envoy_main_interface_lib_no_stamp",
