@@ -1440,8 +1440,8 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
 #if defined(ENVOY_ENABLE_QUIC)
     if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
       throw EnvoyException(
-          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {} {}", cluster.name(),
-                      cluster.DebugString()));
+          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {} {}",
+                      cluster.name(), cluster.DebugString()));
     }
 #else
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
