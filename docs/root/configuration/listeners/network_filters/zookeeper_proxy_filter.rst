@@ -35,11 +35,11 @@ Statistics
 
 Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*.
 
-*_resp_fast* and *_resp_slow* metrics will only be emitted when :ref:`enable_latency_threshold_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_latency_threshold_metrics>` is set to ``true``.
+*_resp_fast* and *_resp_slow* are per-opcode metrics and will only be emitted when :ref:`enable_latency_threshold_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_latency_threshold_metrics>` is set to ``true``.
 
-*_rq_bytes* metrics will only be emitted when :ref:`enable_per_opcode_request_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>` is set to ``true``.
+*_rq_bytes* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_request_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>` is set to ``true``.
 
-*_resp_bytes* metrics will only be emitted when :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>` is set to ``true``.
+*_resp_bytes* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>` is set to ``true``.
 
 The following counters are available:
 

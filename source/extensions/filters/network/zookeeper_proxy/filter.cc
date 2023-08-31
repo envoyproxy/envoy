@@ -246,10 +246,9 @@ void ZooKeeperFilter::onDecodeError() {
 
 void ZooKeeperFilter::onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) {
   auto it = config_->op_code_map_.find(opcode);
-  if (it != config_->op_code_map_.end()) {
-    const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = it->second;
-    opcode_info.rq_bytes_counter_->add(bytes);
-  }
+  ASSERT(it != config_->op_code_map_.end());
+  const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = it->second;
+  opcode_info.rq_bytes_counter_->add(bytes);
 }
 
 void ZooKeeperFilter::onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
@@ -271,10 +270,9 @@ void ZooKeeperFilter::onRequestBytes(const absl::optional<OpCodes> opcode, const
 
 void ZooKeeperFilter::onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) {
   auto it = config_->op_code_map_.find(opcode);
-  if (it != config_->op_code_map_.end()) {
-    const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = it->second;
-    opcode_info.resp_bytes_counter_->add(bytes);
-  }
+  ASSERT(it != config_->op_code_map_.end());
+  const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = it->second;
+  opcode_info.resp_bytes_counter_->add(bytes);
 }
 
 void ZooKeeperFilter::onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
