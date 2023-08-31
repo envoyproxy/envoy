@@ -30,7 +30,7 @@ LedsSubscription::LedsSubscription(
   subscription_->start({});
 }
 
-void LedsSubscription::onConfigUpdate(
+absl::Status LedsSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   // At least one resource must be added or removed.
@@ -44,7 +44,7 @@ void LedsSubscription::onConfigUpdate(
       initial_update_attempt_complete_ = true;
       callback_();
     }
-    return;
+    return absl::OkStatus();
   }
 
   ENVOY_LOG(info, "{}: add {} endpoint(s), remove {} endpoints(s)", cluster_name_,
@@ -70,6 +70,7 @@ void LedsSubscription::onConfigUpdate(
   // Notify the callbacks that the host list has been modified.
   initial_update_attempt_complete_ = true;
   callback_();
+  return absl::OkStatus();
 }
 
 void LedsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

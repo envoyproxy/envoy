@@ -33,9 +33,9 @@ public:
   updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) override;
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) override;
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;

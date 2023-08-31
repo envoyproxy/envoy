@@ -74,9 +74,9 @@ protected:
   Common::CallbackManager<> update_callback_manager_;
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

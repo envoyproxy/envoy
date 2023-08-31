@@ -119,9 +119,9 @@ public:
    * @throw EnvoyException with reason if the configuration is rejected for legacy reasons,
    *        Accepted configurations have their version_info reflected in subsequent requests.
    */
-  virtual void onConfigUpdate(const std::vector<DecodedResourceRef>& added_resources,
-                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                              const std::string& system_version_info) PURE;
+  virtual absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& added_resources,
+                                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                      const std::string& system_version_info) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate

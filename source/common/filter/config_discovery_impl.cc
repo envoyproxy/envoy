@@ -105,7 +105,7 @@ absl::Status FilterConfigSubscription::onConfigUpdate(
   if (next->config_hash_ == last_->config_hash_) {
     // Initial hash is 0, so this branch happens only after a config was already applied, and
     // there is no need to mark the init target ready.
-    return;
+    return absl::OkStatus();
   }
   // Ensure that the filter config is valid in the filter chain context once the proto is
   // processed. Validation happens before updating to prevent a partial update application. It
@@ -127,7 +127,7 @@ absl::Status FilterConfigSubscription::onConfigUpdate(
       filter_config_providers_,
       [last = last_](DynamicFilterConfigProviderImplBase* provider,
                      std::shared_ptr<Cleanup> cleanup) {
-        provider->onConfigUpdate(*last->config_, last->version_info_, [cleanup] {});
+        THROW_IF_NOT_OK(provider->onConfigUpdate(*last->config_, last->version_info_, [cleanup] {}));
       },
       [me = shared_from_this()]() { me->updateComplete(); });
   // The filter configs are created and published to worker queues at this point, so it

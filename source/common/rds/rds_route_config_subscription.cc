@@ -54,7 +54,7 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   if (!validateUpdateSize(resources.size())) {
-    return;
+    return absl::OkStatus();
   }
   const auto& route_config = resources[0].get().resource();
   Protobuf::ReflectableMessage reflectable_config = createReflectableMessage(route_config);

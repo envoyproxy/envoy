@@ -40,7 +40,7 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
   init_manager.add(init_target_);
 }
 
-void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                                 const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_rds_sds;
@@ -107,9 +107,10 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   if (!message.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating listener(s) {}", message));
   }
+  return absl::OkStatus();
 }
 
-void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                 const std::string& version_info) {
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
@@ -127,7 +128,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   for (const auto& listener : listeners_to_remove) {
     *to_remove_repeated.Add() = listener;
   }
-  onConfigUpdate(resources, to_remove_repeated, version_info);
+  return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
 void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
