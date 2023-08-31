@@ -930,9 +930,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
 
     StreamInfoFormatter upstream_format("FILTER_CHAIN_NAME");
 
-    EXPECT_EQ("mock_filter_chain_name",
-              upstream_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body, AccessLog::AccessLogType::NotSet));
+    EXPECT_EQ("mock_filter_chain_name", upstream_format.formatWithContext({}, stream_info));
   }
 
   {
