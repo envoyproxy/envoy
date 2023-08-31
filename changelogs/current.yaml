@@ -17,6 +17,11 @@ minor_behavior_changes:
 - area: ext_authz
   change: |
     removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
+- area: ext_authz
+  change: |
+    Don't append the local address to ``x-forwarded-for`` header when sending an http (not gRPC) auth request.
+    This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.ext_authz_http_send_original_xff`` to false.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.
