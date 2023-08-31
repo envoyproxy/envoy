@@ -178,7 +178,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterIntegrationTest,
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified filter to the stream.
 TEST_P(CompositeFilterIntegrationTest, TestBasic) {
-  prependCompositeDynamicFilter();
+  prependCompositeFilter();
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -200,26 +200,26 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
 
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified dynamic filter to the stream.
-// TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
-//   prependCompositeDynamicFilter("composite-dynamic");
-//   initialize();
-//   codec_client_ = makeHttpConnection(lookupPort("http"));
+TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicFilter) {
+  prependCompositeDynamicFilter("composite-dynamic");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
 
-//   {
-//     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
-//     waitForNextUpstreamRequest();
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    waitForNextUpstreamRequest();
 
-//     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-//     ASSERT_TRUE(response->waitForEndStream());
-//     EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
-//   }
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
 
-//   {
-//     auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
-//     ASSERT_TRUE(response->waitForEndStream());
-//     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
-//   }
-// }
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
+}
 
 // Verifies function of the per-route config in the ExtensionWithMatcher class.
 TEST_P(CompositeFilterIntegrationTest, TestPerRoute) {
