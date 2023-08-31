@@ -184,7 +184,11 @@ void HotRestartingParent::Internal::recordDynamics(HotRestartMessage::Reply::Sta
   }
 }
 
-void HotRestartingParent::Internal::drainListeners() { server_->drainListeners(); }
+void HotRestartingParent::Internal::drainListeners() {
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = *this;
+  server_->drainListeners(options);
+}
 
 } // namespace Server
 } // namespace Envoy

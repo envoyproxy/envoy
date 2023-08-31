@@ -222,7 +222,8 @@ public:
    * listeners on workers. Once a listener is stopped, any listener modifications are not allowed.
    * @param stop_listeners_type indicates listeners to stop.
    */
-  virtual void stopListeners(StopListenersType stop_listeners_type) PURE;
+  virtual void stopListeners(StopListenersType stop_listeners_type,
+                             const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will

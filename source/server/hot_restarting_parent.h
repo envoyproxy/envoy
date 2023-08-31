@@ -20,7 +20,7 @@ public:
 
   // The hot restarting parent's hot restart logic. Each function is meant to be called to fulfill a
   // request from the child for that action.
-  class Internal {
+  class Internal : public Network::NonDispatchedUdpPacketHandler {
   public:
     explicit Internal(Server::Instance* server);
     // Return value is the response to return to the child.
@@ -33,6 +33,9 @@ public:
     void recordDynamics(envoy::HotRestartMessage::Reply::Stats* stats, const std::string& name,
                         Stats::StatName stat_name);
     void drainListeners();
+
+    // Network::NonDispatchedUdpPacketHandler
+    void handle(uint32_t worker_index, const Network::UdpRecvData& packet) override;
 
   private:
     Server::Instance* const server_{};

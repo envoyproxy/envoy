@@ -298,7 +298,7 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
 }
 
 TEST_F(HotRestartingParentTest, DrainListeners) {
-  EXPECT_CALL(server_, drainListeners());
+  EXPECT_CALL(server_, drainListeners(_));
   hot_restarting_parent_.drainListeners();
 }
 
