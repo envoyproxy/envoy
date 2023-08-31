@@ -58,7 +58,7 @@ message UdpProxyConfig {
     oneof config_type {
       // Filter specific configuration which depends on the filter being
       // instantiated. See the supported filters for further documentation.
-      // [#extension-category: envoy.filters.udp.session]
+      // [#extension-category: envoy.udp_proxy.session_filters]
       google.protobuf.Any typed_config = 2;
     }
   }
