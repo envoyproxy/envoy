@@ -257,7 +257,9 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
           config, max_ejection_time,
           std::max(DEFAULT_MAX_EJECTION_TIME_MS, base_ejection_time_ms_)))),
       max_ejection_time_jitter_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
-          config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))) {}
+          config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
+      successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, successful_active_health_check_uneject_host, true)) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
@@ -306,13 +308,11 @@ void DetectorImpl::initialize(Cluster& cluster) {
     }
   }
 
-  if (cluster.healthChecker() != nullptr) {
+  if (config_.successfulActiveHealthCheckUnejectHost() && cluster.healthChecker() != nullptr) {
     cluster.healthChecker()->addHostCheckCompleteCb([this](HostSharedPtr host, HealthTransition) {
       // If the host is ejected by outlier detection and active health check succeeds,
       // we should treat this host as healthy.
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.successful_active_health_check_uneject_host") &&
-          !host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+      if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
           host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
         unejectHost(host);
