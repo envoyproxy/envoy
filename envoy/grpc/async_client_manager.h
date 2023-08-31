@@ -34,12 +34,14 @@ using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
 class GrpcServiceConfigWithHashKey {
 public:
-  GrpcServiceConfigWithHashKey(const envoy::config::core::v3::GrpcService& config)
+  explicit GrpcServiceConfigWithHashKey(const envoy::config::core::v3::GrpcService& config)
       : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)){};
 
   template <typename H> friend H AbslHashValue(H h, const GrpcServiceConfigWithHashKey& wrapper) {
     return H::combine(std::move(h), wrapper.pre_computed_hash_);
   }
+
+  std::size_t getPreComputedHash() const { return pre_computed_hash_; }
 
   friend bool operator==(const GrpcServiceConfigWithHashKey& lhs,
                          const GrpcServiceConfigWithHashKey& rhs) {
