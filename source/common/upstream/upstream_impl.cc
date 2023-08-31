@@ -19,6 +19,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
@@ -1382,6 +1383,18 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
+bool validateTransportSocketSupportsQuic(const envoy::config::core::v3::TransportSocket& transport_socket) {
+  if (transport_socket.name() == "envoy.transport_sockets.quic") {
+    return true;
+  }
+  if (transport_socket.name() != "envoy.transport_sockets.http_11_proxy") {
+    return false;
+  }
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport http11_socket;
+  transport_socket.typed_config().UnpackTo(&http11_socket);
+  return (http11_socket.transport_socket().name() == "envoy.transport_sockets.quic");
+}
+
 ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
                                  ClusterFactoryContext& cluster_context)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
@@ -1438,10 +1451,10 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
 #if defined(ENVOY_ENABLE_QUIC)
-    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
+    if (!validateTransportSocketSupportsQuic(cluster.transport_socket())) {
       throw EnvoyException(
           fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {} {}",
-                      cluster.name(), cluster.DebugString()));
+                      cluster.name(), cluster.transport_socket()));
     }
 #else
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
