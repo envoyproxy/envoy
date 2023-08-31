@@ -40,8 +40,9 @@ public:
   void finalize(Buffer::Instance&) override;
 
 private:
+  StatsParams params_;
   const bool active_{false};
-  Buffer::OwnedImpl json_data_;
+  bool json_histograms_{false};
   std::unique_ptr<StatsJsonRender> histogram_json_render_;
   Http::ResponseHeaderMapPtr json_response_headers_; // ignored.
   std::unique_ptr<Http::ResponseHeaderMap> json_headers_;

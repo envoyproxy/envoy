@@ -238,7 +238,7 @@ static void BM_FilteredCountersPrometheus(benchmark::State& state) {
 BENCHMARK(BM_FilteredCountersPrometheus)->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_HistogramsJson(benchmark::State& state) {
+static void BM_HistogramsJsonDetailed(benchmark::State& state) {
   Envoy::Server::StatsHandlerTest& test_context = testContext();
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
@@ -250,4 +250,19 @@ static void BM_HistogramsJson(benchmark::State& state) {
                    absl::StrCat("count=", count, ", expected > 1.7M"));
   }
 }
-BENCHMARK(BM_HistogramsJson)->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_HistogramsJsonDetailed)->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_HistogramsJsonCombined(benchmark::State& state) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext();
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  params.parse("?format=json&type=Histograms&histogram_buckets=combined", response);
+
+  for (auto _ : state) { // NOLINT
+    uint64_t count = test_context.handlerStats(params);
+    RELEASE_ASSERT(count > 450000 && count < 470000,
+                   absl::StrCat("count=", count, ", expected > 450k"));
+  }
+}
+BENCHMARK(BM_HistogramsJsonCombined)->Unit(benchmark::kMillisecond);

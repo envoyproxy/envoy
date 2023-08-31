@@ -86,14 +86,10 @@ function computeBucketWidthVpx(numBuckets) {
  */
 function renderHistograms(histogramDiv, data) { // eslint-disable-line no-unused-vars
   histogramDiv.replaceChildren();
-  for (stat of data.stats) {
-    const histograms = stat.histograms;
-    if (histograms) {
-      if (histograms.supported_percentiles && histograms.details) {
-        for (histogram of histograms.details) {
-          renderHistogram(histogramDiv, histograms.supported_percentiles, histogram);
-        }
-      }
+  const supported_percentiles = data.supported_percentiles;
+  if (supported_percentiles) {
+    for (histogram of data.histograms) {
+      renderHistogram(histogramDiv, histograms.supported_percentiles, histogram);
     }
   }
 }

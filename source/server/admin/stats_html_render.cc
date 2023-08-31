@@ -21,26 +21,21 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml) {
+    : StatsTextRender(params), params_(params), active_(params.format_ == StatsFormat::ActiveHtml),
+      json_histograms_(
+          !active_ && (params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Combined ||
+                       params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed)) {
   AdminHtmlUtil::renderHead(response_headers, response);
-  if (!active_ && (params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Combined ||
-                   params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed)) {
-    StatsParams json_params(params);
-    json_params.histogram_buckets_mode_ = params.histogram_buckets_mode_;
-    json_response_headers_ = Http::ResponseHeaderMapImpl::create();
-    histogram_json_render_ =
-        std::make_unique<StatsJsonRender>(*json_response_headers_, json_data_, json_params);
-  }
 }
 
 void StatsHtmlRender::finalize(Buffer::Instance& response) {
   // Render all the histograms here using the JSON data we've accumulated
   // for them.
   if (histogram_json_render_ != nullptr) {
-    histogram_json_render_->finalize(json_data_);
-    response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst json = \n");
-    response.add(json_data_);
+    histogram_json_render_->finalize(response);
     response.add(";\nrenderHistograms(document.getElementById('histograms'), json);\n</script\n");
+  } else {
+    response.add("</pre>\n");
   }
 
   AdminHtmlUtil::finalize(response);
@@ -68,10 +63,12 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
 
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
+  ASSERT(histogram_json_render_ == nullptr);
   response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
 }
 
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
+  ASSERT(histogram_json_render_ == nullptr);
   if (!active_) {
     response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
   }
@@ -86,8 +83,15 @@ void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view type
 // All other modes default to rendering the histogram textually.
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
-  if (histogram_json_render_ != nullptr) {
-    histogram_json_render_->generate(json_data_, name, histogram);
+  if (json_histograms_) {
+    if (histogram_json_render_ == nullptr) {
+      StatsParams json_params(params_);
+      json_response_headers_ = Http::ResponseHeaderMapImpl::create();
+      response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst json = \n");
+      histogram_json_render_ =
+          std::make_unique<StatsJsonRender>(*json_response_headers_, response, json_params);
+    }
+    histogram_json_render_->generate(response, name, histogram);
   } else {
     StatsTextRender::generate(response, name, histogram);
   }
