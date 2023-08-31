@@ -201,10 +201,8 @@ new_features:
     :ref:`metadata_options <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.metadata_options>`
     config API to enable sending and receiving metadata from/to the external processing server. Both typed and untyped dynamic
     metadata may be sent to the server. If
-    :ref:`enable_returned_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.enable_returned_metadata>`
-    is enabled, returned metadata may be written to ``envoy.filters.http.ext_proc`` dynamic metadata namespace, or
-    bifurcated into ``envoy.filters.http.ext_proc.decoder`` and ``envoy.filters.http.ext_proc.encoder`` with
-    ``MetadataOptions.bifurcate_returned_metadata_namespace``.
+    :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
+    is defined, returned metadata may be written to the specified allowed namespaces.
 - area: ext_proc
   change: |
     implemented

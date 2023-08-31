@@ -160,15 +160,18 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
 
   const auto& md_opts = overrides.metadata_options();
   if (md_opts.has_forwarding_namespaces()) {
-    untyped_metadata_namespaces_ =
+    untyped_forwarding_namespaces_ =
         std::vector<std::string>(md_opts.forwarding_namespaces().untyped().begin(),
                                  md_opts.forwarding_namespaces().untyped().end());
-    typed_metadata_namespaces_ =
+    typed_forwarding_namespaces_ =
         std::vector<std::string>(md_opts.forwarding_namespaces().typed().begin(),
                                  md_opts.forwarding_namespaces().typed().end());
   }
-  enable_returned_metadata_ = md_opts.enable_returned_metadata();
-  bifurcate_returned_metadata_namespace_ = md_opts.bifurcate_returned_metadata_namespace();
+  if (md_opts.has_receiving_namespaces()) {
+    untyped_receiving_namespaces_ =
+        std::vector<std::string>(md_opts.receiving_namespaces().untyped().begin(),
+                                 md_opts.receiving_namespaces().untyped().end());
+  }
 }
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
@@ -177,17 +180,14 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
   if (src.grpcService().has_value()) {
     grpc_service_ = src.grpcService();
   }
-  if (src.untypedMetadataNamespaces().has_value()) {
-    untyped_metadata_namespaces_ = src.untypedMetadataNamespaces();
+  if (src.untypedForwardingMetadataNamespaces().has_value()) {
+    untyped_forwarding_namespaces_ = src.untypedForwardingMetadataNamespaces();
   }
-  if (src.typedMetadataNamespaces().has_value()) {
-    typed_metadata_namespaces_ = src.typedMetadataNamespaces();
+  if (src.typedForwardingMetadataNamespaces().has_value()) {
+    typed_forwarding_namespaces_ = src.typedForwardingMetadataNamespaces();
   }
-  if (src.enableReturnedMetadata().has_value()) {
-    enable_returned_metadata_ = src.enableReturnedMetadata();
-  }
-  if (src.bifurcateReturnedMetadataNamespace().has_value()) {
-    bifurcate_returned_metadata_namespace_ = src.bifurcateReturnedMetadataNamespace();
+  if (src.untypedReceivingMetadataNamespaces().has_value()) {
+    untyped_receiving_namespaces_ = src.untypedReceivingMetadataNamespaces();
   }
 }
 
@@ -741,7 +741,7 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
   // will be the request metadata value. The metadata will only be searched for the callbacks
   // corresponding to the traffic direction at the time of the external processing request.
   const auto& request_metadata = cb->streamInfo().dynamicMetadata().filter_metadata();
-  for (const auto& context_key : state.untypedMetadataNamespaces()) {
+  for (const auto& context_key : state.untypedForwardingMetadataNamespaces()) {
     if (const auto metadata_it = request_metadata.find(context_key);
         metadata_it != request_metadata.end()) {
       (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
@@ -761,7 +761,7 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
   // callbacks corresponding to the traffic direction at the time of the external processing
   // request.
   const auto& request_typed_metadata = cb->streamInfo().dynamicMetadata().typed_filter_metadata();
-  for (const auto& context_key : state.typedMetadataNamespaces()) {
+  for (const auto& context_key : state.typedForwardingMetadataNamespaces()) {
     if (const auto metadata_it = request_typed_metadata.find(context_key);
         metadata_it != request_typed_metadata.end()) {
       (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
@@ -780,26 +780,31 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
   *req.mutable_metadata_context() = forwarding_metadata;
 }
 
-void Filter::setDynamicMetadata(std::string ns, Http::StreamFilterCallbacks* cb,
-                                const ProcessorState& state,
+void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                                 std::unique_ptr<ProcessingResponse>& response) {
-  if (!state.enableReturnedMetadata() || !response->has_dynamic_metadata()) {
+  bool has_receiving_namespaces = state.untypedReceivingMetadataNamespaces().size() > 0;
+  if (!(has_receiving_namespaces && response->has_dynamic_metadata())) {
     return;
   }
-  std::string md_ns = "envoy.filters.http.ext_proc";
-  if (state.bifurcateReturnedMetadataNamespace()) {
-    auto ss = std::stringstream();
-    ss << md_ns << "." << ns;
-    md_ns = ss.str();
+
+  if (response->has_dynamic_metadata()) {
+    auto response_metadata = response->dynamic_metadata().fields();
+    auto receiving_namespaces = state.untypedReceivingMetadataNamespaces();
+    for (const auto& context_key : response_metadata) {
+      if (auto metadata_it = std::find(receiving_namespaces.begin(), receiving_namespaces.end(),
+                                       context_key.first);
+          metadata_it != receiving_namespaces.end())
+        cb->streamInfo().setDynamicMetadata(context_key.first,
+                                            response_metadata.at(context_key.first).struct_value());
+    }
   }
-  cb->streamInfo().setDynamicMetadata(md_ns, response->dynamic_metadata());
 }
 
 void Filter::setEncoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
-  setDynamicMetadata("encoder", encoder_callbacks_, encoding_state_, response);
+  setDynamicMetadata(encoder_callbacks_, encoding_state_, response);
 }
 void Filter::setDecoderDynamicMetadata(std::unique_ptr<ProcessingResponse>& response) {
-  setDynamicMetadata("decoder", decoder_callbacks_, decoding_state_, response);
+  setDynamicMetadata(decoder_callbacks_, decoding_state_, response);
 }
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
@@ -1072,27 +1077,29 @@ void Filter::mergePerRouteConfig() {
     grpc_service_ = *merged_config->grpcService();
     config_with_hash_key_.setConfig(*merged_config->grpcService());
   }
-  if (merged_config->untypedMetadataNamespaces()) {
-    ENVOY_LOG(trace, "Setting new untyped metadata namespaces from per-route configuration");
-    decoding_state_.setUntypedMetadataNamespaces(*merged_config->untypedMetadataNamespaces());
-    encoding_state_.setUntypedMetadataNamespaces(*merged_config->untypedMetadataNamespaces());
+  if (merged_config->untypedForwardingMetadataNamespaces()) {
+    ENVOY_LOG(trace,
+              "Setting new untyped forwarding metadata namespaces from per-route configuration");
+    decoding_state_.setUntypedForwardingMetadataNamespaces(
+        *merged_config->untypedForwardingMetadataNamespaces());
+    encoding_state_.setUntypedForwardingMetadataNamespaces(
+        *merged_config->untypedForwardingMetadataNamespaces());
   }
-  if (merged_config->typedMetadataNamespaces()) {
-    ENVOY_LOG(trace, "Setting new typed metadata namespaces from per-route configuration");
-    decoding_state_.setTypedMetadataNamespaces(*merged_config->typedMetadataNamespaces());
-    encoding_state_.setTypedMetadataNamespaces(*merged_config->typedMetadataNamespaces());
+  if (merged_config->typedForwardingMetadataNamespaces()) {
+    ENVOY_LOG(trace,
+              "Setting new typed forwarding metadata namespaces from per-route configuration");
+    decoding_state_.setTypedForwardingMetadataNamespaces(
+        *merged_config->typedForwardingMetadataNamespaces());
+    encoding_state_.setTypedForwardingMetadataNamespaces(
+        *merged_config->typedForwardingMetadataNamespaces());
   }
-  if (merged_config->enableReturnedMetadata().has_value()) {
-    ENVOY_LOG(trace, "Setting enable returned metadata from per-route configuration");
-    decoding_state_.setEnableReturnedMetadata(merged_config->enableReturnedMetadata().value());
-    encoding_state_.setEnableReturnedMetadata(merged_config->enableReturnedMetadata().value());
-  }
-  if (merged_config->bifurcateReturnedMetadataNamespace().has_value()) {
-    ENVOY_LOG(trace, "Setting bifurcate returned metadata namespace from per-route configuration");
-    decoding_state_.setBifurcateReturnedMetadataNamespace(
-        merged_config->bifurcateReturnedMetadataNamespace().value());
-    encoding_state_.setBifurcateReturnedMetadataNamespace(
-        merged_config->bifurcateReturnedMetadataNamespace().value());
+  if (merged_config->untypedReceivingMetadataNamespaces()) {
+    ENVOY_LOG(trace,
+              "Setting new untyped receiving metadata namespaces from per-route configuration");
+    decoding_state_.setUntypedReceivingMetadataNamespaces(
+        *merged_config->untypedReceivingMetadataNamespaces());
+    encoding_state_.setUntypedReceivingMetadataNamespaces(
+        *merged_config->untypedReceivingMetadataNamespaces());
   }
 }
 

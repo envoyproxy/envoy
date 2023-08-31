@@ -37,11 +37,12 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
   filter_metadata:
     hello: "world"
   metadata_options:
-    enable_returned_metadata: false
-    bifurcate_returned_metadata_namespace: true
     forwarding_namespaces:
       typed:
       - ns1
+      untyped:
+      - ns2
+    receiving_namespaces:
       untyped:
       - ns2
   )EOF";
@@ -81,11 +82,12 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
   filter_metadata:
     hello: "world"
   metadata_options:
-    enable_returned_metadata: false
-    bifurcate_returned_metadata_namespace: true
     forwarding_namespaces:
       typed:
       - ns1
+      untyped:
+      - ns2
+    receiving_namespaces:
       untyped:
       - ns2
   )EOF";

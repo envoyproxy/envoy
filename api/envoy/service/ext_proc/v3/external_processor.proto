@@ -161,8 +161,9 @@ message ProcessingResponse {
     ImmediateResponse immediate_response = 7;
   }
 
-  // Optional metadata that will be emitted as dynamic metadata to be consumed by the next
-  // filter. This metadata will be placed in the namespace ``envoy.filters.http.ext_proc``.
+  // Optional metadata that will be emitted as dynamic metadata to be consumed by
+  // following filters. This metadata will be placed in the namespace(s) specified by the top-level
+  // field name(s) of the struct.
   google.protobuf.Struct dynamic_metadata = 8;
 
   // Override how parts of the HTTP request and response are processed

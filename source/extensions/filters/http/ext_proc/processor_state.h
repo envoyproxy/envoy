@@ -84,14 +84,18 @@ public:
 
   explicit ProcessorState(Filter& filter,
                           envoy::config::core::v3::TrafficDirection traffic_direction,
-                          std::vector<std::string> untyped, std::vector<std::string> typed,
-                          bool enable, bool bifurcate)
+                          std::vector<std::string> untyped_forwarding_namespaces,
+                          std::vector<std::string> typed_forwarding_namespaces,
+                          std::vector<std::string> untyped_receiving_namespaces)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
         partial_body_processed_(false), traffic_direction_(traffic_direction),
-        untyped_metadata_namespaces_(untyped.begin(), untyped.end()),
-        typed_metadata_namespaces_(typed.begin(), typed.end()), enable_returned_metadata_(enable),
-        bifurcate_returned_metadata_namespace_(bifurcate) {}
+        untyped_forwarding_namespaces_(untyped_forwarding_namespaces.begin(),
+                                       untyped_forwarding_namespaces.end()),
+        typed_forwarding_namespaces_(typed_forwarding_namespaces.begin(),
+                                     typed_forwarding_namespaces.end()),
+        untyped_receiving_namespaces_(untyped_receiving_namespaces.begin(),
+                                      untyped_receiving_namespaces.end()) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -116,28 +120,25 @@ public:
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) PURE;
 
-  const std::vector<std::string>& untypedMetadataNamespaces() const {
-    return untyped_metadata_namespaces_;
+  const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
+    return untyped_forwarding_namespaces_;
   };
-  void setUntypedMetadataNamespaces(const std::vector<std::string> ns) {
-    untyped_metadata_namespaces_ = std::vector<std::string>(ns.begin(), ns.end());
-  };
-
-  const std::vector<std::string>& typedMetadataNamespaces() const {
-    return typed_metadata_namespaces_;
-  };
-  void setTypedMetadataNamespaces(const std::vector<std::string> ns) {
-    typed_metadata_namespaces_ = std::vector<std::string>(ns.begin(), ns.end());
+  void setUntypedForwardingMetadataNamespaces(const std::vector<std::string> ns) {
+    untyped_forwarding_namespaces_ = std::vector<std::string>(ns.begin(), ns.end());
   };
 
-  bool enableReturnedMetadata() const { return enable_returned_metadata_; };
-  void setEnableReturnedMetadata(bool enable) { enable_returned_metadata_ = enable; };
-
-  bool bifurcateReturnedMetadataNamespace() const {
-    return bifurcate_returned_metadata_namespace_;
+  const std::vector<std::string>& typedForwardingMetadataNamespaces() const {
+    return typed_forwarding_namespaces_;
   };
-  void setBifurcateReturnedMetadataNamespace(bool bifurcate) {
-    bifurcate_returned_metadata_namespace_ = bifurcate;
+  void setTypedForwardingMetadataNamespaces(const std::vector<std::string> ns) {
+    typed_forwarding_namespaces_ = std::vector<std::string>(ns.begin(), ns.end());
+  };
+
+  const std::vector<std::string>& untypedReceivingMetadataNamespaces() const {
+    return untyped_receiving_namespaces_;
+  };
+  void setUntypedReceivingMetadataNamespaces(const std::vector<std::string> ns) {
+    untyped_receiving_namespaces_ = std::vector<std::string>(ns.begin(), ns.end());
   };
 
   bool sendHeaders() const { return send_headers_; }
@@ -246,10 +247,9 @@ protected:
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
 
-  std::vector<std::string> untyped_metadata_namespaces_;
-  std::vector<std::string> typed_metadata_namespaces_;
-  bool enable_returned_metadata_;
-  bool bifurcate_returned_metadata_namespace_;
+  std::vector<std::string> untyped_forwarding_namespaces_;
+  std::vector<std::string> typed_forwarding_namespaces_;
+  std::vector<std::string> untyped_receiving_namespaces_;
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
@@ -259,9 +259,12 @@ class DecodingProcessorState : public ProcessorState {
 public:
   explicit DecodingProcessorState(
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode,
-      std::vector<std::string> untyped, std::vector<std::string> typed, bool enable, bool bifurcate)
-      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND, untyped, typed,
-                       enable, bifurcate) {
+      std::vector<std::string> untyped_forwarding_namespaces,
+      std::vector<std::string> typed_forwarding_namespaces,
+      std::vector<std::string> untyped_receiving_namespaces)
+      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
+                       untyped_forwarding_namespaces, typed_forwarding_namespaces,
+                       untyped_receiving_namespaces) {
     setProcessingModeInternal(mode);
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
@@ -337,9 +340,12 @@ class EncodingProcessorState : public ProcessorState {
 public:
   explicit EncodingProcessorState(
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode,
-      std::vector<std::string> untyped, std::vector<std::string> typed, bool enable, bool bifurcate)
-      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND, untyped, typed,
-                       enable, bifurcate) {
+      std::vector<std::string> untyped_forwarding_namespaces,
+      std::vector<std::string> typed_forwarding_namespaces,
+      std::vector<std::string> untyped_receiving_namespaces)
+      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
+                       untyped_forwarding_namespaces, typed_forwarding_namespaces,
+                       untyped_receiving_namespaces) {
     setProcessingModeInternal(mode);
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;

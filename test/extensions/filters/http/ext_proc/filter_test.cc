@@ -2888,63 +2888,6 @@ TEST(OverrideTest, GrpcServiceNonOverride) {
   EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
 }
 
-// When merging two configurations, ensure that the second metadata options
-// overrides the first.
-TEST(OverrideTest, MetadataOptionsOverride) {
-  ExtProcPerRoute cfg1, cfg2;
-  const std::string yaml_1 = R"EOF(
-  overrides:
-    metadata_options:
-      forwarding_namespaces:
-        untyped:
-        - untyped_ns_1
-        typed:
-        - typed_ns_1
-      enable_returned_metadata: true
-      bifurcate_returned_metadata_namespace: true
-  )EOF";
-  const std::string yaml_2 = R"EOF(
-  overrides:
-    metadata_options:
-      forwarding_namespaces:
-        untyped:
-        - untyped_ns_2
-        typed:
-        - typed_ns_2
-      enable_returned_metadata: false
-      bifurcate_returned_metadata_namespace: false
-  )EOF";
-  TestUtility::loadFromYaml(yaml_1, cfg1);
-  TestUtility::loadFromYaml(yaml_2, cfg2);
-
-  FilterConfigPerRoute route1(cfg1);
-  FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-
-  ASSERT_TRUE(cfg2.has_overrides());
-  ASSERT_TRUE(cfg2.overrides().has_metadata_options());
-  auto overrides = cfg2.overrides().metadata_options();
-
-  // ensure all of our cfg2 options were set
-  ASSERT_TRUE(cfg2.overrides().metadata_options().has_forwarding_namespaces());
-  ASSERT_TRUE(route1.untypedMetadataNamespaces().has_value());
-  EXPECT_EQ(1, route1.untypedMetadataNamespaces().value().size());
-  EXPECT_EQ(overrides.forwarding_namespaces().untyped()[0],
-            route1.untypedMetadataNamespaces().value()[0]);
-
-  ASSERT_TRUE(route1.typedMetadataNamespaces().has_value());
-  EXPECT_EQ(1, route1.typedMetadataNamespaces().value().size());
-  EXPECT_EQ(overrides.forwarding_namespaces().typed()[0],
-            route1.typedMetadataNamespaces().value()[0]);
-
-  ASSERT_TRUE(route1.enableReturnedMetadata().has_value());
-  EXPECT_EQ(overrides.enable_returned_metadata(), route1.enableReturnedMetadata());
-
-  ASSERT_TRUE(route1.bifurcateReturnedMetadataNamespace().has_value());
-  EXPECT_EQ(overrides.bifurcate_returned_metadata_namespace(),
-            route1.bifurcateReturnedMetadataNamespace());
-}
-
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
@@ -3086,8 +3029,9 @@ TEST_F(HttpFilterTest, MetadataOptionsOverride) {
       - untyped_ns_1
       typed:
       - typed_ns_1
-    enable_returned_metadata: true
-    bifurcate_returned_metadata_namespace: true
+    receiving_namespaces:
+      untyped:
+      - untyped_receiving_ns_1
   )EOF");
   ExtProcPerRoute override_cfg;
   const std::string override_yaml = R"EOF(
@@ -3098,8 +3042,9 @@ TEST_F(HttpFilterTest, MetadataOptionsOverride) {
         - untyped_ns_2
         typed:
         - typed_ns_2
-      enable_returned_metadata: false
-      bifurcate_returned_metadata_namespace: false
+      receiving_namespaces:
+        untyped:
+        - untyped_receiving_ns_2
   )EOF";
   TestUtility::loadFromYaml(override_yaml, override_cfg);
 
@@ -3117,21 +3062,22 @@ TEST_F(HttpFilterTest, MetadataOptionsOverride) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
 
-  EXPECT_EQ(filter_->encodingState().untypedMetadataNamespaces().size(), 1);
-  EXPECT_EQ(filter_->encodingState().untypedMetadataNamespaces()[0], "untyped_ns_2");
-  EXPECT_EQ(filter_->decodingState().untypedMetadataNamespaces().size(), 1);
-  EXPECT_EQ(filter_->decodingState().untypedMetadataNamespaces()[0], "untyped_ns_2");
+  EXPECT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_2");
+  EXPECT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_2");
 
-  EXPECT_EQ(filter_->encodingState().typedMetadataNamespaces().size(), 1);
-  EXPECT_EQ(filter_->encodingState().typedMetadataNamespaces()[0], "typed_ns_2");
-  EXPECT_EQ(filter_->decodingState().typedMetadataNamespaces().size(), 1);
-  EXPECT_EQ(filter_->decodingState().typedMetadataNamespaces()[0], "typed_ns_2");
+  EXPECT_EQ(filter_->encodingState().typedForwardingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().typedForwardingMetadataNamespaces()[0], "typed_ns_2");
+  EXPECT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces()[0], "typed_ns_2");
 
-  EXPECT_FALSE(filter_->encodingState().enableReturnedMetadata());
-  EXPECT_FALSE(filter_->decodingState().enableReturnedMetadata());
-
-  EXPECT_FALSE(filter_->encodingState().bifurcateReturnedMetadataNamespace());
-  EXPECT_FALSE(filter_->decodingState().bifurcateReturnedMetadataNamespace());
+  EXPECT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces()[0],
+            "untyped_receiving_ns_2");
+  EXPECT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces()[0],
+            "untyped_receiving_ns_2");
 
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
@@ -3294,7 +3240,9 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
   metadata_options:
-    enable_returned_metadata: true
+    receiving_namespaces:
+      untyped:
+      - envoy.filters.http.ext_proc
   )EOF");
 
   Buffer::OwnedImpl empty_chunk;
@@ -3306,8 +3254,11 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
 
   processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    ProtobufWkt::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
     auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
-    (*metadata_mut)["foo"].set_string_value("bar");
+    auto mut_struct = (*metadata_mut)["envoy.filters.http.ext_proc"].mutable_struct_value();
+    *mut_struct = foobar;
   });
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
@@ -3323,61 +3274,56 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 }
 
 // Verify that when returning an response with dynamic_metadata field set, the filter emits
-// dynamic metadata with appropriately bifurcated namespaces.
-TEST_F(HttpFilterTest, EmitBifurcatedDynamicMetadata) {
+// dynamic metadata to namespaces other than its own.
+TEST_F(HttpFilterTest, EmitDynamicMetadataArbitraryNamespace) {
+  // Configure the filter to only pass response headers to ext server.
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    request_header_mode: "SEND"
+    request_header_mode: "SKIP"
     response_header_mode: "SEND"
     request_body_mode: "NONE"
     response_body_mode: "NONE"
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
   metadata_options:
-    enable_returned_metadata: true
-    bifurcate_returned_metadata_namespace: true
+    receiving_namespaces:
+      untyped:
+      - envoy.filters.http.ext_authz
   )EOF");
 
   Buffer::OwnedImpl empty_chunk;
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
-    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
-    (*metadata_mut)["request_foo"].set_string_value("request_bar");
-  });
-
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
 
   processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    ProtobufWkt::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
     auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
-    (*metadata_mut)["response_foo"].set_string_value("response_bar");
+    auto mut_struct = (*metadata_mut)["envoy.filters.http.ext_authz"].mutable_struct_value();
+    *mut_struct = foobar;
   });
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
-  EXPECT_EQ("request_bar", dynamic_metadata_.filter_metadata()
-                               .at("envoy.filters.http.ext_proc.decoder")
-                               .fields()
-                               .at("request_foo")
-                               .string_value());
-  EXPECT_EQ("response_bar", dynamic_metadata_.filter_metadata()
-                                .at("envoy.filters.http.ext_proc.encoder")
-                                .fields()
-                                .at("response_foo")
-                                .string_value());
+  EXPECT_EQ("bar", dynamic_metadata_.filter_metadata()
+                       .at("envoy.filters.http.ext_authz")
+                       .fields()
+                       .at("foo")
+                       .string_value());
 
   filter_->onDestroy();
 }
 
-// Verify that when returning an response with dynamic_metadata field set, the filter emits
-// dynamic metadata with appropriately bifurcated namespaces.
+// Verify that when returning an response with dynamic_metadata field set, the
+// filter does not emit metadata when no allowed namespaces are configured.
 TEST_F(HttpFilterTest, DisableEmitDynamicMetadata) {
   initialize(R"EOF(
   grpc_service:
@@ -3390,17 +3336,12 @@ TEST_F(HttpFilterTest, DisableEmitDynamicMetadata) {
     response_body_mode: "NONE"
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
-  metadata_options:
-    enable_returned_metadata: false
   )EOF");
 
   Buffer::OwnedImpl empty_chunk;
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
-    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
-    (*metadata_mut)["request_foo"].set_string_value("request_bar");
-  });
+  processRequestHeaders(false, absl::nullopt);
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
@@ -3408,14 +3349,124 @@ TEST_F(HttpFilterTest, DisableEmitDynamicMetadata) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
 
   processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    ProtobufWkt::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
     auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
-    (*metadata_mut)["response_foo"].set_string_value("response_bar");
+    auto mut_struct = (*metadata_mut)["envoy.filters.http.ext_proc"].mutable_struct_value();
+    *mut_struct = foobar;
   });
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
   EXPECT_EQ(0, dynamic_metadata_.filter_metadata().size());
+
+  filter_->onDestroy();
+}
+
+// Verify that when returning an response with dynamic_metadata field set, the
+// filter does not emit metadata to namespaces which are not allowed.
+TEST_F(HttpFilterTest, DisableEmittingDynamicMetadataToDisallowedNamespaces) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    receiving_namespaces:
+      untyped:
+      - envoy.filters.http.ext_proc
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    ProtobufWkt::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
+    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
+    auto mut_struct = (*metadata_mut)["envoy.filters.http.ext_authz"].mutable_struct_value();
+    *mut_struct = foobar;
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(0, dynamic_metadata_.filter_metadata().size());
+
+  filter_->onDestroy();
+}
+
+// Verify that when returning an response with dynamic_metadata field set, the filter emits
+// dynamic metadata and later emissions overwrite earlier ones.
+TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
+  // Configure the filter to only pass response headers to ext server.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    receiving_namespaces:
+      untyped:
+      - envoy.filters.http.ext_proc
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    ProtobufWkt::Struct batbaz;
+    (*batbaz.mutable_fields())["bat"].set_string_value("baz");
+    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
+    auto mut_struct = (*metadata_mut)["envoy.filters.http.ext_proc"].mutable_struct_value();
+    *mut_struct = batbaz;
+  });
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    ProtobufWkt::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
+    auto metadata_mut = resp.mutable_dynamic_metadata()->mutable_fields();
+    auto mut_struct = (*metadata_mut)["envoy.filters.http.ext_proc"].mutable_struct_value();
+    *mut_struct = foobar;
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_FALSE(dynamic_metadata_.filter_metadata()
+                   .at("envoy.filters.http.ext_proc")
+                   .fields()
+                   .contains("bat"));
+
+  EXPECT_EQ("bar", dynamic_metadata_.filter_metadata()
+                       .at("envoy.filters.http.ext_proc")
+                       .fields()
+                       .at("foo")
+                       .string_value());
 
   filter_->onDestroy();
 }

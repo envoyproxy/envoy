@@ -211,7 +211,7 @@ message ExternalProcessor {
 // dynamic metadata. Specifically, which namespaces to send to the server, whether
 // metadata returned by the server may be written, and how that metadata may be written.
 message MetadataOptions {
-  message MetadataNamespacesToForward {
+  message MetadataNamespaces {
     // Specifies a list of metadata namespaces whose values, if present,
     // will be passed to the ext_proc service as an opaque *protobuf::Struct*.
     repeated string untyped = 1;
@@ -224,16 +224,13 @@ message MetadataOptions {
   }
 
   // Describes which typed or untyped dynamic metadata namespaces to forward to
-  // the external processing server
-  MetadataNamespacesToForward forwarding_namespaces = 1;
+  // the external processing server.
+  MetadataNamespaces forwarding_namespaces = 1;
 
-  // If set to true, metadata returned from the external processing server will
-  // be written into the stream's dynamic metadata.
-  bool enable_returned_metadata = 2;
-
-  // If set to true, returned metadata will be namespaced according to whether the
-  // processing occurred during decoding or encoding.
-  bool bifurcate_returned_metadata_namespace = 3;
+  // Describes which typed or untyped dynamic metadata namespaces to accept from
+  // the external processing server. Set to empty or leave unset to disallow writing
+  // any received dynamic metadata. Receiving of typed metadata is not supported.
+  MetadataNamespaces receiving_namespaces = 2;
 }
 
 // The HeaderForwardingRules structure specifies what headers are
