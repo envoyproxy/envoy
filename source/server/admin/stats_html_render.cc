@@ -25,7 +25,7 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
   AdminHtmlUtil::renderHead(response_headers, response);
   if (!active_ && params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed) {
     StatsParams json_params(params);
-    json_params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+    json_params.histogram_buckets_mode_ = params.histogram_buckets_mode_;
     json_response_headers_ = Http::ResponseHeaderMapImpl::create();
     histogram_json_render_ =
         std::make_unique<StatsJsonRender>(*json_response_headers_, json_data_, json_params);

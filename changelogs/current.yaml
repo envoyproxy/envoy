@@ -52,6 +52,10 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: aws signer
+  change: |
+    fixed a bug where expiration timestamp on task roles failed to validate. This causes failure of credential caching which
+    results in constant hits to the task role metadata URL.
 - area: router check tool
   change: |
     Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
@@ -111,6 +115,9 @@ new_features:
 - area: redis
   change: |
     added support for time command (returns a local response).
+- area: extension_discovery_service
+  change: |
+    added ECDS support for :ref:` upstream network filters<envoy_v3_api_field_config.cluster.v3.Filter.config_discovery>`.
 - area: redis
   change: |
     added support for lmove command.

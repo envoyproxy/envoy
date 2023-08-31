@@ -585,7 +585,7 @@ TEST_F(TaskRoleCredentialsProviderTest, FullCachedCredentials) {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
   "Token": "token",
-  "Expiration": "20180102T030500Z"
+  "Expiration": "2018-01-02T03:05:00Z"
 }
 )EOF");
   const auto credentials = provider_.getCredentials();
@@ -605,7 +605,7 @@ TEST_F(TaskRoleCredentialsProviderTest, NormalCredentialExpiration) {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
   "Token": "token",
-  "Expiration": "20190102T030405Z"
+  "Expiration": "2019-01-02T03:04:05Z"
 }
 )EOF");
   const auto credentials = provider_.getCredentials();
@@ -618,7 +618,7 @@ TEST_F(TaskRoleCredentialsProviderTest, NormalCredentialExpiration) {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
   "Token": "new_token",
-  "Expiration": "20190102T030405Z"
+  "Expiration": "2019-01-02T03:04:05Z"
 }
 )EOF");
   const auto cached_credentials = provider_.getCredentials();
@@ -634,7 +634,7 @@ TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpiration) {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
   "Token": "token",
-  "Expiration": "20180102T030405Z"
+  "Expiration": "2018-01-02T03:04:05Z"
 }
 )EOF");
   const auto credentials = provider_.getCredentials();
@@ -646,7 +646,7 @@ TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpiration) {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
   "Token": "new_token",
-  "Expiration": "20190102T030405Z"
+  "Expiration": "2019-01-02T03:04:05Z"
 }
 )EOF");
   const auto cached_credentials = provider_.getCredentials();
