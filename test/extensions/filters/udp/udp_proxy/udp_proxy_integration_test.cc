@@ -59,8 +59,7 @@ public:
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()),
         registration_(factory_) {}
 
-  void setup(uint32_t upstream_count,
-             absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
+  void setup(uint32_t upstream_count, absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
              const std::string& session_filters_config = "") {
     FakeUpstreamConfig::UdpConfig config;
     config.max_rx_datagram_size_ = max_rx_datagram_size;
@@ -88,7 +87,8 @@ public:
       max_datagram_config = fmt::format(R"EOF(
   upstream_socket_config:
     max_rx_datagram_size: {}
-)EOF", max_rx_datagram_size.value());
+)EOF",
+                                        max_rx_datagram_size.value());
 
       config_helper_.addConfigModifier(
           [max_rx_datagram_size](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -141,7 +141,10 @@ typed_config:
       downstream_bytes_to_drain: {}
       stop_iteration_on_new_session: {}
       stop_iteration_on_first_read: {}
-)EOF", config.type_, config.downstream_bytes_to_drain_, config.stop_iteration_on_new_session_, config.stop_iteration_on_first_read_);
+)EOF",
+                                        config.type_, config.downstream_bytes_to_drain_,
+                                        config.stop_iteration_on_new_session_,
+                                        config.stop_iteration_on_first_read_);
       } else if (config.type_ == "write") {
         session_filters += fmt::format(R"EOF(
   - name: {}
@@ -149,9 +152,12 @@ typed_config:
       '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionWriteFilterConfig
       upstream_bytes_to_drain: {}
       stop_iteration_on_first_write: {}
-)EOF", config.type_, config.upstream_bytes_to_drain_, config.stop_iteration_on_first_write_);
+)EOF",
+                                        config.type_, config.upstream_bytes_to_drain_,
+                                        config.stop_iteration_on_first_write_);
       } else if (config.type_ == "read_write") {
-        session_filters += fmt::format(R"EOF(
+        session_filters += fmt::format(
+            R"EOF(
   - name: {}
     typed_config:
       '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionFilterConfig
@@ -160,8 +166,10 @@ typed_config:
       stop_iteration_on_new_session: {}
       stop_iteration_on_first_read: {}
       stop_iteration_on_first_write: {}
-)EOF", config.type_, config.downstream_bytes_to_drain_, config.upstream_bytes_to_drain_,
-       config.stop_iteration_on_new_session_, config.stop_iteration_on_first_read_, config.stop_iteration_on_first_write_);
+)EOF",
+            config.type_, config.downstream_bytes_to_drain_, config.upstream_bytes_to_drain_,
+            config.stop_iteration_on_new_session_, config.stop_iteration_on_first_read_,
+            config.stop_iteration_on_first_write_);
       }
     }
 
@@ -436,8 +444,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilter) {
 }
 
 TEST_P(UdpProxyIntegrationTest, TwoReadSessionFilters) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig(
-      {{"read", 3, 0}, {"read", 1, 0}}));
+  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}, {"read", 1, 0}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -453,8 +460,7 @@ TEST_P(UdpProxyIntegrationTest, WriteSessionFilter) {
 }
 
 TEST_P(UdpProxyIntegrationTest, TwoWriteSessionFilters) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig(
-      {{"write", 0, 3}, {"write", 0, 1}}));
+  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"write", 0, 3}, {"write", 0, 1}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -462,8 +468,7 @@ TEST_P(UdpProxyIntegrationTest, TwoWriteSessionFilters) {
 }
 
 TEST_P(UdpProxyIntegrationTest, ReadAndWriteSessionFilters) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig(
-      {{"read", 3, 0}, {"write", 0, 3}}));
+  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}, {"write", 0, 3}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -471,8 +476,9 @@ TEST_P(UdpProxyIntegrationTest, ReadAndWriteSessionFilters) {
 }
 
 TEST_P(UdpProxyIntegrationTest, TwoReadAndWriteSessionFilters) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig(
-      {{"read", 3, 0}, {"write", 0, 3}, {"read", 1, 0}, {"write", 0, 1}}));
+  setup(1, absl::nullopt,
+        getDrainerSessionFilterConfig(
+            {{"read", 3, 0}, {"write", 0, 3}, {"read", 1, 0}, {"write", 0, 1}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -492,8 +498,9 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewConnection) {
   // if it's set to return StopIteration.
   // Therefore we have two read filters where the first one should return StopIteration,
   // so we expect the overall amount of bytes to drain to increase by 1, instead of 2.
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig(
-      {{"read", 2, 0, true, false, false}, {"read", 0, 0, true, false, false}}));
+  setup(1, absl::nullopt,
+        getDrainerSessionFilterConfig(
+            {{"read", 2, 0, true, false, false}, {"read", 0, 0, true, false, false}}));
 
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
@@ -549,8 +556,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
 }
 
 TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnWrite) {
-  setup(1, absl::nullopt, getDrainerSessionFilterConfig(
-      {{"write", 0, 0, false, false, true}}));
+  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"write", 0, 0, false, false, true}}));
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));

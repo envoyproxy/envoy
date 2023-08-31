@@ -14,14 +14,17 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace SessionFilters {
 
-using ReadDrainerConfig = test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionReadFilterConfig;
-using WriteDrainerConfig = test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionWriteFilterConfig;
-using DrainerConfig = test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionFilterConfig;
+using ReadDrainerConfig =
+    test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionReadFilterConfig;
+using WriteDrainerConfig =
+    test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionWriteFilterConfig;
+using DrainerConfig =
+    test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionFilterConfig;
 
 class DrainerUdpSessionReadFilter : public virtual ReadFilter {
 public:
-  DrainerUdpSessionReadFilter(
-        int downstream_bytes_to_drain, bool stop_iteration_on_new_session, bool stop_iteration_on_first_read)
+  DrainerUdpSessionReadFilter(int downstream_bytes_to_drain, bool stop_iteration_on_new_session,
+                              bool stop_iteration_on_first_read)
       : downstream_bytes_to_drain_(downstream_bytes_to_drain),
         stop_iteration_on_new_session_(stop_iteration_on_new_session),
         stop_iteration_on_first_read_(stop_iteration_on_first_read) {}
@@ -124,7 +127,8 @@ public:
   DrainerUdpSessionFilter(int downstream_bytes_to_drain, int upstream_bytes_to_drain,
                           bool stop_iteration_on_new_session, bool stop_iteration_on_first_read,
                           bool stop_iteration_on_first_write)
-      : DrainerUdpSessionReadFilter(downstream_bytes_to_drain, stop_iteration_on_new_session, stop_iteration_on_first_read),
+      : DrainerUdpSessionReadFilter(downstream_bytes_to_drain, stop_iteration_on_new_session,
+                                    stop_iteration_on_first_read),
         DrainerUdpSessionWriteFilter(upstream_bytes_to_drain, stop_iteration_on_first_write) {}
 };
 
