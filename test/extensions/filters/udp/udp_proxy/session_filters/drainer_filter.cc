@@ -50,12 +50,15 @@ public:
     }
   }
 
-  void initializeReadFilterCallbacks(ReadFilterCallbacks&) override {}
+  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) override {
+    session_id_ = callbacks.sessionId();
+  }
 
 private:
   int downstream_bytes_to_drain_;
   bool stop_iteration_on_new_session_{false};
   bool stop_iteration_on_first_read_{false};
+  uint64_t session_id_;
 };
 
 class DrainerUdpSessionReadFilterConfigFactory : public FactoryBase<ReadDrainerConfig> {
@@ -94,11 +97,14 @@ public:
     }
   }
 
-  void initializeWriteFilterCallbacks(WriteFilterCallbacks&) override {}
+  void initializeWriteFilterCallbacks(WriteFilterCallbacks& callbacks) override {
+    session_id_ = callbacks.sessionId();
+  }
 
 private:
   int upstream_bytes_to_drain_;
   bool stop_iteration_on_first_write_{false};
+  uint64_t session_id_;
 };
 
 class DrainerUdpSessionWriteFilterConfigFactory : public FactoryBase<WriteDrainerConfig> {
