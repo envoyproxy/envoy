@@ -18,8 +18,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
-#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
@@ -1383,14 +1383,16 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
-bool validateTransportSocketSupportsQuic(const envoy::config::core::v3::TransportSocket& transport_socket) {
+bool validateTransportSocketSupportsQuic(
+    const envoy::config::core::v3::TransportSocket& transport_socket) {
   if (transport_socket.name() == "envoy.transport_sockets.quic") {
     return true;
   }
   if (transport_socket.name() != "envoy.transport_sockets.http_11_proxy") {
     return false;
   }
-  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport http11_socket;
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
+      http11_socket;
   transport_socket.typed_config().UnpackTo(&http11_socket);
   return (http11_socket.transport_socket().name() == "envoy.transport_sockets.quic");
 }
