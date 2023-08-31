@@ -14,6 +14,21 @@ public:
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
                      mode_t socket_mode);
 
+  // A structure to record the set of registered UDP listeners keyed on their addresses,
+  // to support QUIC packet forwarding.
+  class UdpForwardingContext {
+  public:
+    using ForwardEntry = std::pair<const Network::Address::Instance*, Network::UdpListenerConfig*>;
+    absl::optional<ForwardEntry>
+    getListenerForDestination(const Network::Address::Instance& address);
+    void registerListener(const Network::Address::Instance& address,
+                          Network::UdpListenerConfig& listener_config);
+
+  private:
+    // Map keyed on address as a string, because Network::Address::Instance isn't hashable.
+    absl::flat_hash_map<std::string, ForwardEntry> listener_map_;
+  };
+
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
   void registerUdpForwardingListener(const Network::Address::Instance& address,
                                      Network::UdpListenerConfig& listener_config);
@@ -30,6 +45,8 @@ private:
   sockaddr_un parent_address_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};
   Stats::StatName hot_restart_generation_stat_name_;
+  UdpForwardingContext udp_forwarding_context_;
+  friend class HotRestartUdpForwardingContextTest;
 };
 
 } // namespace Server

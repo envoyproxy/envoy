@@ -7,6 +7,42 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+void HotRestartingChild::UdpForwardingContext::registerListener(
+    const Network::Address::Instance& address, Network::UdpListenerConfig& listener_config) {
+  bool inserted =
+      listener_map_.try_emplace(address.asString(), ForwardEntry{&address, &listener_config})
+          .second;
+  ASSERT(inserted, "Two udp listeners on the same address shouldn't be possible");
+}
+
+absl::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
+HotRestartingChild::UdpForwardingContext::getListenerForDestination(
+    const Network::Address::Instance& address) {
+  auto it = listener_map_.find(address.asString());
+  if (it == listener_map_.end()) {
+    // If no listener on the specific address was found, check for a default route.
+    // If the address is IPv6, check default route IPv6 first, otherwise check default
+    // route IPv4, but either way check both because default route should still apply
+    // even if only one listener was declared.
+    uint32_t port = address.ip()->port();
+    if (address.ip()->version() == Network::Address::IpVersion::v6) {
+      it = listener_map_.find(absl::StrCat("[::]:", port));
+      if (it == listener_map_.end()) {
+        it = listener_map_.find(absl::StrCat("0.0.0.0:", port));
+      }
+    } else {
+      it = listener_map_.find(absl::StrCat("0.0.0.0:", port));
+      if (it == listener_map_.end()) {
+        it = listener_map_.find(absl::StrCat("[::]:", port));
+      }
+    }
+  }
+  if (it == listener_map_.end()) {
+    return absl::nullopt;
+  }
+  return it->second;
+}
+
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                        const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
@@ -62,10 +98,9 @@ void HotRestartingChild::drainParentListeners() {
 }
 
 void HotRestartingChild::registerUdpForwardingListener(
-    const Network::Address::Instance& /* address */,
-    Network::UdpListenerConfig& /* listener_config */) {
+    const Network::Address::Instance& address, Network::UdpListenerConfig& listener_config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  // TODO(ravenblack): Actually register it in the next PR.
+  udp_forwarding_context_.registerListener(address, listener_config);
 }
 
 absl::optional<HotRestart::AdminShutdownResponse>
