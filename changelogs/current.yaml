@@ -156,6 +156,10 @@ new_features:
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: access_log
+  change: | 
+    added %PROXY_PROTOCOL_TLVS(TYPE)% substitution string, which will output the proxy protocol TLVs of the given TYPE stored
+    in the filter state if :ref:`pass_through_tlvs <envoy_v3_api_field_config.listener.v3.ProxyProtocol.pass_through_tlvs>` is set.
 
 deprecated:
 - area: tracing

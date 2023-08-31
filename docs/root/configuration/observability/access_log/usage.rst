@@ -919,6 +919,18 @@ UDP
 
     This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`
 
+%PROXY_PROTOCOL_TLVS(TYPE)%
+  HTTP
+    Extracts any `HAProxy Proxy Protocol <https://www.haproxy.org/download/1.9/doc/proxy-protocol.txt>`_ TLVs of the given TYPE
+    from the :ref:`filter state <arch_overview_data_sharing_between_filters>`.
+
+  .. note::
+    
+    If this is configured, you likely also want to set :ref:`pass_through_tlvs <envoy_v3_api_field_config.listener.v3.ProxyProtocol.pass_through_tlvs>`, which controls storing TLVs in the filter state in the listener chain.
+
+  TCP/UDP
+    Not implemented.
+
 %REQUESTED_SERVER_NAME%
   HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI)

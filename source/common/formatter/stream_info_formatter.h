@@ -114,6 +114,20 @@ private:
 };
 
 /**
+ * StreamInfoFormatterProvider for ProxyProtocolTlvs stored in FilterState from StreamInfo.
+ */
+class ProxyProtocolTlvsFormatter : public StreamInfoFormatterProvider {
+public:
+  ProxyProtocolTlvsFormatter(const std::string& tlv_type);
+  // StreamInfoFormatterProvider
+  absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+
+private:
+  int tlv_type_;
+};
+
+/**
  * Base StreamInfoFormatterProvider for system times from StreamInfo.
  */
 class SystemTimeFormatter : public StreamInfoFormatterProvider {

@@ -2,8 +2,10 @@
 
 #include <regex>
 
+#include "source/common/common/base64.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
@@ -246,6 +248,56 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
   }
 #endif
   return SubstitutionFormatUtils::unspecifiedValue();
+}
+
+ProxyProtocolTlvsFormatter::ProxyProtocolTlvsFormatter(const std::string& tlv_type_str) {
+  // Specified tlv_type must be parsable as an int.
+  ASSERT(!tlv_type_str.empty());
+  if (!absl::SimpleAtoi(tlv_type_str, &tlv_type_)) {
+    throw EnvoyException(fmt::format(
+        "Invalid parameter provided for PROXY_PROTOCOL_TLVS header: {}. Not parsable as int.",
+        tlv_type_str));
+  }
+
+  // Check if a valid TLV type was passed in.
+  if (tlv_type_ >= 256 || tlv_type_ <= 0) {
+    throw EnvoyException(fmt::format("Invalid parameter provided for PROXY_PROTOCOL_TLVS header: "
+                                     "{}. Must be a positive integer less than 256.",
+                                     tlv_type_str));
+  }
+}
+
+absl::optional<std::string> ProxyProtocolTlvsFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
+  const auto& typed_state =
+      stream_info.filterState().getDataReadOnly<Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolFilterState::key());
+
+  // ProxyProtocolFilterState is not stored in the filter state.
+  if (typed_state == nullptr) {
+    ENVOY_LOG_MISC(debug, "Invalid header: PROXY_PROTOCOL_TLVS. The ProxyProtocolFilterState is "
+                          "not stored in the filter state.");
+    return absl::nullopt;
+  }
+
+  std::ostringstream oss;
+  int match_count = 0;
+  for (auto& tlv : typed_state->value().tlv_vector_) {
+    if (tlv.type == tlv_type_) {
+      if (match_count > 0)
+        oss << ", ";
+      oss << Base64::encode(reinterpret_cast<const char*>(tlv.value.data()), tlv.value.size());
+      match_count++;
+    }
+  }
+  ENVOY_LOG_MISC(
+      debug,
+      "Formatting PROXY_PROTOCOL_TLVS header: {} TLVs are stored. {} with type {} added to header.",
+      typed_state->value().tlv_vector_.size(), match_count, tlv_type_);
+  return oss.str();
+}
+
+ProtobufWkt::Value ProxyProtocolTlvsFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(stream_info));
 }
 
 // A SystemTime formatter that extracts the startTime from StreamInfo. Must be provided
@@ -1338,6 +1390,11 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
            {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
             [](const std::string& format, absl::optional<size_t> max_length) {
               return FilterStateFormatter::create(format, max_length, true);
+            }}},
+          {"PROXY_PROTOCOL_TLVS",
+           {CommandSyntaxChecker::PARAMS_REQUIRED,
+            [](const std::string& tlv_type, const absl::optional<size_t>&) {
+              return std::make_unique<ProxyProtocolTlvsFormatter>(tlv_type);
             }}},
           {"DOWNSTREAM_PEER_CERT_V_START",
            {CommandSyntaxChecker::PARAMS_OPTIONAL,

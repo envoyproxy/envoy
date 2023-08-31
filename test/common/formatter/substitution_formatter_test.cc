@@ -15,6 +15,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
@@ -2124,6 +2125,106 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
 
     EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
     EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+}
+
+TEST(SubstitutionFormatterTest, ProxyProtocolTlvsFormatter) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+
+  // No parameter value passed in for tlv_type.
+  {
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PROXY_PROTOCOL_TLVS()%"),
+                              EnvoyException, "PROXY_PROTOCOL_TLVS requires parameters");
+  }
+
+  // Invalid tlv_type passed as parameter -- non-integer
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatParser::parse("%PROXY_PROTOCOL_TLVS(INVALID_TLV_TYPE)%"), EnvoyException,
+        "Invalid parameter provided for PROXY_PROTOCOL_TLVS header: INVALID_TLV_TYPE. Not parsable "
+        "as int.");
+  }
+
+  // Invalid tlv_type passed as parameter -- too large of a number for stoi to parse as int
+  {
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PROXY_PROTOCOL_TLVS(3000000000)%"),
+                              EnvoyException,
+                              "Invalid parameter provided for PROXY_PROTOCOL_TLVS header: "
+                              "3000000000. Not parsable as int.");
+  }
+
+  // Invalid tlv_type passed as parameter -- too large of a number to be a valid TLV type
+  {
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PROXY_PROTOCOL_TLVS(300)%"),
+                              EnvoyException,
+                              "Invalid parameter provided for PROXY_PROTOCOL_TLVS header: 300. "
+                              "Must be a positive integer less than 256.");
+  }
+
+  // ProxyProtocolFilterState is not stored in FilterState
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+    auto providers = SubstitutionFormatParser::parse("%PROXY_PROTOCOL_TLVS(2)%");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ(absl::nullopt, providers[0]->format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body, AccessLog::AccessLogType::NotSet));
+  }
+
+  // No TLVs stored in FilterState with specified tlv_type
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    Network::ProxyProtocolTLV tlv{0x5, {'1'}};
+    Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+    stream_info.filter_state_->setData(
+        Network::ProxyProtocolFilterState::key(),
+        std::make_unique<Network::ProxyProtocolFilterState>(proxy_proto_data),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+    EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+    auto providers = SubstitutionFormatParser::parse("%PROXY_PROTOCOL_TLVS(2)%");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("", providers[0]->format(request_headers, response_headers, response_trailers,
+                                       stream_info, body, AccessLog::AccessLogType::NotSet));
+  }
+
+  // Success case - only 1 TLV value of the associated type stored in the filter state
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    Network::ProxyProtocolTLV tlv_one{0x5, {'\6', '\7'}};
+    Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv_one}};
+    stream_info.filter_state_->setData(
+        Network::ProxyProtocolFilterState::key(),
+        std::make_unique<Network::ProxyProtocolFilterState>(proxy_proto_data),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+    auto providers = SubstitutionFormatParser::parse("%PROXY_PROTOCOL_TLVS(5)%");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("Bgc=", providers[0]->format(request_headers, response_headers, response_trailers,
+                                           stream_info, body, AccessLog::AccessLogType::NotSet));
+  }
+
+  // Success case - 2 TLV values of the associated type stored in the filter state, 1 TLV value with
+  // different type stored
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    Network::ProxyProtocolTLV tlv_one{0x5, {'\6', '\7'}};
+    Network::ProxyProtocolTLV tlv_two{0x5, {'\6', '\4'}};
+    Network::ProxyProtocolTLV tlv_three{0x2, {'\6', '\3'}};
+    Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv_one, tlv_two, tlv_three}};
+    stream_info.filter_state_->setData(
+        "envoy.network.proxy_protocol_options",
+        std::make_unique<Network::ProxyProtocolFilterState>(proxy_proto_data),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+    auto providers = SubstitutionFormatParser::parse("%PROXY_PROTOCOL_TLVS(5)%");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("Bgc=, BgQ=", providers[0]->format(request_headers, response_headers,
+                                                 response_trailers, stream_info, body, AccessLog::AccessLogType::NotSet));
   }
 }
 
