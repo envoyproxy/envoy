@@ -72,7 +72,6 @@ categories:
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
-- envoy.udp_proxy.session_filters
 - envoy.formatter
 - envoy.geoip_providers
 - envoy.grpc_credentials

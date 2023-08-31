@@ -142,9 +142,9 @@ typed_config:
       stop_iteration_on_new_session: {}
       stop_iteration_on_first_read: {}
 )EOF",
-                                        config.type_, config.downstream_bytes_to_drain_,
-                                        config.stop_iteration_on_new_session_,
-                                        config.stop_iteration_on_first_read_);
+                                       config.type_, config.downstream_bytes_to_drain_,
+                                       config.stop_iteration_on_new_session_,
+                                       config.stop_iteration_on_first_read_);
       } else if (config.type_ == "write") {
         session_filters += fmt::format(R"EOF(
   - name: {}
@@ -153,8 +153,8 @@ typed_config:
       upstream_bytes_to_drain: {}
       stop_iteration_on_first_write: {}
 )EOF",
-                                        config.type_, config.upstream_bytes_to_drain_,
-                                        config.stop_iteration_on_first_write_);
+                                       config.type_, config.upstream_bytes_to_drain_,
+                                       config.stop_iteration_on_first_write_);
       } else if (config.type_ == "read_write") {
         session_filters += fmt::format(
             R"EOF(
