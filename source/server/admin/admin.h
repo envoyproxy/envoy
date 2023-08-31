@@ -106,7 +106,7 @@ public:
   // Network::FilterChainFactory
   bool
   createNetworkFilterChain(Network::Connection& connection,
-                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
+                           const Filter::NetworkFilterFactoriesList& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
                                     Network::UdpReadFilterCallbacks&) override {}
@@ -463,7 +463,7 @@ private:
       return std::chrono::milliseconds::zero();
     }
 
-    const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
+    const Filter::NetworkFilterFactoriesList& networkFilterFactories() const override {
       return empty_network_filter_factory_;
     }
 
@@ -471,7 +471,7 @@ private:
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
-    const std::vector<Network::FilterFactoryCb> empty_network_filter_factory_;
+    const Filter::NetworkFilterFactoriesList empty_network_filter_factory_;
   };
 
   Server::Instance& server_;

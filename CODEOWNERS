@@ -23,10 +23,12 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123
-/*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @mattklein123
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch
+/*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @mattklein123 @htuch
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
+# grpc_field_extraction http filter extension
+/*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
@@ -93,17 +95,17 @@ extensions/filters/common/original_src @klarose @mattklein123
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
 # webassembly access logger extensions
-/*/extensions/access_loggers/wasm @mpwarres @mathetake @lizan
+/*/extensions/access_loggers/wasm @mpwarres @lizan
 # webassembly bootstrap extensions
-/*/extensions/bootstrap/wasm @mpwarres @mathetake @lizan
+/*/extensions/bootstrap/wasm @mpwarres @lizan
 # webassembly http extensions
-/*/extensions/filters/http/wasm @mpwarres @mathetake @lizan
+/*/extensions/filters/http/wasm @mpwarres @lizan
 # webassembly network extensions
-/*/extensions/filters/network/wasm @mpwarres @mathetake @lizan
+/*/extensions/filters/network/wasm @mpwarres @lizan
 # webassembly common extension
-/*/extensions/common/wasm @mpwarres @mathetake @lizan
+/*/extensions/common/wasm @mpwarres @lizan
 # webassembly runtimes
-/*/extensions/wasm_runtime/ @mpwarres @mathetake @lizan
+/*/extensions/wasm_runtime/ @mpwarres @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
@@ -127,7 +129,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
 /*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
-/*/extensions/stat_sinks/wasm @mpwarres @mathetake @lizan
+/*/extensions/stat_sinks/wasm @mpwarres @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
@@ -282,6 +284,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
+# Json to metadata
+/*/extensions/filters/http/json_to_metadata @JuniorHsu @kbaichoo
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
@@ -347,7 +351,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/client_ssl_auth/ @UNOWNED @UNOWNED
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
-/contrib/golang/ @doujiang24 @wangfakang @StarryVae
+/contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan

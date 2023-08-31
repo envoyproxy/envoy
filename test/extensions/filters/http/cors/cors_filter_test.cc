@@ -958,6 +958,37 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcardWithInvalidPNA) {
   EXPECT_EQ(decoder_callbacks_.stream_info_.responseCodeDetails().value(), "cors_response");
 }
 
+TEST_F(CorsFilterTest, CorsFilterLatchesRequestOriginValue) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "OPTIONS"},
+                                                 {"origin", "www.envoyproxy.com"},
+                                                 {"access-control-request-method", "GET"}};
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"access-control-allow-origin", "www.envoyproxy.com"},
+      {"access-control-allow-methods", "GET"},
+      {"access-control-allow-headers", "content-type"},
+      {"access-control-max-age", "0"},
+  };
+
+  cors_policy_->allow_methods_ = "*";
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+
+  // Remove the origin request header from the header map. If we don't
+  // latch the value we will have a dangling pointer.
+  request_headers.remove("origin");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+}
+
 } // namespace Cors
 } // namespace HttpFilters
 } // namespace Extensions

@@ -133,7 +133,7 @@ public:
         capturing_handshaker_service_ = nullptr;
         // If max_expected_concurrent_rpcs is zero, the fake handshaker service will not track
         // concurrent RPCs and abort if it exceeds the value.
-        service = grpc::gcp::CreateFakeHandshakerService(/* max_expected_concurrent_rpcs */ 0);
+        service = grpc::gcp::CreateFakeHandshakerService("peer_identity");
       }
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";

@@ -495,10 +495,13 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   // Failed write shouldn't drain the data.
   EXPECT_EQ(payload.length(), buffer->length());
 
-  ON_CALL(os_sys_calls, sendmsg(_, _, _))
-      .WillByDefault(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
-  // EINVAL should cause RELEASE_ASSERT.
-  EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
+  send_result = listener_->send(send_data);
+  EXPECT_FALSE(send_result.ok());
+  EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
+  // Failed write shouldn't drain the data.
+  EXPECT_EQ(payload.length(), buffer->length());
 }
 
 /**

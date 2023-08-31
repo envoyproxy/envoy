@@ -254,11 +254,6 @@ const absl::string_view NamedOverloadActionSymbolTable::name(Symbol symbol) cons
   return names_.at(symbol.index());
 }
 
-bool operator==(const NamedOverloadActionSymbolTable::Symbol& lhs,
-                const NamedOverloadActionSymbolTable::Symbol& rhs) {
-  return lhs.index() == rhs.index();
-}
-
 OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
                                Stats::Scope& stats_scope)
     : state_(OverloadActionState::inactive()),
@@ -570,7 +565,6 @@ LoadShedPoint* OverloadManagerImpl::getLoadShedPoint(absl::string_view point_nam
   if (auto it = loadshed_points_.find(point_name); it != loadshed_points_.end()) {
     return it->second.get();
   }
-  ENVOY_LOG(trace, "LoadShedPoint {} is not found. Is it configured?", point_name);
   return nullptr;
 }
 

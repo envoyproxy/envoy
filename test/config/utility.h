@@ -70,6 +70,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setCurves(const std::vector<std::string>& curves) {
+      curves_ = curves;
+      return *this;
+    }
+
     ServerSslOptions& setExpectClientEcdsaCert(bool expect_client_ecdsa_cert) {
       expect_client_ecdsa_cert_ = expect_client_ecdsa_cert;
       return *this;
@@ -124,6 +129,7 @@ public:
     bool ecdsa_cert_ocsp_staple_{false};
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
+    std::vector<std::string> curves_;
     bool expect_client_ecdsa_cert_{false};
     bool keylog_local_filter_{false};
     bool keylog_remote_filter_{false};
@@ -381,9 +387,12 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls(bool use_alpn = false, bool http3 = false,
-                            absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
-                                alternate_protocol_cache_config = {});
+  void configureUpstreamTls(
+      bool use_alpn = false, bool http3 = false,
+      absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+          alternate_protocol_cache_config = {},
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+          configure_tls_context = nullptr);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.

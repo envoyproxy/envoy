@@ -97,11 +97,11 @@ async function loadStats() {
   const url = prefix + '/stats?format=json&usedonly&histogram_buckets=detailed&' +
         params.map(makeQueryParam).join('&');
 
-  TRY_NEEDS_AUDIT {
+  try {
     const response = await fetch(url);
     const data = await response.json();
     renderStats(data);
-  } END_TRY catch (e) {
+  } catch (e) {
     statusDiv.textContent = 'Error fetching ' + url + ': ' + e;
   }
 

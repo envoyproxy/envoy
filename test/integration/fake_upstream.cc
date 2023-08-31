@@ -358,14 +358,16 @@ public:
 namespace {
 // Fake upstream codec will not do path normalization, so the tests can observe
 // the path forwarded by Envoy.
-constexpr absl::string_view fake_upstream_header_validator_config = R"EOF(
-    name: envoy.http.header_validators.envoy_default
-    typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
-        uri_path_normalization_options:
-          skip_path_normalization: true
-          skip_merging_slashes: true
-)EOF";
+::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+fakeUpstreamHeaderValidatorConfig() {
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig config;
+  config.mutable_uri_path_normalization_options()->set_skip_path_normalization(true);
+  config.mutable_uri_path_normalization_options()->set_skip_merging_slashes(true);
+  config.mutable_uri_path_normalization_options()->set_path_with_escaped_slashes_action(
+      ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
+          UriPathNormalizationOptions::KEEP_UNCHANGED);
+  return config;
+}
 } // namespace
 
 FakeHttpConnection::FakeHttpConnection(
@@ -376,7 +378,7 @@ FakeHttpConnection::FakeHttpConnection(
         headers_with_underscores_action)
     : FakeConnectionBase(shared_connection, time_system), type_(type),
       header_validator_factory_(
-          IntegrationUtil::makeHeaderValidationFactory(fake_upstream_header_validator_config)) {
+          IntegrationUtil::makeHeaderValidationFactory(fakeUpstreamHeaderValidatorConfig())) {
   ASSERT(max_request_headers_count != 0);
   if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;
@@ -672,7 +674,7 @@ void FakeUpstream::cleanUp() {
 }
 
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
-                                            const std::vector<Network::FilterFactoryCb>&) {
+                                            const Filter::NetworkFilterFactoriesList&) {
   absl::MutexLock lock(&lock_);
   if (read_disable_on_new_connection_ && http_type_ != Http::CodecType::HTTP3) {
     // Disable early close detection to avoid closing the network connection before full

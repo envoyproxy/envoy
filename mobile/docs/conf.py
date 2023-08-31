@@ -15,7 +15,7 @@
 from datetime import datetime
 import os
 from sphinx.directives.code import CodeBlock
-import sphinx_rtd_theme
+from envoy.docs.sphinx_runner import sphinx_rtd_theme
 import sys
 
 

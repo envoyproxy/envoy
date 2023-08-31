@@ -39,8 +39,8 @@ is set to ``false``, then the HTTP request is transformed to a JSON payload with
 - ``headers`` are the HTTP request headers. If multiple headers share the same name, their values are
   coalesced into a single comma-separated value.
 - ``query_string_parameters`` are the HTTP request query string parameters. If multiple parameters share the same name,
-  the last one wins. That is, parameters are _not_ coalesced into a single value if they share the same key name.
-- ``body`` the body of the HTTP request is base64-encoded by the filter if the ``content-type`` header exists and is _not_ one of the following:
+  the last one wins. That is, parameters are **not** coalesced into a single value if they share the same key name.
+- ``body`` the body of the HTTP request is base64-encoded by the filter if the ``content-type`` header exists and is **not** one of the following:
 
     -  text/*
     -  application/json
@@ -66,7 +66,7 @@ On the other end, the response of the Lambda function must conform to the follow
   OK``.
 - The ``headers`` are used as the HTTP response headers.
 - The ``cookies`` are used as ``Set-Cookie`` response headers. Unlike the request headers, cookies are _not_ part of the
-  response headers because the ``Set-Cookie`` header cannot contain more than one value per the `RFC`_. Therefore, Each
+  response headers because the ``Set-Cookie`` header cannot contain more than one value per the `RFC`_. Therefore, each
   key/value pair in this JSON array will translate to a single ``Set-Cookie`` header.
 - The ``body`` is base64-decoded if it is marked as base64-encoded and sent as the body of the HTTP response.
 
@@ -200,4 +200,4 @@ comes from the owning HTTP connection manager.
   :widths: 1, 1, 2
 
   server_error, Counter, Total requests that returned invalid JSON response (see :ref:`payload_passthrough <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Config>`)
-  upstream_rq_payload_size, Histogram, Size in bytes of the request after JSON-tranformation (if any).
+  upstream_rq_payload_size, Histogram, Size in bytes of the request after JSON-transformation (if any).

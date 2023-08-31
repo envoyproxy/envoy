@@ -37,7 +37,11 @@ ActiveStream::ActiveStream(Filter& parent, RequestPtr request, ExtendedOptions o
     : parent_(parent), downstream_request_stream_(std::move(request)),
       downstream_request_options_(options),
       stream_info_(parent_.time_source_,
-                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()) {
+                   parent_.callbacks_->connection().connectionInfoProviderSharedPtr()),
+      request_timer_(new Stats::HistogramCompletableTimespanImpl(parent_.stats_.request_time_ms_,
+                                                                 parent_.time_source_)) {
+  parent_.stats_.request_.inc();
+  parent_.stats_.request_active_.inc();
 
   connection_manager_tracing_config_ = parent_.config_->tracingConfig();
 
@@ -74,7 +78,9 @@ uint32_t ActiveStream::maxPathTagLength() const {
   return connection_manager_tracing_config_->maxPathTagLength();
 }
 
-Envoy::Event::Dispatcher& ActiveStream::dispatcher() { return parent_.connection().dispatcher(); }
+Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
+  return parent_.downstreamConnection().dispatcher();
+}
 const CodecFactory& ActiveStream::downstreamCodec() { return parent_.config_->codecFactory(); }
 void ActiveStream::resetStream() {
   if (active_stream_reset_) {
@@ -138,7 +144,7 @@ OptRef<UpstreamManager> ActiveStream::ActiveDecoderFilter::boundUpstreamConn() {
 }
 
 const Network::Connection* ActiveStream::ActiveFilterBase::connection() const {
-  return &parent_.parent_.connection();
+  return &parent_.parent_.downstreamConnection();
 }
 
 void ActiveStream::continueEncoding() {
@@ -163,8 +169,9 @@ void ActiveStream::continueEncoding() {
 }
 
 void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer) {
-  ASSERT(parent_.connection().state() == Network::Connection::State::Open);
-  parent_.connection().write(buffer, false);
+  ASSERT(parent_.downstreamConnection().state() == Network::Connection::State::Open);
+  parent_.downstreamConnection().write(buffer, false);
+  parent_.stats_.response_.inc();
   parent_.deferredStream(*this);
 }
 
@@ -177,6 +184,9 @@ void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
 
 void ActiveStream::completeRequest() {
   stream_info_.onRequestComplete();
+
+  request_timer_->complete();
+  parent_.stats_.request_active_.dec();
 
   if (active_span_) {
     Tracing::TracerUtility::finalizeSpan(*active_span_, *downstream_request_stream_, stream_info_,
@@ -318,6 +328,8 @@ void UpstreamManagerImpl::onDecodingFailure() {
 
   ENVOY_LOG(error, "generic proxy bound upstream manager: decoding failure");
 
+  parent_.stats_.response_decoding_error_.inc();
+
   while (!registered_response_callbacks_.empty()) {
     auto it = registered_response_callbacks_.begin();
     auto cb = it->second;
@@ -341,6 +353,16 @@ void UpstreamManagerImpl::writeToConnection(Buffer::Instance& buffer) {
   }
 }
 
+OptRef<Network::Connection> UpstreamManagerImpl::connection() {
+  if (is_cleaned_up_) {
+    return {};
+  }
+  if (owned_conn_data_ != nullptr) {
+    return {owned_conn_data_->connection()};
+  }
+  return {};
+}
+
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
   if (downstream_connection_closed_) {
     return Envoy::Network::FilterStatus::StopIteration;
@@ -355,15 +377,24 @@ void Filter::onDecodingSuccess(RequestPtr request, ExtendedOptions options) {
 }
 
 void Filter::onDecodingFailure() {
+  stats_.request_decoding_error_.inc();
+
   resetStreamsForUnexpectedError();
   closeDownstreamConnection();
 }
 
-void Filter::writeToConnection(Buffer::Instance& data) {
+void Filter::writeToConnection(Buffer::Instance& buffer) {
   if (downstream_connection_closed_) {
     return;
   }
-  connection().write(data, false);
+  downstreamConnection().write(buffer, false);
+}
+
+OptRef<Network::Connection> Filter::connection() {
+  if (downstream_connection_closed_) {
+    return {};
+  }
+  return {downstreamConnection()};
 }
 
 void Filter::sendReplyDownstream(Response& response, ResponseEncoderCallback& callback) {
@@ -402,7 +433,7 @@ void Filter::closeDownstreamConnection() {
     return;
   }
   downstream_connection_closed_ = true;
-  connection().close(Network::ConnectionCloseType::FlushWrite);
+  downstreamConnection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
 void Filter::mayBeDrainClose() {
@@ -434,7 +465,7 @@ void Filter::onBoundUpstreamConnectionEvent(Network::ConnectionEvent event) {
       // flag to true to ensure the upstream connection is closed in case of
       // the onBoundUpstreamConnectionEvent() is called for other reasons.
       upstream_manager_->cleanUp(true);
-      connection().dispatcher().deferredDelete(std::move(upstream_manager_));
+      downstreamConnection().dispatcher().deferredDelete(std::move(upstream_manager_));
       upstream_manager_ = nullptr;
     }
 

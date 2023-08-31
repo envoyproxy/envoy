@@ -105,8 +105,8 @@ template <typename StatsStructType>
 DeferredCreationCompatibleStats<StatsStructType>
 createDeferredCompatibleStats(Stats::ScopeSharedPtr scope,
                               const typename StatsStructType::StatNameType& stat_names,
-                              bool deferred_creation) {
-  if (deferred_creation) {
+                              bool defer_creation) {
+  if (defer_creation) {
     return DeferredCreationCompatibleStats<StatsStructType>(
         std::make_unique<DeferredStats<StatsStructType>>(stat_names, scope));
   } else {

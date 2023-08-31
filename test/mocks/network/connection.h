@@ -64,7 +64,7 @@ public:
   MOCK_METHOD(bool, initializeReadFilters, ());                                                    \
   MOCK_METHOD(std::string, nextProtocol, (), (const));                                             \
   MOCK_METHOD(void, noDelay, (bool enable));                                                       \
-  MOCK_METHOD(void, readDisable, (bool disable));                                                  \
+  MOCK_METHOD(ReadDisableStatus, readDisable, (bool disable));                                     \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
   MOCK_METHOD(ConnectionInfoSetter&, connectionInfoSetter, ());                                    \

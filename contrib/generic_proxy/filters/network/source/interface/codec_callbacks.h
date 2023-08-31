@@ -2,6 +2,8 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
@@ -96,6 +98,12 @@ public:
    * @param buffer data to write.
    */
   virtual void writeToConnection(Buffer::Instance& buffer) PURE;
+
+  /**
+   * @return the downstream connection that the request is received from. This gives
+   * the custom codec the full power to control the downstream connection.
+   */
+  virtual OptRef<Network::Connection> connection() PURE;
 };
 
 /**
@@ -126,6 +134,12 @@ public:
    * @param buffer data to write.
    */
   virtual void writeToConnection(Buffer::Instance& buffer) PURE;
+
+  /**
+   * @return the upstream connection that the response is received from. This gives
+   * the custom codec the full power to control the upstream connection.
+   */
+  virtual OptRef<Network::Connection> connection() PURE;
 };
 
 /**

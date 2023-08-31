@@ -202,6 +202,19 @@ bool Context::useFineGrainLogger() {
   return false;
 }
 
+void Context::changeAllLogLevels(spdlog::level::level_enum level) {
+  if (!useFineGrainLogger()) {
+    ENVOY_LOG_MISC(info, "change all log levels: level='{}'",
+                   spdlog::level::level_string_views[level]);
+    Registry::setLogLevel(level);
+  } else {
+    // Level setting with Fine-Grain Logger.
+    FINE_GRAIN_LOG(info, "change all log levels: level='{}'",
+                   spdlog::level::level_string_views[level]);
+    getFineGrainLogContext().setAllFineGrainLoggers(level);
+  }
+}
+
 void Context::enableFineGrainLogger() {
   if (current_context) {
     current_context->enable_fine_grain_logging_ = true;
@@ -258,6 +271,10 @@ void Registry::setLogFormat(const std::string& log_format) {
 }
 
 absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_struct) {
+#ifndef ENVOY_ENABLE_YAML
+  UNREFERENCED_PARAMETER(log_format_struct);
+  return absl::UnimplementedError("JSON/YAML support compiled out");
+#else
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   json_options.always_print_primitive_fields = true;
@@ -297,6 +314,7 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
   setLogFormat(format_as_json);
   json_log_format_set_ = true;
   return absl::OkStatus();
+#endif
 }
 
 bool Registry::json_log_format_set_ = false;

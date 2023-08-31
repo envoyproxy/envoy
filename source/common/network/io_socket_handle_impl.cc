@@ -234,6 +234,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    if (result.return_value_ < 0 && result.errno_ == SOCKET_ERROR_INVAL) {
+      ENVOY_LOG(error, fmt::format("EINVAL error. Socket is open: {}, IPv{}.", isOpen(),
+                                   self_ip->version() == Address::IpVersion::v6 ? 6 : 4));
+    }
     return sysCallResultToIoCallResult(result);
   }
 }

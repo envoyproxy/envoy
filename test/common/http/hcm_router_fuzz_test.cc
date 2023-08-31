@@ -259,7 +259,7 @@ public:
     FuzzUpstream* s = select(stream);
     if (s) {
       auto trailers = std::make_unique<Http::TestResponseTrailerMapImpl>(
-          Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(response_trailers));
+          fromHeaders<Http::TestResponseTrailerMapImpl>(response_trailers));
       s->sendTrailers(std::move(trailers));
     }
   }

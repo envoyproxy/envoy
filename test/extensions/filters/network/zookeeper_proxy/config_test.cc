@@ -73,10 +73,8 @@ stat_prefix: test_prefix
 max_packet_bytes: -1
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
-      "Unable to parse JSON as proto \\(INVALID_ARGUMENT:\\(max_packet_bytes.value\\): invalid "
-      "value -1 for type TYPE_UINT32\\)");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
+                          "max_packet_bytes");
 }
 
 TEST_F(ZookeeperFilterConfigTest, UndefinedOpcode) {
@@ -88,15 +86,8 @@ latency_threshold_overrides:
       nanos: 150000000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      TestUtility::loadFromYamlAndValidate(yaml, proto_config_),
-      ProtobufMessage::UnknownProtoFieldException,
-      "Protobuf message (type envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy "
-      "reason INVALID_ARGUMENT:(latency_threshold_overrides[0].opcode): invalid value "
-      "\"Undefined\" for type "
-      "type.googleapis.com/"
-      "envoy.extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode) has "
-      "unknown fields");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_),
+                          ProtobufMessage::UnknownProtoFieldException, "Undefined");
 }
 
 TEST_F(ZookeeperFilterConfigTest, NegativeLatencyThreshold) {

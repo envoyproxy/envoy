@@ -118,6 +118,7 @@ public:
                bool skip_cluster_check));
 };
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 MATCHER_P(ProtoBufferEq, expected, "") {
   typename std::remove_const<decltype(expected)>::type proto;
   if (!proto.ParseFromString(arg->toString())) {
@@ -177,6 +178,7 @@ MATCHER_P(ProtoBufferEqIgnoreRepeatedFieldOrdering, expected, "") {
   }
   return equal;
 }
+#endif
 
 } // namespace Grpc
 } // namespace Envoy

@@ -223,16 +223,18 @@ void SslSocket::drainErrorQueue() {
     if (failure_reason_.empty()) {
       failure_reason_ = "TLS error:";
     }
-    failure_reason_.append(absl::StrCat(" ", err, ":",
-                                        absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
-                                        absl::NullSafeStringView(ERR_func_error_string(err)), ":",
-                                        absl::NullSafeStringView(ERR_reason_error_string(err))));
+    absl::StrAppend(&failure_reason_, " ", err, ":",
+                    absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
+                    absl::NullSafeStringView(ERR_func_error_string(err)), ":",
+                    absl::NullSafeStringView(ERR_reason_error_string(err)));
   }
+
   if (!failure_reason_.empty()) {
     ENVOY_CONN_LOG(debug, "remote address:{},{}", callbacks_->connection(),
                    callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
                    failure_reason_);
   }
+
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }

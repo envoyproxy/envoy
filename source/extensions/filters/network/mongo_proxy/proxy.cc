@@ -43,7 +43,7 @@ AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogMa
 
 void AccessLog::logMessage(const Message& message, bool full,
                            const Upstream::HostDescription* upstream_host) {
-  static const std::string log_format =
+  static constexpr absl::string_view log_format =
       "{{\"time\": \"{}\", \"message\": {}, \"upstream_host\": \"{}\"}}\n";
 
   SystemTime now = time_source_.systemTime();

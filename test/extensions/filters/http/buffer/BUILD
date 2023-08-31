@@ -37,7 +37,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["buffer_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.buffer"],
-    shard_count = 16,
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/buffer:config",
         "//test/config:utility_lib",

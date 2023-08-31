@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -33,10 +33,11 @@ package http
 import "C"
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 const (
@@ -77,7 +78,11 @@ func (r *httpRequest) sendPanicReply(details string) {
 
 func (r *httpRequest) RecoverPanic() {
 	if e := recover(); e != nil {
-		// TODO: print an error message to Envoy error log.
+		const size = 64 << 10
+		buf := make([]byte, size)
+		buf = buf[:runtime.Stack(buf, false)]
+		api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+
 		switch e {
 		case errRequestFinished, errFilterDestroyed:
 			// do nothing
@@ -116,7 +121,9 @@ func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers 
 func (r *httpRequest) Log(level api.LogType, message string) {
 	// TODO performance optimization points:
 	// Add a new goroutine to write logs asynchronously and avoid frequent cgo calls
-	cAPI.HttpLog(level, fmt.Sprintf("[go_plugin_http][%v] %v", r.pluginName(), message))
+	cAPI.HttpLog(level, fmt.Sprintf("[http][%v] %v", r.pluginName(), message))
+	// The default log format is:
+	// [2023-08-09 03:04:16.179][1390][error][golang] [contrib/golang/common/log/cgo.cc:24] [http][plugin_name] msg
 }
 
 func (r *httpRequest) LogLevel() api.LogType {
@@ -138,12 +145,12 @@ type streamInfo struct {
 }
 
 func (s *streamInfo) GetRouteName() string {
-	name, _ := cAPI.HttpGetStringValue(s.request, ValueRouteName)
+	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueRouteName)
 	return name
 }
 
 func (s *streamInfo) FilterChainName() string {
-	name, _ := cAPI.HttpGetStringValue(s.request, ValueFilterChainName)
+	name, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueFilterChainName)
 	return name
 }
 
@@ -165,7 +172,7 @@ func (s *streamInfo) ResponseCode() (uint32, bool) {
 }
 
 func (s *streamInfo) ResponseCodeDetails() (string, bool) {
-	return cAPI.HttpGetStringValue(s.request, ValueResponseCodeDetails)
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueResponseCodeDetails)
 }
 
 func (s *streamInfo) AttemptCount() uint32 {
@@ -183,26 +190,40 @@ func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
 	}
 }
 
+func (d *dynamicMetadata) Get(filterName string) map[string]interface{} {
+	return cAPI.HttpGetDynamicMetadata(unsafe.Pointer(d.request), filterName)
+}
+
 func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
 	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
 }
 
 func (s *streamInfo) DownstreamLocalAddress() string {
-	address, _ := cAPI.HttpGetStringValue(s.request, ValueDownstreamLocalAddress)
+	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueDownstreamLocalAddress)
 	return address
 }
 
 func (s *streamInfo) DownstreamRemoteAddress() string {
-	address, _ := cAPI.HttpGetStringValue(s.request, ValueDownstreamRemoteAddress)
+	address, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueDownstreamRemoteAddress)
 	return address
 }
 
-func (s *streamInfo) UpstreamHostAddress() (string, bool) {
-	return cAPI.HttpGetStringValue(s.request, ValueUpstreamHostAddress)
+// UpstreamLocalAddress return the upstream local address.
+func (s *streamInfo) UpstreamLocalAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamLocalAddress)
+}
+
+// UpstreamRemoteAddress return the upstream remote address.
+func (s *streamInfo) UpstreamRemoteAddress() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamRemoteAddress)
 }
 
 func (s *streamInfo) UpstreamClusterName() (string, bool) {
-	return cAPI.HttpGetStringValue(s.request, ValueUpstreamClusterName)
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueUpstreamClusterName)
+}
+
+func (s *streamInfo) VirtualClusterName() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueVirtualClusterName)
 }
 
 type filterState struct {
@@ -220,5 +241,63 @@ func (f *filterState) SetString(key, value string, stateType api.StateType, life
 }
 
 func (f *filterState) GetString(key string) string {
-	return cAPI.HttpGetStringFilterState(f.request, key)
+	return cAPI.HttpGetStringFilterState(unsafe.Pointer(f.request), key)
+}
+
+type httpConfig struct {
+	config *C.httpConfig
+}
+
+func (c *httpConfig) DefineCounterMetric(name string) api.CounterMetric {
+	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), api.Counter, name)
+	return &counterMetric{
+		config:   c,
+		metricId: id,
+	}
+}
+
+func (c *httpConfig) DefineGaugeMetric(name string) api.GaugeMetric {
+	id := cAPI.HttpDefineMetric(unsafe.Pointer(c.config), api.Gauge, name)
+	return &gaugeMetric{
+		config:   c,
+		metricId: id,
+	}
+}
+
+func (c *httpConfig) Finalize() {
+	cAPI.HttpConfigFinalize(unsafe.Pointer(c.config))
+}
+
+type counterMetric struct {
+	config   *httpConfig
+	metricId uint32
+}
+
+func (m *counterMetric) Increment(offset int64) {
+	cAPI.HttpIncrementMetric(unsafe.Pointer(m.config), m.metricId, offset)
+}
+
+func (m *counterMetric) Get() uint64 {
+	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
+}
+
+func (m *counterMetric) Record(value uint64) {
+	cAPI.HttpRecordMetric(unsafe.Pointer(m.config), m.metricId, value)
+}
+
+type gaugeMetric struct {
+	config   *httpConfig
+	metricId uint32
+}
+
+func (m *gaugeMetric) Increment(offset int64) {
+	cAPI.HttpIncrementMetric(unsafe.Pointer(m.config), m.metricId, offset)
+}
+
+func (m *gaugeMetric) Get() uint64 {
+	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
+}
+
+func (m *gaugeMetric) Record(value uint64) {
+	cAPI.HttpRecordMetric(unsafe.Pointer(m.config), m.metricId, value)
 }

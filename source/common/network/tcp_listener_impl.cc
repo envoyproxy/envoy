@@ -140,6 +140,9 @@ void TcpListenerImpl::configureLoadShedPoints(
     Server::LoadShedPointProvider& load_shed_point_provider) {
   listener_accept_ =
       load_shed_point_provider.getLoadShedPoint("envoy.load_shed_points.tcp_listener_accept");
+  ENVOY_LOG_ONCE_MISC_IF(
+      trace, listener_accept_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.tcp_listener_accept is not found. Is it configured?");
 }
 
 } // namespace Network

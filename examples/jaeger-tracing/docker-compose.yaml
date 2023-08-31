@@ -3,6 +3,7 @@ services:
   # jaeger
   front-envoy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service1:
@@ -34,6 +35,7 @@ services:
 
   jaeger:
     build:
+      context: .
       dockerfile: ../shared/jaeger/Dockerfile
     environment:
     - COLLECTOR_ZIPKIN_HOST_PORT=9411

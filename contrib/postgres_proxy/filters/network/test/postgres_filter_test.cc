@@ -431,6 +431,31 @@ TEST_F(PostgresFilterTest, UpstreamSSL) {
   ASSERT_EQ(2, filter_->getStats().sessions_upstream_ssl_failed_.value());
 }
 
+TEST_F(PostgresFilterTest, UpstreamSSLStats) {
+  static_cast<DecoderImpl*>(filter_->getDecoder())->state(DecoderImpl::State::InitState);
+  EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+  filter_->getConfig()->upstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE;
+
+  createInitialPostgresRequest(data_);
+  filter_->onData(data_, false);
+
+  Buffer::OwnedImpl upstream_data;
+  upstream_data.add("S");
+  EXPECT_CALL(filter_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(true));
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onWrite(upstream_data, false));
+
+  createPostgresMsg(upstream_data, "C", "SELECT blah");
+  filter_->onWrite(upstream_data, false);
+  ASSERT_THAT(filter_->getStats().sessions_upstream_ssl_success_.value(), 1);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 1);
+  ASSERT_THAT(filter_->getStats().statements_select_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
+}
+
 } // namespace PostgresProxy
 } // namespace NetworkFilters
 } // namespace Extensions

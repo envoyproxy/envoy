@@ -102,7 +102,7 @@ cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
 Statistics
 ----------
 
-The local rate limit filter outputs statistics in the *<stat_prefix>.http_local_rate_limit.* namespace.
+The local rate limit filter outputs statistics in the ``<stat_prefix>.http_local_rate_limit.`` namespace.
 429 responses -- or the configured status code -- are emitted to the normal cluster :ref:`dynamic HTTP statistics
 <config_cluster_manager_cluster_stats_dynamic_http>`.
 

@@ -223,6 +223,18 @@ struct ClusterManagerStats {
 };
 
 /**
+ * All thread local cluster manager stats. @see stats_macros.h
+ */
+#define ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(GAUGE) GAUGE(clusters_inflated, NeverImport)
+
+/**
+ * Struct definition for all cluster manager stats. @see stats_macros.h
+ */
+struct ThreadLocalClusterManagerStats {
+  ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(GENERATE_GAUGE_STRUCT)
+};
+
+/**
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
  */
@@ -362,6 +374,8 @@ public:
     return common_lb_config_pool_->getObject(common_lb_config);
   }
 
+  Config::EdsResourcesCacheOptRef edsResourcesCache() override;
+
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -370,8 +384,10 @@ protected:
     struct PerPriority {
       PerPriority(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)
           : hosts_added_(hosts_added), hosts_removed_(hosts_removed), priority_(priority) {}
-
-      const HostVector hosts_added_;
+      // TODO(kbaichoo): make the hosts_added_ vector const and have the
+      // cluster initialization object have a stripped down version of this
+      // struct.
+      HostVector hosts_added_;
       const HostVector hosts_removed_;
       PrioritySet::UpdateHostsParams update_hosts_params_;
       LocalityWeightsConstSharedPtr locality_weights_;
@@ -388,6 +404,34 @@ protected:
 
     std::vector<PerPriority> per_priority_update_params_;
   };
+
+  /**
+   * A cluster initialization object (CIO) encapsulates the relevant information
+   * to create a cluster inline when there is traffic to it. We can thus use the
+   * CIO to deferred instantiating clusters on workers until they are used.
+   */
+  struct ClusterInitializationObject {
+    ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
+                                ClusterInfoConstSharedPtr cluster_info,
+                                LoadBalancerFactorySharedPtr load_balancer_factory,
+                                HostMapConstSharedPtr map);
+
+    ClusterInitializationObject(
+        const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
+            per_priority_state,
+        const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map);
+
+    absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
+    const ClusterInfoConstSharedPtr cluster_info_;
+    const LoadBalancerFactorySharedPtr load_balancer_factory_;
+    const HostMapConstSharedPtr cross_priority_host_map_;
+  };
+
+  using ClusterInitializationObjectConstSharedPtr =
+      std::shared_ptr<const ClusterInitializationObject>;
+  using ClusterInitializationMap =
+      absl::flat_hash_map<std::string, ClusterInitializationObjectConstSharedPtr>;
 
   /**
    * An implementation of an on-demand CDS handle. It forwards the discovery request to the cluster
@@ -635,9 +679,22 @@ private:
     // Upstream::ClusterLifecycleCallbackHandler
     ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) override;
 
+    /**
+     * Transparently initialize the given thread local cluster if possible using
+     * the Cluster Initialization object.
+     *
+     * @return The ClusterEntry of the newly initialized cluster or nullptr if there
+     * is no cluster deferred cluster with that name.
+     */
+    ClusterEntry* initializeClusterInlineIfExists(absl::string_view cluster);
+
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
+    // Known clusters will exclusively exist in either `thread_local_clusters_`
+    // or `thread_local_deferred_clusters_`.
     absl::flat_hash_map<std::string, ClusterEntryPtr> thread_local_clusters_;
+    // Maps from a given cluster name to the CIO for that cluster.
+    ClusterInitializationMap thread_local_deferred_clusters_;
 
     ClusterConnectivityState cluster_manager_state_;
 
@@ -651,6 +708,11 @@ private:
     const PrioritySet* local_priority_set_{};
     bool destroying_{};
     ClusterDiscoveryManager cdm_;
+    ThreadLocalClusterManagerStats local_stats_;
+
+  private:
+    static ThreadLocalClusterManagerStats generateStats(Stats::Scope& scope,
+                                                        const std::string& thread_name);
   };
 
   struct ClusterData : public ClusterManagerCluster {
@@ -783,6 +845,18 @@ private:
   void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
 
 private:
+  /**
+   * Builds the cluster initialization object for this given cluster.
+   * @return a ClusterInitializationObjectSharedPtr that can be used to create
+   * this cluster or nullptr if deferred cluster creation is off or the cluster
+   * type is not supported.
+   */
+  ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
+      const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
+      LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map);
+
+  bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
+
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
@@ -796,6 +870,8 @@ protected:
 
 private:
   ClusterMap warming_clusters_;
+  const bool deferred_cluster_creation_;
+  ClusterInitializationMap cluster_initialization_map_;
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;

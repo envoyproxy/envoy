@@ -9,6 +9,7 @@ services:
 
   grpc-server-proxy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: ./server/envoy-proxy.yaml
@@ -27,6 +28,7 @@ services:
 
   grpc-client-proxy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: ./client/envoy-proxy.yaml

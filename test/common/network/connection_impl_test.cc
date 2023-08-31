@@ -758,31 +758,37 @@ TEST_P(ConnectionImplTest, ReadDisable) {
       std::move(mocks.transport_socket_), stream_info_, true);
 
   EXPECT_CALL(*mocks.file_event_, setEnabled(_));
-  connection->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            connection->readDisable(true));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_));
-  connection->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            connection->readDisable(false));
 
   EXPECT_CALL(*mocks.file_event_, setEnabled(_));
-  connection->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            connection->readDisable(true));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
-  connection->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection->readDisable(true));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
-  connection->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection->readDisable(false));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_));
-  connection->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            connection->readDisable(false));
 
   EXPECT_CALL(*mocks.file_event_, setEnabled(_));
-  connection->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            connection->readDisable(true));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
-  connection->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection->readDisable(true));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
-  connection->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection->readDisable(false));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
-  connection->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection->readDisable(true));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_)).Times(0);
-  connection->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection->readDisable(false));
   EXPECT_CALL(*mocks.file_event_, setEnabled(_));
-  connection->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            connection->readDisable(false));
 
   connection->close(ConnectionCloseType::NoFlush);
 }
@@ -808,14 +814,16 @@ TEST_P(ConnectionImplTest, ReadEnableDispatches) {
   }
 
   {
-    client_connection_->readDisable(true);
+    EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+              client_connection_->readDisable(true));
     EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
           buffer.drain(buffer.length());
           dispatcher_->exit();
           return FilterStatus::StopIteration;
         }));
-    client_connection_->readDisable(false);
+    EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+              client_connection_->readDisable(false));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -848,9 +856,12 @@ TEST_P(ConnectionImplTest, KickUndone) {
     // Like ReadEnableDispatches above, read disable and read enable to kick off
     // an extra read. But then readDisable again and make sure the kick doesn't
     // happen.
-    client_connection_->readDisable(true);
-    client_connection_->readDisable(false); // Sets dispatch_buffered_data_
-    client_connection_->readDisable(true);
+    EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+              client_connection_->readDisable(true));
+    EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+              client_connection_->readDisable(false)); // Sets dispatch_buffered_data_
+    EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+              client_connection_->readDisable(true));
     EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -859,7 +870,8 @@ TEST_P(ConnectionImplTest, KickUndone) {
   // pass up the stack (no data is read)
   {
     connection_buffer->drain(connection_buffer->length());
-    client_connection_->readDisable(false);
+    EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+              client_connection_->readDisable(false));
     EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
     // Data no longer buffered - even if dispatch_buffered_data_ lingered it should have no effect.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -874,16 +886,24 @@ TEST_P(ConnectionImplTest, KickUndone) {
 TEST_P(ConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
   setUpBasicConnection();
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            client_connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            client_connection_->readDisable(false));
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
-  client_connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            client_connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+            client_connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+            client_connection_->readDisable(false));
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            client_connection_->readDisable(false));
 
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            client_connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+            client_connection_->readDisable(true));
   disconnect(false);
 #ifndef NDEBUG
   // When running in debug mode, verify that calls to readDisable and readEnabled on a closed socket
@@ -893,11 +913,11 @@ TEST_P(ConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
   EXPECT_DEBUG_DEATH(client_connection_->readDisable(false), "");
 #else
   // When running in release mode, verify that calls to readDisable change the readEnabled state.
-  client_connection_->readDisable(false);
-  client_connection_->readDisable(true);
-  client_connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::NoTransition, client_connection_->readDisable(false));
+  EXPECT_EQ(Connection::ReadDisableStatus::NoTransition, client_connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::NoTransition, client_connection_->readDisable(false));
   EXPECT_FALSE(client_connection_->readEnabled());
-  client_connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::NoTransition, client_connection_->readDisable(false));
   EXPECT_TRUE(client_connection_->readEnabled());
 #endif
 }
@@ -911,7 +931,8 @@ TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
   setUpBasicConnection();
   connect();
 
-  client_connection_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            client_connection_->readDisable(true));
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
@@ -926,7 +947,8 @@ TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   connect();
 
   client_connection_->detectEarlyCloseWhenReadDisabled(false);
-  client_connection_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            client_connection_->readDisable(true));
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
@@ -934,7 +956,8 @@ TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   server_connection_->close(ConnectionCloseType::FlushWrite);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  client_connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            client_connection_->readDisable(false));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -986,7 +1009,8 @@ TEST_P(ConnectionImplTest, HalfCloseNoEarlyCloseDetection) {
   connect();
 
   server_connection_->enableHalfClose(true);
-  server_connection_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            server_connection_->readDisable(true));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
   EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
@@ -995,7 +1019,8 @@ TEST_P(ConnectionImplTest, HalfCloseNoEarlyCloseDetection) {
   client_connection_->close(ConnectionCloseType::FlushWrite);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  server_connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            server_connection_->readDisable(false));
   EXPECT_CALL(*read_filter_, onData(_, _)).WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
     dispatcher_->exit();
     return FilterStatus::StopIteration;
@@ -1130,7 +1155,8 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   // This time when the buffer is drained, there will be no kick as the consumer
   // does not want to read.
   {
-    client_connection_->readDisable(true);
+    EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+              client_connection_->readDisable(true));
     testClientConnection()->readBuffer().drain(2);
     EXPECT_FALSE(testClientConnection()->readBuffer().highWatermarkTriggered());
     EXPECT_FALSE(testClientConnection()->shouldDrainReadBuffer());
@@ -1144,12 +1170,15 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   // Inside the onData call, readDisable and readEnable. This should trigger
   // another kick on the next dispatcher loop, so onData gets called twice.
   {
-    client_connection_->readDisable(false);
+    EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+              client_connection_->readDisable(false));
     EXPECT_CALL(*client_read_filter, onData(_, false))
         .Times(2)
         .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
-          client_connection_->readDisable(true);
-          client_connection_->readDisable(false);
+          EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+                    client_connection_->readDisable(true));
+          EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+                    client_connection_->readDisable(false));
           return FilterStatus::StopIteration;
         }))
         .WillRepeatedly(Invoke(on_filter_data_exit));
@@ -1173,16 +1202,20 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
     EXPECT_FALSE(client_connection_->readEnabled());
 
     // Read disable and read enable, to set dispatch_buffered_data_ true.
-    client_connection_->readDisable(true);
-    client_connection_->readDisable(false);
+    EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+              client_connection_->readDisable(true));
+    EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+              client_connection_->readDisable(false));
     // Now event loop. This hits the early on-Read path. As above, read
     // disable and read enable from inside the stack of onData, to ensure that
     // dispatch_buffered_data_ works correctly.
     EXPECT_CALL(*client_read_filter, onData(_, false))
         .Times(2)
         .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
-          client_connection_->readDisable(true);
-          client_connection_->readDisable(false);
+          EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+                    client_connection_->readDisable(true));
+          EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+                    client_connection_->readDisable(false));
           return FilterStatus::StopIteration;
         }))
         .WillRepeatedly(Invoke(on_filter_data_exit));
@@ -2159,38 +2192,44 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
   // When processing a sequence of read disable/read enable, changes to the enabled event mask
   // happen only when the disable count transitions to/from 0.
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
-  connection_->readDisable(true);
-  connection_->readDisable(true);
-  connection_->readDisable(true);
-  connection_->readDisable(false);
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(false));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(false));
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
   // Expect a read activation since there have been no transport doRead calls since the call to
   // setTransportSocketIsReadable.
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            connection_->readDisable(false));
 
   // No calls to doRead when file_ready_cb is invoked while read disabled.
   EXPECT_CALL(*file_event_, setEnabled(_));
-  connection_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            connection_->readDisable(true));
   EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
   file_ready_cb_(Event::FileReadyType::Read);
 
   // Expect a read activate when re-enabling since the file ready cb has not done a read.
   EXPECT_CALL(*file_event_, setEnabled(_));
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            connection_->readDisable(false));
 
   // Do a read to clear the transport_wants_read_ flag, verify that no read activation is scheduled.
   EXPECT_CALL(*transport_socket_, doRead(_))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   file_ready_cb_(Event::FileReadyType::Read);
   EXPECT_CALL(*file_event_, setEnabled(_));
-  connection_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            connection_->readDisable(true));
   EXPECT_CALL(*file_event_, setEnabled(_));
   // No read activate call.
   EXPECT_CALL(*file_event_, activate(_)).Times(0);
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            connection_->readDisable(false));
 }
 
 // Verify that read resumption is scheduled when read is re-enabled while the read buffer is
@@ -2241,14 +2280,14 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
 
   // Already read disabled, expect no changes to enabled events mask.
   EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
-  connection_->readDisable(true);
-  connection_->readDisable(true);
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(false));
   // Read buffer is at the high watermark so read_disable_count should be == 1. Expect a read
   // activate but no call to setEnable to change the registration mask.
   EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(false));
 
   // Invoke the file event cb while read_disable_count_ == 1 to partially drain the read buffer.
   // Expect no transport reads.
@@ -2279,11 +2318,13 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
   EXPECT_FALSE(connection_->shouldDrainReadBuffer());
 
   EXPECT_CALL(*file_event_, setEnabled(_));
-  connection_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            connection_->readDisable(true));
   EXPECT_CALL(*file_event_, setEnabled(_));
   // read buffer is empty, no read activate call.
   EXPECT_CALL(*file_event_, activate(_)).Times(0);
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            connection_->readDisable(false));
 }
 
 // Verify that transport_wants_read_ read resumption is not lost when processing read buffer
@@ -2315,14 +2356,14 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
 
   // Already read disabled, expect no changes to enabled events mask.
   EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
-  connection_->readDisable(true);
-  connection_->readDisable(true);
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(false));
   // Read buffer is at the high watermark so read_disable_count should be == 1. Expect a read
   // activate but no call to setEnable to change the registration mask.
   EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, connection_->readDisable(false));
 
   // Invoke the file event cb while read_disable_count_ == 1 and fully drain the read buffer.
   // Expect no transport reads. Expect a read resumption due to transport_wants_read_ being true
@@ -2347,10 +2388,12 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
   // Verify there are no read activate calls the event callback does a transport read and clears the
   // transport_wants_read_ state.
   EXPECT_CALL(*file_event_, setEnabled(_));
-  connection_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            connection_->readDisable(true));
   EXPECT_CALL(*file_event_, setEnabled(_));
   EXPECT_CALL(*file_event_, activate(_)).Times(0);
-  connection_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            connection_->readDisable(false));
 }
 
 // Test that BytesSentCb is invoked at the correct times

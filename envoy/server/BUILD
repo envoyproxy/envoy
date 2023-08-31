@@ -43,7 +43,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:context_interface",
-        "//envoy/ratelimit:ratelimit_interface",
         "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -168,6 +167,7 @@ envoy_cc_library(
     name = "watchdog_interface",
     hdrs = ["watchdog.h"],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/thread:thread_interface",
     ],
 )

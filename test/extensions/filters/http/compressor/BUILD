@@ -27,7 +27,6 @@ envoy_extension_cc_test(
         "//test/mocks/compression/compressor:compressor_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

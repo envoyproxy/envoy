@@ -30,8 +30,14 @@ namespace Server {
 namespace Configuration {
 
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
-                                          const std::vector<Network::FilterFactoryCb>& factories) {
-  for (const Network::FilterFactoryCb& factory : factories) {
+                                          const Filter::NetworkFilterFactoriesList& factories) {
+  for (const auto& filter_config_provider : factories) {
+    auto config = filter_config_provider->config();
+    if (!config.has_value()) {
+      return false;
+    }
+
+    Network::FilterFactoryCb& factory = config.value();
     factory(filter_manager);
   }
 
@@ -245,7 +251,7 @@ void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstr
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
                                           admin.access_log_path()};
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
         server.accessLogManager()));
   }
 }

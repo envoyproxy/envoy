@@ -1123,6 +1123,9 @@ TEST_P(DnsImplTest, DestroyChannelOnResetNetworking) {
 // Validate that the c-ares channel is destroyed and re-initialized when c-ares returns
 // ARES_ECONNREFUSED as its callback status.
 TEST_P(DnsImplTest, DestroyChannelOnRefused) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   ASSERT_FALSE(peer_->isChannelDirty());
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   server_->setRefused(true);

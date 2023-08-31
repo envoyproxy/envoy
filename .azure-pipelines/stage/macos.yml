@@ -31,6 +31,7 @@ jobs:
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+      ENVOY_RBE: 1
 
   - task: PublishTestResults@2
     inputs:

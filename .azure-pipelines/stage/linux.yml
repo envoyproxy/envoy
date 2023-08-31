@@ -6,7 +6,7 @@ parameters:
 - name: pool
   displayName: "Agent pool"
   type: string
-  default: envoy-x64-large
+  default: envoy-x64-small
 - name: artifactSuffix
   displayName: "Artifact suffix"
   type: string
@@ -19,6 +19,17 @@ parameters:
   displayName: "Build timeout"
   type: number
   default: 120
+- name: bazelBuildExtraOptions
+  type: string
+  default: ""
+
+- name: managedAgent
+  type: boolean
+  default: false
+- name: tmpfsDockerDisabled
+  type: string
+  default: ''
+
 
 - name: runBuild
   displayName: "Run build"
@@ -36,13 +47,14 @@ jobs:
   steps:
   - template: ../bazel.yml
     parameters:
-      managedAgent: false
+      managedAgent: ${{ parameters.managedAgent }}
       ciTarget: bazel.release
-      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      bazelBuildExtraOptions: ${{ parameters.bazelBuildExtraOptions }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)
       artifactSuffix: ${{ parameters.artifactSuffix }}
       rbe: ${{ parameters.rbe }}
+      tmpfsDockerDisabled: ${{ parameters.tmpfsDockerDisabled }}
 
 - job: released
   displayName: Complete

@@ -48,6 +48,7 @@
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
@@ -126,28 +127,23 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
   return options;
 }
 
-// Updates the health flags for an existing host to match the new host.
+// Updates the EDS health flags for an existing host to match the new host.
 // @param updated_host the new host to read health flag values from.
 // @param existing_host the host to update.
-// @param flag the health flag to update.
 // @return bool whether the flag update caused the host health to change.
-bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::HealthFlag flag) {
+bool updateEdsHealthFlag(const Host& updated_host, Host& existing_host) {
+  auto updated_eds_health_status = updated_host.edsHealthStatus();
+
   // Check if the health flag has changed.
-  if (existing_host.healthFlagGet(flag) != updated_host.healthFlagGet(flag)) {
-    // Keep track of the previous health value of the host.
-    const auto previous_health = existing_host.coarseHealth();
-
-    if (updated_host.healthFlagGet(flag)) {
-      existing_host.healthFlagSet(flag);
-    } else {
-      existing_host.healthFlagClear(flag);
-    }
-
-    // Rebuild if changing the flag affected the host health.
-    return previous_health != existing_host.coarseHealth();
+  if (updated_eds_health_status == existing_host.edsHealthStatus()) {
+    return false;
   }
 
-  return false;
+  const auto previous_health = existing_host.coarseHealth();
+  existing_host.setEdsHealthStatus(updated_eds_health_status);
+
+  // Rebuild if changing the flag affected the host health.
+  return previous_health != existing_host.coarseHealth();
 }
 
 // Converts a set of hosts into a HostVector, excluding certain hosts.
@@ -467,16 +463,21 @@ Host::CreateConnectionData HostImpl::createConnection(
 }
 
 void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
+  // Clear all old EDS health flags first.
+  HostImpl::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
+  HostImpl::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+
+  // Set the appropriate EDS health flag.
   switch (health_status) {
   case envoy::config::core::v3::UNHEALTHY:
     FALLTHRU;
   case envoy::config::core::v3::DRAINING:
     FALLTHRU;
   case envoy::config::core::v3::TIMEOUT:
-    healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+    HostImpl::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DEGRADED:
-    healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+    HostImpl::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
     break;
   default:
     break;
@@ -549,6 +550,8 @@ std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
   std::vector<std::shared_ptr<HostsPerLocalityImpl>> mutable_clones;
   std::vector<HostsPerLocalityConstSharedPtr> filtered_clones;
 
+  mutable_clones.reserve(predicates.size());
+  filtered_clones.reserve(predicates.size());
   for (size_t i = 0; i < predicates.size(); ++i) {
     mutable_clones.emplace_back(std::make_shared<HostsPerLocalityImpl>());
     filtered_clones.emplace_back(mutable_clones.back());
@@ -863,9 +866,11 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-LazyClusterTrafficStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
-                                                       const ClusterTrafficStatNames& stat_names) {
-  return std::make_unique<ClusterTrafficStats>(stat_names, scope);
+DeferredCreationCompatibleClusterTrafficStats
+ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
+                               const ClusterTrafficStatNames& stat_names, bool defer_creation) {
+  return Stats::createDeferredCompatibleStats<ClusterTrafficStats>(scope, stat_names,
+                                                                   defer_creation);
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
@@ -1042,8 +1047,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      traffic_stats_(
-          generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
+      traffic_stats_(generateStats(stats_scope_,
+                                   factory_context.clusterManager().clusterStatNames(),
+                                   server_context.statsConfig().enableDeferredCreationStats())),
       config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
                            *stats_scope_),
       lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
@@ -1083,6 +1089,11 @@ ClusterInfoImpl::ClusterInfoImpl(
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())
                         : nullptr),
+      http_filter_config_provider_manager_(
+          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+              server_context)),
+      network_filter_config_provider_manager_(
+          createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
@@ -1216,7 +1227,23 @@ ClusterInfoImpl::ClusterInfoImpl(
   filter_factories_.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
+    const bool is_terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  upstream filter #{}:", i);
+
+    if (proto_config.has_config_discovery()) {
+      if (proto_config.has_typed_config()) {
+        throw EnvoyException("Only one of typed_config or config_discovery can be used");
+      }
+
+      ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
+      filter_factories_.push_back(
+          network_filter_config_provider_manager_->createDynamicFilterConfigProvider(
+              proto_config.config_discovery(), proto_config.name(), server_context,
+              upstream_context_, factory_context.clusterManager(), is_terminal, "network",
+              nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
@@ -1224,8 +1251,10 @@ ClusterInfoImpl::ClusterInfoImpl(
     Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, *factory_context_);
-    filter_factories_.push_back(std::move(callback));
+        factory.createFilterFactoryFromProto(*message, upstream_context_);
+    filter_factories_.push_back(
+        network_filter_config_provider_manager_->createStaticFilterConfigProvider(
+            callback, proto_config.name()));
   }
 
   if (http_protocol_options_) {
@@ -1241,15 +1270,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       throw EnvoyException(
           fmt::format("The codec filter is the only valid terminal upstream filter"));
     }
-    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
-        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-            upstream_context_.getServerFactoryContext());
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
-    Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+    Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
-               upstream_context_, prefix);
+        helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
+               factory_context.clusterManager(), upstream_context_, prefix);
     helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
   }
 }
@@ -1336,8 +1362,12 @@ Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
-  for (const auto& factory : filter_factories_) {
-    factory(connection);
+  for (const auto& filter_config_provider : filter_factories_) {
+    auto config = filter_config_provider->config();
+    if (config.has_value()) {
+      Network::FilterFactoryCb& factory = config.value();
+      factory(connection);
+    }
   }
 }
 
@@ -1767,6 +1797,16 @@ std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::get
   return std::make_pair(budget_percent, min_retry_concurrency);
 }
 
+SINGLETON_MANAGER_REGISTRATION(upstream_network_filter_config_provider_manager);
+
+std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+ClusterInfoImpl::createSingletonUpstreamNetworkFilterConfigProviderManager(
+    Server::Configuration::ServerFactoryContext& context) {
+  return context.singletonManager().getTyped<UpstreamNetworkFilterConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(upstream_network_filter_config_provider_manager),
+      [] { return std::make_shared<Filter::UpstreamNetworkFilterConfigProviderManagerImpl>(); });
+}
+
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
@@ -2069,10 +2109,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         hosts_changed = true;
       }
 
-      hosts_changed |=
-          updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::FAILED_EDS_HEALTH);
-      hosts_changed |=
-          updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::DEGRADED_EDS_HEALTH);
+      hosts_changed |= updateEdsHealthFlag(*host, *existing_host->second);
 
       // Did metadata change?
       bool metadata_changed = true;
@@ -2111,13 +2148,47 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
 
       // If we are depending on a health checker, we initialize to unhealthy.
+      // If there's an existing host with the same health checker, the
+      // active health-status is kept.
       if (health_checker_ != nullptr && !host->disableActiveHealthCheck()) {
-        host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update")) {
+          if (existing_host_found && !health_check_address_changed &&
+              !active_health_check_flag_changed) {
+            // If there's an existing host, use the same active health-status.
+            // The existing host can be marked PENDING_ACTIVE_HC or
+            // ACTIVE_HC_TIMEOUT if it is also marked with FAILED_ACTIVE_HC.
+            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
+                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
-        // If we want to exclude hosts until they have been health checked, mark them with
-        // a flag to indicate that they have not been health checked yet.
-        if (info_->warmHosts()) {
-          host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+            constexpr uint32_t active_hc_statuses_mask =
+                enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
+                enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+
+            const uint32_t existing_host_statuses = existing_host->second->healthFlagsGetAll();
+            host->healthFlagsSetAll(existing_host_statuses & active_hc_statuses_mask);
+          } else {
+            // No previous known host, mark it as failed active HC.
+            host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+            // If we want to exclude hosts until they have been health checked, mark them with
+            // a flag to indicate that they have not been health checked yet.
+            if (info_->warmHosts()) {
+              host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+            }
+          }
+        } else {
+          host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+          // If we want to exclude hosts until they have been health checked, mark them with
+          // a flag to indicate that they have not been health checked yet.
+          if (info_->warmHosts()) {
+            host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+          }
         }
       }
 

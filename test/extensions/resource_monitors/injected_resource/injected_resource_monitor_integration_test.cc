@@ -218,23 +218,26 @@ TEST_P(ListenerMaxConnectionPerSocketEventTest, AcceptsConnectionsUpToTheMaximum
 
     // As we are using level trigger for listeners, all new connections get recognized.
     test_server_->waitForGaugeEq(downstream_cx_active, 10);
+
+    // Wait for the histogram to be updated as that occurs after the logs we are
+    // expecting.
+    const std::string connections_accepted_per_socket_event =
+        (version_ == Network::Address::IpVersion::v4)
+            ? "listener.127.0.0.1_0.connections_accepted_per_socket_event"
+            : "listener.[__1]_0.connections_accepted_per_socket_event";
+    test_server_->waitUntilHistogramHasSamples(connections_accepted_per_socket_event);
+    auto connections_accepted_histogram =
+        test_server_->histogram(connections_accepted_per_socket_event);
+    EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                           *connections_accepted_histogram),
+              5);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *connections_accepted_histogram)),
+              10);
   });
 
   std::for_each(client_codecs.begin(), client_codecs.end(),
                 [](IntegrationCodecClientPtr& client_codec) { client_codec->close(); });
-  const std::string connections_accepted_per_socket_event =
-      (version_ == Network::Address::IpVersion::v4)
-          ? "listener.127.0.0.1_0.connections_accepted_per_socket_event"
-          : "listener.[__1]_0.connections_accepted_per_socket_event";
-  test_server_->waitUntilHistogramHasSamples(connections_accepted_per_socket_event);
-  auto connections_accepted_histogram =
-      test_server_->histogram(connections_accepted_per_socket_event);
-  EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
-                                         *connections_accepted_histogram),
-            5);
-  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
-                                                        *connections_accepted_histogram)),
-            10);
 }
 
 } // namespace Envoy

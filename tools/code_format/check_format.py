@@ -252,7 +252,7 @@ class FormatChecker:
                     "{} environment variable to specify the path. Example:\n"
                     "    export {}=`which {}`\n"
                     "If you don't have {} installed, you can install it by:\n"
-                    "    go get -u github.com/bazelbuild/buildtools/{}".format(
+                    "    go install github.com/bazelbuild/buildtools/{}@latest".format(
                         path, name, var, var, name, name, name))
 
         check_bazel_tool('buildifier', self.config.buildifier_path, 'BUILDIFIER_BIN')

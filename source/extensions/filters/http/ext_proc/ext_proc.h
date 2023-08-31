@@ -55,15 +55,36 @@ public:
   explicit ExtProcLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
       : filter_metadata_(filter_metadata) {}
 
+  // gRPC call stats for headers and trailers.
   struct GrpcCall {
-    GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus status,
-             const ProcessorState::CallbackState callback_state)
-        : latency_(latency), status_(status), callback_state_(callback_state) {}
+    GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus call_status)
+        : latency_(latency), call_status_(call_status) {}
     const std::chrono::microseconds latency_;
-    const Grpc::Status::GrpcStatus status_;
-    const ProcessorState::CallbackState callback_state_;
+    const Grpc::Status::GrpcStatus call_status_;
   };
-  using GrpcCalls = std::vector<GrpcCall>;
+
+  // gRPC call stats for body.
+  struct GrpcCallBody {
+    GrpcCallBody(const uint32_t call_count, const Grpc::Status::GrpcStatus call_status,
+                 const std::chrono::microseconds total_latency,
+                 const std::chrono::microseconds max_latency,
+                 const std::chrono::microseconds min_latency)
+        : call_count_(call_count), last_call_status_(call_status), total_latency_(total_latency),
+          max_latency_(max_latency), min_latency_(min_latency) {}
+    uint32_t call_count_;
+    Grpc::Status::GrpcStatus last_call_status_;
+    std::chrono::microseconds total_latency_;
+    std::chrono::microseconds max_latency_;
+    std::chrono::microseconds min_latency_;
+  };
+
+  struct GrpcCallStats {
+    std::unique_ptr<GrpcCall> header_stats_;
+    std::unique_ptr<GrpcCall> trailer_stats_;
+    std::unique_ptr<GrpcCallBody> body_stats_;
+  };
+
+  using GrpcCalls = struct GrpcCallStats;
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
@@ -113,7 +134,9 @@ public:
         processing_mode_(config.processing_mode()), mutation_checker_(config.mutation_rules()),
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
-        header_matchers_(initHeaderMatchers(config)) {}
+        disable_immediate_response_(config.disable_immediate_response()),
+        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
+        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -128,6 +151,7 @@ public:
   }
 
   bool allowModeOverride() const { return allow_mode_override_; }
+  bool disableImmediateResponse() const { return disable_immediate_response_; }
 
   const Filters::Common::MutationRules::Checker& mutationChecker() const {
     return mutation_checker_;
@@ -135,7 +159,10 @@ public:
 
   bool disableClearRouteCache() const { return disable_clear_route_cache_; }
 
-  const std::vector<Matchers::StringMatcherPtr>& headerMatchers() const { return header_matchers_; }
+  const std::vector<Matchers::StringMatcherPtr>& allowedHeaders() const { return allowed_headers_; }
+  const std::vector<Matchers::StringMatcherPtr>& disallowedHeaders() const {
+    return disallowed_headers_;
+  }
 
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
@@ -145,10 +172,10 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
-  const std::vector<Matchers::StringMatcherPtr> initHeaderMatchers(
-      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+  const std::vector<Matchers::StringMatcherPtr>
+  initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list) {
     std::vector<Matchers::StringMatcherPtr> header_matchers;
-    for (const auto& matcher : config.forward_rules().allowed_headers().patterns()) {
+    for (const auto& matcher : header_list.patterns()) {
       header_matchers.push_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               matcher));
@@ -167,8 +194,13 @@ private:
   const Envoy::ProtobufWkt::Struct filter_metadata_;
   // If set to true, allow the processing mode to be modified by the ext_proc response.
   const bool allow_mode_override_;
-  // Empty header_matchers_ means allow all.
-  const std::vector<Matchers::StringMatcherPtr> header_matchers_;
+  // If set to true, disable the immediate response from the ext_proc server, which means
+  // closing the stream to the ext_proc server, and no more external processing.
+  const bool disable_immediate_response_;
+  // Empty allowed_header_ means allow all.
+  const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
+  // Empty disallowed_header_ means disallow nothing, i.e, allow all.
+  const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -220,7 +252,7 @@ public:
   const FilterConfig& config() const { return *config_; }
 
   ExtProcFilterStats& stats() { return stats_; }
-  ExtProcLoggingInfo& loggingInfo() { return *logging_info_; }
+  ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -237,19 +269,14 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
   // ExternalProcessorCallbacks
-
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
-
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
-
   void onGrpcClose() override;
+  void logGrpcStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
-
-  void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
-                        bool end_stream);
 
   void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                      ProcessorState::CallbackState new_state, bool end_stream);
