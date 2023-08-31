@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Upstream {
 
 DefaultUpstreamLocalAddressSelector::DefaultUpstreamLocalAddressSelector(
-    std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses)
+    std::vector<::Envoy::Upstream::UpstreamLocalAddress>&& upstream_local_addresses)
     : upstream_local_addresses_(std::move(upstream_local_addresses)) {
   // If bind config is not provided, we insert at least one
   // ``UpstreamLocalAddress`` with null address.

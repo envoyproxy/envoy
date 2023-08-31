@@ -20,7 +20,7 @@ namespace Upstream {
 class DefaultUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:
   DefaultUpstreamLocalAddressSelector(
-      std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses);
+      std::vector<::Envoy::Upstream::UpstreamLocalAddress>&& upstream_local_addresses);
 
   // UpstreamLocalAddressSelector
   UpstreamLocalAddress getUpstreamLocalAddressImpl(
