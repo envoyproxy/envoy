@@ -84,6 +84,7 @@ public:
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> connection() override;
   void onConnectionClose(Network::ConnectionEvent event) override;
 
   // RequestEncoderCallback
