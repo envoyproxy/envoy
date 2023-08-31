@@ -4863,6 +4863,26 @@ TEST_F(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcher) {
                           ".*which has a non-ALPN transport socket matcher:.*");
 }
 
+TEST_F(ClusterInfoImplTest, UpstreamFilterTypedAndDynamicConfigThrows) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    protocol_selection: USE_DOWNSTREAM_PROTOCOL
+    filters:
+    - name: foo
+      config_discovery:
+        type_urls:
+        - type.googleapis.com/google.protobuf.Struct
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Only one of typed_config or config_discovery can be used");
+}
+
 // Validate empty singleton for HostsPerLocalityImpl.
 TEST(HostsPerLocalityImpl, Empty) {
   EXPECT_FALSE(HostsPerLocalityImpl::empty()->hasLocalLocality());
