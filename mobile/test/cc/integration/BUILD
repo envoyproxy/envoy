@@ -1,4 +1,4 @@
-load("//third_party/envoy/src/bazel:envoy_select.bzl", "envoy_select_enable_yaml")
+load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_yaml")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
 
 licenses(["notice"])  # Apache 2
@@ -7,7 +7,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "send_headers_test",
-    srcs = envoy_select_enable_yaml(["send_headers_test.cc"]),
+    srcs = envoy_select_enable_yaml(["send_headers_test.cc"], "@envoy"),
     repository = "@envoy",
     deps = [
         "//library/cc:envoy_engine_cc_lib_no_stamp",
@@ -18,7 +18,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "lifetimes_test",
-    srcs = envoy_select_enable_yaml(["lifetimes_test.cc"]),
+    srcs = envoy_select_enable_yaml(["lifetimes_test.cc"], "@envoy"),
     repository = "@envoy",
     deps = [
         "//library/cc:envoy_engine_cc_lib_no_stamp",

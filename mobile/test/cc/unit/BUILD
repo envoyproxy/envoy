@@ -1,3 +1,4 @@
+load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_yaml")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
 
 licenses(["notice"])  # Apache 2
@@ -6,7 +7,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "envoy_config_test",
-    srcs = envoy_select_enable_yaml(["envoy_config_test.cc"]),
+    srcs = envoy_select_enable_yaml(["envoy_config_test.cc"], "@envoy"),
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
