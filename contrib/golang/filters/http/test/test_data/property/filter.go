@@ -101,7 +101,6 @@ func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api
 		exp = strconv.Itoa(int(code))
 	}
 	f.assertProperty("response.code", exp)
-	f.assertProperty("response.code", "value not found")
 	f.assertProperty("response.code_details", "via_upstream")
 
 	f.assertProperty("request.size", "10") // "helloworld"
