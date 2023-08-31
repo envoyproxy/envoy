@@ -86,8 +86,7 @@ TEST_F(CELFormatterTest, TestMissingRequestHeader) {
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("-", formatter->format(request_headers_, response_headers_, response_trailers_,
-                                   stream_info_, body_, AccessLog::AccessLogType::NotSet));
+  EXPECT_EQ("-", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(CELFormatterTest, TestWithoutMaxLength) {
@@ -104,8 +103,7 @@ TEST_F(CELFormatterTest, TestWithoutMaxLength) {
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("/original/path?secret=parameter",
-            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+            formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(CELFormatterTest, TestMaxLength) {
@@ -121,8 +119,7 @@ TEST_F(CELFormatterTest, TestMaxLength) {
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("/original", formatter->format(request_headers_, response_headers_, response_trailers_,
-                                           stream_info_, body_, AccessLog::AccessLogType::NotSet));
+  EXPECT_EQ("/original", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(CELFormatterTest, TestInvalidExpression) {
