@@ -1,7 +1,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
+#include "source/extensions/filters/udp/udp_proxy/session_filters/filter_config.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
@@ -61,21 +61,28 @@ private:
   uint64_t session_id_;
 };
 
-class DrainerUdpSessionReadFilterConfigFactory : public FactoryBase<ReadDrainerConfig> {
+class DrainerUdpSessionReadFilterConfigFactory : public NamedUdpSessionFilterConfigFactory {
 public:
-  DrainerUdpSessionReadFilterConfigFactory() : FactoryBase("test.udp_session.drainer_read") {}
   ~DrainerUdpSessionReadFilterConfigFactory() override = default;
 
-private:
   FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ReadDrainerConfig& config,
-                                    Server::Configuration::FactoryContext&) override {
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext& context) override {
+    const auto& config = MessageUtil::downcastAndValidate<const ReadDrainerConfig&>(
+        proto_config, context.messageValidationVisitor());
+
     return [config](FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addReadFilter(std::make_unique<DrainerUdpSessionReadFilter>(
           config.downstream_bytes_to_drain(), config.stop_iteration_on_new_session(),
           config.stop_iteration_on_first_read()));
     };
   }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ReadDrainerConfig>();
+  }
+
+  std::string name() const override { return "test.udp_session.drainer_read"; }
 };
 
 static Registry::RegisterFactory<DrainerUdpSessionReadFilterConfigFactory,
@@ -108,20 +115,27 @@ private:
   uint64_t session_id_;
 };
 
-class DrainerUdpSessionWriteFilterConfigFactory : public FactoryBase<WriteDrainerConfig> {
+class DrainerUdpSessionWriteFilterConfigFactory : public NamedUdpSessionFilterConfigFactory {
 public:
-  DrainerUdpSessionWriteFilterConfigFactory() : FactoryBase("test.udp_session.drainer_write") {}
   ~DrainerUdpSessionWriteFilterConfigFactory() override = default;
 
-private:
   FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const WriteDrainerConfig& config,
-                                    Server::Configuration::FactoryContext&) override {
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext& context) override {
+    const auto& config = MessageUtil::downcastAndValidate<const WriteDrainerConfig&>(
+        proto_config, context.messageValidationVisitor());
+
     return [config](FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addWriteFilter(std::make_unique<DrainerUdpSessionWriteFilter>(
           config.upstream_bytes_to_drain(), config.stop_iteration_on_first_write()));
     };
   }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<WriteDrainerConfig>();
+  }
+
+  std::string name() const override { return "test.udp_session.drainer_write"; }
 };
 
 static Registry::RegisterFactory<DrainerUdpSessionWriteFilterConfigFactory,
@@ -140,15 +154,16 @@ public:
         DrainerUdpSessionWriteFilter(upstream_bytes_to_drain, stop_iteration_on_first_write) {}
 };
 
-class DrainerUdpSessionFilterConfigFactory : public FactoryBase<DrainerConfig> {
+class DrainerUdpSessionFilterConfigFactory : public NamedUdpSessionFilterConfigFactory {
 public:
-  DrainerUdpSessionFilterConfigFactory() : FactoryBase("test.udp_session.drainer") {}
   ~DrainerUdpSessionFilterConfigFactory() override = default;
 
-private:
   FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const DrainerConfig& config,
-                                    Server::Configuration::FactoryContext&) override {
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext& context) override {
+    const auto& config = MessageUtil::downcastAndValidate<const DrainerConfig&>(
+        proto_config, context.messageValidationVisitor());
+
     return [config](FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addFilter(std::make_shared<DrainerUdpSessionFilter>(
           config.downstream_bytes_to_drain(), config.upstream_bytes_to_drain(),
@@ -156,6 +171,12 @@ private:
           config.stop_iteration_on_first_write()));
     };
   }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<DrainerConfig>();
+  }
+
+  std::string name() const override { return "test.udp_session.drainer"; }
 };
 
 static Registry::RegisterFactory<DrainerUdpSessionFilterConfigFactory,
