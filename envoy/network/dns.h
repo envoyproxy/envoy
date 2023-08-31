@@ -62,19 +62,14 @@ enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
 class DnsResponse {
 public:
   DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
-      : response_(AddrInfoResponse{address, ttl}) {}
+      : response_(AddrInfoResponse{
+            address,
+            std::chrono::seconds(std::min(std::chrono::seconds::rep(INT_MAX),
+                                          std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
   DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
       : response_(SrvResponse{host, port, priority, weight}) {}
 
-  const AddrInfoResponse addrInfo() const {
-    const AddrInfoResponse& addrInfoResponse = absl::get<AddrInfoResponse>(response_);
-    // DNS TTL range is [0, 2^31 - 1], [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181)
-    const std::chrono::seconds::rep ttlCount =
-        std::min(std::chrono::seconds::rep(INT_MAX),
-                 std::max(addrInfoResponse.ttl_.count(), std::chrono::seconds::rep(0)));
-
-    return AddrInfoResponse{addrInfoResponse.address_, std::chrono::seconds(ttlCount)};
-  }
+  const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
 
   const SrvResponse& srv() const { return absl::get<SrvResponse>(response_); }
 
