@@ -188,6 +188,7 @@ void HotRestartingChild::onSocketEventUdpForwarding() {
           MonotonicTime(std::chrono::microseconds{req.receive_time_epoch_microseconds()});
       data.buffer_ = std::make_unique<Buffer::OwnedImpl>(req.packet());
       onForwardedUdpPacket(req.worker_index(), std::move(data));
+      break;
     }
     default: {
       ENVOY_LOG(
