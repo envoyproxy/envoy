@@ -173,7 +173,8 @@ void Streamer::addNumber(double number) {
     // On Apple, std::to_chars does not compile, so we revert to the next best implementation.
     response_.addFragments({fmt::to_string(number)});
 #else
-    // Switching the apple version
+    // This version is awkward, and doesn't work on Apple as of August 2023, but
+    // it is the fastest correct option on other platforms.
     char buf[100];
     std::to_chars_result result = std::to_chars(buf, buf + sizeof(buf), number);
     ASSERT(result.ec == std::errc{}, std::make_error_code(result.ec).message());

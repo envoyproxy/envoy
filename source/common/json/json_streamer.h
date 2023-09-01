@@ -5,9 +5,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/optref.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/variant.h"
 
