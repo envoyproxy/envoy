@@ -49,6 +49,13 @@ envoy_cc_library(
     hdrs = ["engine_common.h"],
     repository = "@envoy",
     deps = [
+        "//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto_descriptor",
+        "//library/common/extensions/filters/http/local_error:filter_cc_proto_descriptor",
+        "//library/common/extensions/filters/http/network_configuration:filter_cc_proto_descriptor",
+        "//library/common/extensions/filters/http/platform_bridge:filter_cc_proto_descriptor",
+        "//library/common/extensions/filters/http/socket_tag:filter_cc_proto_descriptor",
+        "//library/common/extensions/key_value/platform:platform_cc_proto_descriptor",
+        "//library/common/extensions/retry/options/network_configuration:predicate_cc_proto_descriptor",
         "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:random_generator_lib",
         "@envoy//source/common/runtime:runtime_lib",
