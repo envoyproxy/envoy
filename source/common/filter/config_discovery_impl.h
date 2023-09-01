@@ -544,6 +544,7 @@ public:
 
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
                                         server_context, cluster_manager, subscription_stat_prefix);
+    std::cout << "obtained subscription" << std::endl;
     // For warming, wait until the subscription receives the first response to indicate readiness.
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.
@@ -562,7 +563,7 @@ public:
           getDefaultConfig(config_source.default_config(), filter_config_name, server_context,
                            last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
-
+    std::cout << "creating dynammic filter config provider impl" << std::endl;
     std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> provider =
         std::make_unique<DynamicFilterConfigImpl>(subscription, require_type_urls, server_context,
                                                   factory_context, std::move(default_config),
@@ -573,7 +574,9 @@ public:
     if (config_source.apply_default_config_without_warming()) {
       factory_context.initManager().add(provider->initTarget());
     }
+    std::cout << "applying last or default config" << std::endl;
     applyLastOrDefaultConfig(subscription, *provider, filter_config_name);
+    std::cout << "applied last or default config" << std::endl;
     return provider;
   }
 
