@@ -13,8 +13,9 @@ envoy_cc_extension(
     name = "upstream_config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # This is core Envoy config.
-    visibility = ["//visibility:public"],
+    extra_visibility = [
+        "//test/common/upstream:__subpackages__",
+    ],
     deps = [
         ":connect",
         "//envoy/network:transport_socket_interface",
