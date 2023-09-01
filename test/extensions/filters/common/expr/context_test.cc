@@ -1,3 +1,5 @@
+#include "source/common/network/address_impl.h"
+#include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -777,6 +779,7 @@ TEST(Context, FilterStateAttributes) {
   ProtobufWkt::DoubleValue v;
   v.set_value(1.0);
   cel_state->setValue(v.SerializeAsString());
+  EXPECT_TRUE(cel_state->serializeAsString().has_value());
   const std::string cel_key = "cel_state_key";
   filter_state.setData(cel_key, cel_state, StreamInfo::FilterState::StateType::ReadOnly);
 
@@ -785,6 +788,34 @@ TEST(Context, FilterStateAttributes) {
     EXPECT_TRUE(value.has_value());
     EXPECT_TRUE(value.value().IsDouble());
     EXPECT_EQ(value.value().DoubleOrDie(), 1.0);
+  }
+
+  const std::string address_key = "envoy.network.transport_socket.original_dst_address";
+  const std::string ip_string = "ip";
+  const std::string port_string = "port";
+  filter_state.setData(address_key,
+                       std::make_unique<Network::DestinationAddress>(
+                           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  {
+    auto value = wrapper[CelValue::CreateStringView(address_key)];
+    ASSERT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMap());
+    auto& map = *value.value().MapOrDie();
+    EXPECT_FALSE(map[CelValue::CreateInt64(5)].has_value());
+    EXPECT_EQ(0, map.size());
+    EXPECT_TRUE(map.empty());
+    EXPECT_EQ(0, map.ListKeys().value()->size());
+    auto ip = map[CelValue::CreateStringView(ip_string)];
+    EXPECT_TRUE(ip.has_value());
+    EXPECT_TRUE(ip->IsString());
+    EXPECT_EQ("10.10.11.11", ip->StringOrDie().value());
+    auto port = map[CelValue::CreateStringView(port_string)];
+    EXPECT_TRUE(port.has_value());
+    EXPECT_TRUE(port->IsInt64());
+    EXPECT_EQ(6666, port->Int64OrDie());
+    auto other = map[CelValue::CreateStringView(address_key)];
+    EXPECT_FALSE(other.has_value());
   }
 }
 
