@@ -1,0 +1,43 @@
+configuration {
+  normalize_path: true
+  http1_options {
+    accept_http_10: true
+  }
+}
+request {
+  method {
+    value: "CONNECT"
+  }
+  authority {
+    value: "foo.bar.com:80"
+  }
+  headers {
+    key: "transfer-encoding"
+    value: "chunked"
+  }
+  headers {
+    key: "foo"
+    value: "bar"
+  }
+  headers {
+    key: "baz"
+    value: "fuz"
+  }
+}
+send_request_body: true
+response {
+  status {
+    value: "200"
+  }
+}
+send_response_body: true
+response_trailers {
+  trailers {
+    key: "something"
+    value: "other"
+  }
+  trailers {
+    key: "key"
+    value: "valUe"
+  }
+}

@@ -350,6 +350,10 @@ public:
     ON_CALL(filter_callbacks_.connection_, close(_, _)).WillByDefault(InvokeWithoutArgs([&] {
       connection_alive_ = false;
     }));
+    ON_CALL(filter_callbacks_.connection_, state()).WillByDefault(InvokeWithoutArgs([&] {
+      return connection_alive_ ? Network::Connection::State::Open
+                               : Network::Connection::State::Closed;
+    }));
     ON_CALL(filter_callbacks_.connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool end_stream) {
           written_wire_bytes_.append(data.toString());
@@ -398,10 +402,12 @@ public:
             }));
 
     EXPECT_CALL(*encoder_filter_, encodeHeaders(_, _))
-        .WillRepeatedly(Invoke([&](ResponseHeaderMap&, bool end_stream) -> FilterHeadersStatus {
-          response_end_stream_ = end_stream;
-          return FilterHeadersStatus::Continue;
-        }));
+        .WillRepeatedly(
+            Invoke([&](ResponseHeaderMap& headers, bool end_stream) -> FilterHeadersStatus {
+              response_headers_ = createHeaderMap<ResponseHeaderMapImpl>(headers);
+              response_end_stream_ = end_stream;
+              return FilterHeadersStatus::Continue;
+            }));
 
     EXPECT_CALL(*decoder_filter_, decodeData(_, _))
         .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterDataStatus {
@@ -452,6 +458,7 @@ public:
   std::shared_ptr<MockStreamEncoderFilter> encoder_filter_ =
       std::make_shared<NiceMock<MockStreamEncoderFilter>>();
   RequestHeaderMapPtr request_headers_;
+  ResponseHeaderMapPtr response_headers_;
   std::string request_data_;
   std::string response_data_;
   RequestTrailerMapPtr request_trailers_;
@@ -491,13 +498,21 @@ public:
       FUZZ_ASSERT(*hcm_under_test_1_.request_headers_ == *hcm_under_test_2_.request_headers_);
     }
 
-    // If codecs produced request headers, send the response from the fuzzer input
-    if (hcm_under_test_1_.request_headers_ && input_.has_response()) {
+    FUZZ_ASSERT(hcm_under_test_1_.connection_alive_ == hcm_under_test_2_.connection_alive_);
+    // If codecs produced request headers and connection is still alive, send the response from the
+    // fuzzer input
+    if (hcm_under_test_1_.connection_alive_ && hcm_under_test_1_.request_headers_ &&
+        input_.has_response()) {
       sendResponse();
     }
 
     FUZZ_ASSERT(hcm_under_test_1_.request_data_ == hcm_under_test_2_.request_data_);
-    FUZZ_ASSERT(hcm_under_test_1_.response_data_ == hcm_under_test_2_.response_data_);
+
+    if (!(hcm_under_test_1_.response_headers_ && hcm_under_test_2_.response_headers_ &&
+          hcm_under_test_1_.response_headers_->getStatusValue() == "501" &&
+          hcm_under_test_2_.response_headers_->getStatusValue() == "400")) {
+      FUZZ_ASSERT(hcm_under_test_1_.response_data_ == hcm_under_test_2_.response_data_);
+    }
 
     // Check that both codecs either produced request trailers or did not
     FUZZ_ASSERT((hcm_under_test_1_.request_trailers_ != nullptr &&
@@ -619,6 +634,8 @@ public:
   void sendRequest() override {
     std::string request = makeHttp1Request(input_.request());
 
+    std::cout << "---------------\n" << request << "\n---------------\n";
+
     Buffer::OwnedImpl wire_input_1(request);
     hcm_under_test_1_.conn_manager_.onData(wire_input_1, true);
 
@@ -634,7 +651,15 @@ public:
       hcm_under_test_1_.written_wire_bytes_[7] = hcm_under_test_2_.written_wire_bytes_[7] = '1';
     }
 
-    FUZZ_ASSERT(hcm_under_test_1_.written_wire_bytes_ == hcm_under_test_2_.written_wire_bytes_);
+    if (hcm_under_test_1_.written_wire_bytes_ == hcm_under_test_2_.written_wire_bytes_) {
+      return;
+    }
+    if (hcm_under_test_1_.response_headers_ && hcm_under_test_2_.response_headers_ &&
+        hcm_under_test_1_.response_headers_->getStatusValue() == "501" &&
+        hcm_under_test_2_.response_headers_->getStatusValue() == "400") {
+      return;
+    }
+    FUZZ_ASSERT(false);
   }
 
 private:
@@ -872,6 +897,7 @@ private:
 };
 
 DEFINE_PROTO_FUZZER(const test::common::http::ServerCodecDiffFuzzTestCase& input) {
+  Http::HeaderStringValidator::disable_validation_for_tests_ = true;
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {

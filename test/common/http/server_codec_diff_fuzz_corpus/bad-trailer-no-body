@@ -1,0 +1,38 @@
+configuration {
+  normalize_path: true
+  http1_options {
+    allow_chunked_length: true
+  }
+}
+request {
+  scheme {
+    value: "https"
+  }
+  method {
+    value: "GET"
+  }
+  path {
+    value: "/"
+  }
+  authority {
+    value: "https"
+  }
+  headers {
+    key: "content-length"
+    value: "10"
+  }
+  headers {
+    key: "transfer-encoding"
+    value: "chunked"
+  }
+  headers {
+    key: "baz"
+    value: "fuz"
+  }
+}
+request_trailers {
+  trailers {
+    key: "a\037\000\000\000p"
+    value: "bar"
+  }
+}

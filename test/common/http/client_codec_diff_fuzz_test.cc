@@ -487,7 +487,7 @@ public:
       codec_under_test_1_->sendResponse();
       codec_under_test_2_->sendResponse();
 
-      //printBytes(codec_under_test_1_->written_wire_bytes_);
+      // printBytes(codec_under_test_1_->written_wire_bytes_);
       codec_under_test_1_->compareOutputWireBytes(codec_under_test_2_->written_wire_bytes_);
 
       FUZZ_ASSERT(codec_under_test_1_->stream_reset_ == codec_under_test_2_->stream_reset_);
