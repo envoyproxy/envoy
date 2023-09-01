@@ -1,0 +1,24 @@
+configuration {
+  normalize_path: true
+  merge_slashes: true
+  path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
+}
+request {
+  scheme {
+    value: "https"
+  }
+  method {
+    value: "GET"
+  }
+  path {
+    value: "https://foo.bar.com/some/path/../with/query?abc=xyz"
+  }
+  authority {
+    value: "foo.bar.com"
+  }
+  headers {
+    key: "foo"
+    value: "bar"
+  }
+}
+send_request_body: true

@@ -45,7 +45,7 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-constexpr absl::string_view request_body = "The quick brown fox jumps over the lazy dog";
+constexpr absl::string_view request_body = "The quick brown fox jumps over the lazy dog.";
 constexpr absl::string_view response_body = "0123456789aBcDeFgHiJkLmNoPqRsTuVwXyZ";
 } // namespace
 
@@ -508,6 +508,7 @@ public:
 
     FUZZ_ASSERT(hcm_under_test_1_.request_data_ == hcm_under_test_2_.request_data_);
 
+    // TODO(#29379): known difference in codec behavior
     if (!(hcm_under_test_1_.response_headers_ && hcm_under_test_2_.response_headers_ &&
           hcm_under_test_1_.response_headers_->getStatusValue() == "501" &&
           hcm_under_test_2_.response_headers_->getStatusValue() == "400")) {
@@ -634,8 +635,6 @@ public:
   void sendRequest() override {
     std::string request = makeHttp1Request(input_.request());
 
-    std::cout << "---------------\n" << request << "\n---------------\n";
-
     Buffer::OwnedImpl wire_input_1(request);
     hcm_under_test_1_.conn_manager_.onData(wire_input_1, true);
 
@@ -654,6 +653,7 @@ public:
     if (hcm_under_test_1_.written_wire_bytes_ == hcm_under_test_2_.written_wire_bytes_) {
       return;
     }
+    // TODO(#29379): known difference in codec behavior
     if (hcm_under_test_1_.response_headers_ && hcm_under_test_2_.response_headers_ &&
         hcm_under_test_1_.response_headers_->getStatusValue() == "501" &&
         hcm_under_test_2_.response_headers_->getStatusValue() == "400") {
