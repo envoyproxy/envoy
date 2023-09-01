@@ -163,16 +163,17 @@ void Streamer::addNumber(double number) {
     response_.addFragments({"null"});
   } else {
     // Converting a double to a string: who would think it would be so complex?
-    // It's easy if you don't care about speed. Here are some options:
+    // It's easy if you don't care about speed or accuracy :). Here are some options:
     //   * absl::StrCat(number) -- fast (19ms on speed test) but loses precision (drops decimals).
     //   * absl::StrFormat("%.15g") -- works great but a bit slow (24ms on speed test)
+    //   * strncat(buf, sizeof(buf), "%.15g", ...) -- works but slow as molasses: 30ms.
     //   * fmt::format("{}") -- works great and is a little faster than absl::StrFormat: 21ms.
-    //   * fmt::to_string -- works great and is a little faster than fmt::format: 19ms..
+    //   * fmt::to_string -- works great and is a little faster than fmt::format: 19ms.
     //   * std::to_chars -- fast (16ms) and precise, but requires a few lines to
-    //     generate the string_view.
+    //     generate the string_view, and does not work on all platforms yet.
 #if defined(__APPLE__) || defined(GCC_COMPILER)
-    // On Apple and gcc, std::to_chars does not compile, so we revert to the next best
-    // implementation.
+    // On Apple and gcc, std::to_chars does not compile, so we revert to the
+    // next fastest correct implementation.
     response_.addFragments({fmt::to_string(number)});
 #else
     // This version is awkward, and doesn't work on Apple as of August 2023, but
