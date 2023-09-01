@@ -17,6 +17,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -584,6 +585,19 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   if (!localHostSet().hostsPerLocality().hasLocalLocality() ||
       localHostSet().hostsPerLocality().get()[0].empty()) {
     stats_.lb_local_cluster_not_ok_.inc();
+    return true;
+  }
+
+  // If the runtime guard is not enabled, keep the old behavior of not performing locality routing
+  // if the number of localities in the local cluster is different from the number of localities
+  // in the upstream cluster.
+  // The lb_zone_number_differs stat is only relevant if the runtime guard is disabled,
+  // so it is only incremented in that case.
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_zone_routing_different_zone_counts") &&
+      host_set.healthyHostsPerLocality().get().size() !=
+          localHostSet().healthyHostsPerLocality().get().size()) {
+    stats_.lb_zone_number_differs_.inc();
     return true;
   }
 

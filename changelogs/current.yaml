@@ -29,7 +29,8 @@ minor_behavior_changes:
 - area: zone-aware routing
   change: |
     Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
-    Local and upstream clusters can now have different sets of localities, which previously caused issues.
+    This behavioral change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` to false.
 - area: router
   change: |
     Enable copying response_code from the upstream stream_info onto the downstream stream_info.
@@ -59,6 +60,10 @@ bug_fixes:
 - area: router check tool
   change: |
     Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
+- area: zone-aware routing
+  change: |
+    Fixed a bug where zone-aware routing doesn't proportion traffic evenly across upstream hosts
+    if the local and upstream clusters have the same number of zones, but the zone sets aren't identical.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
