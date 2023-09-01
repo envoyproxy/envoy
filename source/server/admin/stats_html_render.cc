@@ -28,11 +28,11 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
 }
 
 void StatsHtmlRender::finalize(Buffer::Instance& response) {
-  // Render all the histograms here using the JSON data we've accumulated
-  // for them.
   if (histogram_json_render_ != nullptr) {
-    histogram_json_render_->finalize(response);
-    response.add(";\nrenderHistograms(document.getElementById('histograms'), json);\n</script\n");
+    // We don't actually want the structure around the full stats JSON -- we are
+    // just cherry-picking the JSON structures for the histograms. json_data_ is
+    // just used to sink json structure which we will drop on the floor.
+    histogram_json_render_->finalize(json_data_);
   } else {
     response.add("</pre>\n");
   }
@@ -83,14 +83,36 @@ void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view type
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
   if (json_histograms_) {
+    Json::Streamer streamer(response);
+
+    // If this is the first histogram we are rendering, then we need to first
+    // generate the supported-percentiles array sand save it in a constant. To do
+    // this we must now create the JsonRender object. We do this using a dummy
+    // response buffer (json_data_), as we will not be propagating the general
+    // JSON stats structure to HTML; just the shared supported-percentile array
+    // and each histogram.
+    //
+    // We use a separate <script> tag for each histogram so that the browser can
+    // begin parsing each potentially large histogram as it is generated,rather
+    // than building up a huge json structure with all the histograms and
+    // blocking rendering until that is parsed.
     if (histogram_json_render_ == nullptr) {
       StatsParams json_params(params_);
       json_response_headers_ = Http::ResponseHeaderMapImpl::create();
-      response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst json = \n");
       histogram_json_render_ =
-          std::make_unique<StatsJsonRender>(*json_response_headers_, response, json_params);
+          std::make_unique<StatsJsonRender>(*json_response_headers_, json_data_, json_params);
+      response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst supportedPercentiles = ");
+      histogram_json_render_->populateSupportedPercentiles(*streamer.makeRootArray());
+      response.add(";\nconst histogramDiv = document.getElementById('histograms');\n");
+      // The first histogram will share the first script tag with the histogram
+      // div and supportedPercentiles array constants.
+    } else {
+      response.add("<script>\n");
     }
-    histogram_json_render_->generate(response, name, histogram);
+    response.add("renderHistogram(histogramDiv, supportedPercentiles,\n");
+    histogram_json_render_->generateHistogramDetail(histogram.name(), histogram,
+                                                    *streamer.makeRootMap());
+    response.add(");\n</script>\n");
   } else {
     StatsTextRender::generate(response, name, histogram);
   }

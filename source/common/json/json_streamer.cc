@@ -1,5 +1,7 @@
 #include "source/common/json/json_streamer.h"
 
+#include <charconv>
+
 #include "source/common/json/json_sanitizer.h"
 
 #include "absl/strings/str_format.h"
@@ -46,6 +48,11 @@ Streamer::Level::~Level() {
 Streamer::MapPtr Streamer::makeRootMap() {
   ASSERT_LEVELS_EMPTY;
   return std::make_unique<Map>(*this);
+}
+
+Streamer::ArrayPtr Streamer::makeRootArray() {
+  ASSERT_LEVELS_EMPTY;
+  return std::make_unique<Array>(*this);
 }
 
 Streamer::MapPtr Streamer::Level::addMap() {
@@ -154,7 +161,18 @@ void Streamer::addNumber(double number) {
   if (std::isnan(number)) {
     response_.addFragments({"null"});
   } else {
-    response_.addFragments({absl::StrFormat("%.15g", number)});
+    // Converting a double to a string: who would think it would be so complex?
+    // It's easy if you don't care about speed. Here are some options:
+    //   * absl::StrCat(number) -- fast (19ms on speed test) but loses precision (drops decimals).
+    //   * absl::StrFormat("%.15g") -- works great but a bit slow (24ms on speed test)
+    //   * fmt::format("{}") -- works great and is a little faster than absl::StrFormat: 21ms.
+    //   * std::to_chars -- fast (17ms) and precise, but requires a few lines to
+    //     generate the string_view.
+    char buf[100];
+    std::to_chars_result result = std::to_chars(buf, buf + sizeof(buf), number);
+    ASSERT(result.ec == std::errc{}, std::make_error_code(result.ec).message());
+    absl::string_view str(buf, result.ptr - buf);
+    response_.addFragments({str});
   }
 }
 

@@ -62,17 +62,24 @@ TEST_F(StatsHtmlRenderTest, HistogramStreamingDetailed) {
   response_.drain(response_.length());
 
   renderer.generate(response_, "h1", populateHistogram("h1", {200, 300, 300}));
-  EXPECT_THAT(response_.toString(), HasSubstr("const json = \n{\"stats\":[{\"histograms\":"));
-  EXPECT_THAT(response_.toString(), HasSubstr("[{\"name\":\"h1\","));
+  EXPECT_THAT(response_.toString(), StartsWith("</pre>\n<div id='histograms'></div>\n"
+                                               "<script>\nconst supportedPercentiles = ["));
+  EXPECT_THAT(response_.toString(),
+              HasSubstr("\nconst histogramDiv = document.getElementById('histograms');\n"
+                        "renderHistogram(histogramDiv, supportedPercentiles,\n"
+                        "{\"name\":\"h1\",\"totals\":[{\"lower_bound\":"));
+  EXPECT_THAT(response_.toString(), EndsWith("\n</script>\n"));
   response_.drain(response_.length());
 
   renderer.generate(response_, "h2", populateHistogram("h2", {200, 300, 300}));
-  EXPECT_THAT(response_.toString(), StartsWith(",{\"name\":\"h2\","));
+  EXPECT_THAT(response_.toString(),
+              StartsWith("<script>\nrenderHistogram(histogramDiv, supportedPercentiles,\n"
+                         "{\"name\":\"h2\",\"totals\":[{\"lower_bound\":"));
+  EXPECT_THAT(response_.toString(), EndsWith("\n</script>\n"));
   response_.drain(response_.length());
 
   renderer.finalize(response_);
-  EXPECT_THAT(response_.toString(),
-              HasSubstr("\nrenderHistograms(document.getElementById('histograms'), json);\n"));
+  EXPECT_EQ("</body>\n</html>\n", response_.toString());
 }
 
 TEST_F(StatsHtmlRenderTest, RenderActive) {

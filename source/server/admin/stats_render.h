@@ -77,17 +77,19 @@ public:
                 const Stats::ParentHistogram& histogram) override;
   void finalize(Buffer::Instance& response) override;
 
+  void populateSupportedPercentiles(Json::Streamer::Array& array);
+  void generateHistogramDetail(const std::string& name, const Stats::ParentHistogram& histogram,
+                               Json::Streamer::Map& map);
+
 private:
   // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
                       const std::vector<uint64_t>& interval_buckets,
                       const std::vector<uint64_t>& cumulative_buckets);
 
-  void generateHistogramDetail(const std::string& name, const Stats::ParentHistogram& histogram);
   void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
                               Json::Streamer::Map& map);
   void renderHistogramStart();
-  void populateSupportedPercentiles(Json::Streamer::Map& map);
   void populatePercentiles(const Stats::ParentHistogram& histogram, Json::Streamer::Map& map);
 
   // This function irons out an API mistake made when defining the StatsRender
