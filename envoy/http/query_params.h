@@ -1,12 +1,12 @@
 #pragma once
 
 #include <map>
-#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/container/btree_map.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "header_map.h"
 
 namespace Envoy {
@@ -30,7 +30,7 @@ public:
   void overwrite(absl::string_view key, absl::string_view value);
   std::string toString();
   std::string replaceQueryString(const HeaderString& path);
-  std::optional<std::string> get_first_value(absl::string_view key) const;
+  absl::optional<std::string> get_first_value(absl::string_view key) const;
 
   const absl::btree_map<std::string, std::vector<std::string>>& data() { return data_; }
 
