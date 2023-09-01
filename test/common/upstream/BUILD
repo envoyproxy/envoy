@@ -554,6 +554,7 @@ envoy_cc_test(
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",

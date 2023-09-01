@@ -1385,6 +1385,8 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 
 bool validateTransportSocketSupportsQuic(
     const envoy::config::core::v3::TransportSocket& transport_socket) {
+  // The transport socket is valid for QUIC if it is either a QUIC transport socket,
+  // or if it is a QUIC transport socket wrapped in an HTTP/1.1 proxy socket.
   if (transport_socket.name() == "envoy.transport_sockets.quic") {
     return true;
   }
@@ -1394,7 +1396,7 @@ bool validateTransportSocketSupportsQuic(
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       http11_socket;
   transport_socket.typed_config().UnpackTo(&http11_socket);
-  return (http11_socket.transport_socket().name() == "envoy.transport_sockets.quic");
+  return http11_socket.transport_socket().name() == "envoy.transport_sockets.quic";
 }
 
 ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
@@ -1456,7 +1458,7 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
     if (!validateTransportSocketSupportsQuic(cluster.transport_socket())) {
       throw EnvoyException(
           fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {} {}",
-                      cluster.name(), cluster.transport_socket()));
+                      cluster.name(), cluster.transport_socket().DebugString()));
     }
 #else
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
