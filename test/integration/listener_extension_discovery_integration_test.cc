@@ -904,6 +904,8 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefaul
   sendXdsResponse(filter_name_, "v1", "");
   test_server_->waitForCounterGe(
       "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_fail", 1);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
@@ -923,7 +925,7 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefaul
 
   sendXdsResponse(filter_name_, "v2", "abc");
   test_server_->waitForCounterGe(
-      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 1);
+      "extension_config_discovery.quic_listener_filter." + filter_name_ + ".config_reload", 2);
   testRouterHeaderOnlyRequestAndResponse();
   codec_client_->close();
   std::string log = waitForAccessLog(access_log_name_, 0);

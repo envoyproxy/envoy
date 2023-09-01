@@ -227,6 +227,7 @@ public:
               (const Network::ListenerFilterMatcherSharedPtr&, Network::ListenerFilterPtr&));
 };
 
+#ifdef ENVOY_ENABLE_QUIC
 class MockQuicListenerFilter : public QuicListenerFilter {
 public:
   MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
@@ -245,6 +246,7 @@ public:
 
   MOCK_METHOD(void, onPeerAddressChanged, (const quic::QuicSocketAddress&, Connection&));
 };
+#endif
 
 class MockFilterChain : public DrainableFilterChain {
 public:
