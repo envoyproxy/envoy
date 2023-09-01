@@ -758,32 +758,6 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
   EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
 }
 
-TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue_oauth_header_passthrough_fix) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.oauth_header_passthrough_fix", "false"},
-  });
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
-      {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"}};
-
-  Http::TestRequestHeaderMapImpl expected_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
-  };
-
-  EXPECT_CALL(*validator_, setParams(_, _));
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(request_headers, expected_headers);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
-}
-
 // Validates the behavior of the cookie validator.
 TEST_F(OAuth2Test, CookieValidator) {
   expectValidCookies(
