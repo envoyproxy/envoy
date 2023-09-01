@@ -40,13 +40,9 @@ public:
   void finalize(Buffer::Instance&) override;
 
 private:
-  StatsParams params_;
   const bool active_{false};
   bool json_histograms_{false};
-  Buffer::OwnedImpl json_data_;
-  std::unique_ptr<StatsJsonRender> histogram_json_render_;
-  Http::ResponseHeaderMapPtr json_response_headers_; // ignored.
-  std::unique_ptr<Http::ResponseHeaderMap> json_headers_;
+  bool first_histogram_{true};
 };
 
 } // namespace Server

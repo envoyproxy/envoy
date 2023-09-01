@@ -21,19 +21,14 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params), params_(params), active_(params.format_ == StatsFormat::ActiveHtml),
+    : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml),
       json_histograms_(!active_ &&
                        params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed) {
   AdminHtmlUtil::renderHead(response_headers, response);
 }
 
 void StatsHtmlRender::finalize(Buffer::Instance& response) {
-  if (histogram_json_render_ != nullptr) {
-    // We don't actually want the structure around the full stats JSON -- we are
-    // just cherry-picking the JSON structures for the histograms. json_data_ is
-    // just used to sink json structure which we will drop on the floor.
-    histogram_json_render_->finalize(json_data_);
-  } else {
+  if (first_histogram_) {
     response.add("</pre>\n");
   }
 
@@ -62,12 +57,12 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
 
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
-  ASSERT(histogram_json_render_ == nullptr);
+  ASSERT(first_histogram_);
   response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
 }
 
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
-  ASSERT(histogram_json_render_ == nullptr);
+  ASSERT(first_histogram_);
   if (!active_) {
     response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
   }
@@ -86,23 +81,16 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
     Json::Streamer streamer(response);
 
     // If this is the first histogram we are rendering, then we need to first
-    // generate the supported-percentiles array sand save it in a constant. To do
-    // this we must now create the JsonRender object. We do this using a dummy
-    // response buffer (json_data_), as we will not be propagating the general
-    // JSON stats structure to HTML; just the shared supported-percentile array
-    // and each histogram.
+    // generate the supported-percentiles array sand save it in a constant.
     //
     // We use a separate <script> tag for each histogram so that the browser can
     // begin parsing each potentially large histogram as it is generated,rather
     // than building up a huge json structure with all the histograms and
     // blocking rendering until that is parsed.
-    if (histogram_json_render_ == nullptr) {
-      StatsParams json_params(params_);
-      json_response_headers_ = Http::ResponseHeaderMapImpl::create();
-      histogram_json_render_ =
-          std::make_unique<StatsJsonRender>(*json_response_headers_, json_data_, json_params);
+    if (first_histogram_) {
+      first_histogram_ = false;
       response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst supportedPercentiles = ");
-      histogram_json_render_->populateSupportedPercentiles(*streamer.makeRootArray());
+      StatsJsonRender::populateSupportedPercentiles(*streamer.makeRootArray());
       response.add(";\nconst histogramDiv = document.getElementById('histograms');\n");
       // The first histogram will share the first script tag with the histogram
       // div and supportedPercentiles array constants.
@@ -110,8 +98,7 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
       response.add("<script>\n");
     }
     response.add("renderHistogram(histogramDiv, supportedPercentiles,\n");
-    histogram_json_render_->generateHistogramDetail(histogram.name(), histogram,
-                                                    *streamer.makeRootMap());
+    StatsJsonRender::generateHistogramDetail(histogram.name(), histogram, *streamer.makeRootMap());
     response.add(");\n</script>\n");
   } else {
     StatsTextRender::generate(response, name, histogram);
