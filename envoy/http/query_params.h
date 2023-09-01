@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,7 @@ public:
   void overwrite(absl::string_view key, absl::string_view value);
   std::string toString();
   std::string replaceQueryString(const HeaderString& path);
+  std::optional<std::string> get_first_value(absl::string_view key) const;
 
   const absl::btree_map<std::string, std::vector<std::string>>& data() { return data_; }
 

@@ -3,6 +3,7 @@
 #include <http_parser.h>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -607,6 +608,15 @@ void Utility::QueryParamsMulti::add(absl::string_view key, absl::string_view val
 
 void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_view value) {
   this->data_[key] = std::vector<std::string>{std::string(value)};
+}
+
+std::optional<std::string> Utility::QueryParamsMulti::get_first_value(absl::string_view key) const {
+  auto it = this->data_.find(key);
+  if (it == this->data_.end()) {
+    return std::nullopt;
+  }
+
+  return std::optional<std::string>{it->second.at(0)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
