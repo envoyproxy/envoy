@@ -1,11 +1,7 @@
 #include "source/common/json/json_streamer.h"
 
-#include <charconv>
-
-#include "source/common/common/macros.h"
+#include "source/common/buffer/buffer_util.h"
 #include "source/common/json/json_sanitizer.h"
-
-#include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace Json {
@@ -162,28 +158,7 @@ void Streamer::addNumber(double number) {
   if (std::isnan(number)) {
     response_.addFragments({"null"});
   } else {
-    // Converting a double to a string: who would think it would be so complex?
-    // It's easy if you don't care about speed or accuracy :). Here are some options:
-    //   * absl::StrCat(number) -- fast (19ms on speed test) but loses precision (drops decimals).
-    //   * absl::StrFormat("%.15g") -- works great but a bit slow (24ms on speed test)
-    //   * strncat(buf, sizeof(buf), "%.15g", ...) -- works but slow as molasses: 30ms.
-    //   * fmt::format("{}") -- works great and is a little faster than absl::StrFormat: 21ms.
-    //   * fmt::to_string -- works great and is a little faster than fmt::format: 19ms.
-    //   * std::to_chars -- fast (16ms) and precise, but requires a few lines to
-    //     generate the string_view, and does not work on all platforms yet.
-#if defined(__APPLE__) || defined(GCC_COMPILER)
-    // On Apple and gcc, std::to_chars does not compile, so we revert to the
-    // next fastest correct implementation.
-    response_.addFragments({fmt::to_string(number)});
-#else
-    // This version is awkward, and doesn't work on Apple as of August 2023, but
-    // it is the fastest correct option on other platforms.
-    char buf[100];
-    std::to_chars_result result = std::to_chars(buf, buf + sizeof(buf), number);
-    ASSERT(result.ec == std::errc{}, std::make_error_code(result.ec).message());
-    absl::string_view str(buf, result.ptr - buf);
-    response_.addFragments({str});
-#endif
+    Buffer::Util::serializeDouble(number, response_);
   }
 }
 
