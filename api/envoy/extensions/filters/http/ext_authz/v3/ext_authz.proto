@@ -137,7 +137,7 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
   //
-  // This field MUST NOT be set when the filter is configured on an upstream filter chain.
+  // It is an error to set this field when the filter is configured on an upstream filter chain.
   bool include_peer_certificate = 10;
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
@@ -188,7 +188,7 @@ message ExtAuthz {
   // When this field is true, Envoy will include the SNI name used for TLSClientHello, if available, in the
   // :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
   //
-  // This field MUST NOT be set when the filter is configured on an upstream filter chain.
+  // It is an error to set this field when the filter is configured on an upstream filter chain.
   bool include_tls_session = 18;
 }
 
