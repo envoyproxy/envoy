@@ -20,6 +20,12 @@ HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
   bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
 }
 
+// Network::NonDispatchedUdpPacketHandler
+void HotRestartingParent::Internal::handle(uint32_t /*worker_index*/,
+                                           const Network::UdpRecvData& /*packet*/) {
+  // TODO(ravenblack): forward the packet over a domain socket to HotRestartingChild.
+}
+
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   socket_event_ = dispatcher.createFileEvent(
       myDomainSocket(),
