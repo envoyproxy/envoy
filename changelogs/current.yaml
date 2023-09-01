@@ -123,6 +123,9 @@ new_features:
     config API to ignore the
     :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
     message from the external processing server.
+- area: access_log
+  change: |
+    added a field lookup to %FILTER_STATE% for objects that have reflection enabled.
 
 - area: http
   change: |
