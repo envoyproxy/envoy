@@ -4,6 +4,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
+#include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
@@ -57,7 +58,7 @@ class UdpProxyIntegrationTest : public testing::TestWithParam<Network::Address::
 public:
   UdpProxyIntegrationTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()),
-        registration_(factory_) {}
+        registration_(factory_), session_filter_registration_(session_filter_factory_) {}
 
   void setup(uint32_t upstream_count, absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
              const std::string& session_filters_config = "") {
@@ -246,6 +247,11 @@ typed_config:
 
   UdpReverseFilterConfigFactory factory_;
   Registry::InjectFactory<Server::Configuration::NamedUdpListenerFilterConfigFactory> registration_;
+  Extensions::UdpFilters::UdpProxy::SessionFilters::DrainerUdpSessionFilterConfigFactory
+      session_filter_factory_;
+  Registry::InjectFactory<
+      Extensions::UdpFilters::UdpProxy::SessionFilters::NamedUdpSessionFilterConfigFactory>
+      session_filter_registration_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,

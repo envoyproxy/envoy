@@ -30,7 +30,7 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "drainer_filter_config_lib",
-    srcs = ["drainer_filter.cc"],
+    srcs = ["drainer_filter.h"],
     deps = [
         ":drainer_filter_proto_cc_proto",
         "//envoy/registry",
