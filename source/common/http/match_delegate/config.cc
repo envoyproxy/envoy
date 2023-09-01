@@ -331,9 +331,9 @@ FilterConfigPerRoute::createFilterMatchTree(
   auto requirements =
       std::make_unique<envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
-      envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name()));
+      envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance().GetTypeName()));
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
-      xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name()));
+      xds::type::matcher::v3::HttpAttributesCelMatchInput::default_instance().GetTypeName()));
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       fmt::format("http.{}.",
                   server_context.scope().symbolTable().toString(server_context.scope().prefix())),

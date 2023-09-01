@@ -32,6 +32,7 @@ package http
 */
 import "C"
 import (
+	"errors"
 	"reflect"
 	"runtime"
 	"strings"
@@ -61,21 +62,37 @@ const (
 
 type httpCApiImpl struct{}
 
-// Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
+// When the status means unexpected stage when invoke C API,
 // panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
-	case C.CAPIOK:
-		return
-	case C.CAPIFilterIsGone:
-		panic(errRequestFinished)
-	case C.CAPIFilterIsDestroy:
-		panic(errFilterDestroyed)
-	case C.CAPINotInGo:
-		panic(errNotInGo)
-	case C.CAPIInvalidPhase:
-		panic(errInvalidPhase)
+	case C.CAPIFilterIsGone,
+		C.CAPIFilterIsDestroy,
+		C.CAPINotInGo,
+		C.CAPIInvalidPhase:
+		panic(capiStatusToStr(status))
 	}
+}
+
+func capiStatusToStr(status C.CAPIStatus) string {
+	switch status {
+	case C.CAPIFilterIsGone:
+		return errRequestFinished
+	case C.CAPIFilterIsDestroy:
+		return errFilterDestroyed
+	case C.CAPINotInGo:
+		return errNotInGo
+	case C.CAPIInvalidPhase:
+		return errInvalidPhase
+	case C.CAPIValueNotFound:
+		return errValueNotFound
+	case C.CAPIInternalFailure:
+		return errInternalFailure
+	case C.CAPISerializationFailure:
+		return errSerializationFailure
+	}
+
+	return "unknown status"
 }
 
 func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
@@ -290,6 +307,10 @@ func (c *httpCApiImpl) HttpFinalize(r unsafe.Pointer, reason int) {
 	C.envoyGoFilterHttpFinalize(r, C.int(reason))
 }
 
+func (c *httpCApiImpl) HttpConfigFinalize(cfg unsafe.Pointer) {
+	C.envoyGoConfigHttpFinalize(cfg)
+}
+
 var cAPI api.HttpCAPI = &httpCApiImpl{}
 
 // SetHttpCAPI for mock cAPI
@@ -318,4 +339,57 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 	}
 
 	return strings.Clone(value)
+}
+
+func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (string, error) {
+	r := (*httpRequest)(rr)
+	var value string
+	var rc int
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetStringProperty(unsafe.Pointer(r.req), unsafe.Pointer(&key),
+		unsafe.Pointer(&value), (*C.int)(unsafe.Pointer(&rc)))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+		res = C.CAPIStatus(rc)
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+
+	if res == C.CAPIOK {
+		return strings.Clone(value), nil
+	}
+
+	return "", errors.New(capiStatusToStr(res))
+}
+
+func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
+	var value uint32
+
+	res := C.envoyGoFilterHttpDefineMetric(unsafe.Pointer(cfg), C.uint32_t(metricType), unsafe.Pointer(&name), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	return value
+}
+
+func (c *httpCApiImpl) HttpIncrementMetric(cc unsafe.Pointer, metricId uint32, offset int64) {
+	cfg := (*httpConfig)(cc)
+	res := C.envoyGoFilterHttpIncrementMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.int64_t(offset))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpGetMetric(cc unsafe.Pointer, metricId uint32) uint64 {
+	cfg := (*httpConfig)(cc)
+	var value uint64
+	res := C.envoyGoFilterHttpGetMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), unsafe.Pointer(&value))
+	handleCApiStatus(res)
+	return value
+}
+
+func (c *httpCApiImpl) HttpRecordMetric(cc unsafe.Pointer, metricId uint32, value uint64) {
+	cfg := (*httpConfig)(cc)
+	res := C.envoyGoFilterHttpRecordMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.uint64_t(value))
+	handleCApiStatus(res)
 }

@@ -1288,7 +1288,9 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
     // We need to copy from an existing Cluster Initialization Object. In
     // particular, only update the params with changed priority.
     auto new_initialization_object = std::make_shared<ClusterInitializationObject>(
-        entry->second->per_priority_state_, params, std::move(cluster_info), load_balancer_factory,
+        entry->second->per_priority_state_, params, std::move(cluster_info),
+        load_balancer_factory == nullptr ? entry->second->load_balancer_factory_
+                                         : load_balancer_factory,
         map);
     cluster_initialization_map_[cluster_name] = new_initialization_object;
     return new_initialization_object;

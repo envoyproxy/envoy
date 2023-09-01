@@ -1,19 +1,30 @@
 services:
 
-  # front-proxy
   front-envoy:
     build:
       context: .
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
-      service1:
+      service-envoy-1:
         condition: service_healthy
-      service2:
+      service-envoy-2:
         condition: service_healthy
     ports:
     - "${PORT_PROXY:-8080}:8080"
     - "${PORT_HTTPS:-8443}:8443"
     - "${PORT_STATS:-8001}:8001"
+
+  service-envoy-1:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-admin
+      args:
+        ENVOY_CONFIG: ./service-envoy.yaml
+        ENVOY_ADMIN_PORT: 8001
+    depends_on:
+      service1:
+        condition: service_healthy
 
   service1:
     build:
@@ -21,6 +32,19 @@ services:
       target: aiohttp-tracing-service2
     environment:
     - SERVICE_NAME=1
+
+  service-envoy-2:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-admin
+      args:
+        ENVOY_ADMIN_PORT: 8001
+        ENVOY_CONFIG: ./service-envoy-2.yaml
+
+    depends_on:
+      service2:
+        condition: service_healthy
 
   service2:
     build:

@@ -197,11 +197,11 @@ void SslSocket::onSuccess(SSL* ssl) {
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
-void SslSocket::onFailure(bool syscall_error_occurred) { drainErrorQueue(syscall_error_occurred); }
+void SslSocket::onFailure() { drainErrorQueue(); }
 
 PostIoAction SslSocket::doHandshake() { return info_->doHandshake(); }
 
-void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
+void SslSocket::drainErrorQueue() {
   bool saw_error = false;
   bool saw_counted_error = false;
   while (uint64_t err = ERR_get_error()) {
@@ -223,18 +223,10 @@ void SslSocket::drainErrorQueue(bool syscall_error_occurred) {
     if (failure_reason_.empty()) {
       failure_reason_ = "TLS error:";
     }
-    failure_reason_.append(absl::StrCat(" ", err, ":",
-                                        absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
-                                        absl::NullSafeStringView(ERR_func_error_string(err)), ":",
-                                        absl::NullSafeStringView(ERR_reason_error_string(err))));
-  }
-
-  if (syscall_error_occurred) {
-    if (failure_reason_.empty()) {
-      failure_reason_ = "TLS error:";
-    }
-    failure_reason_.append("SSL_ERROR_SYSCALL");
-    saw_error = true;
+    absl::StrAppend(&failure_reason_, " ", err, ":",
+                    absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
+                    absl::NullSafeStringView(ERR_func_error_string(err)), ":",
+                    absl::NullSafeStringView(ERR_reason_error_string(err)));
   }
 
   if (!failure_reason_.empty()) {
