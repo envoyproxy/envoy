@@ -166,13 +166,20 @@ void Streamer::addNumber(double number) {
     //   * absl::StrCat(number) -- fast (19ms on speed test) but loses precision (drops decimals).
     //   * absl::StrFormat("%.15g") -- works great but a bit slow (24ms on speed test)
     //   * fmt::format("{}") -- works great and is a little faster than absl::StrFormat: 21ms.
-    //   * std::to_chars -- fast (17ms) and precise, but requires a few lines to
+    //   * fmt::to_string -- works great and is a little faster than fmt::format: 19ms..
+    //   * std::to_chars -- fast (16ms) and precise, but requires a few lines to
     //     generate the string_view.
+#ifdef __APPLE__
+    // On Apple, std::to_chars does not compile, so we revert to the next best implementation.
+    response_.addFragments({fmt::to_string(number)});
+#else
+    // Switching the apple version
     char buf[100];
     std::to_chars_result result = std::to_chars(buf, buf + sizeof(buf), number);
     ASSERT(result.ec == std::errc{}, std::make_error_code(result.ec).message());
     absl::string_view str(buf, result.ptr - buf);
     response_.addFragments({str});
+#endif
   }
 }
 
