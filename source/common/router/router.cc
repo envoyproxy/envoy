@@ -46,8 +46,14 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, NumInternalRedirectsFilterStateName,
-                    "num_internal_redirects");
+constexpr absl::string_view InternalRedirectCountKey = "num_internal_redirects";
+
+REGISTER_INLINE_MAP_KEY(StreamInfo::FilterStateInlineMapScope, InternalRedirectCountKey);
+
+StreamInfo::InlineKey internalRedirectCountKey() {
+  INLINE_HANDLE_BY_KEY_ON_FIRST_USE(StreamInfo::FilterStateInlineMapScope,
+                                    InternalRedirectCountKey);
+}
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
@@ -1759,13 +1765,13 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   // redirects allowed for this route.
   StreamInfo::UInt32Accessor* num_internal_redirect{};
 
-  if (num_internal_redirect = filter_state->getDataMutable<StreamInfo::UInt32Accessor>(
-          NumInternalRedirectsFilterStateName);
+  if (num_internal_redirect =
+          filter_state->getDataMutable<StreamInfo::UInt32Accessor>(internalRedirectCountKey());
       num_internal_redirect == nullptr) {
     auto state = std::make_shared<StreamInfo::UInt32AccessorImpl>(0);
     num_internal_redirect = state.get();
 
-    filter_state->setData(NumInternalRedirectsFilterStateName, std::move(state),
+    filter_state->setData(internalRedirectCountKey(), std::move(state),
                           StreamInfo::FilterState::StateType::Mutable,
                           StreamInfo::FilterState::LifeSpan::Request);
   }

@@ -5,8 +5,9 @@
 namespace Envoy {
 namespace Router {
 
-REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, debug_config_inline_key,
-                    "envoy.router.debug_config");
+constexpr absl::string_view DebugConfigKey = "envoy.router.debug_config";
+
+REGISTER_INLINE_MAP_KEY(StreamInfo::FilterStateInlineMapScope, DebugConfigKey);
 
 DebugConfig::DebugConfig(bool append_cluster, absl::optional<Http::LowerCaseString> cluster_header,
                          bool append_upstream_host,
@@ -19,7 +20,9 @@ DebugConfig::DebugConfig(bool append_cluster, absl::optional<Http::LowerCaseStri
       host_address_header_(std::move(host_address_header)), do_not_forward_(do_not_forward),
       not_forwarded_header_(std::move(not_forwarded_header)) {}
 
-const StreamInfo::InlineKey DebugConfig::key() { return debug_config_inline_key; }
+const StreamInfo::InlineKey DebugConfig::key() {
+  INLINE_HANDLE_BY_KEY_ON_FIRST_USE(StreamInfo::FilterStateInlineMapScope, DebugConfigKey);
+}
 
 } // namespace Router
 } // namespace Envoy

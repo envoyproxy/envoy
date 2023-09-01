@@ -3,11 +3,14 @@
 namespace Envoy {
 namespace Network {
 
-REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, http11_proxy_info_inline_key,
-                    "envoy.network.transport_socket.http_11_proxy.info");
+constexpr absl::string_view Http11ProxyInfoFilterStateKey =
+    "envoy.network.http_connection_manager.http1_proxy";
+
+REGISTER_INLINE_MAP_KEY(StreamInfo::FilterStateInlineMapScope, Http11ProxyInfoFilterStateKey);
 
 const StreamInfo::InlineKey Http11ProxyInfoFilterState::key() {
-  return http11_proxy_info_inline_key;
+  INLINE_HANDLE_BY_KEY_ON_FIRST_USE(StreamInfo::FilterStateInlineMapScope,
+                                    Http11ProxyInfoFilterStateKey);
 }
 
 } // namespace Network

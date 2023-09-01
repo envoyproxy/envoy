@@ -5,10 +5,15 @@
 namespace Envoy {
 namespace Network {
 
-REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, application_protocols_inline_key,
-                    "envoy.network.application_protocols");
+constexpr absl::string_view ApplicationProtocolsKey = "envoy.network.application_protocols";
 
-const StreamInfo::InlineKey ApplicationProtocols::key() { return application_protocols_inline_key; }
+REGISTER_INLINE_MAP_KEY(StreamInfo::FilterStateInlineMapScope, ApplicationProtocolsKey);
+
+using Scope = StreamInfo::FilterStateInlineMapScope;
+
+const StreamInfo::InlineKey ApplicationProtocols::key() {
+  INLINE_HANDLE_BY_KEY_ON_FIRST_USE(StreamInfo::FilterStateInlineMapScope, ApplicationProtocolsKey);
+}
 
 } // namespace Network
 } // namespace Envoy

@@ -22,7 +22,7 @@ public:
   static absl::string_view name() { return "inline_map_scope_filter_state"; }
 };
 
-using InlineKey = InlineMapRegistry::InlineKey;
+using InlineKey = InlineMapRegistry::Handle;
 
 class FilterState;
 

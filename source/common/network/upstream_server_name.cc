@@ -5,10 +5,13 @@
 namespace Envoy {
 namespace Network {
 
-REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, upstream_server_name_inline_key,
-                    "envoy.network.upstream_server_name");
+constexpr absl::string_view UpstreamServerNameKey = "envoy.network.upstream_server_name";
 
-const StreamInfo::InlineKey UpstreamServerName::key() { return upstream_server_name_inline_key; }
+REGISTER_INLINE_MAP_KEY(StreamInfo::FilterStateInlineMapScope, UpstreamServerNameKey);
+
+const StreamInfo::InlineKey UpstreamServerName::key() {
+  INLINE_HANDLE_BY_KEY_ON_FIRST_USE(StreamInfo::FilterStateInlineMapScope, UpstreamServerNameKey);
+}
 
 } // namespace Network
 } // namespace Envoy

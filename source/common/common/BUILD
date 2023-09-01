@@ -600,6 +600,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "inline_map_registry",
+    srcs = [
+        "inline_map_registry.cc",
+    ],
     hdrs = [
         "inline_map_registry.h",
     ],

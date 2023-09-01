@@ -5,11 +5,13 @@
 namespace Envoy {
 namespace Network {
 
-REGISTER_INLINE_KEY(StreamInfo::FilterStateInlineMapScope, proxy_protocol_options_inline_key,
-                    "envoy.network.proxy_protocol_options");
+constexpr absl::string_view ProxyProtocolFilterStateKey = "envoy.network.proxy_protocol_options";
+
+REGISTER_INLINE_MAP_KEY(StreamInfo::FilterStateInlineMapScope, ProxyProtocolFilterStateKey);
 
 const StreamInfo::InlineKey ProxyProtocolFilterState::key() {
-  return proxy_protocol_options_inline_key;
+  INLINE_HANDLE_BY_KEY_ON_FIRST_USE(StreamInfo::FilterStateInlineMapScope,
+                                    ProxyProtocolFilterStateKey);
 }
 
 } // namespace Network
