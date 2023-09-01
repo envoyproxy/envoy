@@ -29,7 +29,7 @@ parameters:
 - name: concurrencyChecks
   displayName: "Check concurrency"
   type: number
-  default: 5
+  default: 10
 - name: concurrencyPrechecks
   displayName: "Prechecks concurrency"
   type: number
