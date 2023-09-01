@@ -232,6 +232,15 @@ void UpstreamRequest::writeToConnection(Buffer::Instance& buffer) {
   }
 }
 
+OptRef<Network::Connection> UpstreamRequest::connection() {
+  if (stream_reset_ || response_complete_) {
+    return {};
+  }
+
+  return upstream_conn_ != nullptr ? OptRef<Network::Connection>(*upstream_conn_)
+                                   : OptRef<Network::Connection>();
+}
+
 void UpstreamRequest::onConnectionClose(Network::ConnectionEvent event) {
   // If the upstream response is complete or the upstream request is reset then
   // ignore the connection close event.

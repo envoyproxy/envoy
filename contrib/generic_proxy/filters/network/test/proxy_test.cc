@@ -292,7 +292,7 @@ TEST_F(FilterTest, SendReplyDownstream) {
 TEST_F(FilterTest, GetConnection) {
   initializeFilter();
 
-  EXPECT_EQ(&(filter_callbacks_.connection_), &filter_->connection());
+  EXPECT_EQ(&(filter_callbacks_.connection_), &filter_->downstreamConnection());
 }
 
 TEST_F(FilterTest, NewStreamAndResetStream) {

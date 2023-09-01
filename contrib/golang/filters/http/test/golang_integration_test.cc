@@ -267,8 +267,7 @@ typed_config:
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "test-x-set-header-0"));
 
     // check header exists which removed in golang side: x-test-header-1
-    EXPECT_EQ(true,
-              upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+    EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
     // check header value which set in golang: req-downstream-local-address
     EXPECT_TRUE(
@@ -307,8 +306,7 @@ typed_config:
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
     EXPECT_EQ("bar", entries[0]->value().getStringView());
 
-    EXPECT_EQ(
-        true,
+    EXPECT_TRUE(
         upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
 
     // check trailer value which add in golang: x-test-trailer-2
@@ -337,7 +335,7 @@ typed_config:
     EXPECT_EQ("foo", getHeader(response->headers(), "test-x-set-header-0"));
 
     // check resp header exists which removed in golang side: x-test-header-1
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
     // check header value which is appended in golang: existed-header
     entries = response->headers().get(Http::LowerCaseString("existed-header"));
@@ -361,11 +359,10 @@ typed_config:
     EXPECT_EQ("HTTP/1.1", getHeader(response->headers(), "rsp-protocol"));
 
     // check filter chain name in encode phase, exists.
-    EXPECT_EQ(false,
-              response->headers().get(Http::LowerCaseString("rsp-filter-chain-name")).empty());
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("rsp-filter-chain-name")).empty());
 
     // check response code in encode phase, not exists.
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("rsp-response-code")).empty());
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("rsp-response-code")).empty());
 
     // check response code details in encode phase
     EXPECT_EQ("via_upstream", getHeader(response->headers(), "rsp-response-code-details"));
@@ -388,7 +385,7 @@ typed_config:
     EXPECT_EQ("200", getHeader(response->headers(), "rsp-status"));
 
     // verify protocol
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("test-protocol")).empty());
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("test-protocol")).empty());
 
     // verify scheme
     EXPECT_EQ("http", getHeader(response->headers(), "test-scheme"));
@@ -407,6 +404,36 @@ typed_config:
 
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());
+
+    cleanup();
+  }
+
+  void testMetric(std::string path) {
+    initializeBasicFilter(METRIC);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+
+    waitForNextUpstreamRequest();
+
+    EXPECT_EQ("2", getHeader(upstream_request_->headers(), "go-metric-counter-test-header-key"));
+
+    EXPECT_EQ("3", getHeader(upstream_request_->headers(), "go-metric-gauge-test-header-key"));
+
+    EXPECT_EQ("3",
+              getHeader(upstream_request_->headers(), "go-metric-counter-record-test-header-key"));
+
+    EXPECT_EQ("1",
+              getHeader(upstream_request_->headers(), "go-metric-gauge-record-test-header-key"));
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
 
     cleanup();
   }
@@ -599,6 +626,8 @@ typed_config:
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
   const std::string ROUTECONFIG{"routeconfig"};
+  const std::string ACCESSLOG{"access_log"};
+  const std::string METRIC{"metric"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -667,6 +696,55 @@ TEST_P(GolangIntegrationTest, Passthrough) {
 
   cleanup();
 }
+
+TEST_P(GolangIntegrationTest, AccessLog) {
+  initializeBasicFilter(ACCESSLOG, "test.com");
+
+  auto path = "/test";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", path},
+      {":scheme", "http"},
+      {":authority", "test.com"},
+  };
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(request_encoder, "helloworld", true);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "206"},
+  };
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("good");
+  upstream_request_->encodeData(response_data1, false);
+  Buffer::OwnedImpl response_data2("bye");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("206", getHeader(upstream_request_->headers(), "respCode"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsyncly"));
+
+  cleanup();
+}
+
+// Mertic API testing
+TEST_P(GolangIntegrationTest, Metric) { testMetric("/test"); }
+
+// Metric API testing in async mode.
+TEST_P(GolangIntegrationTest, AsyncMetric) { testMetric("/test?async=1"); }
 
 // Basic API testing, i.e. add/remove/set Headers & data rewrite.
 TEST_P(GolangIntegrationTest, Basic) { testBasic("/test"); }

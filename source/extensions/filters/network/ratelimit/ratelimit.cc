@@ -49,9 +49,9 @@ Config::applySubstitutionFormatter(StreamInfo::StreamInfo& stream_info) {
     for (const RateLimit::DescriptorEntry& descriptor_entry : descriptor.entries_) {
 
       std::string value = descriptor_entry.value_;
-      value = formatter_it->get()->format(*request_headers_.get(), *response_headers_.get(),
-                                          *response_trailers_.get(), stream_info, value,
-                                          AccessLog::AccessLogType::NotSet);
+      value = formatter_it->get()->formatWithContext(
+          {request_headers_.get(), response_headers_.get(), response_trailers_.get(), value},
+          stream_info);
       formatter_it++;
       new_descriptor.entries_.push_back({descriptor_entry.key_, value});
     }
@@ -85,7 +85,7 @@ Network::FilterStatus Filter::onNewConnection() {
     client_->limit(
         *this, config_->domain(),
         config_->applySubstitutionFormatter(filter_callbacks_->connection().streamInfo()),
-        Tracing::NullSpan::instance(), filter_callbacks_->connection().streamInfo());
+        Tracing::NullSpan::instance(), filter_callbacks_->connection().streamInfo(), 0);
     calling_limit_ = false;
   }
 

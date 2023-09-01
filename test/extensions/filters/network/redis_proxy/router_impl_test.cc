@@ -20,6 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::InSequence;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
@@ -65,7 +66,8 @@ TEST(PrefixRoutesTest, RoutedToCatchAll) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("c:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_c, router.upstreamPool(key, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
@@ -80,7 +82,8 @@ TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
 
   std::string key("ab:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
@@ -115,9 +118,9 @@ TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.setReadFilterCallback(&filter_callbacks);
   std::string key("removeMe_catchAllKey");
-  EXPECT_EQ(upstream_catch_all, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_catch_all,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
   EXPECT_EQ("{catchAllKey}-catchAllEnv-subjectCN-{catchAllKey}", key);
 }
 
@@ -152,9 +155,9 @@ TEST(PrefixRoutesTest, TestFormatterWithPrefixRoute) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.setReadFilterCallback(&filter_callbacks);
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
   EXPECT_EQ("{abc:bar}-test-subjectCN-{abc:bar}", key);
 }
 
@@ -187,9 +190,9 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
     route->set_key_formatter(format);
   }
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
-  router.setReadFilterCallback(&filter_callbacks);
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_c, router.upstreamPool(key)->upstream());
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
   EXPECT_EQ("abc:bar", key);
 }
 
@@ -208,7 +211,8 @@ TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("AB:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, RemovePrefix) {
@@ -232,7 +236,8 @@ TEST(PrefixRoutesTest, RemovePrefix) {
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
   std::string key("abc:bar");
-  EXPECT_EQ(upstream_a, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_a, router.upstreamPool(key, stream_info)->upstream());
   EXPECT_EQ(":bar", key);
 }
 
@@ -248,7 +253,8 @@ TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams), runtime_);
 
   std::string key("a:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key)->upstream());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(upstream_b, router.upstreamPool(key, stream_info)->upstream());
   EXPECT_EQ("a:bar", key);
 }
 
@@ -271,11 +277,13 @@ TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
 
   PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
 
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
   std::string key1("a:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key1)->upstream());
+  EXPECT_EQ(upstream_b, router.upstreamPool(key1, stream_info)->upstream());
 
   std::string key2("also_route_to_b:bar");
-  EXPECT_EQ(upstream_b, router.upstreamPool(key2)->upstream());
+  EXPECT_EQ(upstream_b, router.upstreamPool(key2, stream_info)->upstream());
 }
 
 TEST(PrefixRoutesTest, DuplicatePrefix) {

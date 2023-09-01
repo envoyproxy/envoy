@@ -1,6 +1,7 @@
 #include "source/common/io/io_uring_impl.h"
 #include "source/common/network/address_impl.h"
 
+#include "test/mocks/io/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -13,10 +14,12 @@ namespace {
 
 class TestRequest : public Request {
 public:
-  TestRequest(int& data) : data_(data) {}
+  explicit TestRequest(int& data)
+      : Request(RequestType::Read, mock_io_uring_socket_), data_(data) {}
   ~TestRequest() { data_ = -1; }
 
   int& data_;
+  MockIoUringSocket mock_io_uring_socket_;
 };
 
 class IoUringImplTest : public ::testing::Test {
