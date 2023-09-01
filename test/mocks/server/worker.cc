@@ -31,7 +31,7 @@ MockWorker::MockWorker() {
 
   ON_CALL(*this, stopListener(_, _))
       .WillByDefault(
-          Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions& options,
+          Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
                     std::function<void()> completion) -> void {
             if (completion != nullptr) {
               completion();
