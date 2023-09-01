@@ -78,7 +78,7 @@ message ExtAuthz {
   // 3. At least one ``authorization response header`` is added to the client request, or is used for
   // altering another client request header.
   //
-  // This field MUST NOT be set when the filter is configured on an upstream filter chain.
+  // It is an error to set this field when the filter is configured on an upstream filter chain.
   bool clear_route_cache = 6;
 
   // Sets the HTTP status that is returned to the client when the authorization server returns an error
