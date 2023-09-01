@@ -241,12 +241,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // Skip Filter and continue chain if a Passthrough header is matching
   // Must be done before the sanitation of the authorization header,
   // otherwise the authorization header might be altered or removed
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
-    for (const auto& matcher : config_->passThroughMatchers()) {
-      if (matcher.matchesHeaders(headers)) {
-        config_->stats().oauth_passthrough_.inc();
-        return Http::FilterHeadersStatus::Continue;
-      }
+  for (const auto& matcher : config_->passThroughMatchers()) {
+    if (matcher.matchesHeaders(headers)) {
+      config_->stats().oauth_passthrough_.inc();
+      return Http::FilterHeadersStatus::Continue;
     }
   }
 
@@ -362,9 +360,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
-  const auto redirect_uri = formatter.format(
-      headers, *Http::ResponseHeaderMapImpl::create(), *Http::ResponseTrailerMapImpl::create(),
-      decoder_callbacks_->streamInfo(), "", AccessLog::AccessLogType::NotSet);
+  const auto redirect_uri =
+      formatter.formatWithContext({&headers}, decoder_callbacks_->streamInfo());
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
                                      redirect_uri, config_->authType());
 
@@ -385,14 +382,6 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     }
     ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie");
     return true;
-  }
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
-    for (const auto& matcher : config_->passThroughMatchers()) {
-      if (matcher.matchesHeaders(headers)) {
-        ENVOY_LOG(debug, "skipping oauth flow due to passthrough matcher match");
-        return true;
-      }
-    }
   }
   ENVOY_LOG(debug, "can not skip oauth flow");
   return false;
@@ -419,9 +408,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
           : Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
-  const auto redirect_uri = formatter.format(
-      headers, *Http::ResponseHeaderMapImpl::create(), *Http::ResponseTrailerMapImpl::create(),
-      decoder_callbacks_->streamInfo(), "", AccessLog::AccessLogType::NotSet);
+  const auto redirect_uri =
+      formatter.formatWithContext({&headers}, decoder_callbacks_->streamInfo());
   const std::string escaped_redirect_uri =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
           ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri)

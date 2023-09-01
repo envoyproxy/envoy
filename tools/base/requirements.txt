@@ -626,9 +626,9 @@ gitdb==4.0.10 \
     --hash=sha256:6eb990b69df4e15bad899ea868dc46572c3f75339735663b81de79b06f17eb9a \
     --hash=sha256:c286cf298426064079ed96a9e4a9d39e7f3e9bf15ba60701e95f5492f28415c7
     # via gitpython
-gitpython==3.1.32 \
-    --hash=sha256:8d9b8cb1e80b9735e8717c9362079d3ce4c6e5ddeebedd0361b228c3a67a62f6 \
-    --hash=sha256:e3d59b1c2c6ebb9dfa7a184daf3b6dd4914237e7488a1730a6d8f6f5d0b4187f
+gitpython==3.1.33 \
+    --hash=sha256:11f22466f982211ad8f3bdb456c03be8466c71d4da8774f3a9f68344e89559cb \
+    --hash=sha256:13aaa3dff88a23afec2d00eb3da3f2e040e2282e41de484c5791669b31146084
     # via -r requirements.in
 google-api-core==2.11.1 \
     --hash=sha256:25d29e05a0058ed5f19c61c0a78b1b53adea4d9364b464d014fbda941f6d1c9a \

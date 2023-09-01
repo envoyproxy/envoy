@@ -21,6 +21,17 @@ ProtobufWkt::Value TestFormatter::formatValue(const Http::RequestHeaderMap&,
   return ValueUtil::stringValue("");
 }
 
+absl::optional<std::string> TestFormatter::formatWithContext(const HttpFormatterContext&,
+                                                             const StreamInfo::StreamInfo&) const {
+  return "TestFormatter";
+}
+
+ProtobufWkt::Value
+TestFormatter::formatValueWithContext(const HttpFormatterContext& context,
+                                      const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::stringValue(formatWithContext(context, stream_info).value());
+}
+
 FormatterProviderPtr TestCommandParser::parse(const std::string& command, const std::string&,
                                               absl::optional<size_t>&) const {
   if (command == "COMMAND_EXTENSION") {
@@ -58,6 +69,18 @@ AdditionalFormatter::formatValue(const Http::RequestHeaderMap&, const Http::Resp
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view, AccessLog::AccessLogType) const {
   return ValueUtil::stringValue("");
+}
+
+absl::optional<std::string>
+AdditionalFormatter::formatWithContext(const HttpFormatterContext&,
+                                       const StreamInfo::StreamInfo&) const {
+  return "AdditionalFormatter";
+}
+
+ProtobufWkt::Value
+AdditionalFormatter::formatValueWithContext(const HttpFormatterContext& context,
+                                            const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::stringValue(formatWithContext(context, stream_info).value());
 }
 
 FormatterProviderPtr AdditionalCommandParser::parse(const std::string& command, const std::string&,

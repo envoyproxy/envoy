@@ -181,7 +181,7 @@ inline constexpr absl::string_view DefaultUnspecifiedValueStringView = "-";
 template <class FormatterContext>
 class CommonFormatterBaseImpl : public FormatterBase<FormatterContext> {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
   CommonFormatterBaseImpl(const std::string& format, bool omit_empty_values = false)
       : empty_value_string_(omit_empty_values ? absl::string_view{}
@@ -230,9 +230,9 @@ template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVis
  */
 template <class FormatterContext> class StructFormatterBase {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
-  using PlainNumber = PlainNumberFormatter;
-  using PlainString = PlainStringFormatter;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
+  using PlainNumber = PlainNumberFormatterBase<FormatterContext>;
+  using PlainString = PlainStringFormatterBase<FormatterContext>;
 
   StructFormatterBase(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                       bool omit_empty_values, const CommandParsers& commands = {})
@@ -429,7 +429,7 @@ using StructFormatterBasePtr = std::unique_ptr<StructFormatterBase<FormatterCont
 template <class FormatterContext>
 class CommonJsonFormatterBaseImpl : public FormatterBase<FormatterContext> {
 public:
-  using CommandParsers = std::vector<CommandParserPtr>;
+  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
   CommonJsonFormatterBaseImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                               bool omit_empty_values, bool sort_properties,
@@ -467,64 +467,8 @@ public:
   using CommonJsonFormatterBaseImpl<FormatterContext>::CommonJsonFormatterBaseImpl;
 };
 
-/**
- * Wrapper for StructFormatterBase that uses HttpFormatterContext.
- */
-class StructFormatter : public StructFormatterBase<HttpFormatterContext> {
-public:
-  using StructFormatterBase::StructFormatterBase;
-
-  ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& response_headers,
-                             const Http::ResponseTrailerMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info,
-                             absl::string_view local_reply_body,
-                             AccessLog::AccessLogType access_log_type) const {
-    HttpFormatterContext context(&request_headers, &response_headers, &response_trailers,
-                                 local_reply_body, access_log_type);
-    return StructFormatterBase::formatWithContext(context, stream_info);
-  }
-};
-
-template <class Base> class HttpFormatterSpecializationHelper : public Base {
-public:
-  using Base::Base;
-
-  // Formatter
-  std::string format(const Http::RequestHeaderMap& request_headers,
-                     const Http::ResponseHeaderMap& response_headers,
-                     const Http::ResponseTrailerMap& response_trailers,
-                     const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body,
-                     AccessLog::AccessLogType access_log_type) const override {
-    HttpFormatterContext context(&request_headers, &response_headers, &response_trailers,
-                                 local_reply_body, access_log_type);
-    return Base::formatWithContext(context, stream_info);
-  }
-};
-
-/**
- * Specialization of FormatterBaseImpl for HttpFormatterContext. This will implement
- * additional format() method for backwards compatibility.
- */
-template <>
-class FormatterBaseImpl<HttpFormatterContext>
-    : public HttpFormatterSpecializationHelper<CommonFormatterBaseImpl<HttpFormatterContext>> {
-public:
-  using HttpFormatterSpecializationHelper::HttpFormatterSpecializationHelper;
-};
-
+using StructFormatter = StructFormatterBase<HttpFormatterContext>;
 using StructFormatterPtr = std::unique_ptr<StructFormatter>;
-
-/**
- * Specialization of JsonFormatterBaseImpl for HttpFormatterContext. This will implement
- * additional format() method for backwards compatibility.
- */
-template <>
-class JsonFormatterBaseImpl<HttpFormatterContext>
-    : public HttpFormatterSpecializationHelper<CommonJsonFormatterBaseImpl<HttpFormatterContext>> {
-public:
-  using HttpFormatterSpecializationHelper::HttpFormatterSpecializationHelper;
-};
 
 // Aliases for backwards compatibility.
 using FormatterImpl = FormatterBaseImpl<HttpFormatterContext>;
