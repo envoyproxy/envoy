@@ -149,7 +149,7 @@ private:
     ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter)
         : parent_(parent), write_filter_(std::move(filter)) {}
 
-    // SessionFilters::ReadFilterCallbacks
+    // SessionFilters::WriteFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
 
