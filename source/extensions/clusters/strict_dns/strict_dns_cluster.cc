@@ -193,7 +193,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
       });
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                            ClusterFactoryContext& context) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);

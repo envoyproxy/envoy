@@ -99,6 +99,12 @@ public:
     }
     void onDecodingFailure() override {}
     void writeToConnection(Buffer::Instance&) override {}
+    OptRef<Network::Connection> connection() override {
+      if (parent_.upstream_connection_ != nullptr) {
+        return parent_.upstream_connection_->connection();
+      }
+      return {};
+    }
 
     bool complete_{};
     ResponsePtr response_;

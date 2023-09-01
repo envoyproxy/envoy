@@ -1,5 +1,5 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
