@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+import "google/protobuf/duration.proto";
+
+package envoy.extensions.transport_sockets.ssl_handshaker.v3alpha;
+
+import "envoy/config/core/v3/config_source.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.ssl_handshaker.v3alpha";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Custom Ssl Handshaker]
+// [#extension: envoy.transport_sockets.tls.ssl_hanshaker]
+
+// Configuration for Custom Ssl Handshaker
+message Config {
+  // Globally unique ID for a dynamic library file.
+  string library_id = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Path to a dynamic library implementing the
+  string library_path = 2 [(validate.rules).string = {min_len: 1}];
+
+  config.core.v3.ConfigSource sds_config = 3;
+
+  google.protobuf.Duration select_cert_name_timeout = 4 [(validate.rules).duration = {gt {}}];
+  
+  google.protobuf.Duration fetch_cert_timeout = 5 [(validate.rules).duration = {gt {}}];
+}

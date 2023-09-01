@@ -184,6 +184,28 @@ private:
 
 using NetworkFilterDsoPtr = std::shared_ptr<NetworkFilterDso>;
 
+class SSLHandshakerDso : public Dso {
+public:
+  SSLHandshakerDso(const std::string dso_name) : Dso(dso_name){};
+  virtual ~SSLHandshakerDso() = default;
+
+  virtual GoUint64 envoyOnTlsHandshakerSelectCert(GoUint64 p0, GoUint64 p1, GoUint64 p2) PURE;
+};
+
+class SSLHandshakerDsoImpl : public SSLHandshakerDso {
+public:
+  SSLHandshakerDsoImpl(const std::string dso_name);
+  ~SSLHandshakerDsoImpl() override = default;
+
+  GoUint64 envoyOnTlsHandshakerSelectCert(GoUint64 p0, GoUint64 p1, GoUint64 p2) override;
+
+private:
+  GoUint64 (*envoy_on_tls_handshake_select_cert_)(GoUint64 p0, GoUint64 p1,
+                                                  GoUint64 p2) = {nullptr};
+};
+
+using SSLHandshakerDsoPtr = std::shared_ptr<SSLHandshakerDso>;
+
 /*
  * We do not unload a dynamic library once it is loaded. This is because
  * Go shared library could not be unload by dlclose yet, see:

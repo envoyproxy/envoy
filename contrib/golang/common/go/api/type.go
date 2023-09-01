@@ -408,3 +408,11 @@ func (t ConnectionInfoType) String() string {
 	}
 	return "unknown"
 }
+
+type DownstreamTlsCertSelector interface {
+	// TrySelectCertSync try to select cert in sync way
+	// will use the certName when done is true, otherwise, will continue SelectCertAsync.
+	TrySelectCertSync(serverName string) (certName string, done bool)
+	// SelectCertAsync select cert in async way, when done is false from TrySelectCertSync.
+	SelectCertAsync(serverName string) string
+}

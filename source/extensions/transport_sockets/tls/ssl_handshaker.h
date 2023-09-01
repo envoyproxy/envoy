@@ -8,6 +8,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/server/options.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
@@ -114,23 +115,28 @@ using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
 
 class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {
 public:
-  HandshakerFactoryContextImpl(Api::Api& api, const Server::Options& options,
-                               absl::string_view alpn_protocols,
-                               Singleton::Manager& singleton_manager)
+  HandshakerFactoryContextImpl(
+      Api::Api& api, const Server::Options& options, absl::string_view alpn_protocols,
+      Singleton::Manager& singleton_manager,
+      Server::Configuration::TransportSocketFactoryContext& factory_context)
       : api_(api), options_(options), alpn_protocols_(alpn_protocols),
-        singleton_manager_(singleton_manager) {}
+        singleton_manager_(singleton_manager), factory_context_(factory_context) {}
 
   // HandshakerFactoryContext
   Api::Api& api() override { return api_; }
   const Server::Options& options() const override { return options_; }
   absl::string_view alpnProtocols() const override { return alpn_protocols_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
+  Server::Configuration::TransportSocketFactoryContext& factoryContext() {
+    return factory_context_;
+  }
 
 private:
   Api::Api& api_;
   const Server::Options& options_;
   const std::string alpn_protocols_;
   Singleton::Manager& singleton_manager_;
+  Server::Configuration::TransportSocketFactoryContext& factory_context_;
 };
 
 class HandshakerFactoryImpl : public Ssl::HandshakerFactory {

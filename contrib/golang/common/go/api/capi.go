@@ -87,3 +87,7 @@ type NetworkCAPI interface {
 	// UpstreamInfo gets the upstream connection info of infoType
 	UpstreamInfo(f unsafe.Pointer, infoType int) string
 }
+
+type SSLCAPI interface {
+	DownstreamTlsConnSelectCert(envoyTlsHandshaker uint64, respType int, certName uint64, certNameLen int)
+}

@@ -48,3 +48,10 @@ func BufferToSlice(ptr uint64, len uint64) []byte {
 	sHdr.Cap = int(len)
 	return s
 }
+
+// CopyString deep copy a string
+func CopyString(s string) string {
+	b := make([]byte, len(s))
+	copy(b, s)
+	return *(*string)(unsafe.Pointer(&b))
+}

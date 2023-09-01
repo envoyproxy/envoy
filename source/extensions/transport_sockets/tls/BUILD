@@ -50,6 +50,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
+        "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:handshaker_interface",
         "//envoy/ssl:ssl_socket_extended_info_interface",
         "//envoy/ssl:ssl_socket_state",

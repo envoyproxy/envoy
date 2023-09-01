@@ -32,8 +32,10 @@ void ManagerImpl::add(const Target& target) {
     target_handle->initialize(watcher_);
     return;
   case State::Initialized:
-    // If the manager has already completed initialization, consider this a programming error.
-    ASSERT(false, fmt::format("attempted to add {} to initialized {}", target.name(), name_));
+    // FIXME: need to create sds provider on demand.
+    target_handle->initialize(watcher_);
+    return;
+    // ASSERT(false, fmt::format("attempted to add {} to initialized {}", target.name(), name_));
   }
 }
 
@@ -91,6 +93,13 @@ void ManagerImpl::onTargetReady(absl::string_view target_name) {
 }
 
 void ManagerImpl::ready() {
+  if (state_ == State::Initialized) {
+    // skip ready, otherwise, may got assert, eg.
+    // [assert] [source/server/listener_manager_impl.cc:761] assert failure:
+    // existing_warming_listener != warming_listeners_.end().
+    ENVOY_LOG(debug, "{} is already initialized", name_);
+    return;
+  }
   state_ = State::Initialized;
   watcher_handle_->ready();
 }

@@ -111,6 +111,10 @@ CAPIStatus envoyGoFilterSetFilterState(void* wrapper, void* key, void* value, in
                                        int life_span, int stream_sharing);
 CAPIStatus envoyGoFilterGetFilterState(void* wrapper, void* key, void* value);
 
+// ssl handshaker
+void envoyTlsConnectionSelectCert(unsigned long long int envoyTlsHandshaker, int respType,
+                                        unsigned long long int certNameData, int certNameLen);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

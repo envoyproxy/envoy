@@ -227,7 +227,7 @@ ContextConfigImpl::ContextConfigImpl(
   }
 
   HandshakerFactoryContextImpl handshaker_factory_context(api_, options_, alpn_protocols_,
-                                                          singleton_manager_);
+                                                          singleton_manager_, factory_context);
   Ssl::HandshakerFactory* handshaker_factory;
   if (config.has_custom_handshaker()) {
     // If a custom handshaker is configured, derive the factory from the config.
