@@ -58,7 +58,7 @@ template <class T> struct OptRef {
   /**
    * @return true if the object has a value.
    */
-  bool has_value() const { return ptr_ != nullptr; }
+  bool has_value() const { return ptr_ != nullptr; } // // NOLINT(readability-identifier-naming)
 
   /**
    * @return true if the object has a value.

@@ -592,6 +592,7 @@ envoy_cc_library(
         "abseil_node_hash_set",
     ],
     deps = [
+        "//envoy/common:optref_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
