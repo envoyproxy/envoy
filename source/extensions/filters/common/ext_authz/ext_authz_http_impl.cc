@@ -246,6 +246,11 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setChildSpanName(config_->tracingName())
                        .setSampled(absl::nullopt);
 
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_authz_http_send_original_xff")) {
+      options.setSendXff(false);
+    }
+
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
 }

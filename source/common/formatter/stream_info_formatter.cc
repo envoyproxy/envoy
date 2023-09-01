@@ -133,11 +133,12 @@ UpstreamHostMetadataFormatter::UpstreamHostMetadataFormatter(const std::string& 
 std::unique_ptr<FilterStateFormatter>
 FilterStateFormatter::create(const std::string& format, const absl::optional<size_t>& max_length,
                              bool is_upstream) {
-  std::string key, serialize_type;
+  std::string key, serialize_type, field_name;
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
+  static constexpr absl::string_view FIELD_SERIALIZATION{"FIELD"};
 
-  SubstitutionFormatUtils::parseSubcommand(format, ':', key, serialize_type);
+  SubstitutionFormatUtils::parseSubcommand(format, ':', key, serialize_type, field_name);
   if (key.empty()) {
     throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
   }
@@ -145,21 +146,37 @@ FilterStateFormatter::create(const std::string& format, const absl::optional<siz
   if (serialize_type.empty()) {
     serialize_type = std::string(TYPED_SERIALIZATION);
   }
-  if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
+  if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION &&
+      serialize_type != FIELD_SERIALIZATION) {
     throw EnvoyException("Invalid filter state serialize type, only "
-                         "support PLAIN/TYPED.");
+                         "support PLAIN/TYPED/FIELD.");
+  }
+  if ((serialize_type == FIELD_SERIALIZATION) ^ !field_name.empty()) {
+    throw EnvoyException("Invalid filter state serialize type, FIELD "
+                         "should be used with the field name.");
   }
 
   const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
 
-  return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string, is_upstream);
+  return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string, is_upstream,
+                                                field_name);
 }
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
                                            absl::optional<size_t> max_length,
-                                           bool serialize_as_string, bool is_upstream)
-    : key_(key), max_length_(max_length), serialize_as_string_(serialize_as_string),
-      is_upstream_(is_upstream) {}
+                                           bool serialize_as_string, bool is_upstream,
+                                           const std::string& field_name)
+    : key_(key), max_length_(max_length), is_upstream_(is_upstream) {
+  if (!field_name.empty()) {
+    format_ = FilterStateFormat::Field;
+    field_name_ = field_name;
+    factory_ = Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
+  } else if (serialize_as_string) {
+    format_ = FilterStateFormat::String;
+  } else {
+    format_ = FilterStateFormat::Proto;
+  }
+}
 
 const Envoy::StreamInfo::FilterState::Object*
 FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
@@ -180,6 +197,12 @@ FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) con
   return nullptr;
 }
 
+struct StringFieldVisitor {
+  absl::optional<std::string> operator()(int64_t val) { return absl::StrCat(val); }
+  absl::optional<std::string> operator()(absl::string_view val) { return std::string(val); }
+  absl::optional<std::string> operator()(absl::monostate) { return {}; }
+};
+
 absl::optional<std::string>
 FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
@@ -187,7 +210,8 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     return absl::nullopt;
   }
 
-  if (serialize_as_string_) {
+  switch (format_) {
+  case FilterStateFormat::String: {
     absl::optional<std::string> plain_value = state->serializeAsString();
     if (plain_value.has_value()) {
       SubstitutionFormatUtils::truncate(plain_value.value(), max_length_);
@@ -195,27 +219,47 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     }
     return absl::nullopt;
   }
-
-  ProtobufTypes::MessagePtr proto = state->serializeAsProto();
-  if (proto == nullptr) {
-    return absl::nullopt;
-  }
+  case FilterStateFormat::Proto: {
+    ProtobufTypes::MessagePtr proto = state->serializeAsProto();
+    if (proto == nullptr) {
+      return absl::nullopt;
+    }
 
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-  std::string value;
-  const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
-  if (!status.ok()) {
-    // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
-    // TODO(lizan): add support of unknown Any.
+    std::string value;
+    const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
+    if (!status.ok()) {
+      // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
+      // TODO(lizan): add support of unknown Any.
+      return absl::nullopt;
+    }
+
+    SubstitutionFormatUtils::truncate(value, max_length_);
+    return value;
+#else
+    PANIC("FilterStateFormatter::format requires full proto support");
+    return absl::nullopt;
+#endif
+  }
+  case FilterStateFormat::Field: {
+    if (!factory_) {
+      return absl::nullopt;
+    }
+    const auto reflection = factory_->reflect(state);
+    if (!reflection) {
+      return absl::nullopt;
+    }
+    auto field_value = reflection->getField(field_name_);
+    auto string_value = absl::visit(StringFieldVisitor(), field_value);
+    if (!string_value) {
+      return absl::nullopt;
+    }
+    SubstitutionFormatUtils::truncate(string_value.value(), max_length_);
+    return string_value;
+  }
+  default:
     return absl::nullopt;
   }
-
-  SubstitutionFormatUtils::truncate(value, max_length_);
-  return value;
-#else
-  PANIC("FilterStateFormatter::format requires full proto support");
-  return absl::nullopt;
-#endif
 }
 
 ProtobufWkt::Value
@@ -225,7 +269,8 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
-  if (serialize_as_string_) {
+  switch (format_) {
+  case FilterStateFormat::String: {
     absl::optional<std::string> plain_value = state->serializeAsString();
     if (plain_value.has_value()) {
       SubstitutionFormatUtils::truncate(plain_value.value(), max_length_);
@@ -233,19 +278,39 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
     }
     return SubstitutionFormatUtils::unspecifiedValue();
   }
-
-  ProtobufTypes::MessagePtr proto = state->serializeAsProto();
-  if (!proto) {
-    return SubstitutionFormatUtils::unspecifiedValue();
-  }
+  case FilterStateFormat::Proto: {
+    ProtobufTypes::MessagePtr proto = state->serializeAsProto();
+    if (!proto) {
+      return SubstitutionFormatUtils::unspecifiedValue();
+    }
 
 #ifdef ENVOY_ENABLE_YAML
-  ProtobufWkt::Value val;
-  if (MessageUtil::jsonConvertValue(*proto, val)) {
-    return val;
-  }
+    ProtobufWkt::Value val;
+    if (MessageUtil::jsonConvertValue(*proto, val)) {
+      return val;
+    }
 #endif
-  return SubstitutionFormatUtils::unspecifiedValue();
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  case FilterStateFormat::Field: {
+    if (!factory_) {
+      return SubstitutionFormatUtils::unspecifiedValue();
+    }
+    const auto reflection = factory_->reflect(state);
+    if (!reflection) {
+      return SubstitutionFormatUtils::unspecifiedValue();
+    }
+    auto field_value = reflection->getField(field_name_);
+    auto string_value = absl::visit(StringFieldVisitor(), field_value);
+    if (!string_value) {
+      return SubstitutionFormatUtils::unspecifiedValue();
+    }
+    SubstitutionFormatUtils::truncate(string_value.value(), max_length_);
+    return ValueUtil::stringValue(string_value.value());
+  }
+  default:
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
 }
 
 // A SystemTime formatter that extracts the startTime from StreamInfo. Must be provided

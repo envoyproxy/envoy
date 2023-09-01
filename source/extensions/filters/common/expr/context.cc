@@ -284,6 +284,35 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   return {};
 }
 
+class FilterStateObjectWrapper : public google::api::expr::runtime::CelMap {
+public:
+  FilterStateObjectWrapper(const StreamInfo::FilterState::ObjectReflection* reflection)
+      : reflection_(reflection) {}
+  absl::optional<CelValue> operator[](CelValue key) const override {
+    if (reflection_ == nullptr || !key.IsString()) {
+      return {};
+    }
+    auto field_value = reflection_->getField(key.StringOrDie().value());
+    return absl::visit(Visitor{}, field_value);
+  }
+  // Default stubs.
+  int size() const override { return 0; }
+  bool empty() const override { return true; }
+  absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
+    return &WrapperFields::get().Empty;
+  }
+
+private:
+  struct Visitor {
+    absl::optional<CelValue> operator()(int64_t val) { return CelValue::CreateInt64(val); }
+    absl::optional<CelValue> operator()(absl::string_view val) {
+      return CelValue::CreateStringView(val);
+    }
+    absl::optional<CelValue> operator()(absl::monostate) { return {}; }
+  };
+  const StreamInfo::FilterState::ObjectReflection* reflection_;
+};
+
 absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
@@ -295,6 +324,18 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
     if (cel_state) {
       return cel_state->exprValue(&arena_, false);
     } else if (object != nullptr) {
+      // Attempt to find the reflection object.
+      auto factory =
+          Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(value);
+      if (factory) {
+        auto reflection = factory->reflect(object);
+        if (reflection) {
+          auto* raw_reflection = reflection.release();
+          arena_.Own(raw_reflection);
+          return CelValue::CreateMap(
+              ProtobufWkt::Arena::Create<FilterStateObjectWrapper>(&arena_, raw_reflection));
+        }
+      }
       absl::optional<std::string> serialized = object->serializeAsString();
       if (serialized.has_value()) {
         std::string* out = ProtobufWkt::Arena::Create<std::string>(&arena_, serialized.value());

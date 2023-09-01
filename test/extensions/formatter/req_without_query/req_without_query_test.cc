@@ -140,9 +140,7 @@ TEST_F(ReqWithoutQueryTest, TestFormatJson) {
   TestUtility::loadFromYaml(yaml, config_);
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  const std::string actual =
-      formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                        body_, AccessLog::AccessLogType::NotSet);
+  const std::string actual = formatter->formatWithContext(formatter_context_, stream_info_);
   EXPECT_TRUE(TestUtility::jsonStringEqual(actual, expected));
 }
 
