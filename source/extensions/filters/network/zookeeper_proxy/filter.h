@@ -373,9 +373,6 @@ public:
   void clearDynamicMetadata();
 
 private:
-  void onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) override;
-  void onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) override;
-
   Network::ReadFilterCallbacks* read_callbacks_{};
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<Decoder> decoder_;

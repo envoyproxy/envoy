@@ -244,48 +244,30 @@ void ZooKeeperFilter::onDecodeError() {
   setDynamicMetadata("opname", "error");
 }
 
-void ZooKeeperFilter::onDefaultRequestBytes(const OpCodes opcode, const uint64_t bytes) {
-  auto it = config_->op_code_map_.find(opcode);
-  ASSERT(it != config_->op_code_map_.end());
-  const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = it->second;
-  opcode_info.rq_bytes_counter_->add(bytes);
-}
-
 void ZooKeeperFilter::onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
   config_->stats_.request_bytes_.add(bytes);
 
   if (config_->enable_per_opcode_request_bytes_metrics_ && opcode.has_value()) {
-    switch (*opcode) {
-    case OpCodes::Connect:
+    if (*opcode == OpCodes::Connect) {
       config_->stats_.connect_rq_bytes_.add(bytes);
-      break;
-    default:
-      onDefaultRequestBytes(*opcode, bytes);
-      break;
+    } else {
+      ASSERT(config_->op_code_map_.contains(*opcode));
+      config_->op_code_map_[*opcode].rq_bytes_counter_->add(bytes);
     }
   }
 
   setDynamicMetadata("bytes", std::to_string(bytes));
 }
 
-void ZooKeeperFilter::onDefaultResponseBytes(const OpCodes opcode, const uint64_t bytes) {
-  auto it = config_->op_code_map_.find(opcode);
-  ASSERT(it != config_->op_code_map_.end());
-  const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = it->second;
-  opcode_info.resp_bytes_counter_->add(bytes);
-}
-
 void ZooKeeperFilter::onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
   config_->stats_.response_bytes_.add(bytes);
 
   if (config_->enable_per_opcode_response_bytes_metrics_ && opcode.has_value()) {
-    switch (*opcode) {
-    case OpCodes::Connect:
+    if (*opcode == OpCodes::Connect) {
       config_->stats_.connect_resp_bytes_.add(bytes);
-      break;
-    default:
-      onDefaultResponseBytes(*opcode, bytes);
-      break;
+    } else {
+      ASSERT(config_->op_code_map_.contains(*opcode));
+      config_->op_code_map_[*opcode].resp_bytes_counter_->add(bytes);
     }
   }
 
