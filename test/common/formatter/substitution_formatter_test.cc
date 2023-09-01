@@ -211,17 +211,7 @@ TEST(SubstitutionFormatUtilsTest, protocolToStringOrDefault) {
 
 TEST(SubstitutionFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
-
-  EXPECT_EQ("plain", formatter.format(request_headers, response_headers, response_trailers,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet));
-  EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                    stream_info, body, AccessLog::AccessLogType::NotSet),
-              ProtoEq(ValueUtil::stringValue("plain")));
 
   EXPECT_EQ("plain", formatter.formatWithContext({}, stream_info));
   EXPECT_THAT(formatter.formatValueWithContext({}, stream_info),
@@ -230,17 +220,7 @@ TEST(SubstitutionFormatterTest, plainStringFormatter) {
 
 TEST(SubstitutionFormatterTest, plainNumberFormatter) {
   PlainNumberFormatter formatter(400);
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
-
-  EXPECT_EQ("400", formatter.format(request_headers, response_headers, response_trailers,
-                                    stream_info, body, AccessLog::AccessLogType::NotSet));
-  EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                    stream_info, body, AccessLog::AccessLogType::NotSet),
-              ProtoEq(ValueUtil::numberValue(400)));
 
   EXPECT_EQ("400", formatter.formatWithContext({}, stream_info));
   EXPECT_THAT(formatter.formatValueWithContext({}, stream_info),
@@ -251,10 +231,6 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
   StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr};
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
 
   {
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
@@ -266,14 +242,9 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(200)));
     StreamInfoFormatter duration_format("DURATION");
     EXPECT_EQ("200", duration_format.formatWithContext({}, stream_info));
-    EXPECT_EQ("200", duration_format.format(request_headers, response_headers, response_trailers,
-                                            stream_info, body, AccessLog::AccessLogType::NotSet));
 
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(300)));
     EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::numberValue(300.0)));
-    EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::numberValue(300.0)));
   }
 }
