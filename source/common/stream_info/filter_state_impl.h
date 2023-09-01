@@ -95,7 +95,7 @@ private:
                    "conflicting life_span on the same data_name.");
       return;
     }
-    const auto current = data_storage_->lookup(data_key);
+    const auto current = data_storage_->get(data_key);
     if (current.has_value()) {
       // We have another object with same data_name. Check for mutability
       // violations namely: readonly data cannot be overwritten, mutable data
@@ -117,17 +117,17 @@ private:
     filter_object.data_ = data;
     filter_object.state_type_ = state_type;
     filter_object.stream_sharing_ = stream_sharing;
-    data_storage_->insert(data_key, std::move(filter_object));
+    data_storage_->set(data_key, std::move(filter_object));
   }
 
   // This only checks the local data_storage_ for data_name existence.
   template <class DataKeyType> bool hasDataInternal(DataKeyType data_key) const {
-    return data_storage_->lookup(data_key).has_value();
+    return data_storage_->get(data_key).has_value();
   }
 
   template <class DataKeyType>
   const FilterState::Object* getDataReadOnlyGenericInternal(DataKeyType data_key) const {
-    const auto current = data_storage_->lookup(data_key);
+    const auto current = data_storage_->get(data_key);
 
     if (!current.has_value()) {
       if (parent_) {
@@ -141,7 +141,7 @@ private:
 
   template <class DataKeyType>
   std::shared_ptr<FilterState::Object> getDataSharedMutableGenericInternal(DataKeyType data_key) {
-    const auto current = data_storage_->lookup(data_key);
+    const auto current = data_storage_->get(data_key);
 
     if (!current.has_value()) {
       if (parent_) {
