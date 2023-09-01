@@ -2,6 +2,7 @@
 
 #include <charconv>
 
+#include "source/common/common/macros.h"
 #include "source/common/json/json_sanitizer.h"
 
 #include "absl/strings/str_format.h"
@@ -169,8 +170,9 @@ void Streamer::addNumber(double number) {
     //   * fmt::to_string -- works great and is a little faster than fmt::format: 19ms..
     //   * std::to_chars -- fast (16ms) and precise, but requires a few lines to
     //     generate the string_view.
-#ifdef __APPLE__
-    // On Apple, std::to_chars does not compile, so we revert to the next best implementation.
+#if defined(__APPLE__) || defined(GCC_COMPILER)
+    // On Apple and gcc, std::to_chars does not compile, so we revert to the next best
+    // implementation.
     response_.addFragments({fmt::to_string(number)});
 #else
     // This version is awkward, and doesn't work on Apple as of August 2023, but
