@@ -432,8 +432,8 @@ void UdpProxyFilter::ActiveSession::write(Network::UdpRecvData& data) {
 
   const uint64_t tx_buffer_length = data.buffer_->length();
   ENVOY_LOG(trace, "writing {} byte datagram upstream: downstream={} local={} upstream={}",
-            tx_buffer_length, addresses_.peer_->asStringView(),
-            addresses_.local_->asStringView(), host_->address()->asStringView());
+            tx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
+            host_->address()->asStringView());
 
   Api::IoCallUint64Result rc = Network::Utility::writeToSocket(socket_->ioHandle(), *data.buffer_,
                                                                local_ip, *host_->address());

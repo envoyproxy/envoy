@@ -226,8 +226,7 @@ typed_config:
     EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
 
-    EXPECT_EQ(request.size(),
-              test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
+    EXPECT_EQ(request.size(), test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
     EXPECT_EQ(expected_request.size(),
               test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
