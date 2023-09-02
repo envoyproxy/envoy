@@ -123,10 +123,16 @@ func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *strin
 }
 
 func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
-	// TODO: use a memory pool for better performance,
-	// since these go strings in strs, will be copied into the following map.
-	strs := make([]string, num*2)
-	// but, this buffer can not be reused safely,
+	var strs []string
+	if num <= 16 {
+		// NOTE: only const length slice may be allocated on stack.
+		strs = make([]string, 32)
+	} else {
+		// TODO: maybe we could use a memory pool for better performance,
+		// since these go strings in strs, will be copied into the following map.
+		strs = make([]string, num*2)
+	}
+	// NOTE: this buffer can not be reused safely,
 	// since strings may refer to this buffer as string data, and string is const in go.
 	// we have to make sure the all strings is not using before reusing,
 	// but strings may be alive beyond the request life.
@@ -194,11 +200,19 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 }
 
 func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
-	// TODO: use a memory pool for better performance,
-	// but, should be very careful, since string is const in go,
-	// and we have to make sure the strings is not using before reusing,
-	// strings may be alive beyond the request life.
-	strs := make([]string, num*2)
+	var strs []string
+	if num <= 16 {
+		// NOTE: only const length slice may be allocated on stack.
+		strs = make([]string, 32)
+	} else {
+		// TODO: maybe we could use a memory pool for better performance,
+		// since these go strings in strs, will be copied into the following map.
+		strs = make([]string, num*2)
+	}
+	// NOTE: this buffer can not be reused safely,
+	// since strings may refer to this buffer as string data, and string is const in go.
+	// we have to make sure the all strings is not using before reusing,
+	// but strings may be alive beyond the request life.
 	buf := make([]byte, bytes)
 	sHeader := (*reflect.SliceHeader)(unsafe.Pointer(&strs))
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
