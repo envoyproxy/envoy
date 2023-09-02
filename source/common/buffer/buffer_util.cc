@@ -24,7 +24,7 @@ void Util::serializeDouble(double number, Buffer::Instance& buffer) {
 #if defined(__APPLE__) || defined(GCC_COMPILER)
   // On Apple and gcc, std::to_chars does not work with 'double', so we revert
   // to the next fastest correct implementation.
-  buf_.addFragments({fmt::to_string(number)});
+  buffer.addFragments({fmt::to_string(number)});
 #else
   // This version is awkward, and doesn't work on Apple as of August 2023, but
   // it is the fastest correct option on other platforms.
