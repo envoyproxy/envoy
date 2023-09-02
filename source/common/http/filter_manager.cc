@@ -975,7 +975,8 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
                                  streamInfo(), code, body, content_type);
           },
-          [this](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+          [this, code](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+            headers->setStatus(uint64_t(code));
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
           },

@@ -71,6 +71,10 @@ bug_fixes:
 - area: router check tool
   change: |
     Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
+- area: filter manager
+  change: |
+    Fixed a bug where immediate responses for no_healthy_upstream sent responding to a gRPC request contained a 200
+    status code.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
