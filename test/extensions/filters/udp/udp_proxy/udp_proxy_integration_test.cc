@@ -226,14 +226,14 @@ typed_config:
     EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
 
-    EXPECT_EQ(expected_request.size(),
+    EXPECT_EQ(request.size(),
               test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
     EXPECT_EQ(expected_request.size(),
               test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
 
-    EXPECT_EQ(expected_response.size(),
+    EXPECT_EQ(response.size(),
               test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
     // The stat is incremented after the send so there is a race condition and we must wait for
@@ -548,6 +548,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
   Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
   client.write("hello1", *listener_address);
   client.write(request, *listener_address);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams_filter_dropped", 1);
 
   // Wait for the upstream datagram.
   Network::UdpRecvData request_datagram;
@@ -584,6 +585,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnWrite) {
   // Send two datagrams but see that only the second one arrived downstream.
   fake_upstreams_[0]->sendUdpDatagram("response1", request_datagram.addresses_.peer_);
   fake_upstreams_[0]->sendUdpDatagram(response, request_datagram.addresses_.peer_);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams_filter_dropped", 1);
   Network::UdpRecvData response_datagram;
   client.recv(response_datagram);
   EXPECT_EQ(expected_response, response_datagram.buffer_->toString());

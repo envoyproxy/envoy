@@ -63,8 +63,10 @@ struct UdpProxyDownstreamStats {
 #define ALL_UDP_PROXY_UPSTREAM_STATS(COUNTER)                                                      \
   COUNTER(sess_rx_datagrams)                                                                       \
   COUNTER(sess_rx_datagrams_dropped)                                                               \
+  COUNTER(sess_rx_datagrams_filter_dropped)                                                        \
   COUNTER(sess_rx_errors)                                                                          \
   COUNTER(sess_tx_datagrams)                                                                       \
+  COUNTER(sess_tx_datagrams_filter_dropped)                                                        \
   COUNTER(sess_tx_errors)
 
 /**
@@ -167,10 +169,7 @@ private:
    * will be hashed to the same session and will be forwarded to the same upstream, using the same
    * local ephemeral IP/port.
    */
-  class ActiveSession : public Network::UdpPacketProcessor,
-                        public ReadFilterCallbacks,
-                        public WriteFilterCallbacks,
-                        public FilterChainFactoryCallbacks {
+  class ActiveSession : public Network::UdpPacketProcessor, public FilterChainFactoryCallbacks {
   public:
     ActiveSession(ClusterInfo& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
                   const Upstream::HostConstSharedPtr& host);
@@ -184,9 +183,8 @@ private:
       cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
     }
 
-    // SessionFilters::ReadFilterCallbacks
-    uint64_t sessionId() const override { return session_id_; };
-    StreamInfo::StreamInfo& streamInfo() override { return udp_session_info_; };
+    uint64_t sessionId() const { return session_id_; };
+    StreamInfo::StreamInfo& streamInfo() { return udp_session_info_; };
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {

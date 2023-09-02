@@ -394,16 +394,9 @@ void UdpProxyFilter::ActiveSession::write(Network::UdpRecvData& data) {
             data.buffer_->length(), addresses_.peer_->asStringView(),
             addresses_.local_->asStringView(), host_->address()->asStringView());
 
-  for (auto& active_read_filter : read_filters_) {
-    auto status = active_read_filter->read_filter_->onData(data);
-    if (status == ReadFilterStatus::StopIteration) {
-      return;
-    }
-  }
-
-  const uint64_t buffer_length = data.buffer_->length();
-  cluster_.filter_.config_->stats().downstream_sess_rx_bytes_.add(buffer_length);
-  session_stats_.downstream_sess_rx_bytes_ += buffer_length;
+  const uint64_t rx_buffer_length = data.buffer_->length();
+  cluster_.filter_.config_->stats().downstream_sess_rx_bytes_.add(rx_buffer_length);
+  session_stats_.downstream_sess_rx_bytes_ += rx_buffer_length;
   cluster_.filter_.config_->stats().downstream_sess_rx_datagrams_.inc();
   ++session_stats_.downstream_sess_rx_datagrams_;
 
@@ -429,8 +422,17 @@ void UdpProxyFilter::ActiveSession::write(Network::UdpRecvData& data) {
     connected_ = true;
   }
 
+  for (auto& active_read_filter : read_filters_) {
+    auto status = active_read_filter->read_filter_->onData(data);
+    if (status == ReadFilterStatus::StopIteration) {
+      cluster_.cluster_stats_.sess_rx_datagrams_filter_dropped_.inc();
+      return;
+    }
+  }
+
+  const uint64_t tx_buffer_length = data.buffer_->length();
   ENVOY_LOG(trace, "writing {} byte datagram upstream: downstream={} local={} upstream={}",
-            data.buffer_->length(), addresses_.peer_->asStringView(),
+            tx_buffer_length, addresses_.peer_->asStringView(),
             addresses_.local_->asStringView(), host_->address()->asStringView());
 
   Api::IoCallUint64Result rc = Network::Utility::writeToSocket(socket_->ioHandle(), *data.buffer_,
@@ -440,7 +442,7 @@ void UdpProxyFilter::ActiveSession::write(Network::UdpRecvData& data) {
     cluster_.cluster_stats_.sess_tx_errors_.inc();
   } else {
     cluster_.cluster_stats_.sess_tx_datagrams_.inc();
-    cluster_.cluster_.info()->trafficStats()->upstream_cx_tx_bytes_total_.add(buffer_length);
+    cluster_.cluster_.info()->trafficStats()->upstream_cx_tx_bytes_total_.add(tx_buffer_length);
   }
 }
 
@@ -448,26 +450,28 @@ void UdpProxyFilter::ActiveSession::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
     MonotonicTime receive_time) {
+  const uint64_t rx_buffer_length = buffer->length();
   ENVOY_LOG(trace, "received {} byte datagram from upstream: downstream={} local={} upstream={}",
-            buffer->length(), addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
+            rx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_->address()->asStringView());
+
+  cluster_.cluster_stats_.sess_rx_datagrams_.inc();
+  cluster_.cluster_.info()->trafficStats()->upstream_cx_rx_bytes_total_.add(rx_buffer_length);
 
   Network::UdpRecvData recv_data{
       {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
   for (auto& active_write_filter : write_filters_) {
     auto status = active_write_filter->write_filter_->onWrite(recv_data);
     if (status == WriteFilterStatus::StopIteration) {
+      cluster_.cluster_stats_.sess_tx_datagrams_filter_dropped_.inc();
       return;
     }
   }
 
+  const uint64_t tx_buffer_length = recv_data.buffer_->length();
   ENVOY_LOG(trace, "writing {} byte datagram downstream: downstream={} local={} upstream={}",
-            recv_data.buffer_->length(), addresses_.peer_->asStringView(),
-            addresses_.local_->asStringView(), host_->address()->asStringView());
-
-  const uint64_t buffer_length = recv_data.buffer_->length();
-  cluster_.cluster_stats_.sess_rx_datagrams_.inc();
-  cluster_.cluster_.info()->trafficStats()->upstream_cx_rx_bytes_total_.add(buffer_length);
+            tx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
+            host_->address()->asStringView());
 
   Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *recv_data.buffer_};
   const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener().send(data);
@@ -475,8 +479,8 @@ void UdpProxyFilter::ActiveSession::processPacket(
     cluster_.filter_.config_->stats().downstream_sess_tx_errors_.inc();
     ++session_stats_.downstream_sess_tx_errors_;
   } else {
-    cluster_.filter_.config_->stats().downstream_sess_tx_bytes_.add(buffer_length);
-    session_stats_.downstream_sess_tx_bytes_ += buffer_length;
+    cluster_.filter_.config_->stats().downstream_sess_tx_bytes_.add(tx_buffer_length);
+    session_stats_.downstream_sess_tx_bytes_ += tx_buffer_length;
     cluster_.filter_.config_->stats().downstream_sess_tx_datagrams_.inc();
     ++session_stats_.downstream_sess_tx_datagrams_;
   }
