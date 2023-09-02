@@ -28,6 +28,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     if (filter_config_provider_manager_ == nullptr) {
       throw EnvoyException("Failed to create filter config provider manager");
     }
+
     provider_ = filter_config_provider_manager_->createDynamicFilterConfigProvider(
         config_discovery, composite_action.dynamic_config().name(), server_factory_context,
         factory_context, server_factory_context.clusterManager(), false, "http", nullptr);

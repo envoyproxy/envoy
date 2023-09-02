@@ -16,6 +16,7 @@ class ExecuteFilterAction
           envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
 public:
   explicit ExecuteFilterAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
+  ~ExecuteFilterAction() { std::cout << "ExecuteFilterAction destructor" << std::endl; }
 
   void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
 
@@ -27,6 +28,9 @@ class ExecuteFilterActionFactory
     : public Logger::Loggable<Logger::Id::filter>,
       public Matcher::ActionFactory<Http::Matching::HttpFilterActionContext> {
 public:
+  ~ExecuteFilterActionFactory() {
+    std::cout << "ExecuteFilterActionFactory destructor" << std::endl;
+  }
   std::string name() const override { return "composite-action"; }
 
   Matcher::ActionFactoryCb

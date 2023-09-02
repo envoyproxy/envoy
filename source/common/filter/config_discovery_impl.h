@@ -84,19 +84,19 @@ public:
 
   ~DynamicFilterConfigProviderImpl() override {
     std::cout << "Destroying DynamicFilterConfigProviderImpl" << std::endl;
-    auto& tls = main_config_->tls_;
-    if (!tls->isShutdown()) {
-      tls->runOnAllThreads([](OptRef<ThreadLocalConfig> tls) { tls->config_ = {}; },
-                           // Extend the lifetime of TLS by capturing main_config_, because
-                           // otherwise, the callback to clear TLS worker content is not executed.
-                           [main_config = main_config_]() {
-                             // Explicitly delete TLS on the main thread.
-                             main_config->tls_.reset();
-                             // Explicitly clear the last config instance here in case it has its
-                             // own TLS.
-                             main_config->current_config_ = {};
-                           });
-    }
+    // auto& tls = main_config_->tls_;
+    // if (!tls->isShutdown()) {
+    //   tls->runOnAllThreads([](OptRef<ThreadLocalConfig> tls) { tls->config_ = {}; },
+    //                        // Extend the lifetime of TLS by capturing main_config_, because
+    //                        // otherwise, the callback to clear TLS worker content is not
+    //                        executed. [main_config = main_config_]() {
+    //                          // Explicitly delete TLS on the main thread.
+    //                          main_config->tls_.reset();
+    //                          // Explicitly clear the last config instance here in case it has its
+    //                          // own TLS.
+    //                          main_config->current_config_ = {};
+    //                        });
+    // }
   }
 
   // Config::ExtensionConfigProvider
@@ -634,6 +634,9 @@ class HttpFilterConfigProviderManagerImpl
               Server::Configuration::NamedHttpFilterConfigFactory>> {
 public:
   absl::string_view statPrefix() const override { return "http_filter."; }
+  ~HttpFilterConfigProviderManagerImpl() {
+    std::cout << "Destroying HttpFilterConfigProviderManagerImpl" << std::endl;
+  }
 
 protected:
   bool
