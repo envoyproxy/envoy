@@ -22,6 +22,7 @@ py_binary(
     srcs = ["check_format.py"],
     args = [
         "--path=%s" % PATH,
+        "--clang-format_path=$(location @llvm_toolchain//:clang-format)",
         "--buildifier_path=$(location @com_github_bazelbuild_buildtools//buildifier)",
         "--buildozer_path=$(location @com_github_bazelbuild_buildtools//buildozer)",
     ],
@@ -29,6 +30,7 @@ py_binary(
         ":config.yaml",
         "@com_github_bazelbuild_buildtools//buildifier",
         "@com_github_bazelbuild_buildtools//buildozer",
+        "@llvm_toolchain//:clang-format",
     ],
     deps = [
         requirement("pyyaml"),

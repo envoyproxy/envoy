@@ -35,6 +35,10 @@ if is_windows; then
   START_COMMAND=("bash" "-c" "cd /c/source && export HOME=/c/build && $*")
 else
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-ubuntu"
+  ARCH="$(uname -m)"
+  if [[ "$ARCH" == x86_64 ]]; then
+      IMAGE_VARIANT=ci-
+  fi
   # We run as root and later drop permissions. This is required to setup the USER
   # in useradd below, which is need for correct Python execution in the Docker
   # environment.
@@ -61,7 +65,6 @@ else
       "-lc"
       "groupadd ${DOCKER_GROUP_ARGS[*]} -f envoygroup \
           && useradd -o --uid ${USER_UID} ${DOCKER_USER_ARGS[*]} --no-create-home --home-dir /build envoybuild \
-          && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
@@ -78,6 +81,9 @@ fi
 if [[ -z "${IMAGE_ID}" ]]; then
     IMAGE_ID="${ENVOY_BUILD_SHA}"
     if ! is_windows && [[ -n "$ENVOY_BUILD_CONTAINER_SHA" ]]; then
+
+        echo "SHA: ${ENVOY_BUILD_CONTAINER_SHA}"
+
         IMAGE_ID="${ENVOY_BUILD_SHA}@sha256:${ENVOY_BUILD_CONTAINER_SHA}"
     fi
 fi
@@ -90,7 +96,7 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 [[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=(-v "$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)")
 [[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+=(-v "${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK}" -e SSH_AUTH_SOCK)
 
-export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
+export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_VARIANT}${IMAGE_ID}"
 
 VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
@@ -112,9 +118,13 @@ if [[ -n "${ENVOY_DOCKER_PULL}" ]]; then
     time docker pull "${ENVOY_BUILD_IMAGE}"
 fi
 
+_run () {
+    echo "RUN: ${*}"
+    "${@}"
+}
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
-docker run --rm \
+_run docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
        -e AZP_BRANCH \

@@ -47,7 +47,7 @@ variables:
 - name: cacheKeyName
   value: envoy
 - name: cacheKeyVersion
-  value: v1
+  value: v2.dev0
 - name: cacheKeyBazel
   value: '.bazelversion | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 - name: cacheKeyDocker
@@ -73,6 +73,11 @@ stages:
 # Presubmit/default
 - ${{ if eq(variables.pipelineDefault, true) }}:
   - template: stages.yml
+    parameters:
+      buildStageDeps:
+      - env
+      checkStageDeps:
+      - env
 
 # Scheduled run anywhere
 - ${{ if eq(variables.pipelineScheduled, true) }}:

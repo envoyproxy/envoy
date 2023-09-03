@@ -55,7 +55,12 @@ class FormatConfig:
     @cached_property
     def clang_format_path(self) -> str:
         """Path to the clang-format binary."""
-        return os.getenv("CLANG_FORMAT", "clang-format-14")
+        if path := os.getenv("CLANG_FORMAT", None):
+            return path
+        breakpoint()
+        return (
+            os.path.join(self.source_path, self.args.clang_format_path)
+            if self.source_path else self.args.clang_format_path)
 
     @cached_property
     def config(self) -> Dict:
@@ -232,23 +237,7 @@ class FormatChecker:
     # available.
     def check_tools(self):
         error_messages = []
-        clang_format_abs_path = self.look_path(self.config.clang_format_path)
-
-        if clang_format_abs_path:
-            if not self.executable_by_others(clang_format_abs_path):
-                error_messages.append(
-                    "command {} exists, but cannot be executed by other "
-                    "users".format(self.config.clang_format_path))
-        else:
-            error_messages.append(
-                "Command {} not found. If you have clang-format in version 12.x.x "
-                "installed, but the binary name is different or it's not available in "
-                "PATH, please use CLANG_FORMAT environment variable to specify the path. "
-                "Examples:\n"
-                "    export CLANG_FORMAT=clang-format-14.0.0\n"
-                "    export CLANG_FORMAT=/opt/bin/clang-format-14\n"
-                "    export CLANG_FORMAT=/usr/local/opt/llvm@14/bin/clang-format".format(
-                    self.config.clang_format_path))
+        clang_format_abs_path = self.config.clang_format_path
 
         def check_bazel_tool(name, path, var):
             bazel_tool_abs_path = self.look_path(path)
@@ -1054,6 +1043,7 @@ if __name__ == "__main__":
         help="exclude paths from bazel_tools check.")
     parser.add_argument("--buildifier_path", type=str, help="Path to buildifier executable.")
     parser.add_argument("--buildozer_path", type=str, help="Path to buildozer executable.")
+    parser.add_argument("--clang-format_path", type=str, help="Path to clang-format executable.")
     parser.add_argument(
         "--include_dir_order",
         type=str,

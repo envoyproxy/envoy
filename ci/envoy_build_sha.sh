@@ -5,6 +5,10 @@ ENVOY_BUILD_CONTAINER="$(grep envoyproxy/envoy-build-ubuntu "$(dirname "$0")"/..
 ENVOY_BUILD_SHA="$(echo "${ENVOY_BUILD_CONTAINER}" | cut -d@ -f1)"
 ENVOY_BUILD_CONTAINER_SHA="$(echo "${ENVOY_BUILD_CONTAINER}" | cut -d@ -f2)"
 
+if [[ "$ENVOY_BUILD_CONTAINER_SHA" == "$ENVOY_BUILD_SHA" ]]; then
+    ENVOY_BUILD_CONTAINER_SHA=
+fi
+
 if [[ -n "$ENVOY_BUILD_CONTAINER_SHA" ]]; then
     ENVOY_BUILD_CONTAINER_SHA="${ENVOY_BUILD_CONTAINER_SHA:7}"
 fi
