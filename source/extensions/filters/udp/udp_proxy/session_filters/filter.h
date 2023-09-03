@@ -60,7 +60,7 @@ public:
 
   /**
    * Called when a new UDP session is first established. Filters should do one time long term
-   * processing that needs to be done when a connection is established. Filter chain iteration
+   * processing that needs to be done when a session is established. Filter chain iteration
    * can be stopped if needed.
    * @return status used by the filter manager to manage further filter iteration.
    */
