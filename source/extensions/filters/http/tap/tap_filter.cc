@@ -69,6 +69,10 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
   return Http::FilterTrailersStatus::Continue;
 }
 
+void Filter::setDownstreamConnectionAddress(const Envoy::Network::ConnectionInfoProvider& connection_info_provider) {
+  tapper_->setDownstreamConnectionAddress(connection_info_provider);
+}
+
 void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
                  const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
                  AccessLog::AccessLogType) {

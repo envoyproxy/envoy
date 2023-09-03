@@ -5,6 +5,7 @@
 #include "envoy/data/tap/v3/http.pb.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -188,6 +189,11 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
     response_trailers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_trailers()));
   }
 
+  if (should_record_downstream_connection_) {
+    http_trace.mutable_downstream_connection()->mutable_local_address()->MergeFrom(downstream_local_address_);
+    http_trace.mutable_downstream_connection()->mutable_remote_address()->MergeFrom(downstream_remote_address_);
+  }
+
   ENVOY_LOG(debug, "submitting buffered trace sink");
   // move is safe as onDestroyLog is the last method called.
   sink_handle_->submitTrace(std::move(buffered_full_trace_));
@@ -232,6 +238,20 @@ void HttpPerRequestTapperImpl::onBody(
     ASSERT(body.as_bytes().size() <= max_buffered_bytes);
     TapCommon::Utility::addBufferToProtoBytes(body, max_buffered_bytes - body.as_bytes().size(),
                                               data, 0, data.length());
+  }
+}
+
+void HttpPerRequestTapperImpl::setDownstreamConnectionAddress(
+    const Envoy::Network::ConnectionInfoProvider& connection_info_provider) {
+  if (connection_info_provider.localAddress() != nullptr &&
+      connection_info_provider.localAddress()->type() == Network::Address::Type::Ip) {
+    Envoy::Network::Utility::addressToProtobufAddress(*connection_info_provider.localAddress(),
+                                                      downstream_local_address_);
+  }
+  if (connection_info_provider.remoteAddress() != nullptr &&
+      connection_info_provider.remoteAddress()->type() == Network::Address::Type::Ip) {
+    Envoy::Network::Utility::addressToProtobufAddress(*connection_info_provider.remoteAddress(),
+                                                      downstream_remote_address_);
   }
 }
 

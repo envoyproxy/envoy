@@ -251,6 +251,11 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
     return status;
   }
 
+  void setDownstreamConnectionAddress(
+      const Envoy::Network::ConnectionInfoProvider& connection_info_provider) {
+    handle_->setDownstreamConnectionAddress(connection_info_provider);
+  }
+
   void requestDataTooLarge();
   void requestDataDrained();
 

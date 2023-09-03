@@ -115,6 +115,8 @@ public:
     return Http::FilterMetadataStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
+  void setDownstreamConnectionAddress(
+      const Envoy::Network::ConnectionInfoProvider& connection_info_provider) override;
 
   // AccessLog::Instance
   void log(const Http::RequestHeaderMap* request_headers,

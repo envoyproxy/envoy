@@ -55,6 +55,13 @@ public:
    * @return whether the request was tapped or not.
    */
   virtual bool onDestroyLog() PURE;
+
+  /**
+   * Called when set downstream connection address
+   */
+  virtual void setDownstreamConnectionAddress(
+      const Envoy::Network::ConnectionInfoProvider& connection_info_provider) PURE;
+
 };
 
 using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;
