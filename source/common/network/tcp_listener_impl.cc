@@ -107,7 +107,8 @@ void TcpListenerImpl::onSocketEvent(short flags) {
                                                       Address::IpVersion::v6);
 
     cb_.onAccept(std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address,
-                                                      remote_address, overload_state_));
+                                                      remote_address, overload_state_,
+                                                      track_global_cx_limit_in_overload_manager_));
   }
 
   ENVOY_LOG_MISC(trace, "TcpListener accepted {} new connections.",

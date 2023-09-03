@@ -245,16 +245,18 @@ class AcceptedSocketImpl : public ConnectionSocketImpl {
 public:
   AcceptedSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
                      const Address::InstanceConstSharedPtr& remote_address,
-                     Server::ThreadLocalOverloadStateOptRef overload_state)
+                     Server::ThreadLocalOverloadStateOptRef overload_state,
+                     bool track_global_cx_limit_in_overload_manager)
       : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address),
-        overload_state_(overload_state) {
-    if (!trackGlobalActiveCxLimitInOverloadManager()) {
+        overload_state_(overload_state),
+        track_global_cx_limit_in_overload_manager_(track_global_cx_limit_in_overload_manager) {
+    if (!track_global_cx_limit_in_overload_manager_) {
       ++global_accepted_socket_count_;
     }
   }
 
   ~AcceptedSocketImpl() override {
-    if (trackGlobalActiveCxLimitInOverloadManager()) {
+    if (track_global_cx_limit_in_overload_manager_) {
       overload_state_->tryDeallocateResource(
           Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
     } else {
@@ -267,15 +269,10 @@ public:
   // variable until the logic is moved into the overload manager.
   static uint64_t acceptedSocketCount() { return global_accepted_socket_count_.load(); }
 
-  bool trackGlobalActiveCxLimitInOverloadManager() const {
-    return overload_state_ &&
-           overload_state_->isResourceMonitorEnabled(
-               Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections);
-  }
-
 private:
   static std::atomic<uint64_t> global_accepted_socket_count_;
   Server::ThreadLocalOverloadStateOptRef overload_state_;
+  const bool track_global_cx_limit_in_overload_manager_;
 };
 
 // ConnectionSocket used with client connections.
