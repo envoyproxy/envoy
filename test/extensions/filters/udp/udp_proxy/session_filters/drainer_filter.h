@@ -24,10 +24,11 @@ using DrainerConfig =
 class DrainerUdpSessionReadFilter : public virtual ReadFilter {
 public:
   DrainerUdpSessionReadFilter(int downstream_bytes_to_drain, bool stop_iteration_on_new_session,
-                              bool stop_iteration_on_first_read)
+                              bool stop_iteration_on_first_read, bool continue_filter_chain)
       : downstream_bytes_to_drain_(downstream_bytes_to_drain),
         stop_iteration_on_new_session_(stop_iteration_on_new_session),
-        stop_iteration_on_first_read_(stop_iteration_on_first_read) {}
+        stop_iteration_on_first_read_(stop_iteration_on_first_read),
+        continue_filter_chain_(continue_filter_chain) {}
 
   ReadFilterStatus onNewSession() override {
     if (stop_iteration_on_new_session_) {
@@ -46,11 +47,17 @@ public:
       stop_iteration_on_first_read_ = false;
       return ReadFilterStatus::StopIteration;
     } else {
+      if (continue_filter_chain_) {
+        read_callbacks_->continueFilterChain();
+        // Calling twice, to make sure that the second call does not have effect.
+        read_callbacks_->continueFilterChain();
+      }
       return ReadFilterStatus::Continue;
     }
   }
 
   void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
     session_id_ = callbacks.sessionId();
   }
 
@@ -58,7 +65,9 @@ private:
   int downstream_bytes_to_drain_;
   bool stop_iteration_on_new_session_{false};
   bool stop_iteration_on_first_read_{false};
+  bool continue_filter_chain_{false};
   uint64_t session_id_;
+  ReadFilterCallbacks* read_callbacks_;
 };
 
 class DrainerUdpSessionReadFilterConfigFactory : public FactoryBase<ReadDrainerConfig> {
@@ -72,7 +81,7 @@ private:
     return [config](FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addReadFilter(std::make_unique<DrainerUdpSessionReadFilter>(
           config.downstream_bytes_to_drain(), config.stop_iteration_on_new_session(),
-          config.stop_iteration_on_first_read()));
+          config.stop_iteration_on_first_read(), config.continue_filter_chain()));
     };
   }
 };
@@ -132,9 +141,9 @@ class DrainerUdpSessionFilter : public Filter,
 public:
   DrainerUdpSessionFilter(int downstream_bytes_to_drain, int upstream_bytes_to_drain,
                           bool stop_iteration_on_new_session, bool stop_iteration_on_first_read,
-                          bool stop_iteration_on_first_write)
+                          bool continue_filter_chain, bool stop_iteration_on_first_write)
       : DrainerUdpSessionReadFilter(downstream_bytes_to_drain, stop_iteration_on_new_session,
-                                    stop_iteration_on_first_read),
+                                    stop_iteration_on_first_read, continue_filter_chain),
         DrainerUdpSessionWriteFilter(upstream_bytes_to_drain, stop_iteration_on_first_write) {}
 };
 
@@ -150,7 +159,7 @@ private:
       callbacks.addFilter(std::make_shared<DrainerUdpSessionFilter>(
           config.downstream_bytes_to_drain(), config.upstream_bytes_to_drain(),
           config.stop_iteration_on_new_session(), config.stop_iteration_on_first_read(),
-          config.stop_iteration_on_first_write()));
+          config.continue_filter_chain(), config.stop_iteration_on_first_write()));
     };
   }
 };

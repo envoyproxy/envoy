@@ -6,6 +6,7 @@ message DrainerUdpSessionReadFilterConfig {
   uint32 downstream_bytes_to_drain = 1;
   bool stop_iteration_on_new_session = 2;
   bool stop_iteration_on_first_read = 3;
+  bool continue_filter_chain = 4;
 }
 
 message DrainerUdpSessionWriteFilterConfig {
@@ -18,5 +19,6 @@ message DrainerUdpSessionFilterConfig {
   uint32 upstream_bytes_to_drain = 2;
   bool stop_iteration_on_new_session = 3;
   bool stop_iteration_on_first_read = 4;
-  bool stop_iteration_on_first_write = 5;
+  bool continue_filter_chain = 5;
+  bool stop_iteration_on_first_write = 6;
 }

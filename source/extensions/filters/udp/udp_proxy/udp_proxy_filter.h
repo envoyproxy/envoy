@@ -140,9 +140,11 @@ private:
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
+    void continueFilterChain() override { parent_.onContinueFilterChain(this); }
 
     ActiveSession& parent_;
     ReadFilterSharedPtr read_filter_;
+    bool initialized_{false};
   };
 
   using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
@@ -177,7 +179,8 @@ private:
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     const Upstream::Host& host() const { return *host_; }
     void onNewSession();
-    void write(Network::UdpRecvData& data);
+    void onData(Network::UdpRecvData& data);
+    void writeUpstream(Network::UdpRecvData& data);
 
     void createFilterChain() {
       cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
@@ -185,6 +188,7 @@ private:
 
     uint64_t sessionId() const { return session_id_; };
     StreamInfo::StreamInfo& streamInfo() { return udp_session_info_; };
+    void onContinueFilterChain(ActiveReadFilter* filter);
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {

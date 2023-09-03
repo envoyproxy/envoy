@@ -204,7 +204,7 @@ Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::
     }
   }
 
-  active_session->write(data);
+  active_session->onData(data);
 
   return Network::FilterStatus::StopIteration;
 }
@@ -240,7 +240,7 @@ UdpProxyFilter::PerPacketLoadBalancingClusterInfo::onData(Network::UdpRecvData& 
               active_session->host().address()->asStringView());
   }
 
-  active_session->write(data);
+  active_session->onData(data);
 
   return Network::FilterStatus::StopIteration;
 }
@@ -382,6 +382,13 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
 
 void UdpProxyFilter::ActiveSession::onNewSession() {
   for (auto& active_read_filter : read_filters_) {
+    if (active_read_filter->initialized_) {
+      // The filter may call continueFilterChain() in onNewSession(), causing next
+      // filters to iterate onNewSession(), so check that it was not called before.
+      continue;
+    }
+
+    active_read_filter->initialized_ = true;
     auto status = active_read_filter->read_filter_->onNewSession();
     if (status == ReadFilterStatus::StopIteration) {
       return;
@@ -389,7 +396,7 @@ void UdpProxyFilter::ActiveSession::onNewSession() {
   }
 }
 
-void UdpProxyFilter::ActiveSession::write(Network::UdpRecvData& data) {
+void UdpProxyFilter::ActiveSession::onData(Network::UdpRecvData& data) {
   ENVOY_LOG(trace, "received {} byte datagram from downstream: downstream={} local={} upstream={}",
             data.buffer_->length(), addresses_.peer_->asStringView(),
             addresses_.local_->asStringView(), host_->address()->asStringView());
@@ -410,7 +417,6 @@ void UdpProxyFilter::ActiveSession::write(Network::UdpRecvData& data) {
   // NOTE: We do not specify the local IP to use for the sendmsg call if use_original_src_ip_ is not
   //       set. We allow the OS to select the right IP based on outbound routing rules if
   //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
-  const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
   if (!use_original_src_ip_ && !connected_) {
     Api::SysCallIntResult rc = socket_->ioHandle().connect(host_->address());
     if (SOCKET_FAILURE(rc.return_value_)) {
@@ -430,11 +436,18 @@ void UdpProxyFilter::ActiveSession::write(Network::UdpRecvData& data) {
     }
   }
 
+  writeUpstream(data);
+}
+
+void UdpProxyFilter::ActiveSession::writeUpstream(Network::UdpRecvData& data) {
+  ASSERT(connected_ || use_original_src_ip_);
+
   const uint64_t tx_buffer_length = data.buffer_->length();
   ENVOY_LOG(trace, "writing {} byte datagram upstream: downstream={} local={} upstream={}",
             tx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_->address()->asStringView());
 
+  const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
   Api::IoCallUint64Result rc = Network::Utility::writeToSocket(socket_->ioHandle(), *data.buffer_,
                                                                local_ip, *host_->address());
 
@@ -443,6 +456,23 @@ void UdpProxyFilter::ActiveSession::write(Network::UdpRecvData& data) {
   } else {
     cluster_.cluster_stats_.sess_tx_datagrams_.inc();
     cluster_.cluster_.info()->trafficStats()->upstream_cx_tx_bytes_total_.add(tx_buffer_length);
+  }
+}
+
+void UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filter) {
+  ASSERT(filter != nullptr);
+
+  std::list<ActiveReadFilterPtr>::iterator entry = std::next(filter->entry());
+  for (; entry != read_filters_.end(); entry++) {
+    if (!(*entry)->read_filter_ || (*entry)->initialized_) {
+      continue;
+    }
+
+    (*entry)->initialized_ = true;
+    auto status = (*entry)->read_filter_->onNewSession();
+    if (status == ReadFilterStatus::StopIteration) {
+      break;
+    }
   }
 }
 
