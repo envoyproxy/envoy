@@ -323,7 +323,7 @@ public:
           .WillOnce(Invoke(
               [listener, listener_callbacks](Network::SocketSharedPtr&&,
                                              Network::TcpListenerCallbacks& cb, Runtime::Loader&,
-                                             const Network::ListenerConfig&) -> Network::Listener* {
+                                             const Network::ListenerConfig&, Server::ThreadLocalOverloadStateOptRef) -> Network::Listener* {
                 if (listener_callbacks != nullptr) {
                   *listener_callbacks = &cb;
                 }
@@ -392,7 +392,7 @@ public:
             .WillOnce(
                 Invoke([i, &mock_listeners, &listener_callbacks_map](
                            Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                           Runtime::Loader&, const Network::ListenerConfig&) -> Network::Listener* {
+                           Runtime::Loader&, const Network::ListenerConfig&, Server::ThreadLocalOverloadStateOptRef) -> Network::Listener* {
                   auto listener_callbacks_iter = listener_callbacks_map.find(
                       socket->connectionInfoProvider().localAddress()->asString());
                   EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
