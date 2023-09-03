@@ -226,7 +226,7 @@ listeners configure :ref:`downstream connections monitor <envoy_v3_api_msg_exten
 
 :ref:`Downstream connections monitor <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` does not
 support runtime updates for the configured value of :ref:`max_active_downstream_connections
-<envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig.max_active_downstream_connections>`
+<envoy_v3_api_field_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig.max_active_downstream_connections>`
 One could also set this limit via specifying an integer through the runtime key
 ``overload.global_downstream_max_connections``, though this key is deprecated and will be removed in future.
 The connection limit is recommended to be less than
