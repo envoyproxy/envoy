@@ -62,7 +62,7 @@ public:
 
   void setupValidDriverWithHttpExporter() {
     const std::string yaml_string = R"EOF(
-    http_config:
+    http_service:
       cluster_name: "my_o11y_backend"
       traces_path: "/otlp/v1/traces"
       hostname: "some-o11y.com"
@@ -100,6 +100,26 @@ TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfigHttpExporter) {
   setupValidDriverWithHttpExporter();
   EXPECT_NE(driver_, nullptr);
+}
+
+TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    http_service:
+      cluster_name: "my_o11y_backend"
+      hostname: "some-o11y.com"
+      timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  EXPECT_THROW_WITH_MESSAGE(setup(opentelemetry_config), EnvoyException,
+                            "OpenTelemetry Tracer cannot have both gRPC and HTTP exporters "
+                            "configured. OpenTelemetry tracer will be disabled.");
+  EXPECT_EQ(driver_, nullptr);
 }
 
 TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {

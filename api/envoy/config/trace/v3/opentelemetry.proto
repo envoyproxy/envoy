@@ -21,8 +21,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
 message OpenTelemetryConfig {
-  // Configuration for sending traces to the collector over HTTP. Note that
-  // this will only be used if the grpc_service is not set above.
+  // Configuration for sending traces to an upstream cluster over HTTP. Note that
+  // this will only be used if the grpc_service is not set.
   // [#next-free-field: 6]
   message HttpConfig {
     // The upstream cluster that will receive OTLP traces over HTTP.
@@ -38,24 +38,23 @@ message OpenTelemetryConfig {
       gte {}
     }];
 
-    // Custom header values to be added to the OTLP HTTP request.
+    // Custom headers (key-value) to be added to the OTLP HTTP request.
     repeated core.v3.HeaderValue headers = 4;
 
     // The hostname to include in the Host header of the OTLP HTTP request.
     string hostname = 5;
   }
 
-  oneof export_protocol {
-    option (validate.required) = true;
+  // The upstream gRPC cluster that will receive OTLP traces.
+  // Note that the tracer drops traces if the server does not read data fast enough.
+  // This field can be left empty to disable reporting traces to the upstream cluster.
+  core.v3.GrpcService grpc_service = 1;
 
-    // The upstream gRPC cluster that will receive OTLP traces.
-    // Note that the tracer drops traces if the server does not read data fast enough.
-    // This field can be left empty to disable reporting traces to the collector.
-    core.v3.GrpcService grpc_service = 1;
-
-    // The configuration to export OTLP traces via HTTP.
-    HttpConfig http_config = 3;
-  }
+  // The upstream HTTP cluster that will receive OTLP traces.
+  // Note that traces are only exported via HTTP if grpc_service is not set.
+  // This field can be left empty to disable reporting traces to the upstream cluster.
+  // [#next-free-field: 6]
+  HttpConfig http_service = 3;
 
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
   // If it is not provided, it will default to "unknown_service:envoy".

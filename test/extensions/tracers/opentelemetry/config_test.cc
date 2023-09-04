@@ -51,7 +51,7 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerWithHttpExporter) {
       name: envoy.tracers.opentelemetry
       typed_config:
         "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
-        http_config:
+        http_service:
           cluster_name: "my_o11y_backend"
           traces_path: "/otlp/v1/traces"
           hostname: "some-o11y.com"
@@ -86,8 +86,8 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerNoExporter) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  EXPECT_THROW_WITH_REGEX(factory.createTracerDriver(*message, context), EnvoyException,
-                          "field: \"export_protocol\", reason: is required");
+  auto opentelemetry_tracer = factory.createTracerDriver(*message, context);
+  EXPECT_NE(nullptr, opentelemetry_tracer);
 }
 
 } // namespace OpenTelemetry
