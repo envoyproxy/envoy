@@ -11,6 +11,12 @@ behavior_changes:
     :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
     the cached assignment and finish updating the warmed cluster. This change is disabled by default, and can be enabled by setting
     the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to true.
+- area: http
+  change: |
+    Introduced a new runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to disable the name downgrading in the
+    per filter config searching. By default, the filter config name will be used to search the per filter config. If the filter config
+    name is not found, we will downgrade to use canonical name and try again.
+    This downgrading can be disabled by setting the ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to true.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
