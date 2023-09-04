@@ -137,6 +137,13 @@ jobs:
       name: Checkout Envoy repository
       with:
         fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
+
+    - name: 'Print env'
+      run: |
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh fetch'
+
+
+
     - uses: ./.github/actions/env
       name: Generate environment variables
       id: env
@@ -152,6 +159,7 @@ jobs:
 
     - name: 'Print env'
       run: |
+        exit 1
         echo "version_dev=${{ steps.env.outputs.version_dev }}"
         echo "version_patch=${{ steps.env.outputs.version_patch }}"
         echo "trusted=${{ steps.env.outputs.trusted }}"
