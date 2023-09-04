@@ -7,8 +7,6 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
-
 # HTTP L7 filter that decorates request with geolocation data
 # Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/geoip_filter
 

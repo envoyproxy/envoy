@@ -82,7 +82,8 @@ class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {
 
 public:
-  GeoipProvider(GeoipProviderConfigSharedPtr config) : config_(config) {
+  GeoipProvider(Singleton::InstanceSharedPtr owner, GeoipProviderConfigSharedPtr config) : config_(config),
+  owner_(owner) {
     city_db_ = initMaxMindDb(config_->cityDbPath());
     isp_db_ = initMaxMindDb(config_->ispDbPath());
     anon_db_ = initMaxMindDb(config_->anonDbPath());
@@ -111,6 +112,8 @@ private:
   void populateGeoLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
                                absl::flat_hash_map<std::string, std::string>& lookup_result,
                                const std::string& result_key, Params... lookup_params) const;
+    // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
+  const Singleton::InstanceSharedPtr owner_;
 };
 
 using GeoipProviderSharedPtr = std::shared_ptr<GeoipProvider>;
