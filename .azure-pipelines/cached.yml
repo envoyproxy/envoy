@@ -10,6 +10,11 @@ parameters:
   type: string
   default: $(cacheKeyVersion)
 
+# Auth
+- name: authGithub
+  type: string
+  default: $(GitHubPublicRepoOnlyAccessToken)
+
 - name: keyDocker
   type: string
   default: $(cacheKeyDocker)
@@ -65,6 +70,7 @@ steps:
 # Prime the caches for all jobs
 - script: .azure-pipelines/docker/prime_cache.sh "$(Build.StagingDirectory)" "${{ parameters.pathTemp }}" "${{ parameters.arch }}"
   env:
+    GITHUB_TOKEN: "${{ parameters.authGithub }}"
     DOCKER_RESTORED: $(DOCKER_CACHE_RESTORED)
     BAZEL_RESTORED: $(BAZEL_CACHE_RESTORED)
   displayName: "Cache/prime (${{ parameters.name }})"

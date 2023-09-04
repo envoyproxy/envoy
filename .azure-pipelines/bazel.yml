@@ -76,7 +76,7 @@ parameters:
 # Auth
 - name: authGithub
   type: string
-  default: ""
+  default: $(GitHubPublicRepoOnlyAccessToken)
 # Publishing
 - name: publishEnvoy
   type: string
