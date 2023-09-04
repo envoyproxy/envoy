@@ -613,7 +613,7 @@ public:
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
         filter_chain_factory_(filter_chain_factory),
         no_downgrade_to_canonical_name_(Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.no_downgrade_to_canonical_name")) {}
+            "envoy.reloadable_features.no_downgrade_to_canonical_name")) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
