@@ -474,11 +474,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
               absl::StrJoin(info.registered_headers_, ","));
   }
 
-  // Finalize all managed inline map registries.
+  // Finalize all inline map descriptors that managed by the inline map registry.
   InlineMapRegistry::finalize();
   ENVOY_LOG(info, "Inline map registry info:");
-  for (const auto& registry : InlineMapRegistry::descriptors()) {
-    ENVOY_LOG(info, "  {}: {}", registry.first, absl::StrJoin(registry.second->inlineKeys(), ","));
+  for (const auto& info : InlineMapRegistry::registryInfo()) {
+    ENVOY_LOG(info, "  {}: {}", info.first, info.second);
   };
 
   // Initialize the regex engine and inject to singleton.
