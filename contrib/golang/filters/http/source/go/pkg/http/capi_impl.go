@@ -58,6 +58,15 @@ const (
 	ValueUpstreamRemoteAddress   = 10
 	ValueUpstreamClusterName     = 11
 	ValueVirtualClusterName      = 12
+
+	// NOTE: this is a trade-off value.
+	// When the number of header is less this value, we could use the slice on the stack,
+	// otherwise, we have to allocate a new slice on the heap,
+	// and the slice on the stack will be wasted.
+	// So, we choose a value that many requests' number of header is less than this value.
+	// But also, it should not be too large, otherwise it might be waste stack memory.
+	maxStackAllocedHeaderSize = 16
+	maxStackAllocedSliceLen   = maxStackAllocedHeaderSize * 2
 )
 
 type httpCApiImpl struct{}
@@ -124,9 +133,9 @@ func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *strin
 
 func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	var strs []string
-	if num <= 16 {
+	if num <= maxStackAllocedHeaderSize {
 		// NOTE: only const length slice may be allocated on stack.
-		strs = make([]string, 32)
+		strs = make([]string, maxStackAllocedSliceLen)
 	} else {
 		// TODO: maybe we could use a memory pool for better performance,
 		// since these go strings in strs, will be copied into the following map.
@@ -201,9 +210,9 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 
 func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	var strs []string
-	if num <= 16 {
+	if num <= maxStackAllocedHeaderSize {
 		// NOTE: only const length slice may be allocated on stack.
-		strs = make([]string, 32)
+		strs = make([]string, maxStackAllocedSliceLen)
 	} else {
 		// TODO: maybe we could use a memory pool for better performance,
 		// since these go strings in strs, will be copied into the following map.
