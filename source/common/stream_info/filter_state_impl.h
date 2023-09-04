@@ -117,7 +117,7 @@ private:
     filter_object.data_ = data;
     filter_object.state_type_ = state_type;
     filter_object.stream_sharing_ = stream_sharing;
-    data_storage_->set(data_key, std::move(filter_object));
+    data_storage_[data_key] = std::move(filter_object);
   }
 
   // This only checks the local data_storage_ for data_name existence.
