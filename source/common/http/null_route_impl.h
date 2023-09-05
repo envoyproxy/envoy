@@ -182,7 +182,6 @@ struct RouteEntryImpl : public Router::RouteEntry {
   bool includeAttemptCountInRequest() const override { return false; }
   bool includeAttemptCountInResponse() const override { return false; }
   const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
-  const std::string& routeName() const override { return route_name_; }
   const Router::EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
@@ -202,7 +201,6 @@ struct RouteEntryImpl : public Router::RouteEntry {
   const std::string cluster_name_;
   absl::optional<std::chrono::milliseconds> timeout_;
   static const ConnectConfigOptRef connect_config_nullopt_;
-  const std::string route_name_;
   // Pass early data option config through StreamOptions.
   std::unique_ptr<Router::EarlyDataPolicy> early_data_policy_{
       new Router::DefaultEarlyDataPolicy(true)};
@@ -232,6 +230,7 @@ struct NullRouteImpl : public Router::Route {
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   bool filterDisabled(absl::string_view) const override { return false; }
+  const std::string& routeName() const override { return EMPTY_STRING; }
 
   RouteEntryImpl route_entry_;
   const envoy::config::core::v3::Metadata metadata_;
