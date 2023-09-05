@@ -21,8 +21,8 @@ The following list of filter state objects are consumed by Envoy extensions:
        | - *ip*: IP address value;
        | - *port*: port value.
    * - ``envoy.upstream.dynamic_host``
-     - | :ref:`Dynamic forward proxy <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>``
+     - | :ref:`Dynamic forward proxy <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`
        | upstream host override on a per-connection basis.
    * - ``envoy.upstream.dynamic_port``
-     - | :ref:`Dynamic forward proxy <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>``
+     - | :ref:`Dynamic forward proxy <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`
        | upstream port override on a per-connection basis.
