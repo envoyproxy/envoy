@@ -89,7 +89,9 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
-
+- area: xDS
+  change: |
+    Removed ``envoy.restart_features.explicit_wildcard_resource`` and legacy code paths.
 - area: quic
   change: |
     Removed ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` and legacy code paths.
