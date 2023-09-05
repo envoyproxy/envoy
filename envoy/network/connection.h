@@ -222,14 +222,6 @@ public:
   virtual void detectEarlyCloseWhenReadDisabled(bool should_detect) PURE;
 
   /**
-   * Set if Envoy should detect TCP Rst
-   *
-   * @param enbale supplies if disconnects should be detected when the connection has been
-   * read disabled
-   */
-  virtual void enableTcpRstDetectAndSend(bool enbale) PURE;
-
-  /**
    * @return bool whether reading is enabled on the connection.
    */
   virtual bool readEnabled() const PURE;

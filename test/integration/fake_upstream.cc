@@ -871,7 +871,6 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     // Skip enableHalfClose if the connection is already disconnected.
     if (connection->connected()) {
       connection->connection().enableHalfClose(enable_half_close_);
-      connection->connection().enableTcpRstDetectAndSend(enable_rst_detect_send_);
     }
     return AssertionSuccess();
   });

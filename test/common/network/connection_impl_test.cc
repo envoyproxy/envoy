@@ -171,9 +171,8 @@ protected:
     EXPECT_FALSE(client_connection_->connectionInfoProvider().localAddressRestored());
   }
 
-  void connect(bool rst_enabled = false) {
+  void connect() {
     int expected_callbacks = 2;
-    client_connection_->enableTcpRstDetectAndSend(rst_enabled);
     client_connection_->connect();
     read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
@@ -182,7 +181,6 @@ protected:
               std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
-          server_connection_->enableTcpRstDetectAndSend(rst_enabled);
 
           expected_callbacks--;
           if (expected_callbacks == 0) {
@@ -645,7 +643,6 @@ TEST_P(ConnectionImplTest, ClientAbortResetDuringCallback) {
   setUpBasicConnection();
 
   Buffer::OwnedImpl buffer("hello world");
-  client_connection_->enableTcpRstDetectAndSend(true);
   client_connection_->write(buffer, false);
   client_connection_->connect();
 
@@ -665,13 +662,11 @@ TEST_P(ConnectionImplTest, ClientAbortResetDuringCallback) {
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
-        server_connection_->enableTcpRstDetectAndSend(true);
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_->connectionInfoProvider().localAddress(), source_address_,
             Network::Test::createRawBufferSocket(), server_connection_->socketOptions(), nullptr);
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
-        upstream_connection_->enableTcpRstDetectAndSend(true);
       }));
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
@@ -700,7 +695,6 @@ TEST_P(ConnectionImplTest, ClientAbortResetAfterCallback) {
 
   Buffer::OwnedImpl buffer("hello world");
   client_connection_->write(buffer, false);
-  client_connection_->enableTcpRstDetectAndSend(true);
   client_connection_->connect();
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
@@ -715,13 +709,11 @@ TEST_P(ConnectionImplTest, ClientAbortResetAfterCallback) {
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
-        server_connection_->enableTcpRstDetectAndSend(true);
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_->connectionInfoProvider().localAddress(), source_address_,
             Network::Test::createRawBufferSocket(), server_connection_->socketOptions(), nullptr);
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
-        upstream_connection_->enableTcpRstDetectAndSend(true);
       }));
 
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
@@ -752,7 +744,7 @@ TEST_P(ConnectionImplTest, ClientAbortResetAfterCallback) {
 // from the client.
 TEST_P(ConnectionImplTest, ServerResetClose) {
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void {
@@ -774,7 +766,7 @@ TEST_P(ConnectionImplTest, ServerResetCloseRuntimeDisabled) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.detect_and_raise_rst_tcp_connection", "false"}});
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void {
@@ -784,27 +776,6 @@ TEST_P(ConnectionImplTest, ServerResetCloseRuntimeDisabled) {
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void {
         EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::Normal);
-      }));
-
-  // Originally it should close the connection by RST.
-  server_connection_->close(ConnectionCloseType::AbortReset);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-}
-
-// Test the RST close and detection feature is disabled by enable_rst_detect_send_.
-TEST_P(ConnectionImplTest, ServerResetCloseFlagDisabled) {
-  setUpBasicConnection();
-  connect(false);
-
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
-        EXPECT_EQ(client_connection_->detectedCloseType(), DetectedCloseType::Normal);
-        dispatcher_->exit();
-      }));
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
-        EXPECT_EQ(server_connection_->detectedCloseType(), DetectedCloseType::Normal);
-        dispatcher_->exit();
       }));
 
   // Originally it should close the connection by RST.
@@ -1139,7 +1110,7 @@ TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
 // Test normal RST close without readDisable.
 TEST_P(ConnectionImplTest, RstCloseOnNotReadDisabledConnection) {
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   // Connection is not readDisabled, and detect_early_close_ is true.
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -1159,7 +1130,7 @@ TEST_P(ConnectionImplTest, RstCloseOnNotReadDisabledConnection) {
 // Test normal RST close with readDisable=true.
 TEST_P(ConnectionImplTest, RstCloseOnReadDisabledConnectionThenWrite) {
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   // Connection is readDisabled, and detect_early_close_ is true.
   EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
@@ -1188,7 +1159,7 @@ TEST_P(ConnectionImplTest, RstCloseOnReadDisabledConnectionThenWrite) {
 // impact the read and write behaviour for RST.
 TEST_P(ConnectionImplTest, RstCloseOnReadEarlyCloseDisabledThenWrite) {
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   // Connection is readDisabled, and detect_early_close_ is false.
   client_connection_->detectEarlyCloseWhenReadDisabled(false);
@@ -1258,7 +1229,7 @@ TEST_P(ConnectionImplTest, HalfClose) {
 // half-close is enabled
 TEST_P(ConnectionImplTest, HalfCloseResetClose) {
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   server_connection_->enableHalfClose(true);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -1280,7 +1251,7 @@ TEST_P(ConnectionImplTest, HalfCloseResetClose) {
 // half-closed and then the connection is normally closed. This is the current behavior.
 TEST_P(ConnectionImplTest, HalfCloseThenNormallClose) {
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   server_connection_->enableHalfClose(true);
@@ -1326,7 +1297,7 @@ TEST_P(ConnectionImplTest, HalfCloseThenNormallClose) {
 // half-closed and then the connection is RST closed. This is same as other close type.
 TEST_P(ConnectionImplTest, HalfCloseThenResetClose) {
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   server_connection_->enableHalfClose(true);
@@ -1378,7 +1349,7 @@ TEST_P(ConnectionImplTest, HalfCloseThenResetClose) {
 // This behavior is different for windows.
 TEST_P(ConnectionImplTest, HalfCloseThenResetCloseThenWriteData) {
   setUpBasicConnection();
-  connect(true);
+  connect();
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   server_connection_->enableHalfClose(true);
@@ -3390,7 +3361,6 @@ TEST_F(PostCloseConnectionImplTest, AbortReset) {
   InSequence s;
   initialize();
   writeSomeData();
-  connection_->enableTcpRstDetectAndSend(true);
 
   // Connection abort. We have data written above in writeSomeData(),
   // it won't be written and flushed due to ``ConnectionCloseType::AbortReset``.

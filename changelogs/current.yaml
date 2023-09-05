@@ -114,10 +114,8 @@ new_features:
     out to a custom sink extension.
 - area: tcp
   change: |
-    added the support to detect and send TCP RST for raw buffer socket based connection, and this is disabled by default.
-    This literally is supported for linux. Windows also works but some behaviors are different.
-    It can be enabled or disabled by a setting method and the runtime guard
-    ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
+    added the support to detect and send TCP RST for raw buffer socket based connections. This is currently claimed to support Linux.
+    It can be disabled by the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
 - area: tap
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`

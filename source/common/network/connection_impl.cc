@@ -83,7 +83,11 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
-      transport_wants_read_(false), enable_rst_detect_send_(false) {
+      transport_wants_read_(false) {
+
+  // Keep it as a bool flag to reduce the times calling runtime method..
+  enable_rst_detect_send_ = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.detect_and_raise_rst_tcp_connection");
 
   if (!connected) {
     connecting_ = true;
@@ -143,9 +147,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   // RST will be sent only if enable_rst_detect_send_ is true, otherwise it is converted to normal
   // ConnectionCloseType::Abort
-  if ((!enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) ||
-      (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.detect_and_raise_rst_tcp_connection"))) {
+  if (!enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) {
     type = ConnectionCloseType::Abort;
   }
 
@@ -684,13 +686,10 @@ void ConnectionImpl::onReadReady() {
   // The socket is closed immediately when receiving RST.
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.detect_and_raise_rst_tcp_connection")) {
-      ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
-      setDetectedCloseType(DetectedCloseType::RemoteReset);
-      closeSocket(ConnectionEvent::RemoteClose);
-      return;
-    }
+    ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
+    setDetectedCloseType(DetectedCloseType::RemoteReset);
+    closeSocket(ConnectionEvent::RemoteClose);
+    return;
   }
 
   // If this connection doesn't have half-close semantics, translate end_stream into
@@ -768,14 +767,11 @@ void ConnectionImpl::onWriteReady() {
   // The socket is closed immediately when receiving RST.
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.detect_and_raise_rst_tcp_connection")) {
-      // Discard anything in the buffer.
-      ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);
-      setDetectedCloseType(DetectedCloseType::RemoteReset);
-      closeSocket(ConnectionEvent::RemoteClose);
-      return;
-    }
+    // Discard anything in the buffer.
+    ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);
+    setDetectedCloseType(DetectedCloseType::RemoteReset);
+    closeSocket(ConnectionEvent::RemoteClose);
+    return;
   }
 
   // NOTE: If the delayed_close_timer_ is set, it must only trigger after a delayed_close_timeout_

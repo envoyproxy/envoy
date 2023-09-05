@@ -77,7 +77,6 @@ public:
   void noDelay(bool enable) override;
   ReadDisableStatus readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
-  void enableTcpRstDetectAndSend(bool value) override { enable_rst_detect_send_ = value; }
   bool readEnabled() const override;
   ConnectionInfoSetter& connectionInfoSetter() override {
     return socket_->connectionInfoProvider();

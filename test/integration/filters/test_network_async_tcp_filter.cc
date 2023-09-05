@@ -73,7 +73,6 @@ public:
     read_callbacks_ = &callbacks;
     downstream_callbacks_ = std::make_unique<DownstreamCallbacks>(*this);
     read_callbacks_->connection().enableHalfClose(true);
-    read_callbacks_->connection().enableTcpRstDetectAndSend(true);
     read_callbacks_->connection().addConnectionCallbacks(*downstream_callbacks_);
   }
 

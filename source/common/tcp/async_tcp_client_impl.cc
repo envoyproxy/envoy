@@ -38,7 +38,6 @@ bool AsyncTcpClientImpl::connect() {
     return false;
   }
   connection_->enableHalfClose(enable_half_close_);
-  connection_->enableTcpRstDetectAndSend(enable_rst_detect_send_);
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(std::make_shared<NetworkReadFilter>(*this));
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(

@@ -69,7 +69,6 @@ public:
   MOCK_METHOD(void, noDelay, (bool enable));                                                       \
   MOCK_METHOD(ReadDisableStatus, readDisable, (bool disable));                                     \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
-  MOCK_METHOD(void, enableTcpRstDetectAndSend, (bool));                                            \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
   MOCK_METHOD(ConnectionInfoSetter&, connectionInfoSetter, ());                                    \
   MOCK_METHOD(const ConnectionInfoProvider&, connectionInfoProvider, (), (const));                 \

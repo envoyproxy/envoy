@@ -134,7 +134,6 @@ protected:
       void detectEarlyCloseWhenReadDisabled(bool) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
-      void enableTcpRstDetectAndSend(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
       bool readEnabled() const override { return true; }
       Network::ConnectionInfoSetter& connectionInfoSetter() override {
         return *connection_info_provider_;

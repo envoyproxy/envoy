@@ -67,7 +67,6 @@ IntegrationTcpClient::IntegrationTcpClient(
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
   connection_->enableHalfClose(enable_half_close);
-  connection_->enableTcpRstDetectAndSend(enable_rst_detect_send);
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
   connection_->connect();
