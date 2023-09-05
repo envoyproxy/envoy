@@ -22,6 +22,7 @@ def api_dependencies():
     external_http_archive(
         name = "com_google_googleapis",
     )
+
     external_http_archive(
         name = "com_github_cncf_udpa",
     )
