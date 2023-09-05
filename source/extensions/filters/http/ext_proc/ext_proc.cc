@@ -449,8 +449,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailersAvailable(true);
   state.setTrailers(&trailers);
 
-  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
-      state.callbackState() == ProcessorState::CallbackState::BufferedBodyCallback) {
+  if (state.callbackState() != ProcessorState::CallbackState::Idle) {
     ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
