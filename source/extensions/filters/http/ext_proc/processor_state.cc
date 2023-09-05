@@ -340,9 +340,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     clearRouteCache(common_response);
     headers_ = nullptr;
 
-    if (send_trailers_ && trailers_available_) {
-      // Trailers came in while we were waiting for this response, and the server
-      // asked to see them -- send them now.
+    // Send trailers if they are available and no data pending for processing.
+    if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
       filter_.sendTrailers(*this, *trailers_);
       return absl::OkStatus();
     }
