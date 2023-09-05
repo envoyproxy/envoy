@@ -46,8 +46,8 @@ message SinkConfig {
   google.protobuf.BoolValue use_tag_extracted_name = 5;
 
   // If set, emitted stats names will be prepended with a prefix, so full stat name will be
-  // <stats_prefix>.<stats_name>. For example, if the stat name is "foo.bar" and stats_prefix is
+  // <prefix>.<stats_name>. For example, if the stat name is "foo.bar" and prefix is
   // 'pre', the full stat name will be "pre.foo.bar". If this field is not set, there is no
   // prefix added. According to the example, the full stat name will remain "foo.bar".
-  string stats_prefix = 6;
+  string prefix = 6;
 }

@@ -35,14 +35,14 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void setStatsPrefix(const std::string& stats_prefix) { stats_prefix_ = stats_prefix; }
+  void setStatPrefix(const std::string& stat_prefix) { stat_prefix_ = stat_prefix; }
 
   const std::string getFullStatName(const std::string& stat_name) {
-    if (stats_prefix_ == "") {
+    if (stat_prefix_ == "") {
       return stat_name;
     }
 
-    return absl::StrCat(stats_prefix_, ".", stat_name);
+    return absl::StrCat(stat_prefix_, ".", stat_name);
   }
 
   void initialize() override {
@@ -57,7 +57,7 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       setGrpcService(*sink_config.mutable_grpc_service(), "otlp_collector",
                      fake_upstreams_.back()->localAddress());
-      sink_config.set_stats_prefix(stats_prefix_);
+      sink_config.set_prefix(stat_prefix_);
       metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
@@ -176,7 +176,7 @@ public:
 
   FakeHttpConnectionPtr fake_metrics_service_connection_;
   FakeStreamPtr otlp_collector_request_;
-  std::string stats_prefix_ = "";
+  std::string stat_prefix_ = "";
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OpenTelemetryGrpcIntegrationTest,
@@ -207,8 +207,8 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
   cleanup();
 }
 
-TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlowWithStatsPrefix) {
-  setStatsPrefix("prefix");
+TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlowWithStatPrefix) {
+  setStatPrefix("prefix");
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));

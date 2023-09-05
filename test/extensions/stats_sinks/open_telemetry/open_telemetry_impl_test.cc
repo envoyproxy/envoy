@@ -39,13 +39,13 @@ public:
                                          bool report_histograms_as_deltas = false,
                                          bool emit_tags_as_attributes = true,
                                          bool use_tag_extracted_name = true,
-                                         const std::string& stats_prefix = "") {
+                                         const std::string& stat_prefix = "") {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
     sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
     sink_config.mutable_emit_tags_as_attributes()->set_value(emit_tags_as_attributes);
     sink_config.mutable_use_tag_extracted_name()->set_value(use_tag_extracted_name);
-    sink_config.set_stats_prefix(stats_prefix);
+    sink_config.set_prefix(stat_prefix);
 
     return std::make_shared<OtlpOptions>(sink_config);
   }
