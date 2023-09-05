@@ -96,6 +96,9 @@ cc_proto_library(
 proto_library(
     name = "set_envoy_filter_state_proto",
     srcs = ["set_envoy_filter_state.proto"],
+    deps = [
+        "declare_property_proto",
+    ],
 )
 
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.

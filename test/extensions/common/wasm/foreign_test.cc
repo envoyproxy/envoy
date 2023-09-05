@@ -1,5 +1,7 @@
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/filter_state_dst_address.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
@@ -18,8 +20,14 @@ namespace Wasm {
 class TestContext : public Context {};
 
 class ForeignTest : public testing::Test {
+public:
+  ForeignTest() {}
+
+  void initializeFilterCallbacks() { ctx_.initializeReadFilterCallbacks(read_filter_callbacks_); }
+
 protected:
   TestContext ctx_;
+  testing::NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
 };
 
 TEST_F(ForeignTest, ForeignFunctionEdgeCaseTest) {
@@ -53,6 +61,7 @@ TEST_F(ForeignTest, ForeignFunctionEdgeCaseTest) {
 }
 
 TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
+  initializeFilterCallbacks(); // so that we can test setting filter state
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Upstream::MockClusterManager cluster_manager;
@@ -81,14 +90,16 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::NotFound);
 
-  args.set_path("envoy.tcp_proxy.cluster");
+  args.set_path(TcpProxy::PerConnectionCluster::key());
   args.set_value("unicorns");
+  args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest);
   args.SerializeToString(&in);
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::Ok);
 
-  args.set_path("envoy.network.transport_socket.original_dst_address");
-  args.set_value("unicorns");
+  args.set_path(Network::DestinationAddress::key());
+  args.set_value("1.2.3.4:80");
+  args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest);
   args.SerializeToString(&in);
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::Ok);

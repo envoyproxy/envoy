@@ -25,6 +25,20 @@ template <typename T> WasmForeignFunction createFromClass() {
   return c->create(c);
 }
 
+inline StreamInfo::FilterState::LifeSpan
+toFilterStateLifeSpan(envoy::source::extensions::common::wasm::LifeSpan span) {
+  switch (span) {
+  case envoy::source::extensions::common::wasm::LifeSpan::FilterChain:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  case envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest:
+    return StreamInfo::FilterState::LifeSpan::Request;
+  case envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection:
+    return StreamInfo::FilterState::LifeSpan::Connection;
+  default:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  }
+}
+
 RegisterForeignFunction registerCompressForeignFunction(
     "compress",
     [](WasmBase&, std::string_view arguments,
@@ -69,7 +83,8 @@ RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
       envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
-        return context->setEnvoyFilterState(args.path(), args.value());
+        return context->setEnvoyFilterState(args.path(), args.value(),
+                                            toFilterStateLifeSpan(args.span()));
       }
       return WasmResult::BadArgument;
     });
@@ -255,21 +270,7 @@ public:
           // do nothing
           break;
         }
-        StreamInfo::FilterState::LifeSpan span = StreamInfo::FilterState::LifeSpan::FilterChain;
-        switch (args.span()) {
-        case envoy::source::extensions::common::wasm::LifeSpan::FilterChain:
-          span = StreamInfo::FilterState::LifeSpan::FilterChain;
-          break;
-        case envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest:
-          span = StreamInfo::FilterState::LifeSpan::Request;
-          break;
-        case envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection:
-          span = StreamInfo::FilterState::LifeSpan::Connection;
-          break;
-        default:
-          // do nothing
-          break;
-        }
+        StreamInfo::FilterState::LifeSpan span = toFilterStateLifeSpan(args.span());
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
         return context->declareProperty(
             args.name(), std::make_unique<const Filters::Common::Expr::CelStatePrototype>(
