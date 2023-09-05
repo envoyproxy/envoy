@@ -564,7 +564,10 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
     (*entry)->processed_headers_ = true;
-    (*entry)->setDownstreamConnectionAddress(connection()->connectionInfoProvider());
+
+    if (connection_.has_value()) {
+      (*entry)->setDownstreamConnectionAddress(connection_->connectionInfoProvider());
+    }
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
     ENVOY_BUG(!continue_iteration || !state_.local_complete_,
