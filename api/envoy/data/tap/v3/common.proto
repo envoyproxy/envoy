@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.data.tap.v3;
 
 import "envoy/config/core/v3/address.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 

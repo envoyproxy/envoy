@@ -40,7 +40,8 @@ public:
   MOCK_METHOD(void, onResponseHeaders, (const Http::ResponseHeaderMap& headers));
   MOCK_METHOD(void, onResponseBody, (const Buffer::Instance& data));
   MOCK_METHOD(void, onResponseTrailers, (const Http::ResponseTrailerMap& headers));
-  MOCK_METHOD(void, setDownstreamConnectionAddress, (const Envoy::Network::ConnectionInfoProvider& connection_info_provider));
+  MOCK_METHOD(void, setDownstreamConnectionAddress,
+              (const Envoy::Network::ConnectionInfoProvider& connection_info_provider));
   MOCK_METHOD(bool, onDestroyLog, ());
 };
 

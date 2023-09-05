@@ -1,3 +1,7 @@
+#include <memory>
+
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/utility.h"
 #include "source/extensions/filters/http/tap/tap_config_impl.h"
 
 #include "test/extensions/common/tap/common.h"
@@ -5,9 +9,6 @@
 #include "test/mocks/common.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
-#include "source/common/network/socket_impl.h"
-#include "source/common/network/utility.h"
-#include <memory>
 
 using testing::_;
 using testing::Assign;
