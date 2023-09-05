@@ -98,10 +98,7 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
       response.add("<script>\n");
     }
     response.add("renderHistogram(histogramDiv, supportedPercentiles,\n");
-    {
-      StatsJsonRender::generateHistogramDetail(histogram.name(), histogram,
-                                               *streamer.makeRootMap());
-    }
+    { StatsJsonRender::generateHistogramDetail(name, histogram, *streamer.makeRootMap()); }
     response.add(");\n</script>\n");
   } else {
     StatsTextRender::generate(response, name, histogram);
