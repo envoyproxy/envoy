@@ -349,6 +349,7 @@ struct StreamInfoImpl : public StreamInfo {
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
     bytes_retransmitted_ = info.bytesRetransmitted();
     packets_retransmitted_ = info.packetsRetransmitted();
+    should_drain_connection_ = info.shouldDrainConnectionUponCompletion();
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a
@@ -396,6 +397,12 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::string_view downstreamTransportFailureReason() const override {
     return downstream_transport_failure_reason_;
+  }
+
+  bool shouldDrainConnectionUponCompletion() const override { return should_drain_connection_; }
+
+  void setShouldDrainConnectionUponCompletion(bool should_drain) override {
+    should_drain_connection_ = should_drain;
   }
 
   TimeSource& time_source_;
@@ -457,6 +464,7 @@ private:
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
+  bool should_drain_connection_{false};
 };
 
 } // namespace StreamInfo

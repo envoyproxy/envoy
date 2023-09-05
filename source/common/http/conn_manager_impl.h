@@ -351,6 +351,8 @@ private:
       bool on_reset_stream_called_ : 1;   // Whether the stream has been reset.
       bool is_zombie_stream_ : 1;         // Whether stream is waiting for signal
                                           // the underlying codec to be destroyed.
+      // Deprecate it together with runtime guard
+      // envoy.reloadable_features.http1_connection_close_header_in_redirect.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
 
@@ -490,6 +492,8 @@ private:
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
     Http::ServerHeaderValidatorPtr header_validator_;
+    const bool http1_connection_close_header_in_redirect_{Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.http1_connection_close_header_in_redirect")};
 
     friend FilterManager;
 

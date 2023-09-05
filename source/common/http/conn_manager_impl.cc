@@ -262,7 +262,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
                          (!stream.response_headers_ || !stream.response_headers_->ContentLength());
   // We also don't delay-close in the case of HTTP/1.1 where the request is
   // fully read, as there's no race condition to avoid.
-  bool connection_close = stream.state_.saw_connection_close_;
+  const bool connection_close =
+      stream.http1_connection_close_header_in_redirect_
+          ? stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion()
+          : stream.state_.saw_connection_close_;
   bool request_complete = stream.filter_manager_.remoteDecodeComplete();
 
   if (check_for_deferred_close) {
@@ -383,7 +386,11 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   if (config_.maxRequestsPerConnection() > 0 &&
       accumulated_requests_ >= config_.maxRequestsPerConnection()) {
     if (codec_->protocol() < Protocol::Http2) {
-      new_stream->state_.saw_connection_close_ = true;
+      if (new_stream->http1_connection_close_header_in_redirect_) {
+        new_stream->filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+      } else {
+        new_stream->state_.saw_connection_close_ = true;
+      }
       // Prevent erroneous debug log of closing due to incoming connection close header.
       drain_state_ = DrainState::Closing;
     } else if (drain_state_ == DrainState::NotDraining) {
@@ -1120,14 +1127,19 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     request_header_timer_.reset();
   }
 
-  // Both saw_connection_close_ and is_head_request_ affect local replies: set
-  // them as early as possible.
+  // Both shouldDrainConnectionUponCompletion() and is_head_request_ affect local replies: set them
+  // as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
-  state_.saw_connection_close_ =
-      (Runtime::runtimeFeatureEnabled(
-           "envoy.reloadable_features.http1_connection_close_header_in_redirect") &&
-       state_.saw_connection_close_) ||
-      HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
+  if (http1_connection_close_header_in_redirect_) {
+    if (!filter_manager_.streamInfo().shouldDrainConnectionUponCompletion() &&
+        HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
+      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+    }
+  } else {
+    state_.saw_connection_close_ =
+        HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
+  }
+
   filter_manager_.streamInfo().protocol(protocol);
 
   // We end the decode here to mark that the downstream stream is complete.
@@ -1318,7 +1330,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
       // accepted, err on the side of caution and refuse to process any further requests on this
       // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
       // contains a smuggled HTTP request.
-      state_.saw_connection_close_ = true;
+      if (http1_connection_close_header_in_redirect_) {
+        filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+      } else {
+        state_.saw_connection_close_ = true;
+      }
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Code::Forbidden, "", nullptr, absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
@@ -1609,7 +1625,11 @@ void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
   // The BadRequest error code indicates there has been a messaging error.
   if (code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
       !response_encoder_->streamErrorOnInvalidHttpMessage()) {
-    state_.saw_connection_close_ = true;
+    if (http1_connection_close_header_in_redirect_) {
+      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+    } else {
+      state_.saw_connection_close_ = true;
+    }
   }
 }
 
@@ -1678,16 +1698,25 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     // As HTTP/1.0 and below can not do chunked encoding, if there is no content
     // length the response will be framed by connection close.
     if (!headers.ContentLength()) {
-      state_.saw_connection_close_ = true;
+      if (http1_connection_close_header_in_redirect_) {
+        filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+      } else {
+        state_.saw_connection_close_ = true;
+      }
     }
     // If the request came with a keep-alive and no other factor resulted in a
     // connection close header, send an explicit keep-alive header.
-    if (!state_.saw_connection_close_) {
+    if (!(http1_connection_close_header_in_redirect_
+              ? filter_manager_.streamInfo().shouldDrainConnectionUponCompletion()
+              : state_.saw_connection_close_)) {
       headers.setConnection(Headers::get().ConnectionValues.KeepAlive);
     }
   }
 
-  if (connection_manager_.drain_state_ == DrainState::NotDraining && state_.saw_connection_close_) {
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      (http1_connection_close_header_in_redirect_
+           ? filter_manager_.streamInfo().shouldDrainConnectionUponCompletion()
+           : state_.saw_connection_close_)) {
     ENVOY_STREAM_LOG(debug, "closing connection due to connection close header", *this);
     connection_manager_.drain_state_ = DrainState::Closing;
   }
@@ -2102,18 +2131,11 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   // data, and not include upstream related data.
   new_active_stream.filter_manager_.streamInfo().setFromForRecreateStream(
       filter_manager_.streamInfo());
-  // Check if saw_connection_close_ can be carried to the new stream.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_connection_close_header_in_redirect") &&
-      state_.saw_connection_close_ && !new_active_stream.state_.saw_connection_close_ &&
-      !HeaderUtility::shouldCloseConnection(connection_manager_.codec_->protocol(),
-                                            *request_headers_)) {
-    // Set saw_connection_close_ if decoding the request headers won't set this bool.
-    new_active_stream.state_.saw_connection_close_ = true;
-  }
   new_stream.decodeHeaders(std::move(request_headers_), !proxy_body);
-  ENVOY_BUG(!state_.saw_connection_close_ || new_active_stream.state_.saw_connection_close_,
-            "saw_connection_close_ is lost in redirect");
+  ENVOY_BUG(
+      !filter_manager_.streamInfo().shouldDrainConnectionUponCompletion() ||
+          new_active_stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion(),
+      "shouldDrainConnectionUponCompletion() is not carried over in redirect");
   if (proxy_body) {
     // This functionality is currently only used for internal redirects, which the router only
     // allows if the full request has been read (end_stream = true) so we don't need to handle the
