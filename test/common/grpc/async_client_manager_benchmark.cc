@@ -7,6 +7,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 
+#include "test/benchmark/main.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -15,12 +16,9 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
+#include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "test/benchmark/main.h"
-
-#include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -48,10 +46,11 @@ void testGetOrCreateAsyncClientWithConfig(::benchmark::State& state) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  for(auto _ : state) {
-    for(int i = 0; i < 1000; i++){
+  for (auto _ : state) {
+    for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
-          async_client_man_test.async_client_manager_.getOrCreateRawAsyncClient(grpc_service, async_client_man_test.scope_, true);
+          async_client_man_test.async_client_manager_.getOrCreateRawAsyncClient(
+              grpc_service, async_client_man_test.scope_, true);
     }
   }
 }
@@ -63,19 +62,18 @@ void testGetOrCreateAsyncClientWithHashConfig(::benchmark::State& state) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   GrpcServiceConfigWithHashKey config_with_hash_key_a = GrpcServiceConfigWithHashKey(grpc_service);
 
-  for(auto _ : state) {
-      for(int i = 0; i < 1000; i++){
+  for (auto _ : state) {
+    for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
-          async_client_man_test.async_client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key_a, async_client_man_test.scope_, true);
+          async_client_man_test.async_client_manager_.getOrCreateRawAsyncClientWithHashKey(
+              config_with_hash_key_a, async_client_man_test.scope_, true);
     }
   }
-
 }
 
 BENCHMARK(testGetOrCreateAsyncClientWithConfig)->Unit(::benchmark::kMicrosecond);
 BENCHMARK(testGetOrCreateAsyncClientWithHashConfig)->Unit(::benchmark::kMicrosecond);
 
-
-}
-}
-}
+} // namespace
+} // namespace Grpc
+} // namespace Envoy
