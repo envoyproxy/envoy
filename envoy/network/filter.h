@@ -463,8 +463,8 @@ public:
    * @param listener_filter_matcher supplies the matcher to decide when filter is enabled.
    * @param filter supplies the filter being added.
    */
-  virtual void addAcceptFilter(const ListenerFilterMatcherSharedPtr& listener_filter_matcher,
-                               QuicListenerFilterPtr&& filter) PURE;
+  virtual void addFilter(const ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                         QuicListenerFilterPtr&& filter) PURE;
 
   virtual bool shouldAdvertiseServerPreferredAddress(
       const quic::QuicSocketAddress& server_preferred_address) const PURE;
@@ -654,10 +654,10 @@ public:
 
   /**
    * Called to create the QUIC listener filter chain.
-   * @param listener supplies the listener to create the chain on.
+   * @param manager supplies the filter manager to create the chain on.
    * @return true if filter chain was created successfully. Otherwise false.
    */
-  virtual bool createQuicListenerFilterChain(QuicListenerFilterManager& listener) PURE;
+  virtual bool createQuicListenerFilterChain(QuicListenerFilterManager& manager) PURE;
 };
 
 /**

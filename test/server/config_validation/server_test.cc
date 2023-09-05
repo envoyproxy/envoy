@@ -3,6 +3,7 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
 #include "source/server/config_validation/server.h"
 
 #include "test/integration/server.h"
@@ -206,6 +207,9 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
                                      listener_config);
 
   server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
+
+  ValidationListenerComponentFactory listener_component_factory(server);
+  listener_component_factory.getTcpListenerConfigProviderManager();
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against

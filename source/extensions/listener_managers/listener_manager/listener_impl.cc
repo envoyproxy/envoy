@@ -984,12 +984,11 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
   if (Configuration::FilterChainUtility::buildQuicFilterChain(manager,
                                                               quic_listener_filter_factories_)) {
     return true;
-  } else {
-    ENVOY_LOG(debug, "New connection accepted while missing configuration. "
-                     "Close socket and stop the iteration onAccept.");
-    missing_listener_config_stats_.extension_config_missing_.inc();
-    return false;
   }
+  ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                   "Close socket and stop the iteration onAccept.");
+  missing_listener_config_stats_.extension_config_missing_.inc();
+  return false;
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

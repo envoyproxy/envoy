@@ -394,7 +394,7 @@ listener_filters:
   // Verify that the right filter chain type is installed.
   Network::MockQuicListenerFilterManager filter_manager;
   Network::QuicListenerFilterPtr listener_filter;
-  EXPECT_CALL(filter_manager, addAcceptFilter(_, _))
+  EXPECT_CALL(filter_manager, addFilter(_, _))
       .WillOnce([&listener_filter](const Network::ListenerFilterMatcherSharedPtr&,
                                    Network::QuicListenerFilterPtr&& filter) {
         listener_filter = std::move(filter);

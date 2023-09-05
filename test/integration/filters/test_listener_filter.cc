@@ -82,6 +82,7 @@ public:
   std::string name() const override { return "envoy.filters.udp_listener.test"; }
 };
 
+#ifdef ENVOY_ENABLE_QUIC
 /**
  * Config registration for the test filter.
  */
@@ -100,10 +101,9 @@ public:
             allow_server_migration = message.allow_server_migration(),
             allow_client_migration = message.allow_client_migration()](
                Network::QuicListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(
-          listener_filter_matcher,
-          std::make_unique<TestQuicListenerFilter>(added_value, allow_server_migration,
-                                                   allow_client_migration));
+      filter_manager.addFilter(listener_filter_matcher,
+                               std::make_unique<TestQuicListenerFilter>(
+                                   added_value, allow_server_migration, allow_client_migration));
     };
   }
 
@@ -114,6 +114,11 @@ public:
   std::string name() const override { return "envoy.filters.quic_listener.test"; }
 };
 
+REGISTER_FACTORY(TestQuicListenerFilterConfigFactory,
+                 Server::Configuration::NamedQuicListenerFilterConfigFactory);
+
+#endif
+
 REGISTER_FACTORY(TestInspectorConfigFactory,
                  Server::Configuration::NamedListenerFilterConfigFactory);
 
@@ -122,8 +127,5 @@ REGISTER_FACTORY(TestTcpInspectorConfigFactory,
 
 REGISTER_FACTORY(TestUdpInspectorConfigFactory,
                  Server::Configuration::NamedUdpListenerFilterConfigFactory);
-
-REGISTER_FACTORY(TestQuicListenerFilterConfigFactory,
-                 Server::Configuration::NamedQuicListenerFilterConfigFactory);
 
 } // namespace Envoy

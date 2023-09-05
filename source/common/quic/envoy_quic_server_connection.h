@@ -10,6 +10,7 @@
 namespace Envoy {
 namespace Quic {
 
+// A wrapper around the actual listener filter which checks against the given filter matcher.
 class GenericListenerFilter : public Network::QuicListenerFilter {
 public:
   GenericListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
@@ -40,9 +41,8 @@ private:
   bool isDisabled(Network::ListenerFilterCallbacks& cb) {
     if (matcher_ == nullptr) {
       return false;
-    } else {
-      return matcher_->matches(cb);
     }
+    return matcher_->matches(cb);
   }
 
   const Network::QuicListenerFilterPtr listener_filter_;
@@ -74,8 +74,8 @@ public:
   StreamInfo::FilterState& filterState() override { return *stream_info_.filterState().get(); }
 
   // Network::QuicListenerFilterManager
-  void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
-                       Network::QuicListenerFilterPtr&& filter) override {
+  void addFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                 Network::QuicListenerFilterPtr&& filter) override {
     accept_filters_.emplace_back(
         std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
   }

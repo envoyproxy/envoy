@@ -239,7 +239,7 @@ public:
 
 class MockQuicListenerFilterManager : public QuicListenerFilterManager {
 public:
-  MOCK_METHOD(void, addAcceptFilter,
+  MOCK_METHOD(void, addFilter,
               (const Network::ListenerFilterMatcherSharedPtr&, QuicListenerFilterPtr&&));
   MOCK_METHOD(bool, shouldAdvertiseServerPreferredAddress, (const quic::QuicSocketAddress&),
               (const));
