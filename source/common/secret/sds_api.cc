@@ -80,7 +80,7 @@ void SdsApi::onWatchUpdate() {
 }
 
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                            const std::string& version_info) {
+                                    const std::string& version_info) {
   validateUpdateSize(resources.size());
   const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
       resources[0].get().resource());
@@ -133,7 +133,8 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 }
 
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+                                    const Protobuf::RepeatedPtrField<std::string>&,
+                                    const std::string&) {
   validateUpdateSize(added_resources.size());
   return onConfigUpdate(added_resources, added_resources[0].get().version());
 }

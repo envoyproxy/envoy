@@ -64,8 +64,9 @@ void GrpcSubscriptionImpl::requestOnDemandUpdate(
 }
 
 // Config::SubscriptionCallbacks
-absl::Status GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                          const std::string& version_info) {
+absl::Status
+GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                     const std::string& version_info) {
   disableInitFetchTimeoutTimer();
   // TODO(mattklein123): In the future if we start tracking per-resource versions, we need to
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
@@ -101,7 +102,8 @@ absl::Status GrpcSubscriptionImpl::onConfigUpdate(
   disableInitFetchTimeoutTimer();
   stats_.update_attempt_.inc();
   auto start = dispatcher_.timeSource().monotonicTime();
-  absl::Status status = callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  absl::Status status =
+      callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   if (!status.ok()) {
     return status;
   }

@@ -40,9 +40,10 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
   init_manager.add(init_target_);
 }
 
-absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                const std::string& system_version_info) {
+absl::Status
+LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                           const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                           const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_rds_sds;
   if (cm_.adsMux()) {
     const std::vector<std::string> paused_xds_types{
@@ -111,7 +112,7 @@ absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourc
 }
 
 absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                const std::string& version_info) {
+                                        const std::string& version_info) {
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
   absl::node_hash_set<std::string> listeners_to_remove;

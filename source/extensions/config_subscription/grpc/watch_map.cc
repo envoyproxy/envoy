@@ -257,10 +257,12 @@ void WatchMap::onConfigUpdate(
     const auto removed = per_watch_removed.find(cur_watch);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
-      THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate(resource_to_add, {}, system_version_info));
+      THROW_IF_NOT_OK(
+          cur_watch->callbacks_.onConfigUpdate(resource_to_add, {}, system_version_info));
     } else {
       // both additions and removals
-      THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate(resource_to_add, removed->second, system_version_info));
+      THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate(resource_to_add, removed->second,
+                                                           system_version_info));
       // Drop the removals now, so the final removals-only pass won't use them.
       per_watch_removed.erase(removed);
     }
@@ -270,7 +272,8 @@ void WatchMap::onConfigUpdate(
     if (deferred_removed_during_update_->count(cur_watch) > 0) {
       continue;
     }
-    THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info));
+    THROW_IF_NOT_OK(
+        cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info));
   }
   // notify empty update
   if (added_resources.empty() && removed_resources.empty()) {

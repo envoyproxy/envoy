@@ -44,7 +44,7 @@ public:
   ~DynamicFilterConfigProviderImplBase() override;
   const Init::Target& initTarget() const { return init_target_; }
 
-  void validateTypeUrl(const std::string& type_url) const;
+  absl::Status validateTypeUrl(const std::string& type_url) const;
   virtual void validateMessage(const std::string& config_name, const Protobuf::Message& message,
                                const std::string& factory_name) const PURE;
 
@@ -109,7 +109,7 @@ public:
 
   // Config::DynamicExtensionConfigProviderBase
   absl::Status onConfigUpdate(const Protobuf::Message& message, const std::string&,
-                      Config::ConfigAppliedCb applied_on_all_threads) override {
+                              Config::ConfigAppliedCb applied_on_all_threads) override {
     const FactoryCb config = instantiateFilterFactory(message);
     update(config, applied_on_all_threads);
     return absl::OkStatus();
@@ -411,10 +411,10 @@ private:
 
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
+                              const std::string& version_info) override;
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string&) override;
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string&) override;
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
   void updateComplete();

@@ -184,9 +184,11 @@ private:
 
   // Adds or updates scopes, create a new RDS provider for each resource, if an exception is thrown
   // during updating, the exception message is collected via the exception messages vector.
-  // Returns true if any scope updated, false otherwise.
-  bool addOrUpdateScopes(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-                         Init::Manager& init_manager, const std::string& version_info);
+  // Returns if the operation was successful or not. If it was successful,
+  // any_applied will reflect if any scopes were applied.
+  absl::Status addOrUpdateScopes(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
+                                 Init::Manager& init_manager, const std::string& version_info,
+                                 bool& any_applied);
   // Removes given scopes from the managed set of scopes.
   // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
   // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.
@@ -210,10 +212,10 @@ private:
   // NOTE: both delta form and state-of-the-world form onConfigUpdate(resources, version_info) will
   // throw an EnvoyException or return failure on any error and essentially reject an update.
   absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
+                              const std::string& version_info) override;
   absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info) override;
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override {
     ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);

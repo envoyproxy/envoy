@@ -160,8 +160,9 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   all_new_hosts.emplace(address_as_string);
 }
 
-absl::Status EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                    const std::string&) {
+absl::Status
+EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                               const std::string&) {
   if (!validateUpdateSize(resources.size())) {
     return absl::OkStatus();
   }
@@ -284,9 +285,9 @@ void EdsClusterImpl::update(
   return;
 }
 
-absl::Status EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                    const Protobuf::RepeatedPtrField<std::string>&,
-                                    const std::string&) {
+absl::Status
+EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                               const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   if (!validateUpdateSize(added_resources.size())) {
     return absl::OkStatus();
   }

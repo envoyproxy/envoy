@@ -271,10 +271,9 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
   parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
 }
 
-bool ScopedRdsConfigSubscription::addOrUpdateScopes(
+absl::Status ScopedRdsConfigSubscription::addOrUpdateScopes(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
-    const std::string& version_info) {
-  bool any_applied = false;
+    const std::string& version_info, bool& any_applied) {
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
   std::vector<ScopedRouteInfoConstSharedPtr> updated_scopes;
@@ -284,7 +283,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
     if (scoped_route_config.route_configuration_name().empty()) {
-      throw EnvoyException("route_configuration_name is empty.");
+      return absl::InvalidArgumentError("route_configuration_name is empty.");
     }
     const std::string scope_name = scoped_route_config.name();
     if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
@@ -330,7 +329,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       return config;
     });
   }
-  return any_applied;
+  return absl::OkStatus();
 }
 
 std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
@@ -415,7 +414,8 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources =
       detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources, exception_msg);
   if (!exception_msg.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
+    return absl::InvalidArgumentError(
+        fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
   }
 
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
@@ -423,16 +423,18 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers = removeScopes(clean_removed_resources, version_info);
 
-  bool any_applied =
-      addOrUpdateScopes(added_resources,
-                        (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
-                        version_info) ||
-      !to_be_removed_rds_providers.empty();
+  bool any_applied = false;
+  absl::Status scopes = addOrUpdateScopes(
+      added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
+      version_info, any_applied);
+  if (!scopes.ok()) {
+    return scopes;
+  }
   auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
-      if (!status.ok()) {
-        throw EnvoyException(std::string(status.message()));
-      }
-  if (any_applied) {
+  if (!status.ok()) {
+    return status;
+  }
+  if (any_applied || !to_be_removed_rds_providers.empty()) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
   }
   stats_.all_scopes_.set(scoped_route_map_.size());

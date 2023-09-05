@@ -34,7 +34,7 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
 }
 
 absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                const std::string& version_info) {
+                                        const std::string& version_info) {
   auto all_existing_clusters = cm_.clusters();
   // Exclude the clusters which CDS wants to add.
   for (const auto& resource : resources) {
@@ -56,9 +56,10 @@ absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourc
   return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
-absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                const std::string& system_version_info) {
+absl::Status
+CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                           const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                           const std::string& system_version_info) {
   auto exception_msgs =
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   runInitializeCallbackIfAny();

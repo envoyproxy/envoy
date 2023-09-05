@@ -63,11 +63,11 @@ public:
 private:
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
+                              const std::string& version_info) override;
 
   absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string&) override;
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;

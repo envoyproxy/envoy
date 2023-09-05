@@ -34,10 +34,10 @@ public:
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) override;
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
+                              const std::string& version_info) override;
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info) override;
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   GrpcMuxSharedPtr grpcMux() { return grpc_mux_; }

@@ -28,7 +28,8 @@ public:
    * @param cb the continuation callback for a completed configuration application on all threads.
    * @return an absl status indicating if a non-exception-throwing error was encountered.
    */
-  virtual absl::Status onConfigUpdate(const Protobuf::Message& config, const std::string& version_info,
+  virtual absl::Status onConfigUpdate(const Protobuf::Message& config,
+                                      const std::string& version_info,
                                       ConfigAppliedCb applied_on_all_threads) PURE;
 
   /**

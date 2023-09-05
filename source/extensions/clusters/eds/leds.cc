@@ -30,9 +30,10 @@ LedsSubscription::LedsSubscription(
   subscription_->start({});
 }
 
-absl::Status LedsSubscription::onConfigUpdate(
-    const std::vector<Config::DecodedResourceRef>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
+absl::Status
+LedsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                 const std::string&) {
   // At least one resource must be added or removed.
   if (added_resources.empty() && removed_resources.empty()) {
     ENVOY_LOG(debug, "No added or removed LbEndpoint entries for cluster {} in onConfigUpdate()",
