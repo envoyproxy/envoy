@@ -455,8 +455,9 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
-  if (!body_delivered && ((state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) ||
-                          (!state.chunkQueue().empty() && state.bodyMode() == ProcessingMode::BUFFERED_PARTIAL))) {
+  if (!body_delivered &&
+      ((state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) ||
+       (!state.chunkQueue().empty() && state.bodyMode() == ProcessingMode::BUFFERED_PARTIAL))) {
     // If no gRPC stream yet, opens it before sending data.
     switch (openStream()) {
     case StreamOpenState::Error:
@@ -467,14 +468,18 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
       // Fall through
       break;
     }
-    // We would like to process the body in a buffered way, but until now the complete
-    // body has not arrived. With the arrival of trailers, we now know that the body
-    // has arrived.
+
     if (state.bodyMode() == ProcessingMode::BUFFERED) {
-      sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback, false);
+      // Sending data left over in the buffer.
+      sendBodyChunk(state, *state.bufferedData(),
+                    ProcessorState::CallbackState::BufferedBodyCallback, false);
     } else {
-      const auto& all_data = state.consolidateStreamedChunks(true);
-      sendBodyChunk(state, all_data.data, ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
+      // Sending data left over in the queue.
+      const auto& all_data = state.consolidateStreamedChunks();
+      ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
+                state.chunkQueue().receivedData().length(), all_data.end_stream);
+      sendBodyChunk(state, state.chunkQueue().receivedData(),
+                    ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
     }
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
