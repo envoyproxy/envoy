@@ -178,7 +178,7 @@ private:
   // The finalize()/finalized() methods of cross-modules descriptor may be called at same time
   // from different threads. So we need to use atomic to protect the finalized_ flag.
   // This is only happens in the multiple threads tests because all cross-modules descriptors
-  // should be finalized when the first server instance is initialized.
+  // should be finalized when the first server instance is initialized in formal running.
   std::atomic<bool> finalized_{};
 
   InlineKeys inline_keys_;
