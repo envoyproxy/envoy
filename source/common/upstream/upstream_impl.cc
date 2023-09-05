@@ -1390,7 +1390,8 @@ bool validateTransportSocketSupportsQuic(
   if (transport_socket.name() == "envoy.transport_sockets.quic") {
     return true;
   }
-  if (transport_socket.name() != "envoy.transport_sockets.http_11_proxy") {
+  if (transport_socket.name() != "envoy.transport_sockets.http_11_proxy" &&
+      transport_socket.name() != "envoy.transport_sockets.upstream_http_11_proxy") {
     return false;
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
