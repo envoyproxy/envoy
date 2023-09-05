@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-build-ubuntu:321658b6b50abda6869f89fac275f59bf3b1e757
+FROM envoyproxy/envoy-build-ubuntu:1f2f7ee78f894859de0fa7a415b0bedde1f6c560@sha256:6a6a64be3f4e3c4380531ad1624f9419d1fe99dde4e5eeb04e2d538a92f27205
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -qq update \
     && apt-get -qq install --no-install-recommends -y gosu \
