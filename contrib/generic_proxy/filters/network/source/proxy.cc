@@ -193,6 +193,11 @@ void ActiveStream::completeRequest() {
                                          *this, false);
   }
 
+  for (const auto& access_log : parent_.config_->accessLogs()) {
+    access_log->log({downstream_request_stream_.get(), local_or_upstream_response_stream_.get()},
+                    stream_info_);
+  }
+
   for (auto& filter : decoder_filters_) {
     filter->filter_->onDestroy();
   }
