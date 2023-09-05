@@ -30,7 +30,7 @@ public:
   void overwrite(absl::string_view key, absl::string_view value);
   std::string toString();
   std::string replaceQueryString(const HeaderString& path);
-  absl::optional<std::string> get_first_value(absl::string_view key) const;
+  absl::optional<std::string> getFirstValue(absl::string_view key) const;
 
   const absl::btree_map<std::string, std::vector<std::string>>& data() { return data_; }
 

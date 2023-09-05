@@ -40,7 +40,7 @@ ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
 bool ConfigUtility::QueryParameterMatcher::matches(
     const Http::Utility::QueryParamsMulti& request_query_params) const {
   // The docs specify that only the first instance of the query parameter should be matched
-  auto data = request_query_params.get_first_value(name_);
+  auto data = request_query_params.getFirstValue(name_);
   if (!data.has_value()) {
     return false;
   }
