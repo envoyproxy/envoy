@@ -83,20 +83,20 @@ public:
         default_configuration_(std::move(default_config)){};
 
   ~DynamicFilterConfigProviderImpl() override {
-    std::cout << "Destroying DynamicFilterConfigProviderImpl" << std::endl;
-    // auto& tls = main_config_->tls_;
-    // if (!tls->isShutdown()) {
-    //   tls->runOnAllThreads([](OptRef<ThreadLocalConfig> tls) { tls->config_ = {}; },
-    //                        // Extend the lifetime of TLS by capturing main_config_, because
-    //                        // otherwise, the callback to clear TLS worker content is not
-    //                        executed. [main_config = main_config_]() {
-    //                          // Explicitly delete TLS on the main thread.
-    //                          main_config->tls_.reset();
-    //                          // Explicitly clear the last config instance here in case it has its
-    //                          // own TLS.
-    //                          main_config->current_config_ = {};
-    //                        });
-    // }
+    auto& tls = main_config_->tls_;
+    if (!tls->isShutdown()) {
+      tls->runOnAllThreads([](OptRef<ThreadLocalConfig> tls) { tls->config_ = {}; },
+                           // Extend the lifetime of TLS by capturing main_config_, because
+                           // otherwise, the callback to clear TLS worker content is not
+                           // executed.
+                           [main_config = main_config_]() {
+                             // Explicitly delete TLS on the main thread.
+                             main_config->tls_.reset();
+                             // Explicitly clear the last config instance here in case it has its
+                             // own TLS.
+                             main_config->current_config_ = {};
+                           });
+    }
   }
 
   // Config::ExtensionConfigProvider
@@ -536,15 +536,38 @@ public:
       Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
+    return createDynamicFilterConfigProviderInternal(
+        config_source, filter_config_name, server_context, factory_context, cluster_manager,
+        last_filter_in_filter_chain, filter_chain_type, listener_filter_matcher);
+  }
+
+  void registerDynamicFilterConfigProvider(
+      const envoy::config::core::v3::ExtensionConfigSource& config_source,
+      const std::string& filter_config_name,
+      Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
+      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
+    auto provider = createDynamicFilterConfigProviderInternal(
+        config_source, filter_config_name, server_context, factory_context, cluster_manager,
+        last_filter_in_filter_chain, filter_chain_type, listener_filter_matcher);
+    dynamic_providers_[filter_config_name] = std::move(provider);
+  }
+
+  std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>>
+  createDynamicFilterConfigProviderInternal(
+      const envoy::config::core::v3::ExtensionConfigSource& config_source,
+      const std::string& filter_config_name,
+      Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
+      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
-    subscription_stat_prefix =
-        absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
-    provider_stat_prefix = subscription_stat_prefix;
+    subscription_stat_prefix = provider_stat_prefix = subscription_stat_prefix;
 
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
                                         server_context, cluster_manager, subscription_stat_prefix);
-    std::cout << "obtained subscription" << std::endl;
     // For warming, wait until the subscription receives the first response to indicate readiness.
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.
@@ -563,7 +586,6 @@ public:
           getDefaultConfig(config_source.default_config(), filter_config_name, server_context,
                            last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
-    std::cout << "creating dynammic filter config provider impl" << std::endl;
     std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> provider =
         std::make_unique<DynamicFilterConfigImpl>(subscription, require_type_urls, server_context,
                                                   factory_context, std::move(default_config),
@@ -574,9 +596,7 @@ public:
     if (config_source.apply_default_config_without_warming()) {
       factory_context.initManager().add(provider->initTarget());
     }
-    std::cout << "applying last or default config" << std::endl;
     applyLastOrDefaultConfig(subscription, *provider, filter_config_name);
-    std::cout << "applied last or default config" << std::endl;
     return provider;
   }
 
@@ -584,6 +604,14 @@ public:
   createStaticFilterConfigProvider(const FactoryCb& config,
                                    const std::string& filter_config_name) override {
     return std::make_unique<StaticFilterConfigProviderImpl<FactoryCb>>(config, filter_config_name);
+  }
+
+  OptRef<FactoryCb> dynamicProviderConfig(const std::string& filter_config_name) override {
+    auto provider = dynamic_providers_.find(filter_config_name);
+    if (provider == dynamic_providers_.end()) {
+      return absl::nullopt;
+    }
+    return provider->second->config();
   }
 
   absl::string_view statPrefix() const override PURE;
@@ -599,6 +627,9 @@ public:
   }
 
 protected:
+  absl::flat_hash_map<std::string, std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>>>
+      dynamic_providers_;
+
   virtual void validateFilters(const std::string&, const std::string&, const std::string&, bool,
                                bool) const {};
   virtual bool isTerminalFilter(Factory*, Protobuf::Message&,
@@ -634,9 +665,6 @@ class HttpFilterConfigProviderManagerImpl
               Server::Configuration::NamedHttpFilterConfigFactory>> {
 public:
   absl::string_view statPrefix() const override { return "http_filter."; }
-  ~HttpFilterConfigProviderManagerImpl() {
-    std::cout << "Destroying HttpFilterConfigProviderManagerImpl" << std::endl;
-  }
 
 protected:
   bool

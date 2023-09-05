@@ -19,22 +19,16 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     auto config_discovery = composite_action.dynamic_config().config_discovery();
     Server::Configuration::ServerFactoryContext& server_factory_context =
         context.server_factory_context_.value();
-    std::cout << "creating singleton manager and provider" << std::endl;
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
-    filter_config_provider_manager_ =
+    std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
             server_factory_context);
-    std::cout << "created filter config provider manager" << std::endl;
-    if (filter_config_provider_manager_ == nullptr) {
-      throw EnvoyException("Failed to create filter config provider manager");
-    }
-
-    provider_ = filter_config_provider_manager_->createDynamicFilterConfigProvider(
+    filter_config_provider_manager->registerDynamicFilterConfigProvider(
         config_discovery, composite_action.dynamic_config().name(), server_factory_context,
         factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
-    std::cout << "created dynamic filter config provider" << std::endl;
-    return [this]() -> Matcher::ActionPtr {
-      auto config_value = provider_->config();
+    return [name = composite_action.dynamic_config().name(),
+            filter_config_provider_manager]() -> Matcher::ActionPtr {
+      auto config_value = filter_config_provider_manager->dynamicProviderConfig(name);
       if (!config_value.has_value()) {
         throw EnvoyException("Failed to get dynamic config for filter");
       }
