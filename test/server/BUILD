@@ -161,6 +161,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restarting_child_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_child_test.cc"]),
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restarting_child",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "hot_restarting_parent_test",
     srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
     deps = [
