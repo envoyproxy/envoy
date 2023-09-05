@@ -61,7 +61,6 @@ public:
    */
   virtual void setDownstreamConnectionAddress(
       const Envoy::Network::ConnectionInfoProvider& connection_info_provider) PURE;
-
 };
 
 using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;

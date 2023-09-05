@@ -54,9 +54,9 @@ public:
   void onResponseHeaders(const Http::ResponseHeaderMap& headers) override;
   void onResponseBody(const Buffer::Instance& data) override;
   void onResponseTrailers(const Http::ResponseTrailerMap& headers) override;
-  bool onDestroyLog() override;
   void setDownstreamConnectionAddress(
       const Envoy::Network::ConnectionInfoProvider& connection_info_provider) override;
+  bool onDestroyLog() override;
 
 private:
   using HttpStreamedTraceSegment = envoy::data::tap::v3::HttpStreamedTraceSegment;

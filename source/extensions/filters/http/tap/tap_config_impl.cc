@@ -190,8 +190,10 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
   }
 
   if (should_record_downstream_connection_) {
-    http_trace.mutable_downstream_connection()->mutable_local_address()->MergeFrom(downstream_local_address_);
-    http_trace.mutable_downstream_connection()->mutable_remote_address()->MergeFrom(downstream_remote_address_);
+    http_trace.mutable_downstream_connection()->mutable_local_address()->MergeFrom(
+        downstream_local_address_);
+    http_trace.mutable_downstream_connection()->mutable_remote_address()->MergeFrom(
+        downstream_remote_address_);
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");
