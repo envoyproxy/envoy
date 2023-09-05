@@ -133,7 +133,7 @@ jobs:
       version_dev: ${{ steps.env.outputs.version_dev }}
       version_patch: ${{ steps.env.outputs.version_patch }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
         fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}
