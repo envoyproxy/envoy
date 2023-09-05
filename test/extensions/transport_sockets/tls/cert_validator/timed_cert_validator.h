@@ -1,3 +1,5 @@
+#pragma once
+
 #include <openssl/ssl.h>
 
 #include <chrono>
