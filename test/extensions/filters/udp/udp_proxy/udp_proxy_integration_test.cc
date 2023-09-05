@@ -551,7 +551,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
   Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
   client.write("hello1", *listener_address);
   client.write(request, *listener_address);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams_filter_dropped", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams_stopped", 1);
 
   // Wait for the upstream datagram.
   Network::UdpRecvData request_datagram;
@@ -624,7 +624,7 @@ TEST_P(UdpProxyIntegrationTest, WriteSessionFilterStopOnWrite) {
   // Send two datagrams but see that only the second one arrived downstream.
   fake_upstreams_[0]->sendUdpDatagram("response1", request_datagram.addresses_.peer_);
   fake_upstreams_[0]->sendUdpDatagram(response, request_datagram.addresses_.peer_);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams_filter_dropped", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams_stopped", 1);
   Network::UdpRecvData response_datagram;
   client.recv(response_datagram);
   EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
