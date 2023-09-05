@@ -2174,8 +2174,8 @@ PerFilterConfigs::PerFilterConfigs(
   const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
 
-  absl::string_view filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
+  std::string filter_config_type =
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;

@@ -31,6 +31,10 @@ const (
 	errFilterDestroyed = "golang filter has been destroyed"
 	errNotInGo         = "not proccessing Go"
 	errInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
+
+	errInternalFailure      = "internal failure"
+	errValueNotFound        = "value not found"
+	errSerializationFailure = "serialization failure"
 )
 
 // api.HeaderMap
