@@ -13,10 +13,7 @@ namespace ChecksumFilter {
 static std::vector<ChecksumFilterConfig::ChecksumMatcher> buildMatchers(
     const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config) {
   std::vector<ChecksumFilterConfig::ChecksumMatcher> matchers;
-  std::cerr << "building matchers" << std::endl;
   for (const auto& checksum : proto_config.checksums()) {
-    std::cerr << "expecting " << checksum.path_matcher().DebugString() << " -> "
-              << checksum.sha256() << std::endl;
     matchers.emplace_back(std::make_unique<Matchers::PathMatcher>(checksum.path_matcher()),
                           Hex::decode(checksum.sha256()));
   }
@@ -89,8 +86,6 @@ bool ChecksumFilter::checksumMatched() {
   uint8_t checksum_buffer[SHA256_DIGEST_LENGTH];
   SHA256_Final(checksum_buffer, &sha_);
   OPENSSL_cleanse(&sha_, sizeof(sha_));
-  std::cerr << Hex::encode(*expected_checksum_)
-            << " == " << Hex::encode(checksum_buffer, sizeof(checksum_buffer)) << std::endl;
   return absl::string_view{reinterpret_cast<const char*>(&(*expected_checksum_)[0]),
                            expected_checksum_->size()} ==
          absl::string_view{reinterpret_cast<const char*>(checksum_buffer), sizeof(checksum_buffer)};
