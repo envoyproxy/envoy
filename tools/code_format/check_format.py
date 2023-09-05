@@ -19,16 +19,16 @@ from typing import Callable, Dict, List, Pattern, Tuple, Union
 # As `pyyaml` is present in `envoy-build-ubuntu` it should be safe to use here.
 import yaml
 
-import paths
-
 logger = logging.getLogger(__name__)
 
 
 class FormatConfig:
     """Provides a format config object based on parsed YAML config."""
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, args, source_path) -> None:
         self.path = path
+        self.args = args
+        self.source_path = source_path
 
     def __getitem__(self, k):
         return self.config.__getitem__(k)
@@ -36,12 +36,21 @@ class FormatConfig:
     @cached_property
     def buildifier_path(self) -> str:
         """Path to the buildifer binary."""
-        return paths.get_buildifier()
+        path = (
+            os.path.join(self.source_path, self.args.buildifier_path)
+            if self.source_path else self.args.buildifier_path)
+        # v ugly hack
+        os.environ["BUILDIFIER_PATH"] = path
+        return path
 
     @cached_property
     def buildozer_path(self) -> str:
         """Path to the buildozer binary."""
-        return paths.get_buildozer()
+        path = (
+            os.path.join(self.source_path, self.args.buildozer_path)
+            if self.source_path else self.args.buildozer_path)
+        os.environ["BUILDOZER_PATH"] = path
+        return path
 
     @cached_property
     def clang_format_path(self) -> str:
@@ -113,10 +122,11 @@ class FormatConfig:
 
 class FormatChecker:
 
-    def __init__(self, args):
+    def __init__(self, args, source_path):
         self.args = args
         self.config_path = args.config_path
         self.operation_type = args.operation_type
+        self.source_path = source_path
         self.target_path = args.target_path
         self.api_prefix = args.api_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
@@ -130,7 +140,7 @@ class FormatChecker:
 
     @cached_property
     def config(self) -> FormatConfig:
-        return FormatConfig(self.config_path)
+        return FormatConfig(self.config_path, self.args, self.source_path)
 
     @cached_property
     def include_dir_order(self):
@@ -159,13 +169,21 @@ class FormatChecker:
         format_flag = True
         output_lines = []
         for line_number, line in enumerate(self.read_lines(path)):
+            if line_number == 0 and path.endswith(".h"):
+                if line == "":
+                    error_message = f"{path}:{line_number + 1}: the first line is empty for header files"
+                    continue
+                elif not line.startswith("#pragma once"):
+                    error_message = f"{path}:{line_number + 1}: #pragma once missed for header files"
+                    output_lines.append("#pragma once")
+                    output_lines.append("")
             if line.find("// clang-format off") != -1:
                 if not format_flag and error_message is None:
-                    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested off")
+                    error_message = f"{path}:{line_number + 1}: clang-format nested off"
                 format_flag = False
             if line.find("// clang-format on") != -1:
                 if format_flag and error_message is None:
-                    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested on")
+                    error_message = f"{path}:{line_number + 1}: clang-format nested on"
                 format_flag = True
             if format_flag:
                 output_lines.append(line_xform(line, line_number))
@@ -176,7 +194,7 @@ class FormatChecker:
         if write:
             pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
         if not format_flag and error_message is None:
-            error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format remains off")
+            error_message = f"{path}:{line_number + 1}: clang-format remains off"
         return error_message
 
     # Obtain all the lines in a given file.
@@ -214,8 +232,8 @@ class FormatChecker:
     # available.
     def check_tools(self):
         error_messages = []
-
         clang_format_abs_path = self.look_path(self.config.clang_format_path)
+
         if clang_format_abs_path:
             if not self.executable_by_others(clang_format_abs_path):
                 error_messages.append(
@@ -245,7 +263,6 @@ class FormatChecker:
                         "command {} exists, but cannot be executed by other "
                         "users".format(path))
             else:
-
                 error_messages.append(
                     "Command {} not found. If you have {} installed, but the binary "
                     "name is different or it's not available in $GOPATH/bin, please use "
@@ -947,7 +964,8 @@ class FormatChecker:
 
         for file_name in names:
             result = pool.apply_async(
-                self.check_format_return_trace_on_error, args=(dir_name + file_name, fail_on_diff))
+                self.check_format_return_trace_on_error,
+                args=(os.path.join(dir_name, file_name), fail_on_diff))
             result_list.append(result)
 
     # check_error_messages iterates over the list with error messages and prints
@@ -965,7 +983,7 @@ class FormatChecker:
 
 def normalize_path(path):
     """Convert path to form ./path/to/dir/ for directories and ./path/to/file otherwise"""
-    if not path.startswith("./"):
+    if not path.startswith("./") and not path.startswith("/"):
         path = "./" + path
 
     isdir = os.path.isdir(path)
@@ -988,6 +1006,7 @@ if __name__ == "__main__":
         nargs="?",
         default=".",
         help="specify the root directory for the script to recurse over. Default '.'.")
+    parser.add_argument("--path", default=".", help="specify the root path.")
     parser.add_argument(
         "--config_path",
         default="./tools/code_format/config.yaml",
@@ -1033,6 +1052,8 @@ if __name__ == "__main__":
         nargs="+",
         default=[],
         help="exclude paths from bazel_tools check.")
+    parser.add_argument("--buildifier_path", type=str, help="Path to buildifier executable.")
+    parser.add_argument("--buildozer_path", type=str, help="Path to buildozer executable.")
     parser.add_argument(
         "--include_dir_order",
         type=str,
@@ -1040,7 +1061,10 @@ if __name__ == "__main__":
         help="specify the header block include directory order.")
     args = parser.parse_args()
 
-    format_checker = FormatChecker(args)
+    # TODO(phlax): completely rewrite file discovery in this file - its a mess
+    source_path = os.getcwd()
+    os.chdir(args.path)
+    format_checker = FormatChecker(args, source_path)
 
     excluded_prefixes = format_checker.config.paths["excluded"]
     if args.add_excluded_prefixes:

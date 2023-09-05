@@ -9,7 +9,6 @@
 # The number 3G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx3g
-startup --host_jvm_args=-XX:MaxDirectMemorySize=512m
 
 fetch --color=yes
 run --color=yes
@@ -205,14 +204,19 @@ build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
 build:coverage --test_env=HEAPCHECK=
 build:coverage --combined_report=lcov
-build:coverage --strategy=TestRunner=sandboxed,local
+build:coverage --strategy=TestRunner=remote,sandboxed,local
 build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --experimental_generate_llvm_lcov
+build:coverage --experimental_split_coverage_postprocessing
+build:coverage --experimental_fetch_all_coverage_outputs
 build:coverage --collect_code_coverage
 build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],^//envoy[/:],^//contrib(?!/.*/test)[/:]"
-build:coverage --remote_download_toplevel
+build:coverage --remote_download_minimal
 build:coverage --define=tcmalloc=gperftools
+build:coverage --define=no_debug_info=1
+build:coverage --linkopt=-Wl,-s
+build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
@@ -339,7 +343,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:41c5a05d708972d703661b702a63ef5060125c33
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:1f2f7ee78f894859de0fa7a415b0bedde1f6c560@sha256:6a6a64be3f4e3c4380531ad1624f9419d1fe99dde4e5eeb04e2d538a92f27205
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
