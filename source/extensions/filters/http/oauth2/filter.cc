@@ -241,12 +241,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // Skip Filter and continue chain if a Passthrough header is matching
   // Must be done before the sanitation of the authorization header,
   // otherwise the authorization header might be altered or removed
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
-    for (const auto& matcher : config_->passThroughMatchers()) {
-      if (matcher.matchesHeaders(headers)) {
-        config_->stats().oauth_passthrough_.inc();
-        return Http::FilterHeadersStatus::Continue;
-      }
+  for (const auto& matcher : config_->passThroughMatchers()) {
+    if (matcher.matchesHeaders(headers)) {
+      config_->stats().oauth_passthrough_.inc();
+      return Http::FilterHeadersStatus::Continue;
     }
   }
 
@@ -384,14 +382,6 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     }
     ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie");
     return true;
-  }
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
-    for (const auto& matcher : config_->passThroughMatchers()) {
-      if (matcher.matchesHeaders(headers)) {
-        ENVOY_LOG(debug, "skipping oauth flow due to passthrough matcher match");
-        return true;
-      }
-    }
   }
   ENVOY_LOG(debug, "can not skip oauth flow");
   return false;
