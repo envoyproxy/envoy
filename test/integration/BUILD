@@ -566,6 +566,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "upstream_network_filter_integration_test",
+    size = "large",
+    srcs = ["upstream_network_filter_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:test_network_filter_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "buffer_accounting_integration_test",
     size = "large",
     srcs = [

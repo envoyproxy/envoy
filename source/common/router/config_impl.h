@@ -128,10 +128,6 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
-  const std::string& routeName() const override { return route_name_; }
-
-private:
-  const std::string route_name_;
 };
 
 class SslRedirectRoute : public Route {
@@ -150,6 +146,7 @@ public:
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  const std::string& routeName() const override { return EMPTY_STRING; }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -643,7 +640,6 @@ public:
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
   }
-  const std::string& routeName() const override { return route_name_; }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   const HeaderParser& requestHeaderParser() const {
     if (request_headers_parser_ != nullptr) {
@@ -804,6 +800,7 @@ public:
   void traversePerFilterConfig(
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+  const std::string& routeName() const override { return route_name_; }
 
   // Sanitizes the |path| before passing it to PathMatcher, if configured, this method makes the
   // path matching to ignore the path-parameters.
@@ -815,7 +812,6 @@ public:
                       const std::string& name)
         : parent_(parent), owner_(std::move(owner)), cluster_name_(name) {}
 
-    const std::string& routeName() const override { return parent_->routeName(); }
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
     Http::Code clusterNotFoundResponseCode() const override {
@@ -940,6 +936,7 @@ public:
         std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
       parent_->traversePerFilterConfig(filter_name, cb);
     };
+    const std::string& routeName() const override { return parent_->routeName(); }
 
   private:
     const RouteEntryAndRoute* parent_;
