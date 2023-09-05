@@ -68,6 +68,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE",
     ),
+    com_github_bazelbuild_buildtools = dict(
+        project_name = "Bazel build tools",
+        project_desc = "Developer tools for working with Google's bazel buildtool.",
+        project_url = "https://github.com/bazelbuild/buildtools",
+        version = "5.1.0",
+        sha256 = "e3bb0dc8b0274ea1aca75f1f8c0c835adbe589708ea89bf698069d0790701ea3",
+        release_date = "2022-04-14",
+        strip_prefix = "buildtools-{version}",
+        urls = ["https://github.com/bazelbuild/buildtools/archive/{version}.tar.gz"],
+        use_category = ["test_only"],
+    ),
     rules_fuzzing = dict(
         project_name = "Fuzzing Rules for Bazel",
         project_desc = "Bazel rules for fuzz tests",

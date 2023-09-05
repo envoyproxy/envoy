@@ -49,7 +49,7 @@ function format_one() {
     if [[ "$verbose" == "1" ]]; then
       set -x
     fi
-    ./tools/code_format/check_format.py fix "$1"
+    bazel run //tools/code_format:check_format -- fix "${1}"
     ./tools/spelling/check_spelling_pedantic.py fix "$1"
   )
 }
@@ -59,7 +59,7 @@ function format_all() {
     if [[ "$verbose" == "1" ]]; then
       set -x
     fi
-    ./tools/code_format/check_format.py fix
+    bazel run //tools/code_format:check_format -- fix
     ./tools/spelling/check_spelling_pedantic.py fix
   )
 }
