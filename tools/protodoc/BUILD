@@ -1,9 +1,9 @@
+load("@base_pip3//:requirements.bzl", "requirement")
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
+load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 
 licenses(["notice"])  # Apache 2
 

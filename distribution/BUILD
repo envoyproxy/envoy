@@ -1,6 +1,6 @@
+load("@envoy_repo//:version.bzl", "VERSION")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":packages.bzl", "envoy_pkg_distros")
-load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
