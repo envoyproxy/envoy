@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.checksum.v3alpha;
+
+import "envoy/type/matcher/v3/string.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.checksum.v3alpha";
+option java_outer_classname = "ChecksumProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/checksum/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Checksum HTTP filter]
+//
+// Filter to reject responses that don't match a specified checksum.
+// To avoid holding the entire response in memory, the rejection occurs at the end of the stream.
+// [#extension: envoy.filters.http.checksum]
+
+message ChecksumConfig {
+  message Checksum {
+    type.matcher.v3.StringMatcher path_matcher = 1;
+
+    string sha256 = 2;
+  }
+
+  repeated Checksum checksums = 1;
+
+  // If a request doesn't match any of the specified checksum paths and reject_unmatched is
+  // true, the request is rejected immediately.
+  bool reject_unmatched = 2;
+}
