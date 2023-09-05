@@ -1,7 +1,7 @@
+load("@aspect_bazel_lib//lib:jq.bzl", "jq")
+load("@envoy_repo//:path.bzl", "PATH")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
-load("@envoy_repo//:path.bzl", "PATH")
-load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 
 licenses(["notice"])  # Apache 2
 

@@ -9,8 +9,8 @@ load(
     "envoy_package",
     "envoy_select_enable_http3",
 )
-load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
 
@@ -39,9 +39,9 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server:drain_manager_lib",
+        "//source/server:listener_hooks_lib",
         "//source/server:options_lib",
         "//source/server:server_lib",
-        "//source/server:listener_hooks_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
@@ -70,18 +70,18 @@ envoy_cc_library(
         ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
-        "//source/common/thread_local:thread_local_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/grpc:google_grpc_context_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
             ":terminate_handler_lib",
+            "//source/common/signal:sigaction_lib",
         ],
     }),
 )
@@ -110,8 +110,8 @@ envoy_cc_library(
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
             ":terminate_handler_lib",
+            "//source/common/signal:sigaction_lib",
         ],
     }),
 )
@@ -146,9 +146,9 @@ envoy_cc_library(
                "//source/common/stats:stats_lib",
                "//source/common/stats:thread_local_store_lib",
                "//source/server:drain_manager_lib",
+               "//source/server:listener_hooks_lib",
                "//source/server:options_lib",
                "//source/server:server_lib",
-               "//source/server:listener_hooks_lib",
            ] + envoy_all_core_extensions() +
            # TODO(rojkov): drop io_uring dependency when it's fully integrated.
            select({
@@ -183,8 +183,8 @@ envoy_cc_library(
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
             ":terminate_handler_lib",
+            "//source/common/signal:sigaction_lib",
         ],
     }),
 )
@@ -274,8 +274,8 @@ envoy_cc_library(
             ":main_common_lib",
             "//source/common/buffer:buffer_lib",
             "//source/common/common:assert_lib",
-            "//source/common/common:win32_event_logger_impl_lib",
             "//source/common/common:thread_lib",
+            "//source/common/common:win32_event_logger_impl_lib",
             "//source/common/event:signal_lib",
         ],
         "//conditions:default": [],

@@ -1,4 +1,8 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
     "envoy_cc_library",
@@ -7,10 +11,6 @@ load(
     "envoy_cc_win32_library",
     "envoy_package",
     "envoy_pch_library",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
