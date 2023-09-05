@@ -612,12 +612,8 @@ public:
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
-   * @param std::string name denotes the name of the route.
-   */
-  virtual void setRouteName(absl::string_view name) PURE;
-
-  /**
-   * @return std::string& the name of the route.
+   * @return std::string& the name of the route. The name is get from the route() and it is
+   *         empty if there is no route.
    */
   virtual const std::string& getRouteName() const PURE;
 
@@ -842,16 +838,6 @@ public:
    * @return the trace reason for the stream.
    */
   virtual Tracing::Reason traceReason() const PURE;
-
-  /**
-   * @param filter_chain_name Network filter chain name of the downstream connection.
-   */
-  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
-
-  /**
-   * @return Network filter chain name of the downstream connection.
-   */
-  virtual const std::string& filterChainName() const PURE;
 
   /**
    * @param attempt_count, the number of times the request was attempted upstream.

@@ -643,10 +643,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
-  return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
-                               *Http::StaticEmptyHeaders::get().response_headers,
-                               *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                               absl::string_view(), AccessLog::AccessLogType::NotSet);
+  return hostname_fmt_->formatWithContext({}, stream_info);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(

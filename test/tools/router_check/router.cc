@@ -316,7 +316,7 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config,
     failure.mutable_actual_cluster_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markClusterCovered(*tool_config.route_);
+    coverage_.markClusterCovered(tool_config.route_);
   }
   return matches;
 }
@@ -346,7 +346,7 @@ bool RouterCheckTool::compareVirtualCluster(
     failure.mutable_actual_virtual_cluster_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markVirtualClusterCovered(*tool_config.route_);
+    coverage_.markVirtualClusterCovered(tool_config.route_);
   }
   return matches;
 }
@@ -371,7 +371,7 @@ bool RouterCheckTool::compareVirtualHost(
     failure.mutable_actual_virtual_host_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markVirtualHostCovered(*tool_config.route_);
+    coverage_.markVirtualHostCovered(tool_config.route_);
   }
   return matches;
 }
@@ -394,7 +394,7 @@ bool RouterCheckTool::compareRewritePath(
     failure.mutable_actual_path_rewrite()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markPathRewriteCovered(*tool_config.route_);
+    coverage_.markPathRewriteCovered(tool_config.route_);
   }
   return matches;
 }
@@ -417,7 +417,7 @@ bool RouterCheckTool::compareRewriteHost(
     failure.mutable_actual_host_rewrite()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markHostRewriteCovered(*tool_config.route_);
+    coverage_.markHostRewriteCovered(tool_config.route_);
   }
   return matches;
 }
@@ -440,7 +440,7 @@ bool RouterCheckTool::compareRedirectPath(
     failure.mutable_actual_path_redirect()->set_value(actual);
   }
   if (matches && has_direct_response_entry) {
-    coverage_.markRedirectPathCovered(*tool_config.route_);
+    coverage_.markRedirectPathCovered(tool_config.route_);
   }
   return matches;
 }
@@ -463,7 +463,7 @@ bool RouterCheckTool::compareRedirectCode(
     failure.mutable_actual_code_redirect()->set_value(actual);
   }
   if (matches && has_direct_response_entry) {
-    coverage_.markRedirectCodeCovered(*tool_config.route_);
+    coverage_.markRedirectCodeCovered(tool_config.route_);
   }
   return matches;
 }

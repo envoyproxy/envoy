@@ -444,14 +444,14 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
   onPreInitComplete();
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 EdsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                      ClusterFactoryContext& context) {
   // TODO(kbaichoo): EDS cluster should be able to support loading it's
   // configuration from the CustomClusterType protobuf. Currently it does not.
   // See: https://github.com/envoyproxy/envoy/issues/28752
   if (!cluster.has_eds_cluster_config()) {
-    throw EnvoyException("cannot create an EDS cluster without an EDS config");
+    return absl::InvalidArgumentError("cannot create an EDS cluster without an EDS config");
   }
 
   return std::make_pair(std::make_unique<EdsClusterImpl>(cluster, context), nullptr);

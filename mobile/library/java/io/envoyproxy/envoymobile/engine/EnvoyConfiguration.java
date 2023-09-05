@@ -42,6 +42,7 @@ public class EnvoyConfiguration {
   public final Boolean enableHttp3;
   public final String http3ConnectionOptions;
   public final String http3ClientConnectionOptions;
+  public final Map<String, String> quicHints;
   public final Boolean enableGzipDecompression;
   public final Boolean enableBrotliDecompression;
   public final Boolean enableSocketTagging;
@@ -110,6 +111,8 @@ public class EnvoyConfiguration {
    * @param http3ConnectionOptions                        connection options to be used in HTTP/3.
    * @param http3ClientConnectionOptions                  client connection options to be used in
    *     HTTP/3.
+   * @param quicHints                                     A list of host port pairs that's known
+   *     to speak QUIC.
    * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
    *     compression.
@@ -169,11 +172,11 @@ public class EnvoyConfiguration {
       int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
       int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
       String http3ConnectionOptions, String http3ClientConnectionOptions,
-      boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableInterfaceBinding,
-      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
-      int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
-      int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      Map<String, Integer> quicHints, boolean enableGzipDecompression,
+      boolean enableBrotliDecompression, boolean enableSocketTagging,
+      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost, int statsFlushSeconds,
+      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
       TrustChainVerification trustChainVerification,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
@@ -200,6 +203,10 @@ public class EnvoyConfiguration {
     this.enableHttp3 = enableHttp3;
     this.http3ConnectionOptions = http3ConnectionOptions;
     this.http3ClientConnectionOptions = http3ClientConnectionOptions;
+    this.quicHints = new HashMap<>();
+    for (Map.Entry<String, Integer> hostAndPort : quicHints.entrySet()) {
+      this.quicHints.put(hostAndPort.getKey(), String.valueOf(hostAndPort.getValue()));
+    }
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
     this.enableSocketTagging = enableSocketTagging;
@@ -265,12 +272,13 @@ public class EnvoyConfiguration {
     byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
     byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
     byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
+    byte[][] quic_hints = JniBridgeUtility.mapToJniBytes(quicHints);
 
     return JniLibrary.createBootstrap(
         grpcStatsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        http3ConnectionOptions, http3ClientConnectionOptions, enableGzipDecompression,
+        http3ConnectionOptions, http3ClientConnectionOptions, quic_hints, enableGzipDecompression,
         enableBrotliDecompression, enableSocketTagging, enableInterfaceBinding,
         h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
         maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
