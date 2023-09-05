@@ -668,18 +668,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "brotli",
         project_desc = "brotli compression library",
         project_url = "https://brotli.org",
-        # Use the dev branch of brotli to resolve compilation issues.
-        # TODO(rojkov): Remove when brotli > 1.0.9 is released.
-        version = "6d03dfbedda1615c4cba1211f8d81735575209c8",
-        sha256 = "0e8eea905081ce894d1616970a83b21265a13505ce06e8aa6a747fd686938d10",
+        version = "1.1.0",
+        sha256 = "e720a6ca29428b803f4ad165371771f5398faba397edf6778837a18599ea13ff",
         strip_prefix = "brotli-{version}",
-        urls = ["https://github.com/google/brotli/archive/{version}.tar.gz"],
+        urls = ["https://github.com/google/brotli/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.compression.brotli.compressor",
             "envoy.compression.brotli.decompressor",
         ],
-        release_date = "2022-10-25",
+        release_date = "2023-08-31",
         cpe = "cpe:2.3:a:google:brotli:*",
         license = "MIT",
         license_url = "https://github.com/google/brotli/blob/{version}/LICENSE",
