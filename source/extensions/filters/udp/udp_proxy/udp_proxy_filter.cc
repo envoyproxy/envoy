@@ -431,7 +431,6 @@ void UdpProxyFilter::ActiveSession::onData(Network::UdpRecvData& data) {
   for (auto& active_read_filter : read_filters_) {
     auto status = active_read_filter->read_filter_->onData(data);
     if (status == ReadFilterStatus::StopIteration) {
-      cluster_.cluster_stats_.sess_rx_datagrams_stopped_.inc();
       return;
     }
   }
@@ -493,7 +492,6 @@ void UdpProxyFilter::ActiveSession::processPacket(
   for (auto& active_write_filter : write_filters_) {
     auto status = active_write_filter->write_filter_->onWrite(recv_data);
     if (status == WriteFilterStatus::StopIteration) {
-      cluster_.cluster_stats_.sess_tx_datagrams_stopped_.inc();
       return;
     }
   }

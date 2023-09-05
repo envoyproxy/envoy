@@ -63,10 +63,8 @@ struct UdpProxyDownstreamStats {
 #define ALL_UDP_PROXY_UPSTREAM_STATS(COUNTER)                                                      \
   COUNTER(sess_rx_datagrams)                                                                       \
   COUNTER(sess_rx_datagrams_dropped)                                                               \
-  COUNTER(sess_rx_datagrams_stopped)                                                               \
   COUNTER(sess_rx_errors)                                                                          \
   COUNTER(sess_tx_datagrams)                                                                       \
-  COUNTER(sess_tx_datagrams_stopped)                                                               \
   COUNTER(sess_tx_errors)
 
 /**
