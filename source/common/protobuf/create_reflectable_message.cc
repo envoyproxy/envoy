@@ -77,7 +77,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/config/trace/v3/trace_descriptor.pb.h"
 #include "envoy/config/trace/v3/xray_descriptor.pb.h"
 #include "envoy/config/trace/v3/zipkin_descriptor.pb.h"
-#include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector.pb.h"
+#include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector_descriptor.pb.h"
 #include "envoy/data/accesslog/v3/accesslog_descriptor.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event_descriptor.pb.h"
 #include "envoy/data/core/v3/health_check_event_descriptor.pb.h"
