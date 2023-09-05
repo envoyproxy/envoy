@@ -38,7 +38,7 @@ jobs:
         BUILDOZER_BIN: /usr/local/bin/buildozer
         ENVOY_BAZEL_PREFIX: "@envoy"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run formatters'
@@ -56,7 +56,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: 'Install precommit'
       run: brew install pre-commit
     - name: 'Run precommit'
@@ -76,7 +76,7 @@ jobs:
     container:
       image: ghcr.io/realm/swiftlint:0.50.3
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: 'Run Swift Lint (SwiftLint)'
       run: swiftlint lint --strict
       working-directory: mobile
@@ -91,7 +91,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: 'Run DrString'
       env:
         DEVELOPER_DIR: /Applications/Xcode_14.1.app
@@ -109,7 +109,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
       with:
         java-version: '8'

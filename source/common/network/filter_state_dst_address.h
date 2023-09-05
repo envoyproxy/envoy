@@ -22,6 +22,7 @@ public:
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;
+  friend class DestinationAddressReflection;
 };
 
 } // namespace Network
