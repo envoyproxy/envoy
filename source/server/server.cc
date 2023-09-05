@@ -475,10 +475,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   }
 
   // Finalize all inline map descriptors that managed by the inline map registry.
-  InlineMapRegistry::finalize();
+  InlineMapRegistry::get().finalize();
   ENVOY_LOG(info, "Inline map registry info:");
-  for (const auto& info : InlineMapRegistry::registryInfo()) {
-    ENVOY_LOG(info, "  {}: {}", info.first, info.second);
+  for (const auto& info : InlineMapRegistry::get().descriptors()) {
+    ENVOY_LOG(info, "  {}: {}", info.first, info.second->inlineKeysAsString());
   };
 
   // Initialize the regex engine and inject to singleton.

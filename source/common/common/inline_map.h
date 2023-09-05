@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <list>
@@ -125,13 +126,9 @@ public:
 
   /**
    * Finalize this descriptor. No further changes are allowed after this point. This guarantees that
-   * all map created by the process have the same variable size and custom inline key adding. This
-   * method should only be called once.
+   * all map created by the process have the same variable size and custom inline key adding.
    */
-  void finalize() {
-    ASSERT(!finalized_, "Cannot finalize() an already finalized descriptor");
-    finalized_ = true;
-  }
+  void finalize() { finalized_ = true; }
 
   /**
    * @return true if the descriptor is finalized.
@@ -178,7 +175,12 @@ private:
     return inline_keys_map_.size();
   }
 
-  bool finalized_{};
+  // The finalize()/finalized() methods of cross-modules descriptor may be called at same time
+  // from different threads. So we need to use atomic to protect the finalized_ flag.
+  // This is only happens in the multiple threads tests because all cross-modules descriptors
+  // should be finalized when the first server instance is initialized.
+  std::atomic<bool> finalized_{};
+
   InlineKeys inline_keys_;
   InlineKeysMap inline_keys_map_;
 };

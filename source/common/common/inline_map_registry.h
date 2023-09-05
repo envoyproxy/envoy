@@ -34,8 +34,13 @@ public:
     InlineMapKeyRegister(absl::string_view);
   };
 
-  using InlineMapDescriptor = InlineMapDescriptor<std::string>;
-  using Handle = InlineMapDescriptor::Handle;
+  using Descriptor = InlineMapDescriptor<std::string>;
+  using Handle = Descriptor::Handle;
+
+  /**
+   * All registered descriptors. This is a map from scope name to the descriptor pointer.
+   */
+  using Descriptors = absl::flat_hash_map<std::string, Descriptor*>;
 
   struct ScopeInlineKeys {
     std::string name;
@@ -48,60 +53,42 @@ public:
    */
   using ScopeInlineKeysVector = std::vector<ScopeInlineKeys>;
 
-  /**
-   * Registry info type. This is used to get scope name and all managed descriptors' inline keys as
-   * string.
-   */
-  using RegistryInfo = std::vector<std::pair<std::string, std::string>>;
-
 private:
-  using Registry = absl::flat_hash_map<std::string, InlineMapDescriptor*>;
-
   template <class Scope> friend class InlineMapDescriptorRegister;
   template <class Scope> friend class InlineMapKeyRegister;
 
   /**
-   * Call once flag to ensure the registry is finalized only once on multi-thread environment.
+   * Default constructor. This is private because the registry should be a singleton that is only
+   * created once and get by the InlineMapRegistry::get() function.
    */
-  static std::once_flag& onceFlag() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::once_flag); }
-
-  /**
-   * Finalized flag to check whether the registry is finalized.
-   */
-  static bool& finalized() { MUTABLE_CONSTRUCT_ON_FIRST_USE(bool, false); }
-
-  /**
-   * A set of inline map registry that indexed by the scope name.
-   */
-  static Registry& registry() { MUTABLE_CONSTRUCT_ON_FIRST_USE(Registry); }
+  InlineMapRegistry() = default;
 
   /**
    * Create the inline map descriptor based on the scope name and insert it into the registry.
    */
-  static InlineMapDescriptor* createDescriptor(absl::string_view scope_name);
+  Descriptor* createDescriptor(absl::string_view scope_name);
 
   /**
-   * Get or create the inline map registry singleton based on the scope type.
+   * Get or create the inline map descriptor singleton based on the scope type and insert
+   * it into the registry.
    */
-  template <class Scope> static InlineMapDescriptor& getOrCreateDescriptor() {
+  template <class Scope> static Descriptor& getOrCreateDescriptor() {
     // The function level static variable will be initialized only once and is thread safe.
     // This is same with MUTABLE_CONSTRUCT_ON_FIRST_USE but has complex initialization.
-    static InlineMapDescriptor* initialize_once_descriptor = createDescriptor(Scope::name());
+    static Descriptor* initialize_once_descriptor = get().createDescriptor(Scope::name());
     return *initialize_once_descriptor;
-  }
-
-  /**
-   * Add inline key to the descriptor based on the scope.
-   */
-  template <class Scope> static void addInlineKey(absl::string_view key) {
-    getOrCreateDescriptor<Scope>().addInlineKey(key);
   }
 
 public:
   /**
+   * Get the inline map registry singleton.
+   */
+  static InlineMapRegistry& get() { MUTABLE_CONSTRUCT_ON_FIRST_USE(InlineMapRegistry); }
+
+  /**
    * Get the inline handle by the key name.
    */
-  template <class Scope> static absl::optional<Handle> getHandleByKey(absl::string_view key) {
+  template <class Scope> absl::optional<Handle> static getHandleByKey(absl::string_view key) {
     return getOrCreateDescriptor<Scope>().getHandleByKey(key);
   }
 
@@ -113,15 +100,21 @@ public:
   }
 
   /**
-   * Get scope name and all managed descriptors' inline keys as string.
+   * Get the registered descriptors. This is used to get all registered descriptors that are
+   * managed by this registry.
    */
-  static RegistryInfo registryInfo();
+  const Descriptors& descriptors() const;
 
   /**
    * Finalize the registry and all managed descriptors by this registry. This only be called once
    * when the server is initialized. This is safe even there are multiple main threads or servers.
    */
-  static void finalize(const ScopeInlineKeysVector& scope_inline_keys_vector = {});
+  void finalize(const ScopeInlineKeysVector& scope_inline_keys_vector = {});
+
+private:
+  Descriptors descriptors_;
+  std::once_flag once_flag_;
+  bool finalized_{};
 };
 
 template <class Scope>
@@ -131,7 +124,7 @@ InlineMapRegistry::InlineMapDescriptorRegister<Scope>::InlineMapDescriptorRegist
 
 template <class Scope>
 InlineMapRegistry::InlineMapKeyRegister<Scope>::InlineMapKeyRegister(absl::string_view key) {
-  InlineMapRegistry::addInlineKey<Scope>(key);
+  InlineMapRegistry::getOrCreateDescriptor<Scope>().addInlineKey(key);
 }
 
 /**
