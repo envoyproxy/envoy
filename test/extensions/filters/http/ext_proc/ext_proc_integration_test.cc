@@ -429,6 +429,59 @@ protected:
     }
   }
 
+  // Send response data with small chunk size in STREAMED mode.
+  void streamingDataWithSmallChunks(const int last_chunk_size, const bool mutate_last_chunk,
+                                    std::string response_body) {
+    proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+    proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+    proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+    initializeConfig();
+    HttpIntegrationTest::initialize();
+
+    auto response = sendDownstreamRequest(absl::nullopt);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+    // Send four chunks in total with last chunk end_stream flag set to be true..
+    int chunk_number = 3;
+    for (int i = 0; i < chunk_number; i++) {
+      upstream_request_->encodeData(1, false);
+    }
+    upstream_request_->encodeData(last_chunk_size, true);
+
+    // First chunk response.
+    processResponseBodyMessage(
+        *grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse& body_resp) {
+          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(body.body() + " First ");
+          return true;
+        });
+
+    for (int i = 0; i < chunk_number - 1; i++) {
+      processResponseBodyMessage(
+          *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+            auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(body.body() + " The Rest ");
+            return true;
+          });
+    }
+
+    if (mutate_last_chunk) {
+      processResponseBodyMessage(
+          *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+            auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(body.body() + " The Last ");
+            return true;
+          });
+    } else {
+      processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+    }
+    verifyDownstreamResponse(*response, 200);
+    EXPECT_EQ(response_body, response->body());
+  }
+
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
@@ -2947,6 +3000,59 @@ TEST_P(ExtProcIntegrationTest, SkipHeaderTrailerSendBodyClientSendAll) {
     EXPECT_FALSE(body.end_of_stream());
     return true;
   });
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Send response data with small chunk size.
+TEST_P(ExtProcIntegrationTest, StreamingResponseDataWithSmallChunks) {
+  streamingDataWithSmallChunks(1, true, "a First a The Rest a The Rest a The Last ");
+}
+
+// Send response data with small chunk size terminated with an empty string.
+TEST_P(ExtProcIntegrationTest, StreamingResponseDataSmallChunksTerminateEmptyString) {
+  streamingDataWithSmallChunks(0, true, "a First a The Rest a The Rest  The Last ");
+}
+
+// Send response data with small chunk size terminated with an empty string and no mutation
+// on it. Since the last chunk data size after mutation is zero, Envoy won't inject it.
+TEST_P(ExtProcIntegrationTest, StreamingResponseDataSmallChunksNoMutationLastChunk) {
+  streamingDataWithSmallChunks(0, false, "a First a The Rest a The Rest ");
+}
+
+TEST_P(ExtProcIntegrationTest, StreamingRequestDataSmallChunks) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  int chunk_number = 5;
+  for (int i = 0; i < chunk_number; i++) {
+    codec_client_->sendData(*request_encoder_, i + 1, false);
+  }
+  codec_client_->sendData(*request_encoder_, chunk_number + 1, true);
+
+  processRequestBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  for (int i = 0; i < chunk_number - 1; i++) {
+    processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  }
+  // ext_proc server responds to clear the last chunk body.
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_clear_body(true);
+        return true;
+      });
+
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }

@@ -87,6 +87,8 @@ public:
                                 absl::optional<size_t> max_length);
 };
 
+enum class FilterStateFormat { String, Proto, Field };
+
 /**
  * StreamInfoFormatterProvider for FilterState from StreamInfo.
  */
@@ -96,7 +98,8 @@ public:
   create(const std::string& format, const absl::optional<size_t>& max_length, bool is_upstream);
 
   FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
-                       bool serialize_as_string, bool is_upstream = false);
+                       bool serialize_as_string, bool is_upstream = false,
+                       const std::string& field_name = "");
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
@@ -109,8 +112,10 @@ private:
   std::string key_;
   absl::optional<size_t> max_length_;
 
-  bool serialize_as_string_;
   const bool is_upstream_;
+  FilterStateFormat format_;
+  std::string field_name_;
+  StreamInfo::FilterState::ObjectFactory* factory_;
 };
 
 /**
@@ -303,70 +308,6 @@ template <class FormatterContext>
 class StreamInfoFormatterBase : public CommonStreamInfoFormatterBase<FormatterContext> {
 public:
   using CommonStreamInfoFormatterBase<FormatterContext>::CommonStreamInfoFormatterBase;
-};
-
-template <class Base> class HttpFormatterProviderSpecializationHelper : public Base {
-public:
-  using Base::Base;
-
-  // FormatterProviderBase for HttpFormatterContext
-  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
-                                     const Http::ResponseHeaderMap& response_headers,
-                                     const Http::ResponseTrailerMap& response_trailers,
-                                     const StreamInfo::StreamInfo& stream_info,
-                                     absl::string_view local_reply_body,
-                                     AccessLog::AccessLogType access_log_type) const override {
-    HttpFormatterContext context(&request_headers, &response_headers, &response_trailers,
-                                 local_reply_body, access_log_type);
-    return Base::formatWithContext(context, stream_info);
-  }
-
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
-                                 const Http::ResponseHeaderMap& response_headers,
-                                 const Http::ResponseTrailerMap& response_trailers,
-                                 const StreamInfo::StreamInfo& stream_info,
-                                 absl::string_view local_reply_body,
-                                 AccessLog::AccessLogType access_log_type) const override {
-    HttpFormatterContext context(&request_headers, &response_headers, &response_trailers,
-                                 local_reply_body, access_log_type);
-    return Base::formatValueWithContext(context, stream_info);
-  }
-};
-
-/**
- * Specialization of PlainStringFormatterBase for HttpFormatterContext. This will implement
- * additional format() and formatValue() methods for backward compatibility.
- */
-template <>
-class PlainStringFormatterBase<HttpFormatterContext>
-    : public HttpFormatterProviderSpecializationHelper<
-          CommonPlainStringFormatterBase<HttpFormatterContext>> {
-public:
-  using HttpFormatterProviderSpecializationHelper::HttpFormatterProviderSpecializationHelper;
-};
-
-/**
- * Specialization of PlainNumberFormatterBase for HttpFormatterContext. This will implement
- * additional format() and formatValue() methods for backward compatibility.
- */
-template <>
-class PlainNumberFormatterBase<HttpFormatterContext>
-    : public HttpFormatterProviderSpecializationHelper<
-          CommonPlainNumberFormatterBase<HttpFormatterContext>> {
-public:
-  using HttpFormatterProviderSpecializationHelper::HttpFormatterProviderSpecializationHelper;
-};
-
-/**
- * Specialization of StreamInfoFormatterBase for HttpFormatterContext. This will implement
- * additional format() and formatValue() methods for backward compatibility.
- */
-template <>
-class StreamInfoFormatterBase<HttpFormatterContext>
-    : public HttpFormatterProviderSpecializationHelper<
-          CommonStreamInfoFormatterBase<HttpFormatterContext>> {
-public:
-  using HttpFormatterProviderSpecializationHelper::HttpFormatterProviderSpecializationHelper;
 };
 
 // Aliases for backward compatibility.
