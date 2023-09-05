@@ -1,14 +1,14 @@
 load(
+    "@rules_fuzzing//fuzzing:cc_defs.bzl",
+    "cc_fuzzing_engine",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_signal_trace",
-)
-load(
-    "@rules_fuzzing//fuzzing:cc_defs.bzl",
-    "cc_fuzzing_engine",
 )
 
 licenses(["notice"])  # Apache 2
