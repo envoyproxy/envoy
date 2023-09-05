@@ -103,7 +103,7 @@ jobs:
         echo '`repo_ref` should not be set for trusted CI runs'
         exit 1
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
         fetch-depth: ${{ inputs.repo_fetch_depth }}
