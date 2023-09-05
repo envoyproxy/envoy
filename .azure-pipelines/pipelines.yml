@@ -47,7 +47,7 @@ variables:
 - name: cacheKeyName
   value: envoy
 - name: cacheKeyVersion
-  value: v2.dev0
+  value: v2.dev1
 - name: cacheKeyBazel
   value: '.bazelversion | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 - name: cacheKeyDocker
