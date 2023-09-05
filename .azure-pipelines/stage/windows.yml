@@ -23,7 +23,7 @@ jobs:
   steps:
   - task: Cache@2
     inputs:
-      key: '"windows.release" | $(cacheKeyBazelFiles)'
+      key: '"windows.release" | $(cacheKeyBazel)'
       path: $(Build.StagingDirectory)/repository_cache
     continueOnError: true
   - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh

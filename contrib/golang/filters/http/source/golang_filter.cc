@@ -18,6 +18,13 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/extensions/filters/common/expr/context.h"
+
+#include "eval/public/cel_value.h"
+#include "eval/public/containers/field_access.h"
+#include "eval/public/containers/field_backed_list_impl.h"
+#include "eval/public/containers/field_backed_map_impl.h"
+#include "eval/public/structs/cel_proto_wrapper.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,6 +52,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   ENVOY_LOG(debug, "golang filter decodeHeaders, state: {}, phase: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), end_stream);
+
+  request_headers_ = &headers;
 
   state.setEndStream(end_stream);
 
@@ -1222,6 +1231,192 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
     return CAPIStatus::CAPIYield;
   }
   return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus Filter::getStringProperty(absl::string_view path, GoString* value_str, int* rc) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  // to access the headers_ and its friends we need to hold the lock
+  activation_request_headers_ = dynamic_cast<const Http::RequestHeaderMap*>(request_headers_);
+  if (enter_encoding_) {
+    activation_response_headers_ = dynamic_cast<const Http::ResponseHeaderMap*>(headers_);
+    activation_response_trailers_ = dynamic_cast<const Http::ResponseTrailerMap*>(trailers_);
+  }
+
+  if (state.isThreadSafe()) {
+    return getStringPropertyCommon(path, value_str, state);
+  }
+
+  auto weak_ptr = weak_from_this();
+  state.getDispatcher().post([this, &state, weak_ptr, path, value_str, rc] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      *rc = getStringPropertyCommon(path, value_str, state);
+      dynamic_lib_->envoyGoRequestSemaDec(req_);
+    } else {
+      ENVOY_LOG(info, "golang filter has gone or destroyed in getStringProperty");
+    }
+  });
+  return CAPIStatus::CAPIYield;
+}
+
+CAPIStatus Filter::getStringPropertyCommon(absl::string_view path, GoString* value_str,
+                                           ProcessorState& state) {
+  activation_info_ = &state.streamInfo();
+  CAPIStatus status = getStringPropertyInternal(path, &req_->strValue);
+  if (status == CAPIStatus::CAPIOK) {
+    value_str->p = req_->strValue.data();
+    value_str->n = req_->strValue.length();
+  }
+  return status;
+}
+
+absl::optional<google::api::expr::runtime::CelValue> Filter::findValue(absl::string_view name,
+                                                                       Protobuf::Arena* arena) {
+  // as we already support getting/setting FilterState, we don't need to implement
+  // getProperty with non-attribute name & setProperty which actually work on FilterState
+  return StreamActivation::FindValue(name, arena);
+  // we don't need to call resetActivation as activation_xx_ is overridden when we get property
+}
+
+CAPIStatus Filter::getStringPropertyInternal(absl::string_view path, std::string* result) {
+  using google::api::expr::runtime::CelValue;
+
+  bool first = true;
+  CelValue value;
+  Protobuf::Arena arena;
+
+  size_t start = 0;
+  while (true) {
+    if (start >= path.size()) {
+      break;
+    }
+
+    size_t end = path.find('.', start);
+    if (end == absl::string_view::npos) {
+      end = start + path.size();
+    }
+    auto part = path.substr(start, end - start);
+    start = end + 1;
+
+    if (first) {
+      // top-level identifier
+      first = false;
+      auto top_value = findValue(toAbslStringView(part), &arena);
+      if (!top_value.has_value()) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      value = top_value.value();
+    } else if (value.IsMap()) {
+      auto& map = *value.MapOrDie();
+      auto field = map[CelValue::CreateStringView(toAbslStringView(part))];
+      if (!field.has_value()) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      value = field.value();
+    } else if (value.IsMessage()) {
+      auto msg = value.MessageOrDie();
+      if (msg == nullptr) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      const Protobuf::Descriptor* desc = msg->GetDescriptor();
+      const Protobuf::FieldDescriptor* field_desc = desc->FindFieldByName(std::string(part));
+      if (field_desc == nullptr) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      if (field_desc->is_map()) {
+        value = CelValue::CreateMap(
+            Protobuf::Arena::Create<google::api::expr::runtime::FieldBackedMapImpl>(
+                &arena, msg, field_desc, &arena));
+      } else if (field_desc->is_repeated()) {
+        value = CelValue::CreateList(
+            Protobuf::Arena::Create<google::api::expr::runtime::FieldBackedListImpl>(
+                &arena, msg, field_desc, &arena));
+      } else {
+        auto status =
+            google::api::expr::runtime::CreateValueFromSingleField(msg, field_desc, &arena, &value);
+        if (!status.ok()) {
+          return CAPIStatus::CAPIInternalFailure;
+        }
+      }
+    } else if (value.IsList()) {
+      auto& list = *value.ListOrDie();
+      int idx = 0;
+      if (!absl::SimpleAtoi(toAbslStringView(part), &idx)) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      if (idx < 0 || idx >= list.size()) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      value = list[idx];
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+  }
+
+  return serializeStringValue(value, result);
+}
+
+CAPIStatus Filter::serializeStringValue(Filters::Common::Expr::CelValue value,
+                                        std::string* result) {
+  using Filters::Common::Expr::CelValue;
+  const Protobuf::Message* out_message;
+
+  switch (value.type()) {
+  case CelValue::Type::kString:
+    result->assign(value.StringOrDie().value().data(), value.StringOrDie().value().size());
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kBytes:
+    result->assign(value.BytesOrDie().value().data(), value.BytesOrDie().value().size());
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kInt64:
+    result->assign(absl::StrCat(value.Int64OrDie()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kUint64:
+    result->assign(absl::StrCat(value.Uint64OrDie()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kDouble:
+    result->assign(absl::StrCat(value.DoubleOrDie()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kBool:
+    result->assign(value.BoolOrDie() ? "true" : "false");
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kDuration:
+    result->assign(absl::FormatDuration(value.DurationOrDie()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kTimestamp:
+    result->assign(absl::FormatTime(value.TimestampOrDie(), absl::UTCTimeZone()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kMessage:
+    out_message = value.MessageOrDie();
+    result->clear();
+    if (!out_message || out_message->SerializeToString(result)) {
+      return CAPIStatus::CAPIOK;
+    }
+    return CAPIStatus::CAPISerializationFailure;
+  case CelValue::Type::kMap: {
+    // so far, only headers/trailers/filter state are in Map format, and we already have API to
+    // fetch them
+    ENVOY_LOG(error, "map type property result is not supported yet");
+    return CAPIStatus::CAPISerializationFailure;
+  }
+  case CelValue::Type::kList: {
+    ENVOY_LOG(error, "list type property result is not supported yet");
+    return CAPIStatus::CAPISerializationFailure;
+  }
+  default:
+    return CAPIStatus::CAPISerializationFailure;
+  }
 }
 
 /* ConfigId */

@@ -60,11 +60,18 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
-namespace {
 
 class UpstreamImplTestBase {
 protected:
   UpstreamImplTestBase() { ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_)); }
+  std::shared_ptr<StaticClusterImpl>
+  createCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                ClusterFactoryContext& context) {
+    StaticClusterFactory factory;
+    auto status_or_cluster = factory.createClusterImpl(cluster, context);
+    THROW_IF_STATUS_NOT_OK(status_or_cluster, throw);
+    return std::dynamic_pointer_cast<StaticClusterImpl>(status_or_cluster->first);
+  }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
@@ -75,6 +82,7 @@ protected:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
 };
 
+namespace {
 std::list<std::string> hostListToAddresses(const HostVector& hosts) {
   std::list<std::string> addresses;
   for (const HostSharedPtr& host : hosts) {
@@ -1658,15 +1666,15 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-  EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_FALSE(cluster.info()->addedViaApi());
+  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
@@ -1695,15 +1703,15 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
-  EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
-  EXPECT_FALSE(cluster.info()->addedViaApi());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_TRUE(cluster->prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
+  EXPECT_EQ(100, cluster->prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
+  EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostname) {
@@ -1730,13 +1738,13 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostname) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_FALSE(cluster.info()->addedViaApi());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("foo", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
@@ -1764,15 +1772,15 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("foo", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_EQ("foo2",
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostnameForHealthChecks());
-  EXPECT_FALSE(cluster.info()->addedViaApi());
+            cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostnameForHealthChecks());
+  EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
@@ -1816,14 +1824,14 @@ TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
-  EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_FALSE(cluster.info()->addedViaApi());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
+  EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
@@ -1860,11 +1868,11 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
   for (int i = 0; i < 2; ++i) {
     const auto& locality = hosts[i]->locality();
@@ -1872,8 +1880,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster.prioritySet().hostSetsPerPriority()[0]->localityWeights());
-  EXPECT_FALSE(cluster.info()->addedViaApi());
+  EXPECT_EQ(nullptr, cluster->prioritySet().hostSetsPerPriority()[0]->localityWeights());
+  EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
 // Validates that setting an EDS health value through LoadAssignment is honored for static
@@ -1905,13 +1913,13 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
+            cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
 }
 
 TEST_F(StaticClusterImplTest, AltStatName) {
@@ -1936,11 +1944,11 @@ TEST_F(StaticClusterImplTest, AltStatName) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
   // Increment a stat and verify it is emitted with alt_stat_name
-  cluster.info()->trafficStats()->upstream_rq_total_.inc();
+  cluster->info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.staticcluster_stats.upstream_rq_total").value());
 }
 
@@ -1965,13 +1973,13 @@ TEST_F(StaticClusterImplTest, RingHash) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::RingHash, cluster.info()->lbType());
-  EXPECT_TRUE(cluster.info()->addedViaApi());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::RingHash, cluster->info()->lbType());
+  EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
@@ -2001,17 +2009,17 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(LoadBalancerType::RoundRobin, cluster.info()->lbType());
-  auto slow_start_config = cluster.info()->lbRoundRobinConfig()->slow_start_config();
+  EXPECT_EQ(LoadBalancerType::RoundRobin, cluster->info()->lbType());
+  auto slow_start_config = cluster->info()->lbRoundRobinConfig()->slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
   EXPECT_EQ(2.0, slow_start_config.aggression().default_value());
-  EXPECT_TRUE(cluster.info()->addedViaApi());
+  EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
@@ -2041,17 +2049,17 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(LoadBalancerType::LeastRequest, cluster.info()->lbType());
-  auto slow_start_config = cluster.info()->lbLeastRequestConfig()->slow_start_config();
+  EXPECT_EQ(LoadBalancerType::LeastRequest, cluster->info()->lbType());
+  auto slow_start_config = cluster->info()->lbLeastRequestConfig()->slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
   EXPECT_EQ(2.0, slow_start_config.aggression().default_value());
-  EXPECT_TRUE(cluster.info()->addedViaApi());
+  EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, OutlierDetector) {
@@ -2080,34 +2088,37 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
-  cluster.setOutlierDetector(Outlier::DetectorSharedPtr{detector});
-  cluster.initialize([] {});
+  cluster->setOutlierDetector(Outlier::DetectorSharedPtr{detector});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
 
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->outlierDetector().putHttpResponseCode(
-      503);
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+  cluster->prioritySet()
+      .hostSetsPerPriority()[0]
+      ->hosts()[0]
+      ->outlierDetector()
+      .putHttpResponseCode(503);
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_NE(cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0],
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_NE(cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0],
+            cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
 
   // Bring the host back online.
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
+  detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
 }
 
 TEST_F(StaticClusterImplTest, HealthyStat) {
@@ -2136,117 +2147,117 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
-  cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
+  cluster->setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
 
   std::shared_ptr<MockHealthChecker> health_checker(new NiceMock<MockHealthChecker>());
-  cluster.setHealthChecker(health_checker);
+  cluster->setHealthChecker(health_checker);
 
   ReadyWatcher initialized;
-  cluster.initialize([&initialized] { initialized.ready(); });
+  cluster->initialize([&initialized] { initialized.ready(); });
 
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
                                HealthTransition::Changed);
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_CALL(initialized, ready());
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed);
 
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  outlier_detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
                                HealthTransition::Changed);
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  outlier_detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
                                HealthTransition::Changed);
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  outlier_detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed);
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed);
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_degraded_.value());
 
   // Mark the endpoint as unhealthy. This should decrement the degraded stat.
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed);
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
   // Go back to degraded.
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed);
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_degraded_.value());
 
   // Then go healthy.
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed);
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 }
 
 TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
@@ -2277,37 +2288,37 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
-  cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
+  cluster->setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
 
   std::shared_ptr<MockHealthChecker> health_checker(new NiceMock<MockHealthChecker>());
-  cluster.setHealthChecker(health_checker);
+  cluster->setHealthChecker(health_checker);
 
   ReadyWatcher initialized;
-  cluster.initialize([&initialized] { initialized.ready(); });
+  cluster->initialize([&initialized] { initialized.ready(); });
 
   // The endpoint with disabled active health check should not be set FAILED_ACTIVE_HC
   // at beginning.
-  const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(2UL, hosts.size());
   EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
   // The endpoint with disabled active health check is considered healthy.
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
   // Perform a health check for the second host, and then the initialization is finished.
   EXPECT_CALL(initialized, ready());
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+  health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
                                HealthTransition::Changed);
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 TEST_F(StaticClusterImplTest, UrlConfig) {
@@ -2336,31 +2347,32 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_EQ(1024U, cluster->info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U,
-            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
-  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
-  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
-  EXPECT_EQ(0U, cluster.info()->maxRequestsPerConnection());
+            cluster->info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_EQ(1024U, cluster->info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_EQ(3U, cluster->info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_EQ(1024U, cluster->info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_EQ(1024U,
+            cluster->info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_EQ(1024U, cluster->info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_EQ(3U, cluster->info()->resourceManager(ResourcePriority::High).retries().max());
+  EXPECT_EQ(0U, cluster->info()->maxRequestsPerConnection());
   EXPECT_EQ(::Envoy::Http2::Utility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE,
-            cluster.info()->http2Options().hpack_table_size().value());
-  EXPECT_EQ(LoadBalancerType::Random, cluster.info()->lbType());
+            cluster->info()->http2Options().hpack_table_size().value());
+  EXPECT_EQ(LoadBalancerType::Random, cluster->info()->lbType());
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
-  EXPECT_EQ(1UL,
-            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy(
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy(
       HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 }
 
@@ -2387,7 +2399,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
         Envoy::Upstream::ClusterFactoryContextImpl factory_context(
             server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_,
             nullptr, false);
-        StaticClusterImpl cluster(cluster_config, factory_context);
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
       },
       EnvoyException);
 }
@@ -2424,15 +2436,15 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
-  EXPECT_TRUE(cluster.info()->addedViaApi());
-  EXPECT_TRUE(cluster.info()->loadBalancerConfig().has_value());
-  EXPECT_NE(nullptr, cluster.info()->loadBalancerFactory());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
+  EXPECT_TRUE(cluster->info()->addedViaApi());
+  EXPECT_TRUE(cluster->info()->loadBalancerConfig().has_value());
+  EXPECT_NE(nullptr, cluster->info()->loadBalancerFactory());
 }
 
 // lb_policy is set to LOAD_BALANCING_POLICY_CONFIG and has no load_balancing_policy.
@@ -2462,8 +2474,11 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
 
-  EXPECT_THROW_WITH_MESSAGE({ StaticClusterImpl cluster(cluster_config, factory_context); },
-                            EnvoyException, "cluster: field load_balancing_policy need to be set");
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+      },
+      EnvoyException, "cluster: field load_balancing_policy need to be set");
 }
 
 // load_balancing_policy is set and common_lb_config is set.
@@ -2500,7 +2515,9 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
 
-  EXPECT_NO_THROW({ StaticClusterImpl cluster(cluster_config, factory_context); });
+  EXPECT_NO_THROW({
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+  });
 }
 
 // load_balancing_policy is set and some fields in common_lb_config are set.
@@ -2538,7 +2555,10 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFi
       true);
 
   EXPECT_THROW_WITH_MESSAGE(
-      { StaticClusterImpl cluster(cluster_config, factory_context); }, EnvoyException,
+      {
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+      },
+      EnvoyException,
       "cluster: load_balancing_policy cannot be combined with partial fields "
       "(zone_aware_lb_config, "
       "locality_weighted_lb_config, consistent_hashing_lb_config) of common_lb_config");
@@ -2581,8 +2601,10 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
       true);
 
   EXPECT_THROW_WITH_MESSAGE(
-      { StaticClusterImpl cluster(cluster_config, factory_context); }, EnvoyException,
-      "cluster: load_balancing_policy cannot be combined with lb_subset_config");
+      {
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+      },
+      EnvoyException, "cluster: load_balancing_policy cannot be combined with lb_subset_config");
 }
 
 // Verify that if Envoy does not have a factory for any of the load balancing policies specified in
@@ -2620,7 +2642,10 @@ TEST_F(StaticClusterImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) 
       true);
 
   EXPECT_THROW_WITH_MESSAGE(
-      { StaticClusterImpl cluster(cluster_config, factory_context); }, EnvoyException,
+      {
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+      },
+      EnvoyException,
       "cluster: didn't find a registered load balancer factory implementation for cluster: "
       "'cluster_1' with names from [envoy.load_balancers.unknown_lb_1, "
       "envoy.load_balancers.unknown_lb_2]");
@@ -2659,13 +2684,13 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
-  EXPECT_TRUE(cluster.info()->addedViaApi());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
+  EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
 // load_balancing_policy should also be used when lb_policy is omitted.
@@ -2699,12 +2724,12 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
-  StaticClusterImpl cluster(cluster_config, factory_context);
-  cluster.initialize([] {});
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+  cluster->initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
-  EXPECT_TRUE(cluster.info()->addedViaApi());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
+  EXPECT_TRUE(cluster->info()->addedViaApi());
 }
 
 TEST_F(StaticClusterImplTest, MalformedHostIP) {
@@ -2727,7 +2752,8 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(cluster_config, factory_context);
+  EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
+                                createCluster(cluster_config, factory_context);
                             , EnvoyException,
                             "malformed IP address: foo.bar.com. Consider setting resolver_name or "
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
@@ -2752,11 +2778,11 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
@@ -2773,11 +2799,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
 
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()
+    EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(remote_address, nullptr)
                                .address_->asString());
@@ -2795,17 +2821,17 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()
+    EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(remote_address, nullptr)
                                .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("[2001::1]:0", cluster.info()
+    EXPECT_EQ("[2001::1]:0", cluster->info()
                                  ->getUpstreamLocalAddressSelector()
                                  ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                  .address_->asString());
@@ -2820,11 +2846,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()
+    EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
@@ -2845,7 +2871,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         false);
 
     EXPECT_THROW_WITH_MESSAGE(
-        StaticClusterImpl cluster(config, factory_context), EnvoyException,
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
+        EnvoyException,
         "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
         "different IP version source addresses can be supported in BindConfig's source_address and "
         "extra_source_addresses fields");
@@ -2870,7 +2897,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         false);
 
     EXPECT_THROW_WITH_MESSAGE(
-        StaticClusterImpl cluster(config, factory_context), EnvoyException,
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
+        EnvoyException,
         "Bootstrap's upstream binding config has more than one extra source addresses. Only "
         "one extra source can be supported in BindConfig's extra_source_addresses field");
   }
@@ -2888,7 +2916,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
 
-    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(config, factory_context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
+                                  createCluster(config, factory_context),
+                              EnvoyException,
                               "Bootstrap's upstream binding config has extra/additional source "
                               "addresses but no source_address. Extra/additional addresses cannot "
                               "be specified if source_address is not set.");
@@ -2907,11 +2937,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::PipeInstance>("/test");
-    EXPECT_EQ("1.2.3.5:0", cluster.info()
+    EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
@@ -2924,11 +2954,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address, cluster.info()
+    EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
                                    ->getUpstreamLocalAddress(remote_address, nullptr)
                                    .address_->ip()
@@ -2950,7 +2980,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
 
-    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(config, factory_context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
+                                  createCluster(config, factory_context),
+                              EnvoyException,
                               "Cluster staticcluster's upstream binding config has more than one "
                               "extra source addresses. Only one extra source can be "
                               "supported in BindConfig's extra_source_addresses field");
@@ -2970,7 +3002,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         false);
 
     EXPECT_THROW_WITH_MESSAGE(
-        StaticClusterImpl cluster(config, factory_context), EnvoyException,
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
+        EnvoyException,
         "Cluster staticcluster's upstream binding config has extra/additional source "
         "addresses but no source_address. Extra/additional addresses cannot "
         "be specified if source_address is not set.");
@@ -2986,11 +3019,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address, cluster.info()
+    EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
                                    ->getUpstreamLocalAddress(remote_address, nullptr)
                                    .address_->ip()
@@ -3007,10 +3040,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ(cluster_address, cluster.info()
+    EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
                                    ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                    .address_->ip()
@@ -3039,7 +3072,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
-        StaticClusterImpl cluster(config, factory_context), EnvoyException,
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
+        EnvoyException,
         "Can't specify both `extra_source_addresses` and `additional_source_addresses` in the "
         "Bootstrap's upstream binding config");
     server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
@@ -3057,16 +3091,16 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()
+    EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(remote_address, nullptr)
                                .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("[2001::1]:0", cluster.info()
+    EXPECT_EQ("[2001::1]:0", cluster->info()
                                  ->getUpstreamLocalAddressSelector()
                                  ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                  .address_->asString());
@@ -3081,10 +3115,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()
+    EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
@@ -3103,7 +3137,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
-        StaticClusterImpl cluster(config, factory_context), EnvoyException,
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
+        EnvoyException,
         "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
         "different IP version source addresses can be supported in BindConfig's source_address and "
         "additional_source_addresses fields");
@@ -3125,7 +3160,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
-        StaticClusterImpl cluster(config, factory_context), EnvoyException,
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
+        EnvoyException,
         "Bootstrap's upstream binding config has more than one additional source addresses. Only "
         "one additional source can be supported in BindConfig's additional_source_addresses field");
   }
@@ -3142,10 +3178,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::PipeInstance>("/test");
-    EXPECT_EQ("1.2.3.5:0", cluster.info()
+    EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                .address_->asString());
@@ -3164,7 +3200,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(config, factory_context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
+                                  createCluster(config, factory_context),
+                              EnvoyException,
                               "Cluster staticcluster's upstream binding config has more than one "
                               "additional source addresses. Only one additional source can be "
                               "supported in BindConfig's additional_source_addresses field");
@@ -3179,10 +3217,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    StaticClusterImpl cluster(config, factory_context);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address, cluster.info()
+    EXPECT_EQ(cluster_address, cluster->info()
                                    ->getUpstreamLocalAddressSelector()
                                    ->getUpstreamLocalAddress(remote_address, nullptr)
                                    .address_->ip()
@@ -3208,7 +3246,8 @@ TEST_F(StaticClusterImplTest, LedsUnsupported) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
   EXPECT_THROW_WITH_MESSAGE(
-      StaticClusterImpl cluster(cluster_config, factory_context), EnvoyException,
+      std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context),
+      EnvoyException,
       "LEDS is only supported when EDS is used. Static cluster staticcluster cannot use LEDS.");
 }
 
@@ -5397,17 +5436,17 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StaticClusterImpl cluster(cluster_config, factory_context);
-  cluster.initialize([] {});
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+  cluster->initialize([] {});
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
   // Make priority state manager and fill it with the initial state of the cluster and the added
   // hosts
-  PriorityStateManager priority_state_manager(cluster, server_context_.local_info_, nullptr);
+  PriorityStateManager priority_state_manager(*cluster, server_context_.local_info_, nullptr);
 
-  auto current_hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
-  HostVector hosts_added{makeTestHost(cluster.info(), "tcp://127.0.0.1:81", simTime(), zone_b),
-                         makeTestHost(cluster.info(), "tcp://127.0.0.1:82", simTime(), zone_a)};
+  auto current_hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  HostVector hosts_added{makeTestHost(cluster->info(), "tcp://127.0.0.1:81", simTime(), zone_b),
+                         makeTestHost(cluster->info(), "tcp://127.0.0.1:82", simTime(), zone_a)};
 
   envoy::config::endpoint::v3::LocalityLbEndpoints zone_a_endpoints;
   zone_a_endpoints.mutable_locality()->CopyFrom(zone_a);
@@ -5417,7 +5456,7 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   priority_state_manager.initializePriorityFor(zone_b_endpoints);
   priority_state_manager.registerHostForPriority(hosts_added[0], zone_b_endpoints);
   priority_state_manager.registerHostForPriority(
-      cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], zone_b_endpoints);
+      cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0], zone_b_endpoints);
 
   priority_state_manager.initializePriorityFor(zone_a_endpoints);
   priority_state_manager.registerHostForPriority(hosts_added[1], zone_a_endpoints);
@@ -5428,9 +5467,9 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
       absl::nullopt);
 
   // Check that the P=0 host set has the added hosts, and the expected HostsPerLocality state
-  const HostVector& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  const HostVector& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   const HostsPerLocality& hosts_per_locality =
-      cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
+      cluster->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
 
   EXPECT_EQ(3UL, hosts.size());
   EXPECT_EQ(true, hosts_per_locality.hasLocalLocality());
