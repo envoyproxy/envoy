@@ -136,9 +136,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           // flag of decodeData() can be determined by whether the trailers are received.
           // Also, bufferedData() is not nullptr means decodeData() is called, even though
           // the data can be an empty chunk.
-          filter_.sendBodyChunk(*this, *bufferedData(),
-                                ProcessorState::CallbackState::BufferedBodyCallback,
-                                !trailers_available_);
+          auto req = filter_.setupBodyChunk(*this, *bufferedData(), !trailers_available_);
+          filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
           clearWatermark();
           return absl::OkStatus();
         }
@@ -157,9 +156,10 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           modifyBufferedData(
               [&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
           ENVOY_LOG(debug, "Sending first chunk using buffered data ({})", buffered_chunk.length());
-          filter_.sendBodyChunk(*this, buffered_chunk,
-                                ProcessorState::CallbackState::StreamedBodyCallback, false);
+          // Need to first enqueue the data into the chunk queue before sending.
+          auto req = filter_.setupBodyChunk(*this, buffered_chunk, false);
           enqueueStreamingChunk(buffered_chunk, false);
+          filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
         }
         if (queueBelowLowLimit()) {
           clearWatermark();
@@ -185,8 +185,9 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
               debug,
               "Sending {} bytes of data end_stream {} in buffered partial mode before end stream",
               chunkQueue().receivedData().length(), all_data.end_stream);
-          filter_.sendBodyChunk(*this, chunkQueue().receivedData(),
-                                ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
+          auto req = filter_.setupBodyChunk(*this, chunkQueue().receivedData(), false);
+          filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedPartialBodyCallback,
+                                req);
         } else {
           // Let data continue to flow, but don't resume yet -- we would like to hold
           // the headers while we buffer the body up to the limit.
@@ -370,8 +371,7 @@ void ProcessorState::clearAsyncState() {
   onFinishProcessorCall(Grpc::Status::Aborted);
   if (chunkQueue().receivedData().length() > 0) {
     const auto& all_data = consolidateStreamedChunks();
-    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes",
-              chunkQueue().receivedData().length());
+    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunkQueue().receivedData().length());
     injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
   }
   clearWatermark();
