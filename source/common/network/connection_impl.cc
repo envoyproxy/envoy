@@ -290,8 +290,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (detected_close_type_ == DetectedCloseType::RemoteReset ||
-      detected_close_type_ == DetectedCloseType::LocalReset) {
+  if (enable_rst_detect_send_ && (detected_close_type_ == DetectedCloseType::RemoteReset ||
+                                  detected_close_type_ == DetectedCloseType::LocalReset)) {
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
         envoy::config::core::v3::SocketOption::STATE_LISTENING);
