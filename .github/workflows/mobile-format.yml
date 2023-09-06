@@ -34,7 +34,6 @@ jobs:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
       env:
         CLANG_FORMAT: /opt/llvm/bin/clang-format
-        ENVOY_BAZEL_PREFIX: "@envoy"
     steps:
     - uses: actions/checkout@v4
     - name: Add safe directory
