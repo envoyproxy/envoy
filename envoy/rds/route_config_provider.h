@@ -50,6 +50,7 @@ public:
 
   /**
    * Callback used to notify RouteConfigProvider about configuration changes.
+   * @return Status indicating if the call was successful or had graceful error handling.
    */
   virtual absl::Status onConfigUpdate() PURE;
 };

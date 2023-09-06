@@ -237,11 +237,8 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
     });
 
     if (last_config_valid) {
-      auto status = provider.onConfigUpdate(*subscription->lastConfig(),
-                                            subscription->lastVersionInfo(), nullptr);
-      if (!status.ok()) {
-        throw EnvoyException(std::string(status.message()));
-      }
+      THROW_IF_NOT_OK(provider.onConfigUpdate(*subscription->lastConfig(),
+                                              subscription->lastVersionInfo(), nullptr));
     }
   }
 

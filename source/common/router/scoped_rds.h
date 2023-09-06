@@ -184,11 +184,11 @@ private:
 
   // Adds or updates scopes, create a new RDS provider for each resource, if an exception is thrown
   // during updating, the exception message is collected via the exception messages vector.
-  // Returns if the operation was successful or not. If it was successful,
-  // any_applied will reflect if any scopes were applied.
-  absl::Status addOrUpdateScopes(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-                                 Init::Manager& init_manager, const std::string& version_info,
-                                 bool& any_applied);
+  // Returns a failed status if the operation was unsuccessful. If successful,
+  // returns a boolean indicating if any scopes were applied.
+  absl::StatusOr<bool>
+  addOrUpdateScopes(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
+                    Init::Manager& init_manager, const std::string& version_info);
   // Removes given scopes from the managed set of scopes.
   // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
   // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.

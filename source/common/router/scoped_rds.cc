@@ -271,9 +271,10 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
   parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
 }
 
-absl::Status ScopedRdsConfigSubscription::addOrUpdateScopes(
+absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
-    const std::string& version_info, bool& any_applied) {
+    const std::string& version_info) {
+  bool any_applied = false;
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
   std::vector<ScopedRouteInfoConstSharedPtr> updated_scopes;
@@ -329,7 +330,7 @@ absl::Status ScopedRdsConfigSubscription::addOrUpdateScopes(
       return config;
     });
   }
-  return absl::OkStatus();
+  return any_applied;
 }
 
 std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
@@ -423,13 +424,13 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers = removeScopes(clean_removed_resources, version_info);
 
-  bool any_applied = false;
-  absl::Status scopes = addOrUpdateScopes(
+  auto status_or_applied = addOrUpdateScopes(
       added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
-      version_info, any_applied);
-  if (!scopes.ok()) {
-    return scopes;
+      version_info);
+  if (!status_or_applied.status().ok()) {
+    return status_or_applied.status();
   }
+  bool any_applied = status_or_applied.value();
   auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
   if (!status.ok()) {
     return status;

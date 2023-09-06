@@ -83,10 +83,7 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
               config_update_info_->configHash());
 
     if (route_config_provider_ != nullptr) {
-      auto status = route_config_provider_->onConfigUpdate();
-      if (!status.ok()) {
-        throw EnvoyException(std::string(status.message()));
-      }
+      THROW_IF_NOT_OK(route_config_provider_->onConfigUpdate());
     }
 
     afterProviderUpdate();
