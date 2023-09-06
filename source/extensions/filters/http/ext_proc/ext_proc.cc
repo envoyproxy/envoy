@@ -531,7 +531,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
   return req;
 }
 
-void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
+void Filter::sendBodyChunk(ProcessorState& state, const ProcessorState::CallbackState new_state,
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
