@@ -173,7 +173,7 @@ void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
-    RELEASE_ASSERT(isp_db_, "Maxmind asn database is not initialised for performing lookups");
+    RELEASE_ASSERT(isp_db_, "Maxmind asn database is not initialized for performing lookups");
     int mmdb_error;
     const uint32_t n_prev_hits = lookup_result.size();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(

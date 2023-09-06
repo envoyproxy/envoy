@@ -252,6 +252,21 @@ TEST(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {
                           "Proto constraint validation failed.*value is required.*");
 }
 
+TEST(MaxmindProviderConfigTest, DbPathFormatValidatedWhenNonEmptyValue) {
+  std::string provider_config_yaml = R"EOF(
+    isp_db_path: "/geoip2/Isp.exe"
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  TestUtility::loadFromYaml(provider_config_yaml, provider_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  MaxmindProviderFactory factory;
+  EXPECT_THROW_WITH_REGEX(
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context),
+      ProtoValidationException,
+      "Proto constraint validation failed.*value does not match regex pattern.*");
+}
+
 TEST(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:

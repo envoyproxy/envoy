@@ -767,6 +767,7 @@ gateway
 gcov
 genrule
 geolocation
+geo
 geoip
 Geoip
 getaddrinfo
@@ -851,6 +852,7 @@ iovecs
 ips
 iptables
 ish
+isp
 istio
 istream
 istringstream
@@ -914,6 +916,7 @@ matchers
 maxage
 maxbuffer
 Maxmind
+maxmind
 megamiss
 mem
 memcmp

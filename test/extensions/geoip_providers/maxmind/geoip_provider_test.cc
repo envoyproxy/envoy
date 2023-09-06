@@ -1,6 +1,6 @@
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
-
 #include "envoy/registry/registry.h"
+
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/geoip_providers/maxmind/config.h"
@@ -16,6 +16,7 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -26,17 +27,17 @@ namespace Maxmind {
 class GeoipProviderTest : public testing::Test {
 public:
   GeoipProviderTest() {
-    provider_factory_ = Registry::FactoryRegistry<MaxmindProviderFactory>::getFactory(
-        "envoy.geoip_providers.maxmind");
-    if (provider_factory_ == nullptr) {
-      throw EnvoyException("Didn't find a registered implementation for type envoy.geoip_providers.maxmind");
-    }
+    provider_factory_ = dynamic_cast<MaxmindProviderFactory*>(
+        Registry::FactoryRegistry<Geolocation::GeoipProviderFactory>::getFactory(
+            "envoy.geoip_providers.maxmind"));
+    ASSERT(provider_factory_);
   }
 
   void initializeProvider(const std::string& yaml) {
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
+    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(scope_));
   }
 
   void expectStats(const std::string& db_type, const uint32_t total_times = 1,
@@ -49,6 +50,7 @@ public:
   }
 
   NiceMock<Stats::MockStore> stats_;
+  Stats::MockScope& scope_{stats_.mockScope()};
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   DriverSharedPtr provider_;
   MaxmindProviderFactory* provider_factory_;
@@ -87,7 +89,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   EXPECT_EQ("15169", asn_it->second);
 }
 
- // Tests for anonymous database replicate expectations from corresponding Maxmind tests:
+// Tests for anonymous database replicate expectations from corresponding Maxmind tests:
 // https://github.com/maxmind/GeoIP2-perl/blob/main/t/GeoIP2/Database/Reader-Anonymous-IP.t
 TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
@@ -95,7 +97,8 @@ TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         anon_vpn: "x-geo-anon-vpn"
-    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir
+    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -119,7 +122,8 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         anon_hosting: "x-geo-anon-hosting"
-    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir
+    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -143,7 +147,8 @@ TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         anon_tor: "x-geo-anon-tor"
-    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir
+    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -167,7 +172,8 @@ TEST_F(GeoipProviderTest, ValidConfigAnonProxySuccessfulLookup) {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         anon_proxy: "x-geo-anon-proxy"
-    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir
+    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -190,7 +196,8 @@ TEST_F(GeoipProviderTest, ValidConfigEmptyLookupResult) {
     common_provider_config:
       geo_headers_to_add:
         is_anon: "x-geo-anon"
-    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir
+    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -211,7 +218,8 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
-    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    city_db_path: "{{ test_rundir
+    }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address1 =
@@ -242,7 +250,8 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
       geo_headers_to_add:
         city: "x-geo-city"
         asn: "x-geo-asn"
-    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    city_db_path: "{{ test_rundir
+    }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -252,7 +261,7 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   EXPECT_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
-               "assert failure: isp_db_. Details: Maxmind asn database is not initialised for "
+               "assert failure: isp_db_. Details: Maxmind asn database is not initialized for "
                "performing lookups");
 }
 
