@@ -23,9 +23,11 @@ HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
 // Network::NonDispatchedUdpPacketHandler
 void HotRestartingParent::Internal::handle(uint32_t /*worker_index*/,
                                            const Network::UdpRecvData& /*packet*/) {
-  // TODO(ravenblack): encapsulate the packet, dispatch it to the hot restarter thread, and
-  // forward the message over a domain socket to HotRestartingChild.
-  // (Pending PR #29328)
+  dispatcher_.post([]() {
+    // TODO(ravenblack): encapsulate the packet, dispatch it to the hot restarter thread, and
+    // forward the message over a domain socket to HotRestartingChild.
+    // (Pending PR #29328)
+  });
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
