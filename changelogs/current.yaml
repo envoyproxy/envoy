@@ -251,7 +251,7 @@ new_features:
 - area: tap
   change: |
     added :ref:`record_downstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_downstream_connection>`
-    to control whether writing downstream connection address info in trace output.
+    to control writing downstream connection address info in trace output.
 
 deprecated:
 - area: tracing
