@@ -14,7 +14,6 @@ struct AsyncTcpClientOptions {
   bool enable_half_close;
 };
 
-
 using AsyncTcpClientOptionsConstSharedPtr = std::shared_ptr<const AsyncTcpClientOptions>;
 
 /*
