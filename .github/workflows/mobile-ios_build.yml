@@ -31,7 +31,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: |
         cd mobile
         ./ci/mac_ci_setup.sh
@@ -59,7 +59,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: |
         cd mobile
         ./ci/mac_ci_setup.sh
@@ -108,7 +108,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: |
         cd mobile
         ./ci/mac_ci_setup.sh
@@ -157,7 +157,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: |
         cd mobile
         ./ci/mac_ci_setup.sh
@@ -210,7 +210,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: |
         cd mobile
         ./ci/mac_ci_setup.sh
@@ -275,7 +275,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 50
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: |
         cd mobile
         ./ci/mac_ci_setup.sh

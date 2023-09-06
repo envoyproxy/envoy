@@ -14,13 +14,12 @@ import subprocess
 import sys
 import tempfile
 import pathlib
-import paths
 
 # Where does Buildozer live?
-BUILDOZER_PATH = paths.get_buildozer()
+BUILDOZER_PATH = os.environ["BUILDOZER_PATH"]
 
 # Where does Buildifier live?
-BUILDIFIER_PATH = paths.get_buildifier()
+BUILDIFIER_PATH = os.environ["BUILDIFIER_PATH"]
 
 # Canonical Envoy license.
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'

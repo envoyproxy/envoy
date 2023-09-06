@@ -97,6 +97,12 @@ static void jvm_on_track(envoy_map events, const void* context) {
   env->DeleteLocalRef(jcls_EnvoyEventTracker);
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* env, jclass, jint level) {
+  Envoy::Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(level));
+  return 0;
+}
+
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
     JNIEnv* env, jclass, jobject on_start_context, jobject envoy_logger_context,
     jobject j_event_tracker) {
