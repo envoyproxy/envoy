@@ -271,22 +271,6 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     state.requestWatermark();
     return FilterDataStatus::StopIterationAndWatermark;
   }
-  if (state.callbackState() == ProcessorState::CallbackState::StreamedBodyCallbackFinishing) {
-    // We were previously streaming the body, but there are more chunks waiting
-    // to be processed, so we can't send the body yet.
-    // Move the data for our chunk into a queue so that we can re-inject it later
-    // when the processor returns. See the comments below for more details on how
-    // this works in general.
-    ENVOY_LOG(trace, "Enqueuing data while we wait for processing to finish");
-    state.enqueueStreamingChunk(data, end_stream, false);
-    if (end_stream) {
-      // But we need to buffer the last chunk because it's our last chance to do stuff
-      state.setPaused(true);
-      return FilterDataStatus::StopIterationNoBuffer;
-    } else {
-      return FilterDataStatus::Continue;
-    }
-  }
 
   FilterDataStatus result;
   switch (state.bodyMode()) {
@@ -346,7 +330,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // Send the chunk on the gRPC stream
     sendBodyChunk(state, data, ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
     // Move the data to the queue and optionally raise the watermark.
-    state.enqueueStreamingChunk(data, end_stream, true);
+    state.enqueueStreamingChunk(data, end_stream);
 
     // At this point we will continue, but with no data, because that will come later
     if (end_stream) {
@@ -383,12 +367,12 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
                ProcessorState::CallbackState::BufferedPartialBodyCallback) {
       // More data came in while we were waiting for a callback result. We need
       // to queue it and deliver it later in case the callback changes the data.
-      state.enqueueStreamingChunk(data, end_stream, false);
+      state.enqueueStreamingChunk(data, end_stream);
       ENVOY_LOG(trace, "Call in progress for partial mode");
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
-      state.enqueueStreamingChunk(data, end_stream, false);
+      state.enqueueStreamingChunk(data, end_stream);
       if (end_stream || state.queueOverHighLimit()) {
         // At either end of stream or when the buffer is full, it's time to send what we have
         // to the processor.
@@ -622,8 +606,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
-  // set to true. Otherwise, the response mode_override proto field is ignored.
-  if (config_->allowModeOverride() && response->has_mode_override()) {
+  // set to true and filter is waiting for header processing response.
+  // Otherwise, the response mode_override proto field is ignored.
+  if (config_->allowModeOverride() && inHeaderProcessState() && response->has_mode_override()) {
     ENVOY_LOG(debug, "Processing mode overridden by server for this request");
     decoding_state_.setProcessingMode(response->mode_override());
     encoding_state_.setProcessingMode(response->mode_override());

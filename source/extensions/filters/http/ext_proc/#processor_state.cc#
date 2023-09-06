@@ -263,7 +263,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
         injectDataToFilterChain(chunk_data, chunk->end_stream);
       }
-      chunk_data.drain(chunk_data.length());
 
       if (queueBelowLowLimit()) {
         clearWatermark();

@@ -282,6 +282,10 @@ public:
                      ProcessorState::CallbackState new_state, bool end_stream);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+  bool inHeaderProcessState() {
+    return (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
+            encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
+  }
 
 private:
   void mergePerRouteConfig();
