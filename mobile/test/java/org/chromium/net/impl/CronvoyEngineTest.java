@@ -90,7 +90,7 @@ public class CronvoyEngineTest {
     assertThat(response.getBodyAsString()).isEqualTo("hello, world");
     assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
 
-    // Do some basis stats accounting.
+    // Do some basic stats accounting.
     String stats = cronvoyEngine.getEnvoyEngine().dumpStats();
     Map<String, String> statsMap = StatsUtils.statsToList(stats);
     assertThat(statsMap.containsKey("http.hcm.downstream_rq_2xx"));
