@@ -33,6 +33,16 @@
 
 #include "gmock/gmock.h"
 
+#ifndef ENVOY_ENABLE_QUIC
+
+namespace quic {
+
+class QuicSocketAddress {};
+
+} // namespace quic
+
+#endif
+
 namespace Envoy {
 namespace Network {
 
@@ -246,19 +256,6 @@ public:
 
   MOCK_METHOD(void, onPeerAddressChanged, (const quic::QuicSocketAddress&, Connection&));
 };
-#else
-
-} // namespace Network
-} // namespace Envoy
-
-namespace quic {
-
-class QuicSocketAddress {};
-
-} // namespace quic
-
-namespace Envoy {
-namespace Network {
 
 #endif
 

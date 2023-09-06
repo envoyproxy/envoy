@@ -18,7 +18,7 @@ public:
   GenericQuicListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
                             Network::QuicListenerFilterPtr listener_filter)
       : Network::GenericListenerFilterImplBase<Network::QuicListenerFilter>(
-            matcher, std::move(listener_filter)) {}
+            std::move(matcher), std::move(listener_filter)) {}
 
   // Network::QuicListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {

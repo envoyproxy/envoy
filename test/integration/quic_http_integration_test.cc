@@ -1737,6 +1737,18 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
     server_preferred_address.set_ipv4_address("127.0.0.2");
     server_preferred_address.set_ipv6_address("::2");
     preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+
+    // Configure a test listener filter which is incompatible with any server preferred addresses
+    // but with any matcher, which effectively disables the filter.
+    auto* listener_filter =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+    listener_filter->set_name("dumb_filter");
+    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+    configuration.set_added_value("foo");
+    configuration.set_allow_server_migration(false);
+    configuration.set_allow_client_migration(false);
+    listener_filter->mutable_typed_config()->PackFrom(configuration);
+    listener_filter->mutable_filter_disabled()->set_any_match(true);
   });
 
   initialize();
@@ -1839,6 +1851,8 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {
 
 TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFilter) {
   autonomous_upstream_ = true;
+  useAccessLog(fmt::format("%RESPONSE_CODE% %FILTER_STATE({})%",
+                           TestQuicListenerFilter::TestStringFilterState::key()));
   config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listen_address = bootstrap.mutable_static_resources()
                                ->mutable_listeners(0)
@@ -1868,7 +1882,6 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
     configuration.set_allow_server_migration(false);
     configuration.set_allow_client_migration(false);
     listener_filter->mutable_typed_config()->PackFrom(configuration);
-    listener_filter->mutable_filter_disabled()->set_any_match(true);
   });
 
   initialize();
@@ -1884,6 +1897,12 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
               !quic_session->config()->HasReceivedIPv6AlternateServerAddress());
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_FALSE(quic_connection_->IsValidatingServerPreferredAddress());
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  EXPECT_THAT(log, testing::HasSubstr("200 \"foo\""));
 }
 
 } // namespace Quic
