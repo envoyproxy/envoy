@@ -338,9 +338,9 @@ private:
     struct State {
       State()
           : codec_saw_local_complete_(false), codec_encode_complete_(false),
-            on_reset_stream_called_(false), is_zombie_stream_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_destroyed_(false),
-            is_internally_created_(false), is_tunneling_(false), decorated_propagate_(true) {}
+            on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
+            is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
+            decorated_propagate_(true) {}
 
       // It's possibly for the codec to see the completed response but not fully
       // encode it.
@@ -351,9 +351,6 @@ private:
       bool on_reset_stream_called_ : 1;   // Whether the stream has been reset.
       bool is_zombie_stream_ : 1;         // Whether stream is waiting for signal
                                           // the underlying codec to be destroyed.
-      // Deprecate it together with runtime guard
-      // envoy.reloadable_features.http1_connection_close_header_in_redirect.
-      bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
 
       // True if this stream was the original externally created stream, but was
@@ -492,8 +489,6 @@ private:
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
     Http::ServerHeaderValidatorPtr header_validator_;
-    const bool http1_connection_close_header_in_redirect_{Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.http1_connection_close_header_in_redirect")};
 
     friend FilterManager;
 
