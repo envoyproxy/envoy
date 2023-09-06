@@ -23,11 +23,15 @@ public:
     // Returns the address and UdpListenerConfig associated with the given address.
     // The addresses are not necessarily identical, as e.g. the listener might be listening on
     // 0.0.0.0.
+    // This is called from the thread to which the hot restart Event::Dispatcher
+    // dispatches, which is expected to be the same main thread as registerListener
+    // is called from.
     absl::optional<ForwardEntry>
     getListenerForDestination(const Network::Address::Instance& address);
 
     // Registers a UdpListenerConfig and address into the map, to be matched using
     // getListenerForDestination for UDP packet forwarding.
+    // This is called from the main thread during listening socket creation.
     void registerListener(const Network::Address::Instance& address,
                           Network::UdpListenerConfig& listener_config);
 
