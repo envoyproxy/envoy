@@ -26,7 +26,6 @@ Http::FilterFactoryCb ChecksumFilterFactory::createFilterFactoryFromProtoTyped(
  */
 REGISTER_FACTORY(ChecksumFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
-
 } // namespace ChecksumFilter
 } // namespace HttpFilters
 } // namespace Extensions

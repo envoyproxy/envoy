@@ -28,7 +28,6 @@ private:
 using UpstreamChecksumFilterFactory = ChecksumFilterFactory;
 
 DECLARE_FACTORY(ChecksumFilterFactory);
-DECLARE_FACTORY(UpstreamChecksumFilterFactory);
 
 } // namespace ChecksumFilter
 } // namespace HttpFilters
