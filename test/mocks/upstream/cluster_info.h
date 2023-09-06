@@ -201,6 +201,7 @@ public:
                Http::FilterChainManager& manager),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
+  MOCK_METHOD(bool, universalHeaderValidatorEnabled, (), (const));
 
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;

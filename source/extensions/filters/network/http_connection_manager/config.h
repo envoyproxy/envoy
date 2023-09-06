@@ -281,6 +281,14 @@ private:
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           filter_config);
 
+  bool uhvEnabled() const {
+#ifdef ENVOY_ENABLE_UHV
+    return header_validator_factory_ != nullptr;
+#else
+    return false;
+#endif
+  }
+
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;

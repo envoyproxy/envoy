@@ -27,7 +27,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
     Http::Http3::CodecStats& stats,
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    bool uhv_enabled)
     : quic::QuicSpdyServerStreamBase(id, session, type),
       EnvoyQuicStream(
           // Flow control receive window should be larger than 8k to fully utilize congestion
@@ -35,7 +36,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
           stats, http3_options),
-      headers_with_underscores_action_(headers_with_underscores_action) {
+      headers_with_underscores_action_(headers_with_underscores_action), uhv_enabled_(uhv_enabled) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
 
@@ -61,15 +62,16 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // sending them.
   const Http::ResponseHeaderMap* header_map = &headers;
   std::unique_ptr<Http::ResponseHeaderMapImpl> modified_headers;
-#ifndef ENVOY_ENABLE_UHV
-  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      Http::Utility::isUpgrade(headers)) {
-    modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
-    Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
-    header_map = modified_headers.get();
+  if (!uhvEnabled()) {
+    // Extended CONNECT to H/1 upgrade transformation has moved to UHV
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.use_http3_header_normalisation") &&
+        Http::Utility::isUpgrade(headers)) {
+      modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
+      Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
+      header_map = modified_headers.get();
+    }
   }
-#endif
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
@@ -242,30 +244,29 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
 
-#ifndef ENVOY_ENABLE_UHV
-  // These checks are now part of UHV
-  if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
-      Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
-      (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
-    details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-    onStreamError(absl::nullopt);
-    return;
-  }
+  if (!uhvEnabled()) {
+    // These checks are now part of UHV
+    if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+        Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
+        (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
+      details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+      onStreamError(absl::nullopt);
+      return;
+    }
 
-  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      Http::Utility::isH3UpgradeRequest(*headers)) {
-    // Transform Request from H3 to H1
-    Http::Utility::transformUpgradeRequestFromH3toH1(*headers);
-  }
-#else
-  if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
-      (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
+    // Extended CONNECT to H/1 upgrade transformation has moved to UHV
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.use_http3_header_normalisation") &&
+        Http::Utility::isH3UpgradeRequest(*headers)) {
+      // Transform Request from H3 to H1
+      Http::Utility::transformUpgradeRequestFromH3toH1(*headers);
+    }
+  } else if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+             (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
     return;
   }
-#endif
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&

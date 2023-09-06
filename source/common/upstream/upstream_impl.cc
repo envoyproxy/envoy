@@ -1761,6 +1761,14 @@ ClusterInfoImpl::makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) c
 #endif
 }
 
+bool ClusterInfoImpl::universalHeaderValidatorEnabled() const {
+#ifdef ENVOY_ENABLE_UHV
+  return http_protocol_options_->header_validator_factory_ != nullptr;
+#else
+  return false;
+#endif
+}
+
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(
     const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
   constexpr double default_budget_percent = 20.0;

@@ -14,12 +14,13 @@ namespace Http {
 namespace Http2 {
 namespace {
 
+// TODO(#28841) parameterize test suite to run with and without UHV
 void replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Create the client connection containing the nghttp2 session.
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, *codec.stats_store_.rootScope(),
       codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-      Http::DEFAULT_MAX_HEADERS_COUNT, ProdNghttp2SessionFactory::get());
+      Http::DEFAULT_MAX_HEADERS_COUNT, ProdNghttp2SessionFactory::get(), false);
   // Create a new stream.
   Http::Status status = Http::okStatus();
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);

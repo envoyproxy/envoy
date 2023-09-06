@@ -37,6 +37,7 @@ constexpr unsigned int kStreamId = 4u;
 
 } // namespace
 
+// TODO(#28841) parameterize test suite to run with and without UHV
 class EnvoyQuicServerStreamTest : public testing::Test {
 public:
   EnvoyQuicServerStreamTest()
@@ -57,7 +58,7 @@ public:
                                    POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
         quic_stream_(new EnvoyQuicServerStream(
             stream_id_, &quic_session_, quic::BIDIRECTIONAL, stats_, http3_options_,
-            envoy::config::core::v3::HttpProtocolOptions::ALLOW)),
+            envoy::config::core::v3::HttpProtocolOptions::ALLOW, false)),
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
     EXPECT_CALL(stream_decoder_, accessLogHandlers());

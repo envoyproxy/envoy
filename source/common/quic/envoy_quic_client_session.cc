@@ -147,7 +147,7 @@ std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClient
   ASSERT(codec_stats_.has_value() && http3_options_.has_value());
   return std::make_unique<EnvoyQuicClientStream>(GetNextOutgoingBidirectionalStreamId(), this,
                                                  quic::BIDIRECTIONAL, codec_stats_.value(),
-                                                 http3_options_.value());
+                                                 http3_options_.value(), uhv_enabled_);
 }
 
 quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId /*id*/) {

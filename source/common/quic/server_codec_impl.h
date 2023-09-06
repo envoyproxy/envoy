@@ -21,7 +21,8 @@ public:
       const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
       const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action);
+          headers_with_underscores_action,
+      bool uhv_enabled);
 
   // Http::Connection
   void goAway() override;
@@ -43,10 +44,12 @@ public:
       const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
       const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action) override {
+          headers_with_underscores_action,
+      bool uhv_enabled) override {
     return std::make_unique<QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks, stats, http3_options,
-        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action,
+        uhv_enabled);
   }
   std::string name() const override { return "quic.http_server_connection.default"; }
 };

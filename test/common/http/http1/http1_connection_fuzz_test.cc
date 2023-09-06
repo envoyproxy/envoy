@@ -45,7 +45,7 @@ public:
     client_ = std::make_unique<Http1::ClientConnectionImpl>(
         mock_client_connection_,
         Http1::CodecStats::atomicGet(http1_stats_, *stats_store_.rootScope()),
-        mock_client_callbacks_, client_settings_, Http::DEFAULT_MAX_HEADERS_COUNT);
+        mock_client_callbacks_, client_settings_, Http::DEFAULT_MAX_HEADERS_COUNT, false, false);
     Status status = client_->dispatch(payload);
   }
 
@@ -56,7 +56,7 @@ public:
         Http1::CodecStats::atomicGet(http1_stats_, *stats_store_.rootScope()),
         mock_server_callbacks_, server_settings_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
         Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-        overload_manager_);
+        overload_manager_, false);
 
     Status status = server_->dispatch(payload);
   }

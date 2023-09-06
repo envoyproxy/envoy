@@ -678,13 +678,13 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction(), overload_manager);
+        headersWithUnderscoresAction(), overload_manager, uhvEnabled());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager, uhvEnabled());
   case CodecType::HTTP3:
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
@@ -692,13 +692,13 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
             connection, callbacks,
             Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
             http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-            headersWithUnderscoresAction());
+            headersWithUnderscoresAction(), uhvEnabled());
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-        overload_manager);
+        overload_manager, uhvEnabled());
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

@@ -204,6 +204,10 @@ MockClusterInfo::MockClusterInfo()
                                            protocol, codecStats(protocol))
                                      : nullptr;
   }));
+
+  ON_CALL(*this, universalHeaderValidatorEnabled()).WillByDefault(Invoke([&]() {
+    return header_validator_factory_ != nullptr;
+  }));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

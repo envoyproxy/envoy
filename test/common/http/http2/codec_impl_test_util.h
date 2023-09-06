@@ -84,11 +84,12 @@ public:
       Random::RandomGenerator& random, uint32_t max_request_headers_kb,
       uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action)
+          headers_with_underscores_action,
+      bool uhv_enabled)
       : TestCodecStatsProvider(scope),
         ServerConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             headers_with_underscores_action, overload_manager_) {}
+                             headers_with_underscores_action, overload_manager_, uhv_enabled) {}
 
   http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   using ServerConnectionImpl::getStream;
@@ -110,11 +111,11 @@ public:
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                            Random::RandomGenerator& random, uint32_t max_request_headers_kb,
                            uint32_t max_request_headers_count,
-                           Http2SessionFactory& http2_session_factory)
+                           Http2SessionFactory& http2_session_factory, bool uhv_enabled)
       : TestCodecStatsProvider(scope),
         ClientConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             http2_session_factory) {}
+                             http2_session_factory, uhv_enabled) {}
 
   http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   // Submits an H/2 METADATA frame to the peer.

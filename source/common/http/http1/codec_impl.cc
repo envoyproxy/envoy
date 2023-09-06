@@ -440,16 +440,16 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 static constexpr absl::string_view REQUEST_POSTFIX = " HTTP/1.1\r\n";
 
 Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
-#ifndef ENVOY_ENABLE_UHV
-  // Headers are now validated by UHV before encoding by the codec. Two checks below are not needed
-  // when UHV is enabled.
-  //
-  // Required headers must be present. This can only happen by some erroneous processing after the
-  // downstream codecs decode.
-  RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
-  // Verify that a filter hasn't added an invalid header key or value.
-  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
-#endif
+  if (!connection_.uhvEnabled()) {
+    // Headers are now validated by UHV before encoding by the codec. Two checks below are not
+    // needed when UHV is enabled.
+    //
+    // Required headers must be present. This can only happen by some erroneous processing after the
+    // downstream codecs decode.
+    RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
+    // Verify that a filter hasn't added an invalid header key or value.
+    RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+  }
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
@@ -527,12 +527,13 @@ ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<CallbackResult>&& st
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                const Http1Settings& settings, MessageType type,
-                               uint32_t max_headers_kb, const uint32_t max_headers_count)
+                               uint32_t max_headers_kb, const uint32_t max_headers_count,
+                               bool uhv_enabled)
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
-      max_headers_count_(max_headers_count) {
+      max_headers_count_(max_headers_count), uhv_enabled_(uhv_enabled) {
   if (codec_settings_.use_balsa_parser_) {
     parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
                                             codec_settings_.allow_custom_methods_);
@@ -896,38 +897,38 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   // remove the received Content-Length field prior to forwarding such
   // a message.
 
-#ifndef ENVOY_ENABLE_UHV
-  // This check is moved into default header validator.
-  // TODO(yanavlasov): use runtime override here when UHV is moved into the main build
+  if (!uhvEnabled()) {
+    // This check is moved into default header validator.
+    // TODO(yanavlasov): use runtime override here when UHV is moved into the main build
 
-  // Reject message with Http::Code::BadRequest if both Transfer-Encoding and Content-Length
-  // headers are present or if allowed by http1 codec settings and 'Transfer-Encoding'
-  // is chunked - remove Content-Length and serve request.
-  if (parser_->hasTransferEncoding() != 0 && request_or_response_headers.ContentLength()) {
-    if (parser_->isChunked() && codec_settings_.allow_chunked_length_) {
-      request_or_response_headers.removeContentLength();
-    } else {
-      error_code_ = Http::Code::BadRequest;
-      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().ChunkedContentLength));
-      return codecProtocolError(
-          "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
+    // Reject message with Http::Code::BadRequest if both Transfer-Encoding and Content-Length
+    // headers are present or if allowed by http1 codec settings and 'Transfer-Encoding'
+    // is chunked - remove Content-Length and serve request.
+    if (parser_->hasTransferEncoding() != 0 && request_or_response_headers.ContentLength()) {
+      if (parser_->isChunked() && codec_settings_.allow_chunked_length_) {
+        request_or_response_headers.removeContentLength();
+      } else {
+        error_code_ = Http::Code::BadRequest;
+        RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().ChunkedContentLength));
+        return codecProtocolError(
+            "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
+      }
+    }
+
+    // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
+    // transfer-codings it does not understand.
+    // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 a payload with a
+    // CONNECT request has no defined semantics, and may be rejected.
+    if (request_or_response_headers.TransferEncoding()) {
+      const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
+      if (!absl::EqualsIgnoreCase(encoding, header_values.TransferEncodingValues.Chunked) ||
+          parser_->methodName() == header_values.MethodValues.Connect) {
+        error_code_ = Http::Code::NotImplemented;
+        RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));
+        return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
+      }
     }
   }
-
-  // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
-  // transfer-codings it does not understand.
-  // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 a payload with a
-  // CONNECT request has no defined semantics, and may be rejected.
-  if (request_or_response_headers.TransferEncoding()) {
-    const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if (!absl::EqualsIgnoreCase(encoding, header_values.TransferEncodingValues.Chunked) ||
-        parser_->methodName() == header_values.MethodValues.Connect) {
-      error_code_ = Http::Code::NotImplemented;
-      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));
-      return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
-    }
-  }
-#endif
 
   auto statusor = onHeadersCompleteBase();
   if (!statusor.ok()) {
@@ -1057,9 +1058,9 @@ ServerConnectionImpl::ServerConnectionImpl(
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager)
+    Server::OverloadManager& overload_manager, bool uhv_enabled)
     : ConnectionImpl(connection, stats, settings, MessageType::Request, max_request_headers_kb,
-                     max_request_headers_count),
+                     max_request_headers_count, uhv_enabled),
       callbacks_(callbacks),
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
@@ -1395,8 +1396,11 @@ void ServerConnectionImpl::releaseOutboundResponse(
 }
 
 Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
-#ifndef ENVOY_ENABLE_UHV
-  // This check has been moved to UHV
+  if (uhvEnabled()) {
+    // This check has been moved to UHV
+    return okStatus();
+  }
+
   if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
       Http::HeaderUtility::headerNameContainsUnderscore(current_header_field_.getStringView())) {
     if (headers_with_underscores_action_ ==
@@ -1415,10 +1419,6 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
       return codecProtocolError("http/1.1 protocol error: header name contains underscores");
     }
   }
-#else
-  // Workaround for gcc not understanding [[maybe_unused]] for class members.
-  (void)headers_with_underscores_action_;
-#endif
   return okStatus();
 }
 
@@ -1432,9 +1432,9 @@ void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count,
-                                           bool passing_through_proxy)
+                                           bool passing_through_proxy, bool uhv_enabled)
     : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count),
+                     max_response_headers_count, uhv_enabled),
       owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },

@@ -18,7 +18,8 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    bool uhv_enabled)
     : QuicHttpConnectionImplBase(quic_session, stats), quic_server_session_(quic_session) {
   quic_session.setCodecStats(stats);
   quic_session.setHttp3Options(http3_options);
@@ -26,6 +27,7 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
   quic_session.setHttpConnectionCallbacks(callbacks);
   quic_session.setMaxIncomingHeadersCount(max_request_headers_count);
   quic_session.set_max_inbound_header_list_size(max_request_headers_kb * 1024u);
+  quic_session.setUhvEnabled(uhv_enabled);
 }
 
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {

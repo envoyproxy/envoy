@@ -97,6 +97,8 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
+  void setUhvEnabled(bool uhv_enabled) { uhv_enabled_ = uhv_enabled; }
+
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
   using quic::QuicSession::PerformActionOnActiveStreams;
 
@@ -145,6 +147,8 @@ private:
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   absl::optional<ConnectionMapPosition> position_;
   QuicConnectionStats& connection_stats_;
+  // Indicates that header validation is performed by UHV in HTTP Connection Manager
+  bool uhv_enabled_{false};
 };
 
 } // namespace Quic
