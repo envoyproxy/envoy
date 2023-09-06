@@ -123,18 +123,27 @@ TEST_F(HotRestartImplTest, DomainSocketError) {
   EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0), EnvoyException);
 }
 
+class HotRestartUdpForwardingTestHelper {
+public:
+  explicit HotRestartUdpForwardingTestHelper(HotRestartImpl& hot_restart)
+      : hot_restart_(hot_restart) {}
+  void registerUdpForwardingListener(const Network::Address::Instance& address,
+                                     Network::UdpListenerConfig& listener_config) {
+    hot_restart_.as_child_.registerUdpForwardingListener(address, listener_config);
+  }
+  absl::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
+  getListenerForDestination(const Network::Address::Instance& address) {
+    return hot_restart_.as_child_.udp_forwarding_context_.getListenerForDestination(address);
+  }
+
+private:
+  HotRestartImpl& hot_restart_;
+};
+
 class HotRestartUdpForwardingContextTest : public HotRestartImplTest {
 public:
   void SetUp() override { setup(); }
-
-  void childRegisterUdpForwardingListener(const Network::Address::Instance& address,
-                                          Network::UdpListenerConfig& listener_config) {
-    hot_restart_->as_child_.registerUdpForwardingListener(address, listener_config);
-  }
-  absl::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
-  childGetListenerForDestination(const Network::Address::Instance& address) {
-    return hot_restart_->as_child_.udp_forwarding_context_.getListenerForDestination(address);
-  }
+  HotRestartUdpForwardingTestHelper helper_{*hot_restart_};
 };
 
 // Test that registering a forwarding listener results in a UdpForwardingContext which
@@ -142,23 +151,23 @@ public:
 TEST_F(HotRestartUdpForwardingContextTest, RegisterUdpForwardingListenerFindsIpv4Address) {
   Network::MockUdpListenerConfig config_1;
   Network::MockUdpListenerConfig config_any;
-  childRegisterUdpForwardingListener(*test_addresses_.ipv4_test_addr_, config_1);
-  childRegisterUdpForwardingListener(*test_addresses_.ipv4_default_, config_any);
+  helper_.registerUdpForwardingListener(*test_addresses_.ipv4_test_addr_, config_1);
+  helper_.registerUdpForwardingListener(*test_addresses_.ipv4_default_, config_any);
   // Try a request to the specified address and port.
-  auto result = childGetListenerForDestination(*test_addresses_.ipv4_test_addr_);
+  auto result = helper_.getListenerForDestination(*test_addresses_.ipv4_test_addr_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv4_test_addr_->asStringView());
   EXPECT_EQ(result->second, &config_1);
   // Try with mismatched port, should be no result.
-  result = childGetListenerForDestination(*test_addresses_.ipv4_test_addr_different_port_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv4_test_addr_different_port_);
   EXPECT_FALSE(result.has_value());
   // Try with mismatched address, should be default route.
-  result = childGetListenerForDestination(*test_addresses_.ipv4_test_addr_different_ip_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv4_test_addr_different_ip_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv4_default_->asStringView());
   EXPECT_EQ(result->second, &config_any);
   // If there's an IPv6 request and only an IPv4 default route, use that route.
-  result = childGetListenerForDestination(*test_addresses_.ipv6_test_addr_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv6_test_addr_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv4_default_->asStringView());
   EXPECT_EQ(result->second, &config_any);
@@ -169,23 +178,23 @@ TEST_F(HotRestartUdpForwardingContextTest, RegisterUdpForwardingListenerFindsIpv
 TEST_F(HotRestartUdpForwardingContextTest, RegisterUdpForwardingListenerFindsIpv6Address) {
   Network::MockUdpListenerConfig config_1;
   Network::MockUdpListenerConfig config_any;
-  childRegisterUdpForwardingListener(*test_addresses_.ipv6_test_addr_, config_1);
-  childRegisterUdpForwardingListener(*test_addresses_.ipv6_default_, config_any);
+  helper_.registerUdpForwardingListener(*test_addresses_.ipv6_test_addr_, config_1);
+  helper_.registerUdpForwardingListener(*test_addresses_.ipv6_default_, config_any);
   // Try a request to the specified address and port.
-  auto result = childGetListenerForDestination(*test_addresses_.ipv6_test_addr_);
+  auto result = helper_.getListenerForDestination(*test_addresses_.ipv6_test_addr_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv6_test_addr_->asStringView());
   EXPECT_EQ(result->second, &config_1);
   // Try with mismatched port, should be no result.
-  result = childGetListenerForDestination(*test_addresses_.ipv6_test_addr_different_port_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv6_test_addr_different_port_);
   EXPECT_FALSE(result.has_value());
   // Try with mismatched address, should be default route.
-  result = childGetListenerForDestination(*test_addresses_.ipv6_test_addr_different_ip_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv6_test_addr_different_ip_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv6_default_->asStringView());
   EXPECT_EQ(result->second, &config_any);
   // If there's an IPv6 request and only an IPv4 default route, use that route.
-  result = childGetListenerForDestination(*test_addresses_.ipv4_test_addr_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv4_test_addr_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv6_default_->asStringView());
   EXPECT_EQ(result->second, &config_any);
@@ -197,22 +206,22 @@ TEST_F(HotRestartUdpForwardingContextTest,
        RegisterUdpForwardingListenerPrefersSameTypeDefaultRoute) {
   Network::MockUdpListenerConfig config_ip4;
   Network::MockUdpListenerConfig config_ip6;
-  childRegisterUdpForwardingListener(*test_addresses_.ipv4_default_, config_ip4);
-  childRegisterUdpForwardingListener(*test_addresses_.ipv6_default_, config_ip6);
+  helper_.registerUdpForwardingListener(*test_addresses_.ipv4_default_, config_ip4);
+  helper_.registerUdpForwardingListener(*test_addresses_.ipv6_default_, config_ip6);
   // Request to an IPv6 address should use the ip6 config.
-  auto result = childGetListenerForDestination(*test_addresses_.ipv6_test_addr_);
+  auto result = helper_.getListenerForDestination(*test_addresses_.ipv6_test_addr_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv6_default_->asStringView());
   EXPECT_EQ(result->second, &config_ip6);
   // Request to an IPv4 address should use the ip4 config.
-  result = childGetListenerForDestination(*test_addresses_.ipv4_test_addr_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv4_test_addr_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv4_default_->asStringView());
   EXPECT_EQ(result->second, &config_ip4);
   // Request to a different port should be not matched.
-  result = childGetListenerForDestination(*test_addresses_.ipv4_test_addr_different_port_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv4_test_addr_different_port_);
   EXPECT_FALSE(result.has_value());
-  result = childGetListenerForDestination(*test_addresses_.ipv6_test_addr_different_port_);
+  result = helper_.getListenerForDestination(*test_addresses_.ipv6_test_addr_different_port_);
   EXPECT_FALSE(result.has_value());
 }
 

@@ -53,7 +53,7 @@ private:
   std::unique_ptr<Stats::StatMerger> stat_merger_{};
   Stats::StatName hot_restart_generation_stat_name_;
   UdpForwardingContext udp_forwarding_context_;
-  friend class HotRestartUdpForwardingContextTest;
+  friend class HotRestartUdpForwardingTestHelper;
 };
 
 } // namespace Server

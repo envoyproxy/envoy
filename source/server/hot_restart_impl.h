@@ -131,7 +131,7 @@ private:
   SharedMemory* shmem_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
-  friend class HotRestartUdpForwardingContextTest;
+  friend class HotRestartUdpForwardingTestHelper;
 };
 
 } // namespace Server
