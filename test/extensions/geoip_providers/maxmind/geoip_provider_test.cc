@@ -1,5 +1,6 @@
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
 
+#include "envoy/registry/registry.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/geoip_providers/maxmind/config.h"
@@ -24,15 +25,18 @@ namespace Maxmind {
 
 class GeoipProviderTest : public testing::Test {
 public:
+  GeoipProviderTest() {
+    ExtensionRegistry::registerFactories();
+    provider_factory_ = Registry::FactoryRegistry<MaxmindProviderFactory>::getFactory(
+        "envoy.geoip_providers.maxmind");
+    if (provider_factory_ == nullptr) {
+      throw EnvoyException("Didn't find a registered implementation for type envoy.geoip_providers.maxmind");
+    }
+  }
+
   void initializeProvider(const std::string& yaml) {
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
-    provider_factory_ = Registry::FactoryRegistry<MaxmindProviderFactory>::getFactoryByType(
-        "envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig");
-    if (provider_factory_ == nullptr) {
-      throw EnvoyException("Didn't find a registered implementation for type "
-                           "envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig");
-    }
     provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
   }
 
@@ -84,7 +88,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   EXPECT_EQ("15169", asn_it->second);
 }
 
-// Tests for anonymous database replicate expectations from corresponding Maxmind tests:
+ // Tests for anonymous database replicate expectations from corresponding Maxmind tests:
 // https://github.com/maxmind/GeoIP2-perl/blob/main/t/GeoIP2/Database/Reader-Anonymous-IP.t
 TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
