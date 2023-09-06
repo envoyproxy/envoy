@@ -284,6 +284,16 @@ public:
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_proc_disable_response_processing_on_local_reply")) {
+      ENVOY_LOG(trace, "local reply; will skip ext_proc response processing requests");
+      encoding_state_.inLocalReply(true);
+    }
+    return Http::LocalErrorStatus::Continue;
+  }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();

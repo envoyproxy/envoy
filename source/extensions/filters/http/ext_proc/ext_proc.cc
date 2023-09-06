@@ -521,7 +521,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     encoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (processing_complete_ || !encoding_state_.sendHeaders()) {
+  if (processing_complete_ || !encoding_state_.sendHeaders() || encoding_state_.inLocalReply()) {
     ENVOY_LOG(trace, "encodeHeaders: Continue");
     return FilterHeadersStatus::Continue;
   }
@@ -533,6 +533,10 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
 FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "encodeData({}): end_stream = {}", data.length(), end_stream);
+  if (encoding_state_.inLocalReply()) {
+    ENVOY_LOG(trace, "encodeData: Continue");
+    return FilterDataStatus::Continue;
+  }
   const auto status = onData(encoding_state_, data, end_stream);
   ENVOY_LOG(trace, "encodeData returning {}", static_cast<int>(status));
   return status;
@@ -540,6 +544,10 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
 
 FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   ENVOY_LOG(trace, "encodeTrailers");
+  if (encoding_state_.inLocalReply()) {
+    ENVOY_LOG(trace, "encodeTrailers: Continue");
+    return FilterTrailersStatus::Continue;
+  }
   const auto status = onTrailers(encoding_state_, trailers);
   ENVOY_LOG(trace, "encodeTrailers returning {}", static_cast<int>(status));
   return status;
