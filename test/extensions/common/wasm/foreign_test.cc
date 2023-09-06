@@ -90,12 +90,17 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::NotFound);
 
+  auto* stream_info = ctx_.getRequestStreamInfo();
+  ASSERT_NE(stream_info, nullptr);
+
   args.set_path(TcpProxy::PerConnectionCluster::key());
   args.set_value("unicorns");
   args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest);
   args.SerializeToString(&in);
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::Ok);
+  EXPECT_TRUE(stream_info->filterState()->hasData<TcpProxy::PerConnectionCluster>(
+      TcpProxy::PerConnectionCluster::key()));
 
   args.set_path(Network::DestinationAddress::key());
   args.set_value("1.2.3.4:80");
@@ -103,6 +108,8 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
   args.SerializeToString(&in);
   result = function(wasm, in, [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::Ok);
+  EXPECT_TRUE(stream_info->filterState()->hasData<Network::DestinationAddress>(
+      Network::DestinationAddress::key()));
 }
 
 } // namespace Wasm
