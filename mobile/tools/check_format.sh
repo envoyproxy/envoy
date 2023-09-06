@@ -47,4 +47,4 @@ FORMAT_ARGS+=(
     ./library/common/extensions ./test/java ./test/kotlin ./test/objective-c
     ./test/swift ./experimental/swift)
 
-./bazelw run @envoy//tools/code_format:check_format -- --path "$PWD" "${FORMAT_ARGS[@]}"
+export ENVOY_BAZEL_PREFIX="@envoy" && ./bazelw run @envoy//tools/code_format:check_format -- --path "$PWD" "${FORMAT_ARGS[@]}"
