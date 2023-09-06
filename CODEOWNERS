@@ -349,6 +349,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
 /contrib/client_ssl_auth/ @UNOWNED @UNOWNED
+/contrib/checksum/ @ravenblackx @phlax
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
