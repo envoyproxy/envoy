@@ -21,6 +21,12 @@ Http::FilterFactoryCb ChecksumFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+/**
+ * Static registration for the checksum filter (sha256). @see RegisterFactory.
+ */
+REGISTER_FACTORY(ChecksumFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+
+
 } // namespace ChecksumFilter
 } // namespace HttpFilters
 } // namespace Extensions
