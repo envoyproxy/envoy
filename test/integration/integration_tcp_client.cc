@@ -36,7 +36,7 @@ using ::testing::NiceMock;
 
 IntegrationTcpClient::IntegrationTcpClient(
     Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
-    Network::Address::IpVersion version, bool enable_half_close, bool enable_rst_detect_send,
+    Network::Address::IpVersion version, bool enable_half_close,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::Address::InstanceConstSharedPtr source_address, absl::string_view destination_address)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
