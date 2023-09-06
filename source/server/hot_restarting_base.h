@@ -27,7 +27,7 @@ namespace Server {
  */
 class HotRestartingBase : public Logger::Loggable<Logger::Id::main> {
 protected:
-  HotRestartingBase(uint64_t base_id) : my_rpc_stream_(base_id) {}
+  HotRestartingBase(uint64_t base_id) : main_rpc_stream_(base_id) {}
 
   enum class Blocking { Yes, No };
 
@@ -96,7 +96,7 @@ protected:
     // as our child. (E.g. if we are 2, 1 is parent and 0 is child).
     const uint64_t base_id_;
   };
-  RpcStream my_rpc_stream_;
+  RpcStream main_rpc_stream_;
 };
 
 } // namespace Server
