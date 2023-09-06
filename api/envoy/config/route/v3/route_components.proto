@@ -156,9 +156,19 @@ message VirtualHost {
   // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
   // The key should match the :ref:`filter config name
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-  // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
-  // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
-  // entry referred by the canonical filter name will be provided to the filters as fallback.
+  //
+  // For example, given following http filter config:
+  //
+  // .. code-block:: yaml
+  //   http_filters:
+  //   - name: custom-buffer-filter
+  //     typed_config: { ... }
+  //
+  // The ``custom-buffer-filter`` will be used as the key to lookup the per filter config.
+  // If no related entry is found by the key, we will downgrade to try the canonical filter name
+  // ``envoy.filters.http.buffer``. This downgrading is for backward compatibility and could be disabled
+  // by setting the runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to ``true``
+  // explicitly.
   //
   // Use of this field is filter specific;
   // see the :ref:`HTTP filter documentation <config_http_filters>` for if and how it is utilized.
@@ -295,9 +305,19 @@ message Route {
   // The per_filter_config field can be used to provide route-specific configurations for filters.
   // The key should match the :ref:`filter config name
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-  // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
-  // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
-  // entry referred by the canonical filter name will be provided to the filters as fallback.
+  //
+  // For example, given following http filter config:
+  //
+  // .. code-block:: yaml
+  //   http_filters:
+  //   - name: custom-buffer-filter
+  //     typed_config: { ... }
+  //
+  // The ``custom-buffer-filter`` will be used as the key to lookup the per filter config.
+  // If no related entry is found by the key, we will downgrade to try the canonical filter name
+  // ``envoy.filters.http.buffer``. This downgrading is for backward compatibility and could be disabled
+  // by setting the runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to ``true``
+  // explicitly.
   //
   // Use of this field is filter specific;
   // see the :ref:`HTTP filter documentation <config_http_filters>` for if and how it is utilized.
@@ -455,9 +475,19 @@ message WeightedCluster {
     // for filters.
     // The key should match the :ref:`filter config name
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-    // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
-    // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
-    // entry referred by the canonical filter name will be provided to the filters as fallback.
+    //
+    // For example, given following http filter config:
+    //
+    // .. code-block:: yaml
+    //   http_filters:
+    //   - name: custom-buffer-filter
+    //     typed_config: { ... }
+    //
+    // The ``custom-buffer-filter`` will be used as the key to lookup the per filter config.
+    // If no related entry is found by the key, we will downgrade to try the canonical filter name
+    // ``envoy.filters.http.buffer``. This downgrading is for backward compatibility and could be disabled
+    // by setting the runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to ``true``
+    // explicitly.
     //
     // Use of this field is filter specific;
     // see the :ref:`HTTP filter documentation <config_http_filters>` for if and how it is utilized.
