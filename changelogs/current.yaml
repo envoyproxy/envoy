@@ -16,7 +16,9 @@ behavior_changes:
     the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to true.
 - area: http
   change: |
-    Flip default value of ``envoy.reloadable_features.http1_use_balsa_parser`` runtime flag from false to true.
+    Switch from http_parser to BalsaParser for handling HTTP/1.1 traffic. See https://github.com/envoyproxy/envoy/issues/21245 for
+    details. This behavioral change can be reverted by setting runtime flag ``envoy.reloadable_features.http1_use_balsa_parser`` to
+    false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
