@@ -600,8 +600,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
-    weighted_clusters_config_ = std::make_unique<WeightedClustersConfig>(
-        weighted_clusters, total_weight, route.route().weighted_clusters().header_name());
+    weighted_clusters_config_ =
+        std::make_unique<WeightedClustersConfig>(std::move(weighted_clusters), total_weight,
+                                                 route.route().weighted_clusters().header_name());
 
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
@@ -2173,8 +2174,8 @@ PerFilterConfigs::PerFilterConfigs(
   const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
 
-  absl::string_view filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
+  std::string filter_config_type =
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;

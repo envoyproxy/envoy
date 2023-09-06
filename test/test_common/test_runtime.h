@@ -1,3 +1,5 @@
+#pragma once
+
 // A simple test utility to easily allow for runtime feature overloads in unit tests.
 //
 // As long as this class is in scope one can do runtime feature overrides:
@@ -35,19 +37,10 @@ public:
     Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
     // This will ignore values set in test, but just use flag defaults!
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.remove_runtime_singleton")) {
-      runtime_ = std::move(runtime_ptr);
-    } else {
-      runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
-    }
+    runtime_ = std::move(runtime_ptr);
   }
 
-  Runtime::Loader& loader() {
-    if (runtime_singleton_) {
-      return runtime_singleton_->instance();
-    }
-    return *runtime_;
-  }
+  Runtime::Loader& loader() { return *runtime_; }
 
   void mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
     loader().mergeValues(values);
@@ -62,7 +55,6 @@ protected:
   Api::ApiPtr api_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Runtime::Loader> runtime_;
 };
 

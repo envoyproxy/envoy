@@ -49,11 +49,27 @@ public:
   //                    requests.
   XdsBuilder(std::string xds_server_address, const int xds_server_port);
 
+  // Sets the authentication token in the gRPC headers used to authenticate to the xDS management
+  // server.
+  //
+  // For example, if using API keys to authenticate to Traffic Director on GCP (see
+  // https://cloud.google.com/docs/authentication/api-keys for details), invoke:
+  //   builder.setAuthenticationToken("x-goog-api-key", api_key_token)
+  //
+  // If this method is called, then don't call setJwtAuthenticationToken.
+  //
+  // `token_header`: the header name for which the the `token` will be set as a value.
+  // `token`: the authentication token.
+  XdsBuilder& setAuthenticationToken(std::string token_header, std::string token);
+
   // Sets JWT as the authentication method to the xDS management server, using the given token.
+  //
+  // If setAuthenticationToken is called, then invocations of this method will be ignored.
   //
   // `token`: the JWT token used to authenticate the client to the xDS management server.
   // `token_lifetime_in_seconds`: <optional> the lifetime of the JWT token, in seconds. If none
   //                              (or 0) is specified, then DefaultJwtTokenLifetimeSeconds is used.
+  // TODO(abeyad): Deprecate and remove this.
   XdsBuilder&
   setJwtAuthenticationToken(std::string token,
                             int token_lifetime_in_seconds = DefaultJwtTokenLifetimeSeconds);
@@ -107,6 +123,8 @@ private:
 
   std::string xds_server_address_;
   int xds_server_port_;
+  std::string authentication_token_header_;
+  std::string authentication_token_;
   std::string jwt_token_;
   int jwt_token_lifetime_in_seconds_ = DefaultJwtTokenLifetimeSeconds;
   std::string ssl_root_certs_;
@@ -152,6 +170,9 @@ public:
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
 #ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
+  EngineBuilder& setHttp3ConnectionOptions(std::string options);
+  EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
+  EngineBuilder& addQuicHint(std::string host, int port);
 #endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
@@ -232,6 +253,9 @@ private:
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
   bool enable_http3_ = true;
+  std::string http3_connection_options_ = "";
+  std::string http3_client_connection_options_ = "";
+  std::vector<std::pair<std::string, int>> quic_hints_;
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;

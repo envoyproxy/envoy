@@ -26,10 +26,9 @@ public:
 
   Http::TestRequestHeaderMapImpl request_headers_{
       {":method", "GET"}, {":path", "/bar/foo"}, {"content-type", "application/json"}};
-  Http::TestResponseHeaderMapImpl response_headers_;
-  Http::TestResponseTrailerMapImpl response_trailers_;
   StreamInfo::MockStreamInfo stream_info_;
-  std::string body_;
+
+  HttpFormatterContext formatter_context_{&request_headers_};
 
   envoy::config::core::v3::SubstitutionFormatString config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -50,8 +49,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("plain text, path=/bar/foo, code=200",
-            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+            formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
@@ -66,8 +64,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
-                                          stream_info_, body_, AccessLog::AccessLogType::NotSet);
+  const auto out_json = formatter->formatWithContext(formatter_context_, stream_info_);
 
   const std::string expected = R"EOF({
     "text": "plain text",
@@ -112,8 +109,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension)
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("plain text TestFormatter",
-            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+            formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest,
@@ -171,8 +167,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithExtension) 
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
-                                          stream_info_, body_, AccessLog::AccessLogType::NotSet);
+  const auto out_json = formatter->formatWithContext(formatter_context_, stream_info_);
 
   const std::string expected = R"EOF({
     "text": "plain text TestFormatter",
@@ -207,8 +202,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithMultipleExt
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
-                                          stream_info_, body_, AccessLog::AccessLogType::NotSet);
+  const auto out_json = formatter->formatWithContext(formatter_context_, stream_info_);
 
   const std::string expected = R"EOF({
     "text": "plain text TestFormatter",

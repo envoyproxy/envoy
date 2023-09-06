@@ -30,7 +30,13 @@ package api
 
 */
 import "C"
-import "unsafe"
+import (
+	"fmt"
+	"unsafe"
+)
+
+// The default log format is:
+// [2023-08-09 03:04:15.985][1390][critical][golang] [contrib/golang/common/log/cgo.cc:27] msg
 
 func LogTrace(message string) {
 	C.envoyGoFilterLog(C.uint32_t(Trace), unsafe.Pointer(&message))
@@ -54,4 +60,32 @@ func LogError(message string) {
 
 func LogCritical(message string) {
 	C.envoyGoFilterLog(C.uint32_t(Critical), unsafe.Pointer(&message))
+}
+
+func LogTracef(format string, v ...any) {
+	LogTrace(fmt.Sprintf(format, v...))
+}
+
+func LogDebugf(format string, v ...any) {
+	LogDebug(fmt.Sprintf(format, v...))
+}
+
+func LogInfof(format string, v ...any) {
+	LogInfo(fmt.Sprintf(format, v...))
+}
+
+func LogWarnf(format string, v ...any) {
+	LogWarn(fmt.Sprintf(format, v...))
+}
+
+func LogErrorf(format string, v ...any) {
+	LogError(fmt.Sprintf(format, v...))
+}
+
+func LogCriticalf(format string, v ...any) {
+	LogCritical(fmt.Sprintf(format, v...))
+}
+
+func GetLogLevel() LogType {
+	return LogType(C.envoyGoFilterLogLevel())
 }

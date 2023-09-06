@@ -16,6 +16,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_stream.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
@@ -33,13 +34,7 @@ class NewGrpcMuxImpl
       public GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse>,
       Logger::Loggable<Logger::Id::config> {
 public:
-  NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-                 const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
-                 const RateLimitSettings& rate_limit_settings,
-                 const LocalInfo::LocalInfo& local_info,
-                 CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
-                 XdsConfigTrackerOptRef xds_config_tracker,
-                 EdsResourcesCachePtr eds_resources_cache);
+  NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context);
 
   ~NewGrpcMuxImpl() override;
 

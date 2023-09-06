@@ -7,6 +7,7 @@
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
@@ -213,7 +214,7 @@ public:
 
   void setup(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
              bool has_cluster = true, bool expect_gro = true) {
-    config_ = std::make_shared<UdpProxyFilterConfig>(factory_context_, config);
+    config_ = std::make_shared<UdpProxyFilterConfigImpl>(factory_context_, config);
     EXPECT_CALL(factory_context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -748,15 +749,27 @@ matcher:
   // Add a cluster that we don't care about.
   NiceMock<Upstream::MockThreadLocalCluster> other_thread_local_cluster;
   other_thread_local_cluster.cluster_.info_->name_ = "other_cluster";
-  cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster);
+  {
+    Upstream::ThreadLocalClusterCommand command =
+        [&other_thread_local_cluster]() -> Upstream::ThreadLocalCluster& {
+      return other_thread_local_cluster;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster.info()->name(),
+                                                    command);
+  }
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_no_route_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   // Now add the cluster we care about.
-  cluster_update_callbacks_->onClusterAddOrUpdate(
-      factory_context_.cluster_manager_.thread_local_cluster_);
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return factory_context_.cluster_manager_.thread_local_cluster_;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(
+        factory_context_.cluster_manager_.thread_local_cluster_.info()->name(), command);
+  }
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");

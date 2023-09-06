@@ -729,6 +729,46 @@ ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   return result.value();
 }
 
+FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value);
+FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct);
+
+FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value) {
+  switch (protobuf_value.kind_case()) {
+  case ProtobufWkt::Value::kStringValue:
+    return Field::createValue(protobuf_value.string_value());
+  case ProtobufWkt::Value::kNumberValue:
+    return Field::createValue(protobuf_value.number_value());
+  case ProtobufWkt::Value::kBoolValue:
+    return Field::createValue(protobuf_value.bool_value());
+  case ProtobufWkt::Value::kNullValue:
+    return Field::createNull();
+  case ProtobufWkt::Value::kListValue: {
+    FieldSharedPtr array = Field::createArray();
+    for (const auto& list_value : protobuf_value.list_value().values()) {
+      array->append(loadFromProtobufValueInternal(list_value));
+    }
+    return array;
+  }
+  case ProtobufWkt::Value::kStructValue:
+    return loadFromProtobufStructInternal(protobuf_value.struct_value());
+  default:
+    throw Exception("Protobuf value case not implemented");
+  }
+}
+
+FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct) {
+  auto root = Field::createObject();
+  for (const auto& field : protobuf_struct.fields()) {
+    root->insert(field.first, loadFromProtobufValueInternal(field.second));
+  }
+
+  return root;
+}
+
+ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct) {
+  return loadFromProtobufStructInternal(protobuf_struct);
+}
+
 std::string Factory::serialize(absl::string_view str) {
   nlohmann::json j(str);
   return j.dump();

@@ -49,9 +49,17 @@ type HttpCAPI interface {
 	HttpLogLevel() LogType
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+	HttpConfigFinalize(c unsafe.Pointer)
 
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	HttpGetStringFilterState(r unsafe.Pointer, key string) string
+
+	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
+
+	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
+	HttpIncrementMetric(c unsafe.Pointer, metricId uint32, offset int64)
+	HttpGetMetric(c unsafe.Pointer, metricId uint32) uint64
+	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
 }
 
 type NetworkCAPI interface {

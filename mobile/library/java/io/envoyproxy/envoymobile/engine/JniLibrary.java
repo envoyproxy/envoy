@@ -265,6 +265,13 @@ public class JniLibrary {
   protected static native int setProxySettings(long engine, String host, int port);
 
   /**
+   * Update the log level for all active logs
+   *
+   * @param log_level The Log level to change to. Must be an integer 0-6.
+   */
+  protected static native void setLogLevel(int log_level);
+
+  /**
    * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.
    * To be used for testing only.
    *
@@ -303,15 +310,16 @@ public class JniLibrary {
       long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      boolean enableHttp3, String http3ConnectionOptions, String http3ClientConnectionOptions,
+      byte[][] quicHints, boolean enableGzipDecompression, boolean enableBrotliDecompression,
       boolean enableSocketTagging, boolean enableInterfaceBinding,
       long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
       long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
       long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] filterChain, byte[][] statSinks,
       boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsResourceName,
-      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsJwtToken,
-      long xdsJwtTokenLifetime, String xdsRootCerts, String xdsSni, String nodeId,
-      String nodeRegion, String nodeZone, String nodeSubZone, String cdsResourcesLocator,
-      long cdsTimeoutSeconds, boolean enableCds);
+      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, String xdsAuthenticationHeader,
+      String xdsAuthenticationToken, String xdsJwtToken, long xdsJwtTokenLifetime,
+      String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
+      String nodeSubZone, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
 }

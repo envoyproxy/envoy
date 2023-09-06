@@ -28,7 +28,7 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Build test binary'
@@ -58,13 +58,9 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         ref: main
-    # TODO(phlax): remove once the bazel config is on main
-    - uses: actions/checkout@v3
-      with:
-        path: current
     - name: Add safe directory
       run: |
         git config --global --add safe.directory /__w/envoy/envoy
@@ -72,9 +68,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # TODO(phlax): remove once the bazel config is on main
-        cp -a current/.bazelrc .
-        cp -a current/mobile/.bazelrc mobile/
         cd mobile
         ./bazelw build \
             --config=mobile-remote-release-clang \
@@ -98,7 +91,7 @@ jobs:
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/download-artifact@v3
       with:
         name: sizecurrent

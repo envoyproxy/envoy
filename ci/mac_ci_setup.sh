@@ -53,13 +53,4 @@ do
     is_installed "${DEP}" || install "${DEP}"
 done
 
-# Required as bazel and a foreign bazelisk are installed in the latest macos vm image, we have
-# to unlink/overwrite them to install bazelisk
-echo "Installing bazelisk"
-brew reinstall --force bazelisk
-if ! brew link --overwrite bazelisk; then
-    echo "Failed to install and link bazelisk"
-    exit 1
-fi
-
 bazel version

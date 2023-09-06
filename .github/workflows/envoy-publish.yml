@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   env:
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (!contains(github.actor, '[bot]')

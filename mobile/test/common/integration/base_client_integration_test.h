@@ -81,6 +81,7 @@ protected:
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;
   TestEngineBuilder builder_;
+  envoy_final_stream_intel last_stream_final_intel_;
 };
 
 } // namespace Envoy

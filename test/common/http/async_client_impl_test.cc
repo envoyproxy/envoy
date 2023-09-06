@@ -133,6 +133,14 @@ TEST_F(AsyncClientImplTest, BasicStream) {
       .WillOnce(Invoke(
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            // The backing object of 'decoder' should also implemented the
+            // Router::UpstreamToDownstream.
+            const auto* upstream_to_downstream =
+                dynamic_cast<Router::UpstreamToDownstream*>(&decoder);
+            EXPECT_NE(nullptr, upstream_to_downstream);
+            // Ensure the route() is populated and valid.
+            EXPECT_NE(nullptr, upstream_to_downstream->route().routeEntry());
+
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
                                   stream_info_, {});
             response_decoder_ = &decoder;
@@ -1870,20 +1878,20 @@ TEST_F(AsyncClientImplTest, DumpState) {
 // Must not be in anonymous namespace for friend to work.
 class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
-  std::unique_ptr<AsyncStreamImpl::RouteImpl> route_impl_{new AsyncStreamImpl::RouteImpl(
-      client_, absl::nullopt,
+  std::unique_ptr<NullRouteImpl> route_impl_{new NullRouteImpl(
+      client_.cluster_->name(), client_.singleton_manager_, absl::nullopt,
       Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
       absl::nullopt)};
-  AsyncStreamImpl::NullVirtualHost vhost_;
-  AsyncStreamImpl::NullCommonConfig config_;
+  NullVirtualHost vhost_;
+  NullCommonConfig config_;
 
   void setupRouteImpl(const std::string& yaml_config) {
     envoy::config::route::v3::RetryPolicy retry_policy;
 
     TestUtility::loadFromYaml(yaml_config, retry_policy);
 
-    route_impl_ = std::make_unique<AsyncStreamImpl::RouteImpl>(
-        client_, absl::nullopt,
+    route_impl_ = std::make_unique<NullRouteImpl>(
+        client_.cluster_->name(), client_.singleton_manager_, absl::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
         std::move(retry_policy));
   }

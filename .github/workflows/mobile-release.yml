@@ -18,7 +18,7 @@ jobs:
       statuses: write
 
   android_release_artifacts:
-    if: |
+    if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
           && (github.event.schedule
@@ -37,7 +37,7 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Add safe directory
@@ -53,7 +53,7 @@ jobs:
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a \
           --define=pom_version="$version" \
-          --config=release-android \
+          --config=mobile-release-android \
           --linkopt=-fuse-ld=lld \
           //:android_dist
     - name: 'Tar artifacts'
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Add safe directory

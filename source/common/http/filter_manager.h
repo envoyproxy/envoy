@@ -587,6 +587,9 @@ public:
   const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
   }
+  OptRef<const Network::FilterChainInfo> filterChainInfo() const override {
+    return StreamInfoImpl::downstreamAddressProvider().filterChainInfo();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
@@ -1062,9 +1065,7 @@ public:
                       proxy_100_continue, buffer_limit, filter_chain_factory),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span),
-        local_reply_(local_reply),
-        avoid_reentrant_filter_invocation_during_local_reply_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {}
+        local_reply_(local_reply) {}
   ~DownstreamFilterManager() override {
     ASSERT(prepared_local_reply_ == nullptr,
            "Filter Manager destroyed without executing prepared local reply");
@@ -1137,7 +1138,6 @@ private:
 private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
-  const bool avoid_reentrant_filter_invocation_during_local_reply_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
 };
 

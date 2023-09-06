@@ -33,10 +33,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wasm_test",
     srcs = ["wasm_test.cc"],
-    args = [
-        # Force creation of c-ares DnsResolverImpl when running test on macOS.
-        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
-    ],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/common/wasm/test_data:bad_signature_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_context_cpp.wasm",

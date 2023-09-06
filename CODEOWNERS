@@ -23,8 +23,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123
-/*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @mattklein123
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch
+/*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @mattklein123 @htuch
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_field_extraction http filter extension
@@ -284,6 +284,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
+# Json to metadata
+/*/extensions/filters/http/json_to_metadata @JuniorHsu @kbaichoo
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
@@ -349,7 +351,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/client_ssl_auth/ @UNOWNED @UNOWNED
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
-/contrib/golang/ @doujiang24 @wangfakang @StarryVae
+/contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan

@@ -52,9 +52,12 @@ envoy_cc_test(
     name = "golang_integration_test",
     srcs = ["golang_integration_test.cc"],
     data = [
+        "//contrib/golang/filters/http/test/test_data/access_log:filter.so",
         "//contrib/golang/filters/http/test/test_data/basic:filter.so",
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",
+        "//contrib/golang/filters/http/test/test_data/metric:filter.so",
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
+        "//contrib/golang/filters/http/test/test_data/property:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},

@@ -17,7 +17,10 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
   for (const auto& entry : config_->allClusterNames()) {
     Upstream::ThreadLocalCluster* cluster = config->clusterManager().getThreadLocalCluster(entry);
     if (cluster != nullptr) {
-      onClusterAddOrUpdate(*cluster);
+      Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+        return *cluster;
+      };
+      onClusterAddOrUpdate(cluster->info()->name(), command);
     }
   }
 
@@ -36,9 +39,11 @@ UdpProxyFilter::~UdpProxyFilter() {
   }
 }
 
-void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  auto cluster_name = cluster.info()->name();
+void UdpProxyFilter::onClusterAddOrUpdate(absl::string_view cluster_name,
+                                          Upstream::ThreadLocalClusterCommand& get_cluster) {
   ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster_name);
+
+  auto& cluster = get_cluster();
   ASSERT((!cluster_infos_.contains(cluster_name)) ||
          &cluster_infos_[cluster_name]->cluster_ != &cluster);
 
@@ -247,19 +252,19 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
-      socket_(cluster.filter_.createSocket(host)) {
-  if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
-    udp_session_stats_.emplace(
-        StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr));
-  }
+      socket_(cluster.filter_.createSocket(host)),
+      udp_session_info_(
+          StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr)) {
 
   socket_->ioHandle().initializeFileEvent(
       cluster.filter_.read_callbacks_->udpListener().dispatcher(),
       [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
       Event::FileReadyType::Read);
+
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host->address()->asStringView());
+
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
   cluster_.filter_.config_->stats().downstream_sess_active_.inc();
   cluster_.cluster_.info()
@@ -298,7 +303,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_session_stats_.value(),
+      access_log->log(nullptr, nullptr, nullptr, udp_session_info_,
                       AccessLog::AccessLogType::NotSet);
     }
   }
@@ -316,7 +321,7 @@ void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
   fields_map["datagrams_received"] =
       ValueUtil::numberValue(session_stats_.downstream_sess_rx_datagrams_);
 
-  udp_session_stats_.value().setDynamicMetadata("udp.proxy.session", stats_obj);
+  udp_session_info_.setDynamicMetadata("udp.proxy.session", stats_obj);
 }
 
 void UdpProxyFilter::fillProxyStreamInfo() {
