@@ -9,7 +9,7 @@ using HotRestartMessage = envoy::HotRestartMessage;
 
 void HotRestartingChild::UdpForwardingContext::registerListener(
     const Network::Address::Instance& address, Network::UdpListenerConfig& listener_config) {
-  bool inserted =
+  const bool inserted =
       listener_map_.try_emplace(address.asString(), ForwardEntry{&address, &listener_config})
           .second;
   ASSERT(inserted, "Two udp listeners on the same address shouldn't be possible");
