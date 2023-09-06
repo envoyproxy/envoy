@@ -1257,10 +1257,16 @@ public:
   virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
 
   /**
-   * @return create header validator based on cluster configuration. Returns nullptr if
+   * @return header validator based on cluster configuration. Returns nullptr if
    * ENVOY_ENABLE_UHV is undefined.
    */
   virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
+
+  /**
+   * @return true if header validator was enabled in cluster configuration. Always returns false if
+   * ENVOY_ENABLE_UHV is undefined.
+   */
+  virtual bool universalHeaderValidatorEnabled() const PURE;
 
 protected:
   /**

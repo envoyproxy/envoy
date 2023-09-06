@@ -274,9 +274,21 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
+  // Indicates that header validation is performed by UHV in HTTP Connection Manager
+  bool uhvEnabled() const {
+#ifdef ENVOY_ENABLE_UHV
+    return uhv_enabled_;
+#else
+    // Workaround for gcc not understanding [[maybe_unused]] for class members.
+    (void)uhv_enabled_;
+    return false;
+#endif
+  }
+
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
-                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 bool uhv_enabled);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -456,6 +468,8 @@ private:
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
   Protocol protocol_{Protocol::Http11};
+  // Indicates that header validation is performed by UHV in HTTP Connection Manager
+  const bool uhv_enabled_{false};
 };
 
 /**
@@ -468,7 +482,7 @@ public:
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action,
-                       Server::OverloadManager& overload_manager);
+                       Server::OverloadManager& overload_manager, bool uhv_enabled);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
 protected:
@@ -589,8 +603,8 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       const uint32_t max_response_headers_count,
-                       bool passing_through_proxy = false);
+                       const uint32_t max_response_headers_count, bool passing_through_proxy,
+                       bool uhv_enabled);
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 

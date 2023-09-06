@@ -242,13 +242,14 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks,
                                                  Server::OverloadManager& overload_manager) {
+  // TODO(#29503): figure out how admin will interact with UHV. For now UHV is not used in admin
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),
       maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-      overload_manager);
+      overload_manager, false);
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

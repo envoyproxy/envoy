@@ -155,6 +155,15 @@ protected:
     return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *store_.rootScope());
   }
 
+  bool uhvEnabled() const {
+#ifdef ENVOY_ENABLE_UHV
+    // TODO(#28841) parameterize test suite to run with and without UHV
+    return true;
+#else
+    return false;
+#endif
+  }
+
   const Http1ParserImpl parser_impl_;
   NiceMock<Http1Settings> codec_settings_;
   Stats::TestUtil::TestStore store_;
@@ -168,7 +177,8 @@ public:
     createHeaderValidator();
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, headers_with_underscores_action_, overload_manager_);
+        max_request_headers_count_, headers_with_underscores_action_, overload_manager_,
+        uhvEnabled());
   }
 
   ~Http1ServerConnectionImplTest() override {
@@ -256,7 +266,7 @@ void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-      overload_manager_);
+      overload_manager_, uhvEnabled());
 
   MockRequestDecoder decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
@@ -285,7 +295,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
         max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-        overload_manager_);
+        overload_manager_, uhvEnabled());
   }
 
   MockRequestDecoder decoder;
@@ -307,7 +317,7 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
         max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-        overload_manager_);
+        overload_manager_, uhvEnabled());
   }
 
   InSequence sequence;
@@ -345,7 +355,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-      overload_manager_);
+      overload_manager_, uhvEnabled());
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
@@ -424,7 +434,7 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-      overload_manager_);
+      overload_manager_, uhvEnabled());
 
   MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   Http::ResponseEncoder* response_encoder = nullptr;
@@ -871,7 +881,7 @@ TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfTrue) {
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-      overload_manager_);
+      overload_manager_, uhvEnabled());
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   NiceMock<MockRequestDecoder> decoder;
@@ -891,7 +901,7 @@ TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-      overload_manager_);
+      overload_manager_, uhvEnabled());
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   NiceMock<MockRequestDecoder> decoder;
@@ -1928,7 +1938,7 @@ TEST_P(Http1ServerConnectionImplTest, VerifyRequestHeaderTrailerMapMaxLimits) {
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-      overload_manager_);
+      overload_manager_, uhvEnabled());
 
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
@@ -2536,7 +2546,7 @@ public:
   void initialize() {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_,
-        /* passing_through_proxy=*/false);
+        /* passing_through_proxy=*/false, uhvEnabled());
   }
 
   void readDisableOnRequestEncoder(RequestEncoder* request_encoder, bool disable) {
@@ -2560,7 +2570,8 @@ void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(
 #ifndef ENVOY_ENABLE_UHV
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
   codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_,
+      false, uhvEnabled());
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
@@ -3782,7 +3793,8 @@ TEST_P(Http1ClientConnectionImplTest, VerifyResponseHeaderTrailerMapMaxLimits) {
   codec_settings_.allow_chunked_length_ = true;
   codec_settings_.enable_trailers_ = true;
   codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_,
+      false, uhvEnabled());
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);

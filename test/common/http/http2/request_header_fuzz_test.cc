@@ -13,12 +13,13 @@ namespace Http {
 namespace Http2 {
 namespace {
 
+// TODO(#28841) parameterize test suite to run with and without UHV
 void replay(const Frame& frame, ServerCodecFrameInjector& codec) {
   // Create the server connection containing the nghttp2 session.
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, *codec.stats_store_.rootScope(),
       codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-      Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW, false);
   Http::Status status = Http::okStatus();
   status = codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   status = codec.write(WellKnownFrames::defaultSettingsFrame(), connection);

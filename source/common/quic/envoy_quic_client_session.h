@@ -41,6 +41,8 @@ public:
     http_connection_callbacks_ = &callbacks;
   }
 
+  void setUhvEnabled(bool uhv_enabled) { uhv_enabled_ = uhv_enabled; }
+
   // Network::Connection
   absl::string_view requestedServerName() const override;
   void dumpState(std::ostream&, int) const override {
@@ -127,6 +129,8 @@ private:
   OptRef<Http::HttpServerPropertiesCache> rtt_cache_;
   Stats::Scope& scope_;
   bool disable_keepalive_{false};
+  // Indicates that header validation is performed by UHV in HTTP Connection Manager
+  bool uhv_enabled_{false};
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 };
 

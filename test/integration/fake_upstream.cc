@@ -341,10 +341,10 @@ public:
       const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
-      Server::OverloadManager& overload_manager)
+      Server::OverloadManager& overload_manager, bool uhv_enabled)
       : ServerConnectionImpl(connection, callbacks, stats, random_generator, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             headers_with_underscores_action, overload_manager) {}
+                             headers_with_underscores_action, overload_manager, uhv_enabled) {}
 
   void updateConcurrentStreams(uint32_t max_streams) {
     absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
@@ -389,14 +389,15 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action, overload_manager_);
+        max_request_headers_count, headers_with_underscores_action, overload_manager_,
+        header_validator_factory_ != nullptr);
   } else if (type == Http::CodecType::HTTP2) {
     envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
     codec_ = std::make_unique<TestHttp2ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, random_, http2_options,
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action,
-        overload_manager_);
+        overload_manager_, header_validator_factory_ != nullptr);
   } else {
     ASSERT(type == Http::CodecType::HTTP3);
 #ifdef ENVOY_ENABLE_QUIC
@@ -404,7 +405,7 @@ FakeHttpConnection::FakeHttpConnection(
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
         fake_upstream.http3Options(), max_request_headers_kb, max_request_headers_count,
-        headers_with_underscores_action);
+        headers_with_underscores_action, header_validator_factory_ != nullptr);
 #else
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif

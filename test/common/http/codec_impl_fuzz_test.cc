@@ -601,11 +601,11 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     client = std::make_unique<Http2::ClientConnectionImpl>(
         client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, scope),
         random, client_http2_options, max_request_headers_kb, max_response_headers_count,
-        Http2::ProdNghttp2SessionFactory::get());
+        Http2::ProdNghttp2SessionFactory::get(), false);
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
         client_connection, Http1::CodecStats::atomicGet(http1_stats, scope), client_callbacks,
-        client_http1settings, max_response_headers_count);
+        client_http1settings, max_response_headers_count, false, false);
   }
 
   if (http2) {
@@ -614,13 +614,13 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     server = std::make_unique<Http2::ServerConnectionImpl>(
         server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, scope),
         random, server_http2_options, max_request_headers_kb, max_request_headers_count,
-        headers_with_underscores_action, overload_manager_);
+        headers_with_underscores_action, overload_manager_, false);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
         server_connection, Http1::CodecStats::atomicGet(http1_stats, scope), server_callbacks,
         server_http1settings, max_request_headers_kb, max_request_headers_count,
-        headers_with_underscores_action, overload_manager_);
+        headers_with_underscores_action, overload_manager_, false);
   }
 
   // We track whether the connection should be closed for HTTP/1, since stream resets imply
@@ -806,6 +806,7 @@ void codecFuzzHttp2Oghttp2(const test::common::http::CodecImplFuzzTestCase& inpu
 } // namespace
 
 // Fuzz the H1/H2 codec implementations.
+// TODO(#28841) parameterize test suite to run with and without UHV
 DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
   try {
     // Validate input early.
