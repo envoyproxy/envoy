@@ -16,9 +16,8 @@ public class StatsUtils {
   public static Map<String, String> statsToList(String statsString) {
     Map<String, String> stats = new HashMap<>();
 
-    String[] lines = statsString.split("\n");
-    for (int i = 0; i < lines.length; i++) {
-      String[] keyValue = lines[i].split(": ");
+    for (String line : statsString.split("\n")) {
+      String[] keyValue = line.split(": ");
       if (keyValue.length != 2) {
         System.out.println("Unexpected stats token");
         continue;
