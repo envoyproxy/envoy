@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <list>
 #include <memory>
 
@@ -187,7 +188,7 @@ private:
  * This is the inline map that could be used as an alternative of normal hash map to store the
  * key/value pairs.
  */
-template <class Key, class Value> class InlineMap : public InlineStorage {
+template <class Key, class Value> class InlineMap {
 private:
   using TypedInlineMapDescriptor = InlineMapDescriptor<Key>;
   using Hash = typename TypedInlineMapDescriptor::Hash;
@@ -415,40 +416,46 @@ public:
   }
 
   /**
-   * Create an inline map with the given descriptor. If the descriptor is not finalized, it will be
-   * finalized before creating the inline map.
-   * @param descriptor the descriptor that contains the inline keys.
-   * @return the created inline map.
+   * Construct an inline map with the given descriptor.
    */
-  static std::unique_ptr<InlineMap> create(TypedInlineMapDescriptor& descriptor) {
-    if (!descriptor.finalized()) {
-      // Call finalize() to make sure that the descriptor is finalized and no any new inline
-      // keys could be registered.
-      descriptor.finalize();
-    }
-
-    return std::unique_ptr<InlineMap>(new ((descriptor.inlineKeysNum() * sizeof(Value)))
-                                          InlineMap(descriptor));
+  InlineMap(const TypedInlineMapDescriptor& descriptor) : descriptor_(descriptor) {
+    ASSERT(descriptor_.finalized(), "Cannot create inline map before finalize()");
   }
 
+  /**
+   * Construct an inline map by moving another inline map.
+   */
+  InlineMap(InlineMap&&) noexcept = default;
+
 private:
+  using StoragePtr = std::unique_ptr<uint8_t[]>;
   friend class InlineMapDescriptor<Key>;
 
-  InlineMap(TypedInlineMapDescriptor& descriptor) : descriptor_(descriptor) {
-    // Initialize the inline entries to nullptr.
-    uint64_t inline_keys_num = descriptor_.inlineKeysNum();
-    inline_entries_valid_.resize(inline_keys_num, false);
-    memset(inline_entries_storage_, 0, inline_keys_num * sizeof(Value));
-    inline_entries_ = reinterpret_cast<Value*>(inline_entries_storage_);
+  void lazyInitializeInlineEntriesMemory() {
+    if (inline_entries_storage_ == nullptr) {
+      const uint64_t value_memory_size = descriptor_.inlineKeysNum() * sizeof(Value);
+      const uint64_t valid_memory_size = descriptor_.inlineKeysNum() * sizeof(bool);
+      const uint64_t memory_size = value_memory_size + valid_memory_size;
+
+      inline_entries_storage_.reset(new uint8_t[memory_size]);
+      memset(inline_entries_storage_.get(), 0, memory_size);
+
+      inline_entries_ = reinterpret_cast<Value*>(inline_entries_storage_.get());
+      inline_entries_valid_ =
+          reinterpret_cast<bool*>(inline_entries_storage_.get() + value_memory_size);
+    }
   }
 
   template <class SetValue> void resetInlineMapEntry(uint64_t inline_entry_id, SetValue&& value) {
     ASSERT(inline_entry_id < descriptor_.inlineKeysNum());
+    // Only allocate the memory for inline entries when the first inline entry is added.
+    lazyInitializeInlineEntriesMemory();
 
     clearInlineMapEntry(inline_entry_id);
 
     // Construct the new entry in the inline array.
     new (inline_entries_ + inline_entry_id) Value(std::forward<SetValue>(value));
+
     setInlineEntryValid(inline_entry_id, true);
   }
 
@@ -484,10 +491,16 @@ private:
 
   bool inlineEntryValid(uint64_t inline_entry_id) const {
     ASSERT(inline_entry_id < descriptor_.inlineKeysNum());
+
+    if (inline_entries_storage_ == nullptr) {
+      // If the inline entries storage is not allocated, then the inline entry is not valid.
+      return false;
+    }
     return inline_entries_valid_[inline_entry_id];
   }
   void setInlineEntryValid(uint64_t inline_entry_id, bool flag) {
     ASSERT(inline_entry_id < descriptor_.inlineKeysNum());
+    ASSERT(inline_entries_storage_ != nullptr);
 
     if (flag) {
       inline_entries_size_++;
@@ -506,20 +519,13 @@ private:
   // This is the underlay hash map for the dynamic map entries.
   DynamicHashMap dynamic_entries_;
 
-  // These are flags to indicate if the inline entries are valid.
-  // TODO(wbpcode): this will add additional one time memory allocation when constructing inline
-  // map. It is possible to use memory in the inline_entries_storage_ to store the flags in the
-  // future.
-  std::vector<bool> inline_entries_valid_;
-
   uint64_t inline_entries_size_{};
 
   Value* inline_entries_{};
+  // These are flags to indicate if the inline entries are valid.
+  bool* inline_entries_valid_{};
 
-  // This should be the last member of the class and no member should be added after this.
-  uint8_t inline_entries_storage_[];
+  StoragePtr inline_entries_storage_;
 };
-
-template <class Key, class Value> using InlineMapPtr = std::unique_ptr<InlineMap<Key, Value>>;
 
 } // namespace Envoy
