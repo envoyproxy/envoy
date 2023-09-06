@@ -167,7 +167,8 @@ public:
   ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.aggregate") {}
 
 private:
-  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,

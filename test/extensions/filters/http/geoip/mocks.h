@@ -1,4 +1,7 @@
+#pragma once
+
 #include "envoy/geoip/geoip_provider_driver.h"
+
 
 #include "test/extensions/filters/http/geoip/dummy.pb.h"
 #include "test/extensions/filters/http/geoip/dummy.pb.validate.h"

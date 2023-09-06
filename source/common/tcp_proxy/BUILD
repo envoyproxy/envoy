@@ -45,6 +45,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
+        "//envoy/registry",
         "//envoy/router:router_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",

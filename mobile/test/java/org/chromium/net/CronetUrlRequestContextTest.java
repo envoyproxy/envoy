@@ -328,7 +328,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testNetLog() throws Exception {
     Context context = getContext();
     File directory = new File(PathUtils.getDataDirectory());
@@ -348,7 +347,8 @@ public class CronetUrlRequestContextTest {
     cronetEngine.stopNetLog();
     assertTrue(file.exists());
     assertTrue(file.length() != 0);
-    assertFalse(hasBytesInNetLog(file));
+    assertTrue(hasDebugInNetLog(file));
+    assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
     assertTrue(!file.exists());
   }
@@ -356,7 +356,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testBoundedFileNetLog() throws Exception {
     Context context = getContext();
     File directory = new File(PathUtils.getDataDirectory());
@@ -379,7 +378,7 @@ public class CronetUrlRequestContextTest {
     cronetEngine.stopNetLog();
     assertTrue(logFile.exists());
     assertTrue(logFile.length() != 0);
-    assertFalse(hasBytesInNetLog(logFile));
+    assertFalse(hasTraceInNetLog(logFile));
     FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
     assertFalse(netLogDir.exists());
   }
@@ -387,7 +386,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   // Tests that if stopNetLog is not explicitly called, CronetEngine.shutdown()
   // will take care of it. crbug.com/623701.
   public void testNoStopNetLog() throws Exception {
@@ -406,8 +404,8 @@ public class CronetUrlRequestContextTest {
     // Shut down the engine without calling stopNetLog.
     cronetEngine.shutdown();
     assertTrue(file.exists());
-    assertTrue(file.length() != 0);
-    assertFalse(hasBytesInNetLog(file));
+    assertTrue(hasDebugInNetLog(file));
+    assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
     assertTrue(!file.exists());
   }
@@ -415,7 +413,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   // Tests that if stopNetLog is not explicitly called, CronetEngine.shutdown()
   // will take care of it. crbug.com/623701.
   public void testNoStopBoundedFileNetLog() throws Exception {
@@ -446,8 +443,7 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
-  // Tests that NetLog contains events emitted by all live CronetEngines.
+  // Unlike Cronet, Cronvoy will log all events emitted to the last log file requested.
   public void testNetLogContainEventsFromAllLiveEngines() throws Exception {
     Context context = getContext();
     File directory = new File(PathUtils.getDataDirectory());
@@ -474,12 +470,8 @@ public class CronetUrlRequestContextTest {
     cronetEngine2.stopNetLog();
     assertTrue(file1.exists());
     assertTrue(file2.exists());
-    // Make sure both files contain the two requests made separately using
-    // different engines.
-    assertTrue(containsStringInNetLog(file1, mUrl404));
-    assertTrue(containsStringInNetLog(file1, mUrl500));
-    assertTrue(containsStringInNetLog(file2, mUrl404));
-    assertTrue(containsStringInNetLog(file2, mUrl500));
+    assertTrue(containsStringInNetLog(file2, NativeTestServer.getNotFoundPath()));
+    assertTrue(containsStringInNetLog(file2, NativeTestServer.getInternalErrorPath()));
     assertTrue(file1.delete());
     assertTrue(file2.delete());
   }
@@ -487,8 +479,7 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
-  // Tests that NetLog contains events emitted by all live CronetEngines.
+  // Unlike Cronet, Cronvoy will log all events emitted to the last log file requested.
   public void testBoundedFileNetLogContainEventsFromAllLiveEngines() throws Exception {
     Context context = getContext();
     File directory = new File(PathUtils.getDataDirectory());
@@ -523,15 +514,15 @@ public class CronetUrlRequestContextTest {
 
     assertTrue(logFile1.exists());
     assertTrue(logFile2.exists());
-    assertTrue(logFile1.length() != 0);
+
+    BufferedReader logReader = new BufferedReader(new FileReader(logFile2));
+    String logLine;
+    logReader.close();
+
     assertTrue(logFile2.length() != 0);
 
-    // Make sure both files contain the two requests made separately using
-    // different engines.
-    assertTrue(containsStringInNetLog(logFile1, mUrl404));
-    assertTrue(containsStringInNetLog(logFile1, mUrl500));
-    assertTrue(containsStringInNetLog(logFile2, mUrl404));
-    assertTrue(containsStringInNetLog(logFile2, mUrl500));
+    assertTrue(containsStringInNetLog(logFile2, NativeTestServer.getNotFoundPath()));
+    assertTrue(containsStringInNetLog(logFile2, NativeTestServer.getInternalErrorPath()));
 
     FileUtils.recursivelyDeleteFile(netLogDir1, FileUtils.DELETE_ALL);
     assertFalse(netLogDir1.exists());
@@ -660,7 +651,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testNetLogAfterShutdown() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -678,7 +668,7 @@ public class CronetUrlRequestContextTest {
     } catch (Exception e) {
       assertEquals("Engine is shut down.", e.getMessage());
     }
-    assertFalse(hasBytesInNetLog(file));
+    assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
     assertFalse(file.exists());
   }
@@ -686,7 +676,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogAfterShutdown() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -715,7 +704,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testNetLogStartMultipleTimes() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
     File directory = new File(PathUtils.getDataDirectory());
@@ -733,8 +721,8 @@ public class CronetUrlRequestContextTest {
     callback.blockForDone();
     testFramework.mCronetEngine.stopNetLog();
     assertTrue(file.exists());
-    assertTrue(file.length() != 0);
-    assertFalse(hasBytesInNetLog(file));
+    assertTrue(hasDebugInNetLog(file));
+    assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
     assertFalse(file.exists());
   }
@@ -742,7 +730,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogStartMultipleTimes() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
     File directory = new File(PathUtils.getDataDirectory());
@@ -765,7 +752,7 @@ public class CronetUrlRequestContextTest {
     testFramework.mCronetEngine.stopNetLog();
     assertTrue(logFile.exists());
     assertTrue(logFile.length() != 0);
-    assertFalse(hasBytesInNetLog(logFile));
+    assertFalse(hasTraceInNetLog(logFile));
     FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
     assertFalse(netLogDir.exists());
   }
@@ -773,7 +760,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testNetLogStopMultipleTimes() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
     File directory = new File(PathUtils.getDataDirectory());
@@ -792,8 +778,8 @@ public class CronetUrlRequestContextTest {
     testFramework.mCronetEngine.stopNetLog();
     testFramework.mCronetEngine.stopNetLog();
     assertTrue(file.exists());
-    assertTrue(file.length() != 0);
-    assertFalse(hasBytesInNetLog(file));
+    assertTrue(hasDebugInNetLog(file));
+    assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
     assertFalse(file.exists());
   }
@@ -801,7 +787,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogStopMultipleTimes() throws Exception {
     final CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
     File directory = new File(PathUtils.getDataDirectory());
@@ -825,7 +810,7 @@ public class CronetUrlRequestContextTest {
     testFramework.mCronetEngine.stopNetLog();
     assertTrue(logFile.exists());
     assertTrue(logFile.length() != 0);
-    assertFalse(hasBytesInNetLog(logFile));
+    assertFalse(hasTraceInNetLog(logFile));
     FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
     assertFalse(netLogDir.exists());
   }
@@ -833,7 +818,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testNetLogWithBytes() throws Exception {
     Context context = getContext();
     File directory = new File(PathUtils.getDataDirectory());
@@ -849,8 +833,8 @@ public class CronetUrlRequestContextTest {
     callback.blockForDone();
     cronetEngine.stopNetLog();
     assertTrue(file.exists());
-    assertTrue(file.length() != 0);
-    assertTrue(hasBytesInNetLog(file));
+    assertTrue(hasDebugInNetLog(file));
+    assertTrue(hasTraceInNetLog(file));
     assertTrue(file.delete());
     assertFalse(file.exists());
   }
@@ -858,7 +842,6 @@ public class CronetUrlRequestContextTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Netlog not implemented")
   public void testBoundedFileNetLogWithBytes() throws Exception {
     Context context = getContext();
     File directory = new File(PathUtils.getDataDirectory());
@@ -879,13 +862,17 @@ public class CronetUrlRequestContextTest {
 
     assertTrue(logFile.exists());
     assertTrue(logFile.length() != 0);
-    assertTrue(hasBytesInNetLog(logFile));
+    assertTrue(hasTraceInNetLog(logFile));
     FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
     assertFalse(netLogDir.exists());
   }
 
-  private boolean hasBytesInNetLog(File logFile) throws Exception {
-    return containsStringInNetLog(logFile, "\"bytes\"");
+  private boolean hasTraceInNetLog(File logFile) throws Exception {
+    return containsStringInNetLog(logFile, "trace");
+  }
+
+  private boolean hasDebugInNetLog(File logFile) throws Exception {
+    return containsStringInNetLog(logFile, "debug");
   }
 
   private boolean containsStringInNetLog(File logFile, String content) throws Exception {

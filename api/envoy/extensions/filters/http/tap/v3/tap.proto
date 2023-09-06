@@ -26,4 +26,9 @@ message Tap {
   // Common configuration for the HTTP tap filter.
   common.tap.v3.CommonExtensionConfig common_config = 1
       [(validate.rules).message = {required: true}];
+
+  // Indicates whether HTTP tap filter records the time stamp for request/response headers.
+  // Request headers time stamp is stored after receiving request headers.
+  // Response headers time stamp is stored after receiving response headers.
+  bool record_headers_received_time = 2;
 }

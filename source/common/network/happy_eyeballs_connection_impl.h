@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/multi_connection_base_impl.h"

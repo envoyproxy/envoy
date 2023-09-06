@@ -573,8 +573,10 @@ public:
   TestUtilOptionsV2(
       const envoy::config::listener::v3::Listener& listener,
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx_proto,
-      bool expect_success, Network::Address::IpVersion version)
-      : TestUtilOptionsBase(expect_success, version), listener_(listener),
+      bool expect_success, Network::Address::IpVersion version,
+      bool skip_server_failure_reason_check = false)
+      : TestUtilOptionsBase(expect_success, version),
+        skip_server_failure_reason_check_(skip_server_failure_reason_check), listener_(listener),
         client_ctx_proto_(client_ctx_proto), transport_socket_options_(nullptr) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake").setExpectedClientStats("ssl.handshake");
@@ -584,6 +586,7 @@ public:
     }
   }
 
+  bool skipServerFailureReasonCheck() const { return skip_server_failure_reason_check_; }
   const envoy::config::listener::v3::Listener& listener() const { return listener_; }
   const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& clientCtxProto() const {
     return client_ctx_proto_;
@@ -675,6 +678,7 @@ public:
   }
 
 private:
+  bool skip_server_failure_reason_check_;
   const envoy::config::listener::v3::Listener& listener_;
   const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx_proto_;
   std::string expected_client_stats_;
@@ -879,7 +883,9 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   } else {
     EXPECT_THAT(std::string(client_connection->transportFailureReason()),
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
-    EXPECT_NE("", server_connection->transportFailureReason());
+    if (!options.skipServerFailureReasonCheck()) {
+      EXPECT_NE("", server_connection->transportFailureReason());
+    }
   }
 }
 
@@ -6733,6 +6739,46 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
                .setExpectedServerStats("ssl.connection_error"));
 }
 
+// Test private key provider and cert validation can work together.
+TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem"
+      private_key_provider:
+        provider_name: test
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setPrivateKeyMethodExpected(true)
+               .setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
+}
+
 TEST_P(SslSocketTest, TestStaplesOcspResponseSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -7147,11 +7193,12 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 
   // Enable the rsa_key_usage enforcement.
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
-  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_);
-  // Client connection is failed with key_usage_mismatch, which is expected.
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
+                                 /*skip_server_failure_reason_check=*/true);
+  // Client connection is failed with key_usage_mismatch.
   test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
-  // Server connection failed with connection error.
-  test_options.setExpectedServerStats("ssl.connection_error");
+  // Server connection error was not populated in this case.
+  test_options.setExpectedServerStats("");
   testUtilV2(test_options);
 }
 

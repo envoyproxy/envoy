@@ -1312,8 +1312,6 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
-                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1367,8 +1365,6 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
-                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1568,8 +1564,6 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
-                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1843,8 +1837,7 @@ INSTANTIATE_TEST_SUITE_P(
                      // There should be no variation across clients.
                      testing::Values(Grpc::ClientType::EnvoyGrpc),
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw,
-                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta),
-                     testing::Values(OldDssOrNewDss::Old, OldDssOrNewDss::New)));
+                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
   initialize();

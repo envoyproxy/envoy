@@ -1,7 +1,7 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//tools/protoxform:protoxform.bzl", "protoxform_rule")
 
 licenses(["notice"])  # Apache 2

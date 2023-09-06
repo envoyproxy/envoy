@@ -1,6 +1,8 @@
 #include "contrib/golang/filters/http/source/golang_filter.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -16,6 +18,13 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/extensions/filters/common/expr/context.h"
+
+#include "eval/public/cel_value.h"
+#include "eval/public/containers/field_access.h"
+#include "eval/public/containers/field_backed_list_impl.h"
+#include "eval/public/containers/field_backed_map_impl.h"
+#include "eval/public/structs/cel_proto_wrapper.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,6 +52,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   ENVOY_LOG(debug, "golang filter decodeHeaders, state: {}, phase: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), end_stream);
+
+  request_headers_ = &headers;
 
   state.setEndStream(end_stream);
 
@@ -201,9 +212,17 @@ void Filter::onDestroy() {
 
 // access_log is executed before the log of the stream filter
 void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
+                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info,
                  Envoy::AccessLog::AccessLogType) {
-  // Todo log phase of stream filter
+  // `log` may be called multiple times with different log type
+  if (!stream_info.requestComplete().has_value()) {
+    return;
+  }
+
+  // TODO: support mid-request logging
+  auto& state = getProcessorState();
+  state.log();
+  dynamic_lib_->envoyGoFilterOnHttpLog(req_);
 }
 
 /*** common APIs for filter, both decode and encode ***/
@@ -979,9 +998,12 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   case EnvoyValue::RouteName:
     req_->strValue = state.streamInfo().getRouteName();
     break;
-  case EnvoyValue::FilterChainName:
-    req_->strValue = state.streamInfo().filterChainName();
+  case EnvoyValue::FilterChainName: {
+    const auto filter_chain_info = state.streamInfo().downstreamAddressProvider().filterChainInfo();
+    req_->strValue =
+        filter_chain_info.has_value() ? std::string(filter_chain_info->name()) : std::string();
     break;
+  }
   case EnvoyValue::ResponseCodeDetails:
     if (!state.streamInfo().responseCodeDetails().has_value()) {
       return CAPIStatus::CAPIValueNotFound;
@@ -1211,6 +1233,192 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::getStringProperty(absl::string_view path, GoString* value_str, int* rc) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  // to access the headers_ and its friends we need to hold the lock
+  activation_request_headers_ = dynamic_cast<const Http::RequestHeaderMap*>(request_headers_);
+  if (enter_encoding_) {
+    activation_response_headers_ = dynamic_cast<const Http::ResponseHeaderMap*>(headers_);
+    activation_response_trailers_ = dynamic_cast<const Http::ResponseTrailerMap*>(trailers_);
+  }
+
+  if (state.isThreadSafe()) {
+    return getStringPropertyCommon(path, value_str, state);
+  }
+
+  auto weak_ptr = weak_from_this();
+  state.getDispatcher().post([this, &state, weak_ptr, path, value_str, rc] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      *rc = getStringPropertyCommon(path, value_str, state);
+      dynamic_lib_->envoyGoRequestSemaDec(req_);
+    } else {
+      ENVOY_LOG(info, "golang filter has gone or destroyed in getStringProperty");
+    }
+  });
+  return CAPIStatus::CAPIYield;
+}
+
+CAPIStatus Filter::getStringPropertyCommon(absl::string_view path, GoString* value_str,
+                                           ProcessorState& state) {
+  activation_info_ = &state.streamInfo();
+  CAPIStatus status = getStringPropertyInternal(path, &req_->strValue);
+  if (status == CAPIStatus::CAPIOK) {
+    value_str->p = req_->strValue.data();
+    value_str->n = req_->strValue.length();
+  }
+  return status;
+}
+
+absl::optional<google::api::expr::runtime::CelValue> Filter::findValue(absl::string_view name,
+                                                                       Protobuf::Arena* arena) {
+  // as we already support getting/setting FilterState, we don't need to implement
+  // getProperty with non-attribute name & setProperty which actually work on FilterState
+  return StreamActivation::FindValue(name, arena);
+  // we don't need to call resetActivation as activation_xx_ is overridden when we get property
+}
+
+CAPIStatus Filter::getStringPropertyInternal(absl::string_view path, std::string* result) {
+  using google::api::expr::runtime::CelValue;
+
+  bool first = true;
+  CelValue value;
+  Protobuf::Arena arena;
+
+  size_t start = 0;
+  while (true) {
+    if (start >= path.size()) {
+      break;
+    }
+
+    size_t end = path.find('.', start);
+    if (end == absl::string_view::npos) {
+      end = start + path.size();
+    }
+    auto part = path.substr(start, end - start);
+    start = end + 1;
+
+    if (first) {
+      // top-level identifier
+      first = false;
+      auto top_value = findValue(toAbslStringView(part), &arena);
+      if (!top_value.has_value()) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      value = top_value.value();
+    } else if (value.IsMap()) {
+      auto& map = *value.MapOrDie();
+      auto field = map[CelValue::CreateStringView(toAbslStringView(part))];
+      if (!field.has_value()) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      value = field.value();
+    } else if (value.IsMessage()) {
+      auto msg = value.MessageOrDie();
+      if (msg == nullptr) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      const Protobuf::Descriptor* desc = msg->GetDescriptor();
+      const Protobuf::FieldDescriptor* field_desc = desc->FindFieldByName(std::string(part));
+      if (field_desc == nullptr) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      if (field_desc->is_map()) {
+        value = CelValue::CreateMap(
+            Protobuf::Arena::Create<google::api::expr::runtime::FieldBackedMapImpl>(
+                &arena, msg, field_desc, &arena));
+      } else if (field_desc->is_repeated()) {
+        value = CelValue::CreateList(
+            Protobuf::Arena::Create<google::api::expr::runtime::FieldBackedListImpl>(
+                &arena, msg, field_desc, &arena));
+      } else {
+        auto status =
+            google::api::expr::runtime::CreateValueFromSingleField(msg, field_desc, &arena, &value);
+        if (!status.ok()) {
+          return CAPIStatus::CAPIInternalFailure;
+        }
+      }
+    } else if (value.IsList()) {
+      auto& list = *value.ListOrDie();
+      int idx = 0;
+      if (!absl::SimpleAtoi(toAbslStringView(part), &idx)) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      if (idx < 0 || idx >= list.size()) {
+        return CAPIStatus::CAPIValueNotFound;
+      }
+      value = list[idx];
+    } else {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+  }
+
+  return serializeStringValue(value, result);
+}
+
+CAPIStatus Filter::serializeStringValue(Filters::Common::Expr::CelValue value,
+                                        std::string* result) {
+  using Filters::Common::Expr::CelValue;
+  const Protobuf::Message* out_message;
+
+  switch (value.type()) {
+  case CelValue::Type::kString:
+    result->assign(value.StringOrDie().value().data(), value.StringOrDie().value().size());
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kBytes:
+    result->assign(value.BytesOrDie().value().data(), value.BytesOrDie().value().size());
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kInt64:
+    result->assign(absl::StrCat(value.Int64OrDie()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kUint64:
+    result->assign(absl::StrCat(value.Uint64OrDie()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kDouble:
+    result->assign(absl::StrCat(value.DoubleOrDie()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kBool:
+    result->assign(value.BoolOrDie() ? "true" : "false");
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kDuration:
+    result->assign(absl::FormatDuration(value.DurationOrDie()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kTimestamp:
+    result->assign(absl::FormatTime(value.TimestampOrDie(), absl::UTCTimeZone()));
+    return CAPIStatus::CAPIOK;
+  case CelValue::Type::kMessage:
+    out_message = value.MessageOrDie();
+    result->clear();
+    if (!out_message || out_message->SerializeToString(result)) {
+      return CAPIStatus::CAPIOK;
+    }
+    return CAPIStatus::CAPISerializationFailure;
+  case CelValue::Type::kMap: {
+    // so far, only headers/trailers/filter state are in Map format, and we already have API to
+    // fetch them
+    ENVOY_LOG(error, "map type property result is not supported yet");
+    return CAPIStatus::CAPISerializationFailure;
+  }
+  case CelValue::Type::kList: {
+    ENVOY_LOG(error, "list type property result is not supported yet");
+    return CAPIStatus::CAPISerializationFailure;
+  }
+  default:
+    return CAPIStatus::CAPISerializationFailure;
+  }
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId(ProcessorState& state) {
@@ -1242,27 +1450,135 @@ FilterConfig::FilterConfig(
     Server::Configuration::FactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
-      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib) {
-  ENVOY_LOG(debug, "initializing golang filter config");
+      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
+      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))){};
 
+void FilterConfig::newGoPluginConfig() {
+  ENVOY_LOG(debug, "initializing golang filter config");
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
   ASSERT(res, "SerializeToString should always successful");
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
-  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
-                                                          buf.length());
+
+  config_ = new httpConfigInternal(weak_from_this());
+  config_->plugin_name_ptr = name_ptr;
+  config_->plugin_name_len = plugin_name_.length();
+  config_->config_ptr = buf_ptr;
+  config_->config_len = buf.length();
+  config_->is_route_config = 0;
+
+  config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
+
   if (config_id_ == 0) {
-    throw EnvoyException(fmt::format("golang filter failed to parse plugin config: {} {}",
-                                     proto_config.library_id(), proto_config.library_path()));
+    throw EnvoyException(
+        fmt::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
   }
+
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
-};
+}
 
 FilterConfig::~FilterConfig() {
   if (config_id_ > 0) {
     dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
   }
+}
+
+CAPIStatus FilterConfig::defineMetric(uint32_t metric_type, absl::string_view name,
+                                      uint32_t* metric_id) {
+  Thread::LockGuard lock(mutex_);
+  if (metric_type > static_cast<uint32_t>(MetricType::Max)) {
+    return CAPIStatus::CAPIValueNotFound;
+  }
+
+  auto type = static_cast<MetricType>(metric_type);
+
+  Stats::StatNameManagedStorage storage(name, metric_store_->scope_->symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  if (type == MetricType::Counter) {
+    auto id = metric_store_->nextCounterMetricId();
+    auto c = &metric_store_->scope_->counterFromStatName(stat_name);
+    metric_store_->counters_.emplace(id, c);
+    *metric_id = id;
+  } else if (type == MetricType::Gauge) {
+    auto id = metric_store_->nextGaugeMetricId();
+    auto g =
+        &metric_store_->scope_->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::Accumulate);
+    metric_store_->gauges_.emplace(id, g);
+    *metric_id = id;
+  } else { // (type == MetricType::Histogram)
+    ASSERT(type == MetricType::Histogram);
+    auto id = metric_store_->nextHistogramMetricId();
+    auto h = &metric_store_->scope_->histogramFromStatName(stat_name,
+                                                           Stats::Histogram::Unit::Unspecified);
+    metric_store_->histograms_.emplace(id, h);
+    *metric_id = id;
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus FilterConfig::incrementMetric(uint32_t metric_id, int64_t offset) {
+  Thread::LockGuard lock(mutex_);
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = metric_store_->counters_.find(metric_id);
+    if (it != metric_store_->counters_.end()) {
+      if (offset > 0) {
+        it->second->add(offset);
+      }
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = metric_store_->gauges_.find(metric_id);
+    if (it != metric_store_->gauges_.end()) {
+      if (offset > 0) {
+        it->second->add(offset);
+      } else {
+        it->second->sub(-offset);
+      }
+    }
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus FilterConfig::getMetric(uint32_t metric_id, uint64_t* value) {
+  Thread::LockGuard lock(mutex_);
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = metric_store_->counters_.find(metric_id);
+    if (it != metric_store_->counters_.end()) {
+      *value = it->second->value();
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = metric_store_->gauges_.find(metric_id);
+    if (it != metric_store_->gauges_.end()) {
+      *value = it->second->value();
+    }
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus FilterConfig::recordMetric(uint32_t metric_id, uint64_t value) {
+  Thread::LockGuard lock(mutex_);
+  auto type = static_cast<MetricType>(metric_id & MetricStore::kMetricTypeMask);
+  if (type == MetricType::Counter) {
+    auto it = metric_store_->counters_.find(metric_id);
+    if (it != metric_store_->counters_.end()) {
+      it->second->add(value);
+    }
+  } else if (type == MetricType::Gauge) {
+    auto it = metric_store_->gauges_.find(metric_id);
+    if (it != metric_store_->gauges_.end()) {
+      it->second->set(value);
+    }
+  } else {
+    ASSERT(type == MetricType::Histogram);
+    auto it = metric_store_->histograms_.find(metric_id);
+    if (it != metric_store_->histograms_.end()) {
+      it->second->recordValue(value);
+    }
+  }
+  return CAPIStatus::CAPIOK;
 }
 
 uint64_t FilterConfig::getConfigId() { return config_id_; }
@@ -1339,8 +1655,14 @@ uint64_t RoutePluginConfig::getConfigId() {
   ASSERT(res, "SerializeToString is always successful");
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
-  return dso_lib_->envoyGoFilterNewHttpPluginConfig(name_ptr, plugin_name_.length(), buf_ptr,
-                                                    buf.length());
+
+  config_ = new httpConfig();
+  config_->plugin_name_ptr = name_ptr;
+  config_->plugin_name_len = plugin_name_.length();
+  config_->config_ptr = buf_ptr;
+  config_->config_len = buf.length();
+  config_->is_route_config = 1;
+  return dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 };
 
 uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {

@@ -1,5 +1,7 @@
 #include "test/server/config_validation/xds_verifier.h"
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/logger.h"
 
 namespace Envoy {
