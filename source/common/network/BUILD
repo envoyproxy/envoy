@@ -574,11 +574,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "listener_filter_manager_impl_base_lib",
-    srcs = ["listener_filter_manager_impl_base.cc"],
-    hdrs = ["listener_filter_manager_impl_base.h"],
+    name = "generic_listener_filter_impl_base_lib",
+    hdrs = ["generic_listener_filter_impl_base.h"],
     deps = [
-        "//envoy/event:dispatcher_interface",
         "//envoy/network:filter_interface",
     ],
 )

@@ -2,6 +2,7 @@
 
 #include "envoy/network/listener.h"
 
+#include "source/common/network/generic_listener_filter_impl_base.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
 
@@ -11,42 +12,38 @@ namespace Envoy {
 namespace Quic {
 
 // A wrapper around the actual listener filter which checks against the given filter matcher.
-class GenericListenerFilter : public Network::QuicListenerFilter {
+class GenericQuicListenerFilter
+    : public Network::GenericListenerFilterImplBase<Network::QuicListenerFilter> {
 public:
-  GenericListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
-                        Network::QuicListenerFilterPtr listener_filter)
-      : listener_filter_(std::move(listener_filter)), matcher_(std::move(matcher)) {}
+  GenericQuicListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
+                            Network::QuicListenerFilterPtr listener_filter)
+      : Network::GenericListenerFilterImplBase<Network::QuicListenerFilter>(
+            matcher, std::move(listener_filter)) {}
 
   // Network::QuicListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
     if (isDisabled(cb)) {
-      return Network::FilterStatus::Continue;
+      on_accept_by_passed_ = true;
     }
-    return listener_filter_->onAccept(cb);
+    return Network::GenericListenerFilterImplBase<Network::QuicListenerFilter>::onAccept(cb);
   }
   bool isCompatibleWithServerPreferredAddress(
       const quic::QuicSocketAddress& server_preferred_address) const override {
+    if (on_accept_by_passed_) {
+      return true;
+    }
     return listener_filter_->isCompatibleWithServerPreferredAddress(server_preferred_address);
   }
   Network::FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
                                              Network::Connection& connection) override {
+    if (on_accept_by_passed_) {
+      return Network::FilterStatus::Continue;
+    }
     return listener_filter_->onPeerAddressChanged(new_address, connection);
   }
 
 private:
-  /**
-   * Check if this filter filter should be disabled on the incoming socket.
-   * @param cb the callbacks the filter instance can use to communicate with the filter chain.
-   **/
-  bool isDisabled(Network::ListenerFilterCallbacks& cb) {
-    if (matcher_ == nullptr) {
-      return false;
-    }
-    return matcher_->matches(cb);
-  }
-
-  const Network::QuicListenerFilterPtr listener_filter_;
-  const Network::ListenerFilterMatcherSharedPtr matcher_;
+  bool on_accept_by_passed_{false};
 };
 
 // An object created on the stack during QUIC connection creation to apply listener filters, if
@@ -77,7 +74,7 @@ public:
   void addFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                  Network::QuicListenerFilterPtr&& filter) override {
     accept_filters_.emplace_back(
-        std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
+        std::make_unique<GenericQuicListenerFilter>(listener_filter_matcher, std::move(filter)));
   }
   bool shouldAdvertiseServerPreferredAddress(
       const quic::QuicSocketAddress& server_preferred_address) const override {

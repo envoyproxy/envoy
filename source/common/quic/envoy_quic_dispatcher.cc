@@ -8,7 +8,6 @@
 #include "envoy/common/optref.h"
 
 #include "source/common/common/safe_memcpy.h"
-#include "source/common/network/listener_filter_manager_impl_base.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 

@@ -348,6 +348,7 @@ envoy_cc_library(
     deps = [
         ":quic_io_handle_wrapper_lib",
         ":quic_network_connection_lib",
+        "//source/common/network:generic_listener_filter_impl_base_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
     ],
@@ -381,7 +382,6 @@ envoy_cc_library(
         ":envoy_quic_server_session_lib",
         ":quic_stat_names_lib",
         "//envoy/network:listener_interface",
-        "//source/common/network:listener_filter_manager_impl_base_lib",
         "@com_github_google_quiche//:quic_core_server_lib",
         "@com_github_google_quiche//:quic_core_utils_lib",
     ],
