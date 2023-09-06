@@ -55,14 +55,14 @@ bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) 
   if (life_span > life_span_) {
     return parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span);
   }
-  return !data_storage_->empty() || (parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span));
+  return !data_storage_.empty() || (parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span));
 }
 
 FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() const {
   auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
                          : std::make_unique<FilterState::Objects>();
 
-  data_storage_->iterate([&objects](const std::string& name, const FilterObject& object) -> bool {
+  data_storage_.iterate([&objects](const std::string& name, const FilterObject& object) -> bool {
     switch (object.stream_sharing_) {
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
       objects->push_back(

@@ -93,10 +93,13 @@ public:
   }
 
   /**
-   * Create inline map based on the scope and value type.
+   * Get the finalized inline map descriptor singleton based on the scope type. This is used to get
+   * the finalized descriptor to construct the inline map.
    */
-  template <class Scope, class Value> static auto createInlineMap() {
-    return InlineMap<std::string, Value>::create(getOrCreateDescriptor<Scope>());
+  template <class Scope> static const Descriptor& finalizedDescriptor() {
+    auto& descriptor = getOrCreateDescriptor<Scope>();
+    descriptor.finalize();
+    return descriptor;
   }
 
   /**
