@@ -10,6 +10,7 @@ import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.utilities.StatsUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -88,6 +89,14 @@ public class CronvoyEngineTest {
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
     assertThat(response.getBodyAsString()).isEqualTo("hello, world");
     assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+
+    // Do some basic stats accounting.
+    String stats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    Map<String, String> statsMap = StatsUtils.statsToList(stats);
+    assertThat(statsMap.containsKey("http.hcm.downstream_rq_2xx"));
+    assertThat(statsMap.containsKey("http.hcm.downstream_total"));
+    assertThat(statsMap.containsKey("runtime.load_success"));
+    assertThat(statsMap.get("runtime.load_success")).isEqualTo("1");
   }
 
   @Test

@@ -139,15 +139,41 @@ Http::Utility::QueryParams buildAutorizationQueryParams(
   return query_params;
 }
 
-std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view host,
-                       absl::string_view expires, absl::string_view token = "",
-                       absl::string_view id_token = "", absl::string_view refresh_token = "") {
+std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string_view host,
+                                absl::string_view expires, absl::string_view token = "",
+                                absl::string_view id_token = "",
+                                absl::string_view refresh_token = "") {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hmac_payload =
       absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
   std::string encoded_hmac;
   absl::Base64Escape(Hex::encode(crypto_util.getSha256Hmac(secret, hmac_payload)), &encoded_hmac);
   return encoded_hmac;
+}
+
+std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_view host,
+                             absl::string_view expires, absl::string_view token = "",
+                             absl::string_view id_token = "",
+                             absl::string_view refresh_token = "") {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  const auto hmac_payload =
+      absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
+
+  std::string base64_encoded_hmac;
+  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
+  std::string hmac_string(hmac_result.begin(), hmac_result.end());
+  absl::Base64Escape(hmac_string, &base64_encoded_hmac);
+  return base64_encoded_hmac;
+}
+
+std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view host,
+                       absl::string_view expires, absl::string_view token = "",
+                       absl::string_view id_token = "", absl::string_view refresh_token = "") {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hmac_base64_encoding_only")) {
+    return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
+  } else {
+    return encodeHmacHexBase64(secret, host, expires, token, id_token, refresh_token);
+  }
 }
 
 } // namespace
@@ -205,7 +231,9 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
 }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
-  return encodeHmac(secret_, host_, expires_, token_, id_token_, refresh_token_) == hmac_;
+  return (
+      (encodeHmacBase64(secret_, host_, expires_, token_, id_token_, refresh_token_) == hmac_) ||
+      (encodeHmacHexBase64(secret_, host_, expires_, token_, id_token_, refresh_token_) == hmac_));
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
