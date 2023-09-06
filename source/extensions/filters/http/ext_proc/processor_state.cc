@@ -309,14 +309,11 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       partial_body_processed_ = true;
 
       // If anything else is left on the queue, inject it too
-      Buffer::OwnedImpl leftover_data;
-      while (auto leftover_chunk = dequeueStreamingChunk(leftover_data)) {
-        if (leftover_data.length() > 0) {
-          ENVOY_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
-                    leftover_data.length());
-          injectDataToFilterChain(leftover_data, leftover_chunk->end_stream);
-        }
-        leftover_data.drain(leftover_data.length());
+      if (chunkQueue().receivedData().length() > 0) {
+        const auto& all_data = consolidateStreamedChunks();
+        ENVOY_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
+                  chunkQueue().receivedData().length());
+        injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
       }
     } else {
       // Fake a grpc error when processor state and received message type doesn't match, beware this
@@ -371,11 +368,11 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 
 void ProcessorState::clearAsyncState() {
   onFinishProcessorCall(Grpc::Status::Aborted);
-  Buffer::OwnedImpl chunk_data;
-  while (auto chunk = dequeueStreamingChunk(chunk_data)) {
-    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk_data.length());
-    injectDataToFilterChain(chunk_data, chunk->end_stream);
-    chunk_data.drain(chunk_data.length());
+  if (chunkQueue().receivedData().length() > 0) {
+    const auto& all_data = consolidateStreamedChunks();
+    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes",
+              chunkQueue().receivedData().length());
+    injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
   }
   clearWatermark();
   continueIfNecessary();
