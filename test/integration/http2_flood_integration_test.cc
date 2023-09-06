@@ -51,7 +51,7 @@ std::string testParamsToString(
 // destructor stops Envoy the SocketInterfaceSwap destructor needs to run after it. This order of
 // multiple inheritance ensures that SocketInterfaceSwap destructor runs after
 // Http2FrameIntegrationTest destructor completes.
-// TODO(#28841) parameterise to run with and without UHV
+// TODO(#28841) parameterize to run with and without UHV
 class Http2FloodMitigationTest
     : public SocketInterfaceSwap,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http2Impl, bool>>,
@@ -71,6 +71,12 @@ public:
     setupHttp2ImplOverrides(std::get<1>(GetParam()));
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       deferredProcessing(GetParam()) ? "true" : "false");
+  }
+
+  void enableUhvRuntimeFeature() {
+#ifdef ENVOY_ENABLE_UHV
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_header_validator", "true");
+#endif
   }
 
 protected:
@@ -1114,9 +1120,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
-#ifdef ENVOY_ENABLE_UHV
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_header_validator", "true");
-#endif
+  enableUhvRuntimeFeature();
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
 
@@ -1236,9 +1240,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
-#ifdef ENVOY_ENABLE_UHV
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_header_validator", "true");
-#endif
+  enableUhvRuntimeFeature();
   initializeUpstreamFloodTest();
   // Send client request which will send an upstream request.
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1261,9 +1263,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
-#ifdef ENVOY_ENABLE_UHV
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_header_validator", "true");
-#endif
+  enableUhvRuntimeFeature();
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");

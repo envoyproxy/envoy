@@ -188,6 +188,11 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
         fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
                     config.typed_header_validation_config().name()));
   }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_header_validator")) {
+    throw EnvoyException(
+        "Header validator can not be enabled since this Envoy binary does not support it.");
+  }
 #endif
   return header_validator_factory;
 }

@@ -472,7 +472,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
-                     testing::Bool(true)),
+                     testing::Values(true)),
     ipSuppressEnvoyHeadersTestParamsToString);
 #else
 INSTANTIATE_TEST_SUITE_P(
