@@ -2,8 +2,10 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/extensions/geoip_providers/maxmind/config.h"
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -25,8 +27,13 @@ public:
   void initializeProvider(const std::string& yaml) {
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
-    config_ = std::make_shared<GeoipProviderConfig>(config, "prefix.", stats_.mockScope());
-    provider_ = std::make_shared<GeoipProvider>(config_);
+    provider_factory_ = Registry::FactoryRegistry<MaxmindProviderFactory>::getFactoryByType(
+        "envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig");
+    if (provider_factory_ == nullptr) {
+      throw EnvoyException("Didn't find a registered implementation for type "
+                           "envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig");
+    }
+    provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
   }
 
   void expectStats(const std::string& db_type, const uint32_t total_times = 1,
@@ -39,8 +46,9 @@ public:
   }
 
   NiceMock<Stats::MockStore> stats_;
-  GeoipProviderConfigSharedPtr config_;
-  GeoipProviderSharedPtr provider_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  DriverSharedPtr provider_;
+  MaxmindProviderFactory* provider_factory_;
   absl::flat_hash_map<std::string, std::string> captured_lookup_response_;
 };
 

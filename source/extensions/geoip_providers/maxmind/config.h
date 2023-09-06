@@ -29,6 +29,8 @@ private:
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
+DECLARE_FACTORY(MaxmindProviderFactory);
+
 } // namespace Maxmind
 } // namespace GeoipProviders
 } // namespace Extensions

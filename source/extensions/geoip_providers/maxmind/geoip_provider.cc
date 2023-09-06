@@ -196,8 +196,6 @@ void GeoipProvider::lookupInAsnDb(
   }
 }
 
-// todo: document En as default and only language used for lookups. Document that region is selcted
-// as least specific subdivision
 void GeoipProvider::lookupInAnonDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {

@@ -25,6 +25,7 @@ message CommonGeoipProviderConfig {
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the header will be used to populate the region ISO code associated with the IP address.
+    // The least specific subdivision will be selected as region value.
     string region = 3
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 

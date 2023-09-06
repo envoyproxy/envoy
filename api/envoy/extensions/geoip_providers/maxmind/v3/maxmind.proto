@@ -25,13 +25,13 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.geoip_providers.maxmind]
 message MaxMindConfig {
   // Full file path to the Maxmind city database, e.g. `/etc/GeoLite2-City.mmdb`.
-  string city_db_path = 1;
+  string city_db_path = 1 [(validate.rules).string = {pattern: "^$|*\.mmdb"}];;
 
   // Full file path to the Maxmind ASN database, e.g. `/etc/GeoLite2-ASN.mmdb`.
-  string isp_db_path = 2;
+  string isp_db_path = 2 [(validate.rules).string = {pattern: "^$|*\.mmdb"}];;
 
   // Full file path to the Maxmind anonymous IP database, e.g. `/etc/GeoIP2-Anonymous-IP.mmdb`.
-  string anon_db_path = 3;
+  string anon_db_path = 3 [(validate.rules).string = {pattern: "^$|*\.mmdb"}];;
 
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
   common.v3.CommonGeoipProviderConfig common_provider_config = 4

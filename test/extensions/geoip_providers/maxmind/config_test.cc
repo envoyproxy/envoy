@@ -252,6 +252,86 @@ TEST(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {
                           "Proto constraint validation failed.*value is required.*");
 }
 
+TEST(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+        anon_vpn: "x-anon-vpn"
+        asn: "x-geo-asn"
+        anon_tor: "x-anon-tor"
+        anon_proxy: "x-anon-proxy"
+        anon_hosting: "x-anon-hosting"
+    city_db_path: %s
+    isp_db_path: %s
+    anon_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
+  auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto processed_provider_config_yaml =
+      absl::StrFormat(provider_config_yaml, city_db_path, asn_db_path, anon_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver1 =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context);
+  Geolocation::DriverSharedPtr driver2 =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context);
+  EXPECT_EQ(driver1.get(), driver2.get());
+}
+
+TEST(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfig) {
+  const auto provider_config_yaml1 = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+        anon_vpn: "x-anon-vpn"
+        asn: "x-geo-asn"
+        anon_tor: "x-anon-tor"
+        anon_proxy: "x-anon-proxy"
+        anon_hosting: "x-anon-hosting"
+    city_db_path: %s
+    isp_db_path: %s
+    anon_db_path: %s
+  )EOF";
+  const auto provider_config_yaml2 = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+        anon_vpn: "x-anon-vpn"
+        anon_tor: "x-anon-tor"
+        anon_proxy: "x-anon-proxy"
+        anon_hosting: "x-anon-hosting"
+    city_db_path: %s
+    anon_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config1;
+  MaxmindProviderConfig provider_config2;
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
+  auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto processed_provider_config_yaml1 =
+      absl::StrFormat(provider_config_yaml1, city_db_path, asn_db_path, anon_db_path);
+  auto processed_provider_config_yaml2 =
+      absl::StrFormat(provider_config_yaml2, city_db_path, anon_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml1, provider_config1);
+  TestUtility::loadFromYaml(processed_provider_config_yaml2, provider_config2);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver1 =
+      factory.createGeoipProviderDriver(provider_config1, "maxmind", context);
+  Geolocation::DriverSharedPtr driver2 =
+      factory.createGeoipProviderDriver(provider_config2, "maxmind", context);
+  EXPECT_NE(driver1.get(), driver2.get());
+}
+
 } // namespace Maxmind
 } // namespace GeoipProviders
 } // namespace Extensions
