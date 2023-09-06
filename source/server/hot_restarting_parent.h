@@ -22,7 +22,7 @@ public:
   // request from the child for that action.
   class Internal : public Network::NonDispatchedUdpPacketHandler {
   public:
-    explicit Internal(Server::Instance* server);
+    explicit Internal(Server::Instance* server, Event::Dispatcher& dispatcher);
     // Return value is the response to return to the child.
     envoy::HotRestartMessage shutdownAdmin();
     // Return value is the response to return to the child.
@@ -39,6 +39,7 @@ public:
 
   private:
     Server::Instance* const server_{};
+    Event::Dispatcher& dispatcher_;
   };
 
 private:

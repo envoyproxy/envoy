@@ -23,7 +23,9 @@ HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
 // Network::NonDispatchedUdpPacketHandler
 void HotRestartingParent::Internal::handle(uint32_t /*worker_index*/,
                                            const Network::UdpRecvData& /*packet*/) {
-  // TODO(ravenblack): forward the packet over a domain socket to HotRestartingChild.
+  // TODO(ravenblack): encapsulate the packet, dispatch it to the hot restarter thread, and
+  // forward the message over a domain socket to HotRestartingChild.
+  // (Pending PR #29328)
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
@@ -34,7 +36,7 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
         onSocketEvent();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
-  internal_ = std::make_unique<Internal>(&server);
+  internal_ = std::make_unique<Internal>(&server, dispatcher);
 }
 
 void HotRestartingParent::onSocketEvent() {
@@ -90,7 +92,8 @@ void HotRestartingParent::onSocketEvent() {
 
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
-HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(server) {
+HotRestartingParent::Internal::Internal(Server::Instance* server, Event::Dispatcher& dispatcher)
+    : server_(server), dispatcher_(dispatcher) {
   Stats::Gauge& hot_restart_generation = hotRestartGeneration(*server->stats().rootScope());
   hot_restart_generation.inc();
 }
