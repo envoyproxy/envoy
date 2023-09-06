@@ -47,7 +47,7 @@ message SinkConfig {
 
   // If set, emitted stats names will be prepended with a prefix, so full stat name will be
   // <prefix>.<stats_name>. For example, if the stat name is "foo.bar" and prefix is
-  // 'pre', the full stat name will be "pre.foo.bar". If this field is not set, there is no
+  // "pre", the full stat name will be "pre.foo.bar". If this field is not set, there is no
   // prefix added. According to the example, the full stat name will remain "foo.bar".
   string prefix = 6;
 }

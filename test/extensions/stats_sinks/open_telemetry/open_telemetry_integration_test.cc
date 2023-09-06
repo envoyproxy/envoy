@@ -159,6 +159,19 @@ public:
       otlp_collector_request_->finishGrpcStream(Grpc::Status::Ok);
     }
 
+    void expectNoUpstreamRequest() {
+      switch (clientType()) {
+      case Grpc::ClientType::EnvoyGrpc:
+        test_server_->waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+        break;
+      case Grpc::ClientType::GoogleGrpc:
+        test_server_->waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
+        break;
+      default:
+        PANIC("reached unexpected code");
+      }
+    }
+
     EXPECT_TRUE(known_counter_exists);
     EXPECT_TRUE(known_gauge_exists);
     EXPECT_TRUE(known_histogram_exists);
@@ -176,7 +189,7 @@ public:
 
   FakeHttpConnectionPtr fake_metrics_service_connection_;
   FakeStreamPtr otlp_collector_request_;
-  std::string stat_prefix_ = "";
+  std::string stat_prefix_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OpenTelemetryGrpcIntegrationTest,
@@ -193,17 +206,7 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   ASSERT_TRUE(waitForMetricsRequest());
 
-  switch (clientType()) {
-  case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq(getFullStatName("cluster.otlp_collector.upstream_rq_active"), 0);
-    break;
-  case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe(getFullStatName("grpc.otlp_collector.streams_closed_0"), 1);
-    break;
-  default:
-    PANIC("reached unexpected code");
-  }
-
+  expectNoUpstreamRequest();
   cleanup();
 }
 
@@ -218,17 +221,7 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlowWithStatPrefix) {
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   ASSERT_TRUE(waitForMetricsRequest());
 
-  switch (clientType()) {
-  case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
-    break;
-  case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
-    break;
-  default:
-    PANIC("reached unexpected code");
-  }
-
+  expectNoUpstreamRequest();
   cleanup();
 }
 
