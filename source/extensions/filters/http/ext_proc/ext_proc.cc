@@ -460,14 +460,14 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     if (state.bodyMode() == ProcessingMode::BUFFERED) {
       // Sending data left over in the buffer.
       auto req = setupBodyChunk(state, *state.bufferedData(), false);
-      sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, false);
+      sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
     } else {
       // Sending data left over in the queue.
       const auto& all_data = state.consolidateStreamedChunks();
       auto req = setupBodyChunk(state, state.chunkQueue().receivedData(), false);
       ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
                 state.chunkQueue().receivedData().length(), all_data.end_stream);
-      sendBodyChunk(state, ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
+      sendBodyChunk(state, ProcessorState::CallbackState::BufferedPartialBodyCallback, req);
     }
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
