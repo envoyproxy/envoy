@@ -26,7 +26,6 @@ namespace Maxmind {
 class GeoipProviderTest : public testing::Test {
 public:
   GeoipProviderTest() {
-    ExtensionRegistry::registerFactories();
     provider_factory_ = Registry::FactoryRegistry<MaxmindProviderFactory>::getFactory(
         "envoy.geoip_providers.maxmind");
     if (provider_factory_ == nullptr) {
