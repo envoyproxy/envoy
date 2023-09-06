@@ -74,7 +74,7 @@ enum class ConnectionCloseType {
                       // until the delayed_close_timeout expires
   Abort, // Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
   AbortReset // Do not write/flush any pending data and immediately raise
-             // ConnectionEvent::LocalClose. Envoy will try close the connection with RST flag.
+             // ConnectionEvent::LocalClose. Envoy will try to close the connection with RST flag.
 };
 
 /**

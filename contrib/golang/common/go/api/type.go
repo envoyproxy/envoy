@@ -350,7 +350,7 @@ const (
 	// Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
 	Abort ConnectionCloseType = 3
 	// Do not write/flush any pending data and immediately raise
-	// ConnectionEvent::LocalClose. Envoy will try close the connection with RST flag.
+	// ConnectionEvent::LocalClose. Envoy will try to close the connection with RST flag.
 	AbortReset ConnectionCloseType = 4
 )
 
