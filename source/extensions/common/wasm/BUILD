@@ -92,6 +92,7 @@ envoy_cc_extension(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_null_vm_wasm_api",
+        "//source/extensions/common/wasm/ext:set_envoy_filter_state_cc_proto",
         "//source/extensions/filters/common/expr:context_lib",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
