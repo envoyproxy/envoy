@@ -169,13 +169,21 @@ class FormatChecker:
         format_flag = True
         output_lines = []
         for line_number, line in enumerate(self.read_lines(path)):
+            if line_number == 0 and path.endswith(".h"):
+                if line == "":
+                    error_message = f"{path}:{line_number + 1}: the first line is empty for header files"
+                    continue
+                elif not line.startswith("#pragma once"):
+                    error_message = f"{path}:{line_number + 1}: #pragma once missed for header files"
+                    output_lines.append("#pragma once")
+                    output_lines.append("")
             if line.find("// clang-format off") != -1:
                 if not format_flag and error_message is None:
-                    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested off")
+                    error_message = f"{path}:{line_number + 1}: clang-format nested off"
                 format_flag = False
             if line.find("// clang-format on") != -1:
                 if format_flag and error_message is None:
-                    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested on")
+                    error_message = f"{path}:{line_number + 1}: clang-format nested on"
                 format_flag = True
             if format_flag:
                 output_lines.append(line_xform(line, line_number))
@@ -186,7 +194,7 @@ class FormatChecker:
         if write:
             pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
         if not format_flag and error_message is None:
-            error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format remains off")
+            error_message = f"{path}:{line_number + 1}: clang-format remains off"
         return error_message
 
     # Obtain all the lines in a given file.
