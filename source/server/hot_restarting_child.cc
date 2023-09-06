@@ -10,12 +10,12 @@ using HotRestartMessage = envoy::HotRestartMessage;
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                        const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
-  initDomainSocketAddress(&parent_address_);
+  my_rpc_stream_.initDomainSocketAddress(&parent_address_);
   if (restart_epoch_ != 0) {
-    parent_address_ =
-        createDomainSocketAddress(restart_epoch_ + -1, "parent", socket_path, socket_mode);
+    parent_address_ = my_rpc_stream_.createDomainSocketAddress(restart_epoch_ + -1, "parent",
+                                                               socket_path, socket_mode);
   }
-  bindDomainSocket(restart_epoch_, "child", socket_path, socket_mode);
+  my_rpc_stream_.bindDomainSocket(restart_epoch_, "child", socket_path, socket_mode);
 }
 
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
@@ -27,10 +27,12 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_address(address);
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_worker_index(worker_index);
-  sendHotRestartMessage(parent_address_, wrapped_request);
+  my_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  if (!replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kPassListenSocket)) {
+  std::unique_ptr<HotRestartMessage> wrapped_reply =
+      my_rpc_stream_.receiveHotRestartMessage(Blocking::Yes);
+  if (!my_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
+                                          HotRestartMessage::Reply::kPassListenSocket)) {
     return -1;
   }
   return wrapped_reply->reply().pass_listen_socket().fd();
@@ -43,11 +45,13 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_stats();
-  sendHotRestartMessage(parent_address_, wrapped_request);
+  my_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
-                 "Hot restart parent did not respond as expected to get stats request.");
+  std::unique_ptr<HotRestartMessage> wrapped_reply =
+      my_rpc_stream_.receiveHotRestartMessage(Blocking::Yes);
+  RELEASE_ASSERT(
+      my_rpc_stream_.replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
+      "Hot restart parent did not respond as expected to get stats request.");
   return wrapped_reply;
 }
 
@@ -58,7 +62,7 @@ void HotRestartingChild::drainParentListeners() {
   // No reply expected.
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_drain_listeners();
-  sendHotRestartMessage(parent_address_, wrapped_request);
+  my_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
 }
 
 absl::optional<HotRestart::AdminShutdownResponse>
@@ -69,10 +73,12 @@ HotRestartingChild::sendParentAdminShutdownRequest() {
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_shutdown_admin();
-  sendHotRestartMessage(parent_address_, wrapped_request);
+  my_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
+  std::unique_ptr<HotRestartMessage> wrapped_reply =
+      my_rpc_stream_.receiveHotRestartMessage(Blocking::Yes);
+  RELEASE_ASSERT(my_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
+                                                    HotRestartMessage::Reply::kShutdownAdmin),
                  "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
   return HotRestart::AdminShutdownResponse{
       static_cast<time_t>(
@@ -86,7 +92,7 @@ void HotRestartingChild::sendParentTerminateRequest() {
   }
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_terminate();
-  sendHotRestartMessage(parent_address_, wrapped_request);
+  my_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
 
   // Note that the 'generation' counter needs to retain the contribution from

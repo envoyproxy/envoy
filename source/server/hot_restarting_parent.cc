@@ -16,13 +16,14 @@ using HotRestartMessage = envoy::HotRestartMessage;
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
                                          const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
-  child_address_ = createDomainSocketAddress(restart_epoch_ + 1, "child", socket_path, socket_mode);
-  bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
+  child_address_ = my_rpc_stream_.createDomainSocketAddress(restart_epoch_ + 1, "child",
+                                                            socket_path, socket_mode);
+  my_rpc_stream_.bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   socket_event_ = dispatcher.createFileEvent(
-      myDomainSocket(),
+      my_rpc_stream_.domain_socket_,
       [this](uint32_t events) -> void {
         ASSERT(events == Event::FileReadyType::Read);
         onSocketEvent();
@@ -33,30 +34,30 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
 
 void HotRestartingParent::onSocketEvent() {
   std::unique_ptr<HotRestartMessage> wrapped_request;
-  while ((wrapped_request = receiveHotRestartMessage(Blocking::No))) {
+  while ((wrapped_request = my_rpc_stream_.receiveHotRestartMessage(Blocking::No))) {
     if (wrapped_request->requestreply_case() == HotRestartMessage::kReply) {
       ENVOY_LOG(error, "child sent us a HotRestartMessage reply (we want requests); ignoring.");
       HotRestartMessage wrapped_reply;
       wrapped_reply.set_didnt_recognize_your_last_message(true);
-      sendHotRestartMessage(child_address_, wrapped_reply);
+      my_rpc_stream_.sendHotRestartMessage(child_address_, wrapped_reply);
       continue;
     }
     switch (wrapped_request->request().request_case()) {
     case HotRestartMessage::Request::kShutdownAdmin: {
-      sendHotRestartMessage(child_address_, internal_->shutdownAdmin());
+      my_rpc_stream_.sendHotRestartMessage(child_address_, internal_->shutdownAdmin());
       break;
     }
 
     case HotRestartMessage::Request::kPassListenSocket: {
-      sendHotRestartMessage(child_address_,
-                            internal_->getListenSocketsForChild(wrapped_request->request()));
+      my_rpc_stream_.sendHotRestartMessage(
+          child_address_, internal_->getListenSocketsForChild(wrapped_request->request()));
       break;
     }
 
     case HotRestartMessage::Request::kStats: {
       HotRestartMessage wrapped_reply;
       internal_->exportStatsToChild(wrapped_reply.mutable_reply()->mutable_stats());
-      sendHotRestartMessage(child_address_, wrapped_reply);
+      my_rpc_stream_.sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
 
@@ -75,7 +76,7 @@ void HotRestartingParent::onSocketEvent() {
       ENVOY_LOG(error, "child sent us an unfamiliar type of HotRestartMessage; ignoring.");
       HotRestartMessage wrapped_reply;
       wrapped_reply.set_didnt_recognize_your_last_message(true);
-      sendHotRestartMessage(child_address_, wrapped_reply);
+      my_rpc_stream_.sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
     }
