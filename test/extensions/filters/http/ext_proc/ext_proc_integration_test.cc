@@ -290,8 +290,7 @@ protected:
 
   void
   processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
-                            absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb,
-                            bool mode_override = false) {
+                            absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -303,9 +302,6 @@ protected:
       processor_stream_->startGrpcStream();
     }
     ProcessingResponse response;
-    if (mode_override) {
-      response.mutable_mode_override()->set_request_body_mode(ProcessingMode::NONE);
-    }
     auto* body = response.mutable_request_body();
     const bool sendReply = !cb || (*cb)(request.request_body(), *body);
     if (sendReply) {
