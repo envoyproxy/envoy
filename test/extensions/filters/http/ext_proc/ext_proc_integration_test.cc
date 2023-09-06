@@ -288,9 +288,9 @@ protected:
     }
   }
 
-  void
-  processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
-                            absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
+  void processRequestBodyMessage(
+      FakeUpstream& grpc_upstream, bool first_message,
+      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
