@@ -44,6 +44,8 @@ struct TestAddresses {
       Network::Utility::parseInternetAddressAndPort("[::1]:12346");
   Network::Address::InstanceConstSharedPtr ipv6_default_ =
       Network::Utility::parseInternetAddressAndPort("[::]:12345");
+  Network::Address::InstanceConstSharedPtr ipv6_default_with_ipv4_support_ =
+      Network::Utility::parseInternetAddressAndPort("[::]:12345", false);
 };
 
 class HotRestartImplTest : public testing::Test {
@@ -194,8 +196,17 @@ TEST_F(HotRestartUdpForwardingContextTest, RegisterUdpForwardingListenerFindsIpv
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv6_default_->asStringView());
   EXPECT_EQ(result->second, &config_any);
-  // If there's an IPv4 request and only an IPv6 default route, use that route.
+  // If there's an IPv4 request and only an IPv6 default route, no match.
   result = helper_->getListenerForDestination(*test_addresses_.ipv4_test_addr_);
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(HotRestartUdpForwardingContextTest,
+       RegisterUdpForwardingListenerIpv6DefaultRouteCanMatchIpv4) {
+  Network::MockUdpListenerConfig config_any;
+  helper_->registerUdpForwardingListener(*test_addresses_.ipv6_default_with_ipv4_support_,
+                                         config_any);
+  auto result = helper_->getListenerForDestination(*test_addresses_.ipv4_test_addr_);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv6_default_->asStringView());
   EXPECT_EQ(result->second, &config_any);

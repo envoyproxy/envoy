@@ -31,6 +31,10 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
       it = listener_map_.find(absl::StrCat("0.0.0.0:", port));
       if (it == listener_map_.end()) {
         it = listener_map_.find(absl::StrCat("[::]:", port));
+        if (it != listener_map_.end() && it->second.first->ip()->ipv6()->v6only()) {
+          // If there is a default IPv6 route but it's set v6only, don't use it.
+          it = listener_map_.end();
+        }
       }
     }
   }
