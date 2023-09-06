@@ -42,18 +42,19 @@ message OpenTelemetryConfig {
     repeated core.v3.HeaderValue headers = 4;
 
     // The hostname to include in the Host header of the OTLP HTTP request.
+    // Must match the address of the cluster. The default is an empty string.
     string hostname = 5;
   }
 
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
   // This field can be left empty to disable reporting traces to the upstream cluster.
+  // Only one of ``grpc_service``, ``http_service`` may be used.
   core.v3.GrpcService grpc_service = 1;
 
   // The upstream HTTP cluster that will receive OTLP traces.
-  // Note that traces are only exported via HTTP if grpc_service is not set.
   // This field can be left empty to disable reporting traces to the upstream cluster.
-  // [#next-free-field: 6]
+  // Only one of ``grpc_service``, ``http_service`` may be used.
   HttpConfig http_service = 3;
 
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
