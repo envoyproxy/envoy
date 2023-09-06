@@ -171,6 +171,11 @@ Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Clust
 
 } // namespace
 
+// Allow disabling ALPN checks for transport sockets. See
+// https://github.com/envoyproxy/envoy/issues/22876
+const absl::string_view ClusterImplBase::DoNotValidateAlpnRuntimeKey =
+    "config.do_not_validate_alpn_support";
+
 UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
@@ -1448,7 +1453,8 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
     }
-    if (!matcher_supports_alpn) {
+    if (!matcher_supports_alpn &&
+        !runtime_.snapshot().featureEnabled(ClusterImplBase::DoNotValidateAlpnRuntimeKey, 0)) {
       throw EnvoyException(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));
