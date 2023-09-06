@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
