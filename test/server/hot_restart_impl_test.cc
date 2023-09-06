@@ -193,11 +193,9 @@ TEST_F(HotRestartUdpForwardingContextTest, RegisterUdpForwardingListenerFindsIpv
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv6_default_->asStringView());
   EXPECT_EQ(result->second, &config_any);
-  // If there's an IPv6 request and only an IPv4 default route, use that route.
+  // If there's an IPv6 request and only an IPv4 default route, no match.
   result = helper_.getListenerForDestination(*test_addresses_.ipv4_test_addr_);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result->first->asStringView(), test_addresses_.ipv6_default_->asStringView());
-  EXPECT_EQ(result->second, &config_any);
+  EXPECT_FALSE(result.has_value());
 }
 
 // Test that registering a udp forwarding listener default route for IPv6 and

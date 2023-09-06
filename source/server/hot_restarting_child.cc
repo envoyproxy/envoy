@@ -21,15 +21,12 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
   auto it = listener_map_.find(address.asString());
   if (it == listener_map_.end()) {
     // If no listener on the specific address was found, check for a default route.
-    // If the address is IPv6, check default route IPv6 first, otherwise check default
-    // route IPv4, but either way check both because default route should still apply
-    // even if only one listener was declared.
+    // If the address is IPv6, check default route IPv6 only, otherwise check default
+    // route IPv4 then default route IPv6, as either can potentially receive an IPv4
+    // packet.
     uint32_t port = address.ip()->port();
     if (address.ip()->version() == Network::Address::IpVersion::v6) {
       it = listener_map_.find(absl::StrCat("[::]:", port));
-      if (it == listener_map_.end()) {
-        it = listener_map_.find(absl::StrCat("0.0.0.0:", port));
-      }
     } else {
       it = listener_map_.find(absl::StrCat("0.0.0.0:", port));
       if (it == listener_map_.end()) {
