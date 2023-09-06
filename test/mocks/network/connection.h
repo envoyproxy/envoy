@@ -40,7 +40,6 @@ public:
   std::list<Network::Connection::BytesSentCb> bytes_sent_callbacks_;
   uint64_t id_{next_id_++};
   bool read_enabled_{true};
-  bool enable_rst_detect_send_{false};
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::string local_close_reason_{"unset_local_close_reason"};
   Connection::State state_{Connection::State::Open};

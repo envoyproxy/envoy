@@ -22,12 +22,12 @@ class AsyncTcpClientImplTest : public Event::TestUsingSimulatedTime, public test
 public:
   AsyncTcpClientImplTest() {}
 
-  void setUpClient(bool rst_detect = false) {
+  void setUpClient() {
     cluster_manager_.initializeClusters({"fake_cluster"}, {});
     cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     client_ = std::make_unique<AsyncTcpClientImpl>(
-        dispatcher_, cluster_manager_.thread_local_cluster_, nullptr, false, rst_detect);
+        dispatcher_, cluster_manager_.thread_local_cluster_, nullptr, false);
     client_->setAsyncTcpClientCallbacks(callbacks_);
   }
 
@@ -78,7 +78,7 @@ TEST_F(AsyncTcpClientImplTest, BasicWrite) {
 }
 
 TEST_F(AsyncTcpClientImplTest, RstClose) {
-  setUpClient(true);
+  setUpClient();
   expectCreateConnection();
 
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))

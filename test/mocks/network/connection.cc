@@ -81,7 +81,7 @@ template <class T> static void initializeMockConnection(T& connection) {
       }));
   ON_CALL(connection, close(_))
       .WillByDefault(Invoke([&connection](ConnectionCloseType type) -> void {
-        if (connection.enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) {
+        if (type == ConnectionCloseType::AbortReset) {
           connection.detected_close_type_ = DetectedCloseType::LocalReset;
         }
         connection.raiseEvent(Network::ConnectionEvent::LocalClose);

@@ -645,7 +645,6 @@ struct FakeUpstreamConfig {
   Event::TestTimeSystem& time_system_;
   Http::CodecType upstream_protocol_{Http::CodecType::HTTP1};
   bool enable_half_close_{};
-  bool enable_rst_detect_send_{};
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
@@ -955,7 +954,6 @@ private:
   // Setting this true disables all events and does not re-enable as the above does.
   bool disable_and_do_not_enable_{};
   const bool enable_half_close_;
-  const bool enable_rst_detect_send_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);

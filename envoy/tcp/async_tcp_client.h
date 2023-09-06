@@ -10,14 +10,10 @@ namespace Tcp {
  * AsyncTcpClientOptions for the creation of async tcp client;
  */
 struct AsyncTcpClientOptions {
-  AsyncTcpClientOptions(bool enable_half_close)
-      : enable_half_close(enable_half_close), enable_rst_detect_send(false){};
-  AsyncTcpClientOptions(bool enable_half_close, bool enable_rst_detect_send)
-      : enable_half_close(enable_half_close), enable_rst_detect_send(enable_rst_detect_send){};
-
+  AsyncTcpClientOptions(bool enable_half_close) : enable_half_close(enable_half_close){};
   bool enable_half_close;
-  bool enable_rst_detect_send;
 };
+
 
 using AsyncTcpClientOptionsConstSharedPtr = std::shared_ptr<const AsyncTcpClientOptions>;
 

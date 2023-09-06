@@ -18,11 +18,11 @@ namespace Tcp {
 AsyncTcpClientImpl::AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
                                        Upstream::ThreadLocalCluster& thread_local_cluster,
                                        Upstream::LoadBalancerContext* context,
-                                       bool enable_half_close, bool enable_rst_detect_send)
+                                       bool enable_half_close)
     : dispatcher_(dispatcher), thread_local_cluster_(thread_local_cluster),
       cluster_info_(thread_local_cluster_.info()), context_(context),
       connect_timer_(dispatcher.createTimer([this]() { onConnectTimeout(); })),
-      enable_half_close_(enable_half_close), enable_rst_detect_send_(enable_rst_detect_send) {
+      enable_half_close_(enable_half_close) {
   connect_timer_->enableTimer(cluster_info_->connectTimeout());
   cluster_info_->trafficStats()->upstream_cx_active_.inc();
   cluster_info_->trafficStats()->upstream_cx_total_.inc();

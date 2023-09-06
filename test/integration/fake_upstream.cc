@@ -656,7 +656,6 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)), config_(config),
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
-      enable_rst_detect_send_(config.enable_rst_detect_send_),
       listener_(*this, http_type_ == Http::CodecType::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))),
       stats_scope_(stats_store_.createScope("test_server_scope")) {

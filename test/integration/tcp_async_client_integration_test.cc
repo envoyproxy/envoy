@@ -114,7 +114,6 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
 // Test if RST close can be detected from downstream and upstream is closed by RST.
 TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
   enableHalfClose(true);
-  enableRstDetectSend(true);
   initialize();
 
   std::string request("request");
@@ -147,7 +146,6 @@ TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
 // Test if RST close can be detected from upstream.
 TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
   enableHalfClose(true);
-  enableRstDetectSend(true);
   initialize();
 
   std::string request("request");
@@ -183,7 +181,6 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
 // unix like system, disabled the test for windows.
 TEST_P(TcpAsyncClientIntegrationTest, TestDownstremHalfClosedThenRST) {
   enableHalfClose(true);
-  enableRstDetectSend(true);
   initialize();
 
   std::string request("request");
