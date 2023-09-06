@@ -116,6 +116,10 @@ public:
   MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClient,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
                bool skip_cluster_check));
+
+  MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClientWithHashKey,
+              (const GrpcServiceConfigWithHashKey& config_with_hash_key, Stats::Scope& scope,
+               bool skip_cluster_check));
 };
 
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
