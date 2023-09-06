@@ -24,20 +24,6 @@ TEST_F(TerminateHandlerTest, LogsEnvoyException) {
                       logException(std::make_exception_ptr(EnvoyException("boom"))));
 }
 
-#ifdef WIN32
-TEST_F(TerminateHandlerTest, LogsStdException) {
-  EXPECT_LOG_CONTAINS("critical",
-                      "std::terminate called! Uncaught exception 'Unknown exception', see trace.",
-                      logException(std::make_exception_ptr(std::exception())));
-}
-#else
-TEST_F(TerminateHandlerTest, LogsStdException) {
-  EXPECT_LOG_CONTAINS("critical",
-                      "std::terminate called! Uncaught exception 'std::exception', see trace.",
-                      logException(std::make_exception_ptr(std::exception())));
-}
-#endif
-
 TEST_F(TerminateHandlerTest, LogsUnknownException) {
   EXPECT_LOG_CONTAINS("critical", "std::terminate called! Uncaught unknown exception, see trace.",
                       logException(std::make_exception_ptr("Boom")));

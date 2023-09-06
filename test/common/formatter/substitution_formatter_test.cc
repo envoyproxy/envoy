@@ -104,7 +104,40 @@ public:
 
 private:
   std::string raw_string_;
+  friend class TestSerializedStringReflection;
 };
+
+class TestSerializedStringReflection : public StreamInfo::FilterState::ObjectReflection {
+public:
+  TestSerializedStringReflection(const TestSerializedStringFilterState* data) : data_(data) {}
+  FieldType getField(absl::string_view field_name) const override {
+    if (field_name == "test_field") {
+      return data_->raw_string_;
+    } else if (field_name == "test_num") {
+      return 137;
+    }
+    return {};
+  }
+
+private:
+  const TestSerializedStringFilterState* data_;
+};
+
+class TestSerializedStringFilterStateFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "test_key"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view) const override {
+    return nullptr;
+  }
+  std::unique_ptr<StreamInfo::FilterState::ObjectReflection>
+  reflect(const StreamInfo::FilterState::Object* data) const override {
+    return std::make_unique<TestSerializedStringReflection>(
+        dynamic_cast<const TestSerializedStringFilterState*>(data));
+  }
+};
+
+REGISTER_FACTORY(TestSerializedStringFilterStateFactory, StreamInfo::FilterState::ObjectFactory);
 
 // Test tests multiple versions of variadic template method parseSubcommand
 // extracting tokens.
@@ -178,17 +211,7 @@ TEST(SubstitutionFormatUtilsTest, protocolToStringOrDefault) {
 
 TEST(SubstitutionFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
-
-  EXPECT_EQ("plain", formatter.format(request_headers, response_headers, response_trailers,
-                                      stream_info, body, AccessLog::AccessLogType::NotSet));
-  EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                    stream_info, body, AccessLog::AccessLogType::NotSet),
-              ProtoEq(ValueUtil::stringValue("plain")));
 
   EXPECT_EQ("plain", formatter.formatWithContext({}, stream_info));
   EXPECT_THAT(formatter.formatValueWithContext({}, stream_info),
@@ -197,17 +220,7 @@ TEST(SubstitutionFormatterTest, plainStringFormatter) {
 
 TEST(SubstitutionFormatterTest, plainNumberFormatter) {
   PlainNumberFormatter formatter(400);
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
-
-  EXPECT_EQ("400", formatter.format(request_headers, response_headers, response_trailers,
-                                    stream_info, body, AccessLog::AccessLogType::NotSet));
-  EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
-                                    stream_info, body, AccessLog::AccessLogType::NotSet),
-              ProtoEq(ValueUtil::numberValue(400)));
 
   EXPECT_EQ("400", formatter.formatWithContext({}, stream_info));
   EXPECT_THAT(formatter.formatValueWithContext({}, stream_info),
@@ -218,10 +231,6 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
   StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr};
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
 
   {
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
@@ -233,14 +242,9 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(200)));
     StreamInfoFormatter duration_format("DURATION");
     EXPECT_EQ("200", duration_format.formatWithContext({}, stream_info));
-    EXPECT_EQ("200", duration_format.format(request_headers, response_headers, response_trailers,
-                                            stream_info, body, AccessLog::AccessLogType::NotSet));
 
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(300)));
     EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::numberValue(300.0)));
-    EXPECT_THAT(duration_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body, AccessLog::AccessLogType::NotSet),
                 ProtoEq(ValueUtil::numberValue(300.0)));
   }
 }
@@ -2125,6 +2129,41 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
     EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
     EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
   }
+  // FIELD test cases
+  {
+    FilterStateFormatter formatter("test_key", absl::optional<size_t>(), false, false,
+                                   "test_field");
+
+    EXPECT_EQ("test_value", formatter.format(stream_info));
+    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_value")));
+  }
+  {
+    FilterStateFormatter formatter("test_key", absl::optional<size_t>(), false, false, "test_num");
+
+    EXPECT_EQ("137", formatter.format(stream_info));
+    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("137")));
+  }
+  {
+    FilterStateFormatter formatter("test_wrong_key", absl::optional<size_t>(), false, false,
+                                   "test_field");
+
+    EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
+    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    FilterStateFormatter formatter("test_key", absl::optional<size_t>(), false, false,
+                                   "test_wrong_field");
+
+    EXPECT_EQ(absl::nullopt, formatter.format(stream_info));
+    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    FilterStateFormatter formatter("test_key", absl::optional<size_t>(5), false, false,
+                                   "test_field");
+
+    EXPECT_EQ("test_", formatter.format(stream_info));
+    EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(ValueUtil::stringValue("test_")));
+  }
 }
 
 TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
@@ -3470,12 +3509,14 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
   absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"test_key_plain", "test_value By PLAIN"},
       {"test_key_typed", "\"test_value By TYPED\""},
+      {"test_key_field", "test_value"},
   };
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key_plain: '%FILTER_STATE(test_key:PLAIN)%'
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
+    test_key_field: '%FILTER_STATE(test_key:FIELD:test_field)%'
   )EOF",
                             key_mapping);
   StructFormatter formatter(key_mapping, false, false);
@@ -3505,6 +3546,7 @@ TEST(SubstitutionFormatterTest, TypedFilterStateSpeciferTest) {
   TestUtility::loadFromYaml(R"EOF(
     test_key_plain: '%FILTER_STATE(test_key:PLAIN)%'
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
+    test_key_field: '%FILTER_STATE(test_key:FIELD:test_field)%'
   )EOF",
                             key_mapping);
   StructFormatter formatter(key_mapping, true, false);
@@ -3514,6 +3556,7 @@ TEST(SubstitutionFormatterTest, TypedFilterStateSpeciferTest) {
   const auto& fields = output.fields();
   EXPECT_EQ("test_value By PLAIN", fields.at("test_key_plain").string_value());
   EXPECT_EQ("test_value By TYPED", fields.at("test_key_typed").string_value());
+  EXPECT_EQ("test_value", fields.at("test_key_field").string_value());
 }
 
 // Error specifier will cause an exception to be thrown.
@@ -3539,7 +3582,31 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
   )EOF",
                             key_mapping);
   EXPECT_THROW_WITH_MESSAGE(StructFormatter formatter(key_mapping, false, false), EnvoyException,
-                            "Invalid filter state serialize type, only support PLAIN/TYPED.");
+                            "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD.");
+}
+
+// Error specifier for PLAIN will cause an error if field is specified.
+TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferFieldTest) {
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    test_key_plain: '%FILTER_STATE(test_key:PLAIN:test_field)%'
+  )EOF",
+                            key_mapping);
+  EXPECT_THROW_WITH_MESSAGE(StructFormatter formatter(key_mapping, false, false), EnvoyException,
+                            "Invalid filter state serialize type, FIELD "
+                            "should be used with the field name.");
+}
+
+// Error specifier for FIELD will cause an exception to be thrown if no field is specified.
+TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferFieldNoNameTest) {
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    test_key_plain: '%FILTER_STATE(test_key:FIELD)%'
+  )EOF",
+                            key_mapping);
+  EXPECT_THROW_WITH_MESSAGE(StructFormatter formatter(key_mapping, false, false), EnvoyException,
+                            "Invalid filter state serialize type, FIELD "
+                            "should be used with the field name.");
 }
 
 TEST(SubstitutionFormatterTest, StructFormatterStartTimeTest) {
