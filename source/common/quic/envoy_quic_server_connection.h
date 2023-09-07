@@ -11,11 +11,11 @@
 namespace Envoy {
 namespace Quic {
 
-// A subclass to implement the QUIC listener filter interface.
-class GenericQuicListenerFilter
+// A subclass to implement the extra QUIC listener filter interfaces.
+class QuicListenerFilterWrapper
     : public Network::GenericListenerFilterImplBase<Network::QuicListenerFilter> {
 public:
-  GenericQuicListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
+  QuicListenerFilterWrapper(const Network::ListenerFilterMatcherSharedPtr& matcher,
                             Network::QuicListenerFilterPtr listener_filter)
       : Network::GenericListenerFilterImplBase<Network::QuicListenerFilter>(
             std::move(matcher), std::move(listener_filter)) {}
@@ -74,7 +74,7 @@ public:
   void addFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                  Network::QuicListenerFilterPtr&& filter) override {
     accept_filters_.emplace_back(
-        std::make_unique<GenericQuicListenerFilter>(listener_filter_matcher, std::move(filter)));
+        std::make_unique<QuicListenerFilterWrapper>(listener_filter_matcher, std::move(filter)));
   }
   bool shouldAdvertiseServerPreferredAddress(
       const quic::QuicSocketAddress& server_preferred_address) const override {
