@@ -16,6 +16,7 @@ behavior_changes:
   change: |
     Introduced runtime flag ``envoy.reloadable_features.enable_header_validator`` for toggling Universal Header Validator (UHV) on and off.
     The default value is off. This option is currently functional only when the ``ENVOY_ENABLE_UHV`` build flag is enabled.
+    For more information about UHV see https://github.com/envoyproxy/envoy/issues/10646
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

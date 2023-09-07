@@ -71,7 +71,7 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
 }
 
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     // TODO(#27132): auto_host_rewrite is broken for IPv6 and is failing UHV validation
     return;
   }
@@ -3947,7 +3947,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
 TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
   config_helper_.disableDelayClose();
   // we only care about upstream protocol.
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     // permissive parsing is enabled
     return;
   }
@@ -4032,7 +4032,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidateUpstreamHeaders) {
 }
 
 TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     // UHV does not support this case so far.
     return;
   }
@@ -4081,7 +4081,7 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
 }
 
 TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     // UHV always validated headers before sending them upstream. This test is not applicable
     // when UHV is enabled.
     return;
@@ -4201,7 +4201,7 @@ TEST_P(ProtocolIntegrationTest, BufferContinue) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     // UHV does not track consistency of content-length and amount of DATA in HTTP/2
     return;
   }
@@ -4233,7 +4233,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     // UHV does not track consistency of content-length and amount of DATA in HTTP/2
     return;
   }
@@ -4613,7 +4613,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
                                      {":scheme", "/admin http"},
                                      {":authority", "sni.lyft.com"}});
 
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     if (downstreamProtocol() != Http::CodecType::HTTP1) {
       ASSERT_TRUE(response->waitForReset());
       EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
@@ -4675,7 +4675,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailer) {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
   }
 
-  if (!use_header_validator_) {
+  if (!use_universal_header_validator_) {
     // TODO(#24620) UHV does not include the DPE prefix in the downstream protocol error reasons
     if (downstreamProtocol() != Http::CodecType::HTTP3) {
       // TODO(#24630) QUIC also does not include the DPE prefix in the downstream protocol error
@@ -4729,7 +4729,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailerStreamError) {
   codec_client_->close();
   ASSERT_TRUE(response->reset());
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
-  if (!use_header_validator_) {
+  if (!use_universal_header_validator_) {
     // TODO(#24620) UHV does not include the DPE prefix in the downstream protocol error reasons
     if (downstreamProtocol() != Http::CodecType::HTTP3) {
       // TODO(#24630) QUIC also does not include the DPE prefix in the downstream protocol error
@@ -4757,7 +4757,7 @@ TEST_P(DownstreamProtocolIntegrationTest, UnknownPseudoHeader) {
                                      {":scheme", "http"},
                                      {":authority", "host"}});
   ASSERT_TRUE(response->waitForReset());
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
   } else {
     EXPECT_THAT(waitForAccessLog(access_log_name_),

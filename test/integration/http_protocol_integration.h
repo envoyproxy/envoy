@@ -72,7 +72,7 @@ public:
             GetParam().downstream_protocol, GetParam().version,
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)),
-        use_header_validator_(GetParam().use_header_validator) {
+        use_universal_header_validator_(GetParam().use_header_validator) {
     setupHttp1ImplOverrides(GetParam().http1_implementation);
     setupHttp2ImplOverrides(GetParam().http2_implementation);
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
@@ -91,7 +91,7 @@ public:
   void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
 
 protected:
-  const bool use_header_validator_{false};
+  const bool use_universal_header_validator_{false};
 };
 
 class UpstreamDownstreamIntegrationTest

@@ -135,7 +135,7 @@ TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversionWithUhvOverride
                                      {":path", "/path\\with%5Cback%5Cslashes"},
                                      {":scheme", "http"},
                                      {":authority", "host"}});
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     // By default Envoy disconnects connection on protocol errors
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     if (downstream_protocol_ != Http::CodecType::HTTP2) {
@@ -222,7 +222,7 @@ TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreservedWithUhvOverr
                                      {":authority", "host"}});
   waitForNextUpstreamRequest();
 
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3Bmixed%5Ccase%FEsequences");
   } else {
     EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3bmixed%5Ccase%Fesequences");
@@ -375,7 +375,7 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsRejectedWithUhvO
                                      {":path", "/path%Z%30with%XYbad%7Jencoding%A"},
                                      {":scheme", "http"},
                                      {":authority", "host"}});
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     // By default Envoy disconnects connection on protocol errors
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     if (downstream_protocol_ != Http::CodecType::HTTP2) {
@@ -455,7 +455,7 @@ TEST_P(DownstreamUhvIntegrationTest, UhvAllowsPercent00WithOverride) {
                                      {":path", "/path%00/to/something"},
                                      {":scheme", "http"},
                                      {":authority", "host"}});
-  if (use_header_validator_) {
+  if (use_universal_header_validator_) {
     waitForNextUpstreamRequest();
 
     EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%00/to/something");
