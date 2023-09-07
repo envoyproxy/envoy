@@ -72,7 +72,7 @@ do
     # either of these things aren't true, the check fails.
     for i in $(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1); do
       echo -ne "  Checking format for $i - "
-      "$SCRIPT_DIR"/code_format/check_format.py check "$i" || exit 1
+      bazel run //tools/code_format:check_format -- check "$i" || exit 1
 
       # TODO(phlax): It seems this is not running in CI anymore and is now finding issues
       # in merged PRs. Unify this hook and format checks in CI when the new format tool is rolled
