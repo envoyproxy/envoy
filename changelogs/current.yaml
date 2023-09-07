@@ -25,6 +25,11 @@ minor_behavior_changes:
 - area: ext_authz
   change: |
     removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
+- area: alternate_protocols_cache_filter
+  change: |
+    Changed the alternate protocols cache filter to get the cache from cluster config rather than filter config.
+    This allows one downstream filter to be used with multiple clusters with different caches. This change can be reverted by
+    setting runtime guard ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` to false.
 - area: ext_authz
   change: |
     Don't append the local address to ``x-forwarded-for`` header when sending an http (not gRPC) auth request.
