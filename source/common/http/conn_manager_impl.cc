@@ -2084,7 +2084,6 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   connection_manager_.doEndStream(*this, /*check_for_deferred_close*/ false);
 
   RequestDecoder& new_stream = connection_manager_.newStream(*response_encoder, true);
-  ActiveStream& new_active_stream = **connection_manager_.streams_.begin();
 
   // Set the new RequestDecoder on the ResponseEncoder. Even though all of the decoder callbacks
   // have already been called at this point, the encoder still needs the new decoder for deferred
@@ -2099,7 +2098,7 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   // FilterState that we inherit, we'll end up copying this every time even though we could get
   // away with just resetting it to the HCM filter_state_.
   if (filter_state->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::Request)) {
-    new_active_stream.filter_manager_.streamInfo().filter_state_ =
+    (*connection_manager_.streams_.begin())->filter_manager_.streamInfo().filter_state_ =
         std::make_shared<StreamInfo::FilterStateImpl>(
             filter_state->parent(), StreamInfo::FilterState::LifeSpan::FilterChain);
   }
@@ -2107,13 +2106,10 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   // Make sure that relevant information makes it from the original stream info
   // to the new one. Generally this should consist of all downstream related
   // data, and not include upstream related data.
-  new_active_stream.filter_manager_.streamInfo().setFromForRecreateStream(
-      filter_manager_.streamInfo());
+  (*connection_manager_.streams_.begin())
+      ->filter_manager_.streamInfo()
+      .setFromForRecreateStream(filter_manager_.streamInfo());
   new_stream.decodeHeaders(std::move(request_headers_), !proxy_body);
-  ENVOY_BUG(
-      !filter_manager_.streamInfo().shouldDrainConnectionUponCompletion() ||
-          new_active_stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion(),
-      "shouldDrainConnectionUponCompletion() is not carried over in redirect");
   if (proxy_body) {
     // This functionality is currently only used for internal redirects, which the router only
     // allows if the full request has been read (end_stream = true) so we don't need to handle the
