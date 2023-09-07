@@ -31,12 +31,7 @@ public:
 
   void close(Network::ConnectionCloseType type) override;
 
-  Network::DetectedCloseType detectedCloseType() const override {
-    if (connection_) {
-      return connection_->detectedCloseType();
-    }
-    return Network::DetectedCloseType::Normal;
-  }
+  Network::DetectedCloseType detectedCloseType() const override { return detected_close_; }
 
   /**
    * @return true means a host is successfully picked from a Cluster.
@@ -102,6 +97,7 @@ private:
   Stats::TimespanPtr conn_length_ms_;
   Event::TimerPtr connect_timer_;
   AsyncTcpClientCallbacks* callbacks_{};
+  Network::DetectedCloseType detected_close_{Network::DetectedCloseType::Normal};
   bool disconnected_{true};
   bool enable_half_close_{false};
 };

@@ -148,7 +148,6 @@ public:
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
-  void setDetectedCloseType(DetectedCloseType close_type);
   DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:
@@ -214,6 +213,9 @@ private:
 
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
+
+  // Set the detected close type for this connection.
+  void setDetectedCloseType(DetectedCloseType close_type);
 
   static std::atomic<uint64_t> next_global_id_;
 

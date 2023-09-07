@@ -530,7 +530,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
   return AssertionSuccess();
 }
 
-AssertionResult FakeConnectionBase::waitForRstDisconnect(milliseconds timeout) {
+AssertionResult FakeConnectionBase::waitForRstDisconnect(std::chrono::milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase waiting for RST disconnect");
   absl::MutexLock lock(&lock_);
   const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -539,7 +539,8 @@ AssertionResult FakeConnectionBase::waitForRstDisconnect(milliseconds timeout) {
 
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     if (timeout == TestUtility::DefaultTimeout) {
-      ADD_FAILURE() << "Please don't waitForDisconnect with a 5s timeout if failure is expected\n";
+      ADD_FAILURE()
+          << "Please don't waitForRstDisconnect with a 5s timeout if failure is expected\n";
     }
     return AssertionFailure() << "Timed out waiting for RST disconnect.";
   }

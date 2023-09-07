@@ -86,7 +86,7 @@ TEST_F(AsyncTcpClientImplTest, RstClose) {
         EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::LocalReset);
       }));
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
-    EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
+    EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::LocalReset);
   }));
   client_->close(Network::ConnectionCloseType::AbortReset);
   ASSERT_FALSE(client_->connected());
