@@ -30,7 +30,7 @@ void Util::serializeDouble(double number, Buffer::Instance& buffer) {
   // it is the fastest correct option on other platforms.
   char buf[100];
   std::to_chars_result result = std::to_chars(buf, buf + sizeof(buf), number);
-  ASSERT(result.ec == std::errc{}, std::make_error_code(result.ec).message());
+  ENVOY_BUG(result.ec == std::errc{}, std::make_error_code(result.ec).message());
   buffer.addFragments({absl::string_view(buf, result.ptr - buf)});
 
   // Note: there is room to speed this up further by serializing the number directly
