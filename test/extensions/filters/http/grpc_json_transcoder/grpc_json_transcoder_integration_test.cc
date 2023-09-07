@@ -351,9 +351,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
       },
       R"({"id":"20","theme":"Children"})");
 
-#ifndef ENVOY_ENABLE_UHV
-  // TODO(#23291) - UHV validate JSON-encoded gRPC query parameters
-  // json_name = "search[decoded]", "search[decoded]" should work
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/shelf?shelf.search[decoded]=Google"},
@@ -365,7 +362,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
           {"content-type", "application/json"},
       },
       R"({"id":"20","theme":"Children"})");
-#endif
 
   // json_name = "search%5Bencoded%5D", "search[encode]" should fail.
   // It is tested in test case "DecodedQueryParameterWithEncodedJsonName"

@@ -254,6 +254,7 @@ def envoy_dependencies(skip_targets = []):
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_github_axboe_liburing()
+    _com_github_bazel_buildtools()
     _com_github_c_ares_c_ares()
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
@@ -388,6 +389,13 @@ def _com_github_axboe_liburing():
     native.bind(
         name = "uring",
         actual = "@envoy//bazel/foreign_cc:liburing",
+    )
+
+def _com_github_bazel_buildtools():
+    # TODO(phlax): Add binary download
+    #  cf: https://github.com/bazelbuild/buildtools/issues/367
+    external_http_archive(
+        name = "com_github_bazelbuild_buildtools",
     )
 
 def _com_github_c_ares_c_ares():

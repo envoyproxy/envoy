@@ -26,6 +26,11 @@ namespace NetworkFilters {
 namespace GenericProxy {
 namespace {
 
+static const std::string DEFAULT_LOG_FORMAT =
+    "%HOST% %PATH% %METHOD% %PROTOCOL% %REQUEST_PROPERTY(request-key)% "
+    "%RESPONSE_PROPERTY(response-key)% "
+    "%REQUEST_PROPERTY(non-exist-key)%";
+
 class MockRouteConfigProvider : public Rds::RouteConfigProvider {
 public:
   MockRouteConfigProvider() { ON_CALL(*this, config()).WillByDefault(Return(route_config_)); }
@@ -40,7 +45,7 @@ public:
 
 class FilterConfigTest : public testing::Test {
 public:
-  void initializeFilterConfig(bool with_tracing = false) {
+  void initializeFilterConfig(bool with_tracing = false, AccessLogInstanceSharedPtr logger = {}) {
     if (with_tracing) {
       tracer_ = std::make_shared<NiceMock<Tracing::MockTracer>>();
 
@@ -80,9 +85,26 @@ public:
 
     mock_route_entry_ = std::make_shared<NiceMock<MockRouteEntry>>();
 
+    std::vector<AccessLogInstanceSharedPtr> access_logs;
+    if (logger) {
+      access_logs.push_back(logger);
+    }
+
     filter_config_ = std::make_shared<FilterConfigImpl>(
         "test_prefix", std::move(codec_factory), route_config_provider_, factories, tracer_,
-        std::move(tracing_config_), factory_context_);
+        std::move(tracing_config_), std::move(access_logs), factory_context_);
+  }
+
+  AccessLogInstanceSharedPtr loggerFormFormat(const std::string& format = DEFAULT_LOG_FORMAT) {
+    envoy::config::core::v3::SubstitutionFormatString sff_config;
+    sff_config.mutable_text_format_source()->set_inline_string(format);
+    auto formatter =
+        Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig<FormatterContext>(
+            sff_config, factory_context_);
+
+    return std::make_shared<FileAccessLog>(Filesystem::FilePathAndType{}, nullptr,
+                                           std::move(formatter),
+                                           factory_context_.accessLogManager());
   }
 
   std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_;
@@ -154,8 +176,9 @@ TEST_F(FilterConfigTest, CodecFactory) {
 
 class FilterTest : public FilterConfigTest {
 public:
-  void initializeFilter(bool with_tracing = false, bool bind_upstream = false) {
-    FilterConfigTest::initializeFilterConfig(with_tracing);
+  void initializeFilter(bool with_tracing = false, bool bind_upstream = false,
+                        AccessLogInstanceSharedPtr logger = {}) {
+    FilterConfigTest::initializeFilterConfig(with_tracing, logger);
 
     auto encoder = std::make_unique<NiceMock<MockResponseEncoder>>();
     encoder_ = encoder.get();
@@ -675,9 +698,15 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
   auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
   mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
 
-  initializeFilter();
+  // The logger is used to test the log format.
+  initializeFilter(false, false, loggerFormFormat());
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  request->host_ = "host-value";
+  request->path_ = "/path-value";
+  request->method_ = "method-value";
+  request->protocol_ = "protocol-value";
+  request->data_["request-key"] = "request-value";
 
   filter_->newDownstreamRequest(std::move(request), ExtendedOptions());
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
@@ -693,10 +722,16 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
         callback.onEncodingSuccess(buffer);
       }));
 
+  EXPECT_CALL(
+      *factory_context_.access_log_manager_.file_,
+      write("host-value /path-value method-value protocol-value request-value response-value -"));
+
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  response->data_["response-key"] = "response-value";
+
   active_stream->upstreamResponse(std::move(response), ExtendedOptions());
 }
 
