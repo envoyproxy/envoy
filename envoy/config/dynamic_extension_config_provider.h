@@ -26,9 +26,11 @@ public:
    * validated.
    * @param version_info is the version of the new extension configuration.
    * @param cb the continuation callback for a completed configuration application on all threads.
+   * @return an absl status indicating if a non-exception-throwing error was encountered.
    */
-  virtual void onConfigUpdate(const Protobuf::Message& config, const std::string& version_info,
-                              ConfigAppliedCb applied_on_all_threads) PURE;
+  virtual absl::Status onConfigUpdate(const Protobuf::Message& config,
+                                      const std::string& version_info,
+                                      ConfigAppliedCb applied_on_all_threads) PURE;
 
   /**
    * Removes the current configuration from the provider.

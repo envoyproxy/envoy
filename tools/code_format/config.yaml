@@ -86,6 +86,8 @@ paths:
     # Header files that can throw exceptions. These should be limited; the only
     # valid situation identified so far is template functions used for config
     # processing.
+    - envoy/common/exception.h
+    - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/map_matcher.h
     - source/common/matcher/field_matcher.h
