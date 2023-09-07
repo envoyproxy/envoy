@@ -404,6 +404,22 @@ public:
  */
 using ListenerFilterFactoryCb = std::function<void(ListenerFilterManager& filter_manager)>;
 
+#ifndef ENVOY_ENABLE_QUIC
+
+} // namespace Network
+} // namespace Envoy
+
+namespace quic {
+
+class QuicSocketAddress {};
+
+} // namespace quic
+
+namespace Envoy {
+namespace Network {
+
+#endif
+
 /**
  * QUIC Listener Filter
  */
@@ -413,10 +429,13 @@ public:
 
   /**
    * Called when a new connection is accepted, but before a Connection is created.
-   * Filter chain iteration can be stopped if the cb shouldn't be accessed any more
+   * Filter chain iteration can be terminated if the cb shouldn't be accessed any more
    * by returning `FilterStatus::StopIteration`, or continue the filter chain iteration
    * by returning `FilterStatus::ContinueIteration`. Reject the connection by closing
-   * the socket and returning `FilterStatus::StopIteration`.
+   * the socket and returning `FilterStatus::StopIteration`. If `FilterStatus::StopIteration` is
+   * returned, following filters' onAccept() will be skipped, but the connection creation is not
+   * going to be paused. If the connection socket is closed upon connection creation, the connection
+   * will be closed immediately.
    * @param cb the callbacks the filter instance can use to communicate with the filter chain.
    * @param server_preferred_addresses the server's preferred addresses to be advertised.
    * @return status used by the filter manager to manage further filter iteration.

@@ -33,16 +33,6 @@
 
 #include "gmock/gmock.h"
 
-#ifndef ENVOY_ENABLE_QUIC
-
-namespace quic {
-
-class QuicSocketAddress {};
-
-} // namespace quic
-
-#endif
-
 namespace Envoy {
 namespace Network {
 

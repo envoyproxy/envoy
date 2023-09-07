@@ -99,11 +99,10 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       *listener_filter_manager);
   const Network::FilterChain* filter_chain = nullptr;
   if (success) {
-    // Quic listener filters are not supposed to pause the filter chain iteration. So this call
-    // should finish iterating through all filters.
     listener_filter_manager->startFilterChain();
-    // If any listener filter closed the socket, do not get a network filter chain. Thus early fail
-    // the connection.
+    // Quic listener filters are not supposed to pause the filter chain iteration unless it closes
+    // the connection socket. If any listener filter have closed the socket, do not get a network
+    // filter chain. Thus early fail the connection.
     if (connection_socket->ioHandle().isOpen()) {
       for (auto address_family : {quiche::IpAddressFamily::IP_V4, quiche::IpAddressFamily::IP_V6}) {
         absl::optional<quic::QuicSocketAddress> address =
