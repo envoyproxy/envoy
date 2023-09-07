@@ -76,12 +76,9 @@ public:
 
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
-  Rules generateRules(
-      const ProtobufRepeatedRule& proto_rule)
-      const;
+  Rules generateRules(const ProtobufRepeatedRule& proto_rule) const;
   absl::flat_hash_set<std::string> generateAllowContentTypes(
-      const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types)
-      const;
+      const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types) const;
   JsonToMetadataStats stats_;
   const Rules request_rules_;
   const Rules response_rules_;

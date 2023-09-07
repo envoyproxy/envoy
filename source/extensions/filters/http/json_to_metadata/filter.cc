@@ -88,8 +88,10 @@ FilterConfig::FilterConfig(
     : stats_{ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata."))},
       request_rules_(generateRules(proto_config.request_rules().rules())),
       response_rules_(generateRules(proto_config.response_rules().rules())),
-      request_allow_content_types_(generateAllowContentTypes(proto_config.request_rules().allow_content_types())),
-      response_allow_content_types_(generateAllowContentTypes(proto_config.response_rules().allow_content_types())),
+      request_allow_content_types_(
+          generateAllowContentTypes(proto_config.request_rules().allow_content_types())),
+      response_allow_content_types_(
+          generateAllowContentTypes(proto_config.response_rules().allow_content_types())),
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()),
       response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()) {
   if (request_rules_.empty() && response_rules_.empty()) {
@@ -98,9 +100,7 @@ FilterConfig::FilterConfig(
   }
 }
 
-Rules FilterConfig::generateRules(
-    const ProtobufRepeatedRule& proto_rules)
-    const {
+Rules FilterConfig::generateRules(const ProtobufRepeatedRule& proto_rules) const {
   Rules rules;
   for (const auto& rule : proto_rules) {
     rules.emplace_back(rule);
@@ -109,15 +109,13 @@ Rules FilterConfig::generateRules(
 }
 
 absl::flat_hash_set<std::string> FilterConfig::generateAllowContentTypes(
-    const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types)
-    const {
+    const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types) const {
   if (proto_allow_content_types.empty()) {
     return {Http::Headers::get().ContentTypeValues.Json};
   }
 
   absl::flat_hash_set<std::string> allow_content_types;
-  for (const auto& request_allowed_content_type :
-       proto_allow_content_types) {
+  for (const auto& request_allowed_content_type : proto_allow_content_types) {
     allow_content_types.insert(request_allowed_content_type);
   }
   return allow_content_types;
