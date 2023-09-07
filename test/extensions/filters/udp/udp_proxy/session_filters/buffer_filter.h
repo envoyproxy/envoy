@@ -23,7 +23,7 @@ using BufferingFilterConfig =
 
 using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
 
-class BufferingSessionFilter : public Filter  {
+class BufferingSessionFilter : public Filter {
 public:
   BufferingSessionFilter(int downstream_datagrams_to_buffer, int upstream_datagrams_to_buffer,
                          bool continue_after_inject)
