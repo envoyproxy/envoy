@@ -12,6 +12,7 @@ on:
         default: envoyproxy/envoy-build-ubuntu
       build_image_sha:
         type: string
+        # this image sha should match the gcr image tag (9db54410ba9f8216cac84391ebcfb18a297c2217690c7c77bb050f78f56bb629)
         default: 6a6a64be3f4e3c4380531ad1624f9419d1fe99dde4e5eeb04e2d538a92f27205
       build_image_mobile_sha:
         type: string
