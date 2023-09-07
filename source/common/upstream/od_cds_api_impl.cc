@@ -63,7 +63,7 @@ OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
     notifier_.notifyMissingCluster(resource_name);
   }
   if (!exception_msgs.empty()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
   return absl::OkStatus();
