@@ -3030,7 +3030,8 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
 
   // Enable UHV runtime flag to test config translation
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
 
   TestHeaderValidatorFactoryConfig factory;
   Registry::InjectFactory<Http::HeaderValidatorFactoryConfig> registration(factory);
@@ -3083,7 +3084,8 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfigWithRuntimeDisabled
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
-  // Without envoy.reloadable_features.enable_header_validator runtime set, UHV is always disabled
+  // Without envoy.reloadable_features.enable_universal_header_validator runtime set, UHV is always
+  // disabled
   EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #else
   // If UHV is disabled, providing config should result in rejection
@@ -3111,7 +3113,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfigWithRuntimeE
 
   // Enable UHV runtime flag to test config translation
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
@@ -3135,8 +3138,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfigWithRuntimeE
                 UriPathNormalizationOptions::KEEP_UNCHANGED);
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled, enabling envoy.reloadable_features.enable_header_validator should result in
-  // rejection
+  // If UHV is disabled, enabling envoy.reloadable_features.enable_universal_header_validator should
+  // result in rejection
   EXPECT_THROW(
       {
         HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
@@ -3172,7 +3175,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
 
-  // Without envoy.reloadable_features.enable_header_validator runtime set, UHV is always disabled
+  // Without envoy.reloadable_features.enable_universal_header_validator runtime set, UHV is always
+  // disabled
   EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 }
 
@@ -3193,7 +3197,8 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
   )EOF";
 
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   // Make sure the http_reject_path_with_fragment runtime value is reflected in config
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
@@ -3221,8 +3226,8 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                 UriPathNormalizationOptions::UNESCAPE_AND_FORWARD);
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled, enabling envoy.reloadable_features.enable_header_validator should result in
-  // rejection
+  // If UHV is disabled, enabling envoy.reloadable_features.enable_universal_header_validator should
+  // result in rejection
   EXPECT_THROW(
       {
         HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),

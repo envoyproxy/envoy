@@ -423,7 +423,7 @@ public:
       };
     }
 
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_header_validator",
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       std::get<2>(GetParam()) ? "true" : "false");
 
     HttpIntegrationTest::initialize();

@@ -109,7 +109,8 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
   Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_header_validator")) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
     // This will cause codecs to use legacy header validation and path normalization
     return nullptr;
   }
@@ -149,7 +150,8 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
                     options.header_validation_config().name()));
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_header_validator")) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
     throw EnvoyException(
         "Header validator can not be enabled since this Envoy binary does not support it.");
   }

@@ -173,7 +173,8 @@ TEST_F(ConfigTest, HeaderValidatorConfig) {
   )EOF";
   // Enable UHV runtime flag to test config instantiation
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
 
   TestHeaderValidatorFactoryConfig factory;
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
@@ -205,7 +206,7 @@ TEST_F(ConfigTest, HeaderValidatorConfigWithRuntimeDisabled) {
 #ifdef ENVOY_ENABLE_UHV
   ProtocolOptionsConfigImpl config(options_, server_context_);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
-  // Without envoy.reloadable_features.enable_header_validator set UHV is always disabled
+  // Without envoy.reloadable_features.enable_universal_header_validator set UHV is always disabled
   EXPECT_EQ(nullptr, config.header_validator_factory_);
 #else
   // If UHV is disabled, providing config should result in rejection
@@ -216,7 +217,8 @@ TEST_F(ConfigTest, HeaderValidatorConfigWithRuntimeDisabled) {
 TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithRuntimeEnabled) {
   // Enable UHV runtime flag to test config translation
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
@@ -228,8 +230,8 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithRuntimeEnabled) {
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled but envoy.reloadable_features.enable_header_validator is set, the config is
-  // rejected
+  // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
+  // config is rejected
   EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
 #endif
 }
@@ -241,7 +243,8 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithoutOverride) {
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
   ProtocolOptionsConfigImpl config(options_, server_context_);
-  // By default envoy.reloadable_features.enable_header_validator is false preventing UHV use
+  // By default envoy.reloadable_features.enable_universal_header_validator is false preventing UHV
+  // use
   EXPECT_EQ(nullptr, config.header_validator_factory_);
 }
 
@@ -253,7 +256,8 @@ TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig
   )EOF";
   // Enable UHV runtime flag to test config translation
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
@@ -267,8 +271,8 @@ TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled but envoy.reloadable_features.enable_header_validator is set, the config is
-  // rejected
+  // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
+  // config is rejected
   EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
 #endif
 }
@@ -281,7 +285,8 @@ TEST_F(ConfigTest, TranslateAutoLegacyConfigToDefaultHeaderValidatorConfig) {
   )EOF";
   // Enable UHV runtime flag to test config translation
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
@@ -295,8 +300,8 @@ TEST_F(ConfigTest, TranslateAutoLegacyConfigToDefaultHeaderValidatorConfig) {
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled but envoy.reloadable_features.enable_header_validator is set, the config is
-  // rejected
+  // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
+  // config is rejected
   EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
 #endif
 }
@@ -309,7 +314,8 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
   )EOF";
   // Enable UHV runtime flag to test config translation
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
@@ -323,8 +329,8 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled but envoy.reloadable_features.enable_header_validator is set, the config is
-  // rejected
+  // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
+  // config is rejected
   EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
 #endif
 }
@@ -337,7 +343,8 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
   )EOF";
   // Enable UHV runtime flag to test config translation
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_header_validator", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       proto_config;
@@ -351,8 +358,8 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled but envoy.reloadable_features.enable_header_validator is set, the config is
-  // rejected
+  // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
+  // config is rejected
   EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
 #endif
 }

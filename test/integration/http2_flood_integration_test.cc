@@ -75,7 +75,8 @@ public:
 
   void enableUhvRuntimeFeature() {
 #ifdef ENVOY_ENABLE_UHV
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_header_validator", "true");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                      "true");
 #endif
   }
 

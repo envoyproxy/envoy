@@ -78,7 +78,7 @@ public:
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       GetParam().defer_processing_backedup_streams ? "true"
                                                                                    : "false");
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_header_validator",
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       GetParam().use_universal_header_validator ? "true" : "false");
   }
 
@@ -109,7 +109,7 @@ public:
         Runtime::defer_processing_backedup_streams,
         std::get<0>(GetParam()).defer_processing_backedup_streams ? "true" : "false");
     config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.enable_header_validator",
+        "envoy.reloadable_features.enable_universal_header_validator",
         std::get<0>(GetParam()).use_universal_header_validator ? "true" : "false");
   }
   static std::string testParamsToString(
