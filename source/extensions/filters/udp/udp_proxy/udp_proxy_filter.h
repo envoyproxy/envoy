@@ -12,6 +12,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/common/linked_object.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
@@ -21,6 +22,8 @@
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
+#include "source/extensions/filters/udp/udp_proxy/session_filters/filter_config.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -29,6 +32,8 @@ namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
+
+using namespace UdpProxy::SessionFilters;
 
 /**
  * All UDP proxy downstream stats. @see stats_macros.h
@@ -87,6 +92,7 @@ public:
   virtual const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const PURE;
+  virtual const FilterChainFactory& sessionFilterFactory() const PURE;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -122,7 +128,38 @@ public:
   Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode error_code) override;
 
 private:
+  class ActiveSession;
   class ClusterInfo;
+
+  struct ActiveReadFilter : public virtual ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
+    ActiveReadFilter(ActiveSession& parent, ReadFilterSharedPtr filter)
+        : parent_(parent), read_filter_(std::move(filter)) {}
+
+    // SessionFilters::ReadFilterCallbacks
+    uint64_t sessionId() const override { return parent_.sessionId(); };
+    StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
+    void continueFilterChain() override { parent_.onContinueFilterChain(this); }
+
+    ActiveSession& parent_;
+    ReadFilterSharedPtr read_filter_;
+    bool initialized_{false};
+  };
+
+  using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
+
+  struct ActiveWriteFilter : public virtual WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
+    ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter)
+        : parent_(parent), write_filter_(std::move(filter)) {}
+
+    // SessionFilters::WriteFilterCallbacks
+    uint64_t sessionId() const override { return parent_.sessionId(); };
+    StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
+
+    ActiveSession& parent_;
+    WriteFilterSharedPtr write_filter_;
+  };
+
+  using ActiveWriteFilterPtr = std::unique_ptr<ActiveWriteFilter>;
 
   /**
    * An active session is similar to a TCP connection. It binds a 4-tuple (downstream IP/port, local
@@ -132,14 +169,47 @@ private:
    * will be hashed to the same session and will be forwarded to the same upstream, using the same
    * local ephemeral IP/port.
    */
-  class ActiveSession : public Network::UdpPacketProcessor {
+  class ActiveSession : public Network::UdpPacketProcessor, public FilterChainFactoryCallbacks {
   public:
     ActiveSession(ClusterInfo& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
                   const Upstream::HostConstSharedPtr& host);
     ~ActiveSession() override;
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     const Upstream::Host& host() const { return *host_; }
-    void write(const Buffer::Instance& buffer);
+    void onNewSession();
+    void onData(Network::UdpRecvData& data);
+    void writeUpstream(Network::UdpRecvData& data);
+
+    void createFilterChain() {
+      cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
+    }
+
+    uint64_t sessionId() const { return session_id_; };
+    StreamInfo::StreamInfo& streamInfo() { return udp_session_info_; };
+    void onContinueFilterChain(ActiveReadFilter* filter);
+
+    // SessionFilters::FilterChainFactoryCallbacks
+    void addReadFilter(ReadFilterSharedPtr filter) override {
+      ActiveReadFilterPtr wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
+      filter->initializeReadFilterCallbacks(*wrapper);
+      LinkedList::moveIntoListBack(std::move(wrapper), read_filters_);
+    };
+
+    void addWriteFilter(WriteFilterSharedPtr filter) override {
+      ActiveWriteFilterPtr wrapper = std::make_unique<ActiveWriteFilter>(*this, filter);
+      filter->initializeWriteFilterCallbacks(*wrapper);
+      LinkedList::moveIntoList(std::move(wrapper), write_filters_);
+    };
+
+    void addFilter(FilterSharedPtr filter) override {
+      ActiveReadFilterPtr read_wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
+      filter->initializeReadFilterCallbacks(*read_wrapper);
+      LinkedList::moveIntoListBack(std::move(read_wrapper), read_filters_);
+
+      ActiveWriteFilterPtr write_wrapper = std::make_unique<ActiveWriteFilter>(*this, filter);
+      filter->initializeWriteFilterCallbacks(*write_wrapper);
+      LinkedList::moveIntoList(std::move(write_wrapper), write_filters_);
+    };
 
   private:
     void onIdleTimer();
@@ -173,6 +243,8 @@ private:
       uint64_t downstream_sess_rx_datagrams_;
     };
 
+    static std::atomic<uint64_t> next_global_session_id_;
+
     ClusterInfo& cluster_;
     const bool use_original_src_ip_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
@@ -192,6 +264,9 @@ private:
 
     UdpProxySessionStats session_stats_{};
     StreamInfo::StreamInfoImpl udp_session_info_;
+    uint64_t session_id_;
+    std::list<ActiveReadFilterPtr> read_filters_;
+    std::list<ActiveWriteFilterPtr> write_filters_;
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;

@@ -11,7 +11,9 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 
-class UdpProxyFilterConfigImpl : public UdpProxyFilterConfig, Logger::Loggable<Logger::Id::config> {
+class UdpProxyFilterConfigImpl : public UdpProxyFilterConfig,
+                                 public FilterChainFactory,
+                                 Logger::Loggable<Logger::Id::config> {
 public:
   UdpProxyFilterConfigImpl(
       Server::Configuration::ListenerFactoryContext& context,
@@ -42,6 +44,14 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const override {
     return proxy_access_logs_;
   }
+  const FilterChainFactory& sessionFilterFactory() const override { return *this; };
+
+  // FilterChainFactory
+  void createFilterChain(FilterChainFactoryCallbacks& callbacks) const override {
+    for (const FilterFactoryCb& factory : filter_factories_) {
+      factory(callbacks);
+    }
+  };
 
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
@@ -63,6 +73,7 @@ private:
   std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
   std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
   Random::RandomGenerator& random_;
+  std::list<SessionFilters::FilterFactoryCb> filter_factories_;
 };
 
 /**
