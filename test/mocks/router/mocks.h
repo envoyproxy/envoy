@@ -58,7 +58,6 @@ public:
               (Http::RequestHeaderMap & headers, bool insert_envoy_original_path), (const));
   MOCK_METHOD(Http::Code, responseCode, (), (const));
   MOCK_METHOD(const std::string&, responseBody, (), (const));
-  MOCK_METHOD(const std::string&, routeName, (), (const));
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -436,12 +435,10 @@ public:
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(const ConnectConfigOptRef, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
-  MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
 
   std::string cluster_name_{"fake_cluster"};
-  std::string route_name_{"fake_route_name"};
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
@@ -516,12 +513,14 @@ public:
               (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(const std::string&, routeName, (), (const));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
   testing::NiceMock<MockRouteTracing> route_tracing_;
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
+  std::string route_name_{"fake_route_name"};
 };
 
 class MockConfig : public Config {

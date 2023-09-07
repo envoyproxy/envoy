@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stream_info/filter_state.h"

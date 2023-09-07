@@ -4341,6 +4341,7 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   // Shut down the server before os_calls goes out of scope to avoid syscalls
   // during its removal.
   test_server_.reset();
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
