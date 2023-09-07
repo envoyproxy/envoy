@@ -92,7 +92,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
   TRY_ASSERT_MAIN_THREAD {
     const auto decoded_resources =
         DecodedResourcesWrapper(*resource_decoder_, message.resources(), message.version_info());
-    callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
+    THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info()));
     request_.set_version_info(message.version_info());
     stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));

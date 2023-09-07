@@ -184,6 +184,7 @@ envoy.filters.http.admission_control:
   - envoy.filters.http.upstream
   security_posture: unknown
   status: stable
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.admission_control.v3.AdmissionControl
 envoy.filters.http.alternate_protocols_cache:
@@ -222,6 +223,7 @@ envoy.filters.http.buffer:
   - envoy.filters.http.upstream
   security_posture: robust_to_untrusted_downstream
   status: stable
+  status_upstream: stable
   type_urls:
   - envoy.extensions.filters.http.buffer.v3.Buffer
   - envoy.extensions.filters.http.buffer.v3.BufferPerRoute
@@ -251,6 +253,7 @@ envoy.filters.http.upstream_codec:
   - envoy.filters.http.upstream
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  status_upstream: stable
   type_urls:
   - envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
 envoy.filters.http.composite:
@@ -532,6 +535,7 @@ envoy.filters.http.header_mutation:
   - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
   - envoy.extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute

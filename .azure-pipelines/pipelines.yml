@@ -47,11 +47,11 @@ variables:
 - name: cacheKeyName
   value: envoy
 - name: cacheKeyVersion
-  value: v1
+  value: v2
 - name: cacheKeyBazel
   value: '.bazelversion | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 - name: cacheKeyDocker
-  value: ".devcontainer/Dockerfile"
+  value: ".bazelrc"
 # Docker build uses separate docker cache
 - name: cacheKeyDockerBuild
   # VERSION.txt is included to refresh Docker images for release
@@ -88,7 +88,6 @@ stages:
       - env
       checkStageDeps:
       - env
-      concurrencyChecks: 10
       macBuildStageDeps:
       - env
       windowsBuildStageDeps:
@@ -105,7 +104,6 @@ stages:
       - env
       checkStageDeps:
       - env
-      concurrencyChecks: 10
       macBuildStageDeps:
       - env
       windowsBuildStageDeps:

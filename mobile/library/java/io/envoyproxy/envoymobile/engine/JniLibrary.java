@@ -214,9 +214,10 @@ public class JniLibrary {
 
   /**
    * Retrieve the value of all active stats. Note that this function may block for some time.
+   * @param engine,  handle to the engine that owns the counter.
    * @return The list of active stats and their values, or empty string of the operation failed
    */
-  protected static native String dumpStats();
+  protected static native String dumpStats(long engine);
 
   /**
    * Register a platform-provided key-value store implementation.
@@ -263,6 +264,13 @@ public class JniLibrary {
    * @return The resulting status of the operation.
    */
   protected static native int setProxySettings(long engine, String host, int port);
+
+  /**
+   * Update the log level for all active logs
+   *
+   * @param log_level The Log level to change to. Must be an integer 0-6.
+   */
+  protected static native void setLogLevel(int log_level);
 
   /**
    * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.

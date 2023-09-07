@@ -1,3 +1,5 @@
+#pragma once
+
 // TODO(ikepolinsky): Major action items to improve this fuzzer
 // 1. Move external process from separate thread to have test all in one thread
 //    - Explore using fake gRPC client for this

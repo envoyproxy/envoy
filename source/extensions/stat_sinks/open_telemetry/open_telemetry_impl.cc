@@ -13,7 +13,8 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
       emit_tags_as_attributes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
       use_tag_extracted_name_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)) {}
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
+      stat_prefix_(sink_config.prefix() != "" ? sink_config.prefix() + "." : "") {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
@@ -131,7 +132,9 @@ void OtlpMetricsFlusherImpl::setMetricCommon(
     const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
   // TODO(ohadvano): support ``start_time_unix_nano`` optional field
-  metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
+  metric.set_name(absl::StrCat(config_->statPrefix(), config_->useTagExtractedName()
+                                                          ? stat.tagExtractedName()
+                                                          : stat.name()));
 
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
@@ -148,7 +151,9 @@ void OtlpMetricsFlusherImpl::setMetricCommon(
     const Stats::Metric& stat) const {
   data_point.set_time_unix_nano(snapshot_time_ns);
   // TODO(ohadvano): support ``start_time_unix_nano optional`` field
-  metric.set_name(config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
+  metric.set_name(absl::StrCat(config_->statPrefix(), config_->useTagExtractedName()
+                                                          ? stat.tagExtractedName()
+                                                          : stat.name()));
 
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {

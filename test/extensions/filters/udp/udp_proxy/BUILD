@@ -4,12 +4,27 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_extension_cc_mock(
+    name = "mocks",
+    srcs = ["mocks.cc"],
+    hdrs = ["mocks.h"],
+    extension_names = ["envoy.filters.udp_listener.udp_proxy"],
+    deps = [
+        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:printers_lib",
+    ],
+)
 
 envoy_extension_cc_test(
     name = "udp_proxy_filter_test",
@@ -18,6 +33,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:hash_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//source/extensions/matching/network/common:inputs_lib",
         "//test/mocks/api:api_mocks",
@@ -71,6 +87,10 @@ envoy_extension_cc_test(
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/udp/udp_proxy:config",
+        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_config_interface",
+        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_config_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_proto_cc_proto",
         "//test/integration:integration_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
