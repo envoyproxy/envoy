@@ -118,7 +118,7 @@ public:
 
   Config::XdsConfigTrackerPtr createXdsConfigTracker(const ProtobufWkt::Any&,
                                                      ProtobufMessage::ValidationVisitor&,
-                                                     Event::Dispatcher&,
+                                                     Api::Api& api, Event::Dispatcher&,
                                                      Stats::Scope& stats) override {
     return std::make_unique<TestXdsConfigTracker>(stats);
   }
