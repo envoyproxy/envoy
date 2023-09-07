@@ -241,7 +241,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client, typed_secret);
   const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
 
-  client_callback->onConfigUpdate(decoded_resources_client.refvec_, "");
+  EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
   EXPECT_EQ(secret_reader.tokenSecret(), "");
 
@@ -254,7 +254,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_token, typed_secret);
   const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
 
-  token_callback->onConfigUpdate(decoded_resources_token.refvec_, "");
+  EXPECT_TRUE(token_callback->onConfigUpdate(decoded_resources_token.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
   EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
 
@@ -267,7 +267,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client_recheck, typed_secret);
   const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
 
-  client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "");
+  EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
   EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
 }
