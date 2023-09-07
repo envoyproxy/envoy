@@ -738,6 +738,22 @@ TEST_P(GolangIntegrationTest, Passthrough) {
   cleanup();
 }
 
+TEST_P(GolangIntegrationTest, PluginNotFound) {
+  initializeConfig(ECHO, genSoPath(ECHO), PASSTHROUGH);
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanup();
+}
+
 TEST_P(GolangIntegrationTest, Property) {
   initializePropertyConfig(PROPERTY, genSoPath(PROPERTY), PROPERTY);
   initialize();
