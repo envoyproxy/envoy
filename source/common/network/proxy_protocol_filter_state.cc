@@ -5,8 +5,6 @@
 #include "source/common/common/base64.h"
 #include "source/common/common/macros.h"
 
-// #include "fmt/format.h"
-
 namespace Envoy {
 namespace Network {
 
@@ -49,8 +47,6 @@ public:
       }
     }
     return oss.str();
-
-    // Always return something 
   }
 
 private:
