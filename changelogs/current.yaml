@@ -154,7 +154,6 @@ new_features:
 - area: access_log
   change: |
     added a field lookup to %FILTER_STATE% for objects that have reflection enabled.
-
 - area: http
   change: |
     added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
@@ -183,6 +182,10 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: otlp_stats_sink
+  change: |
+    added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
+    to OTLP stats sink that enables adding a static prefix to all stats flushed by this sink.
 - area: tap
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
