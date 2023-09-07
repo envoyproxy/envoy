@@ -18,13 +18,8 @@ behavior_changes:
   change: |
     Introduced a new runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to disable the name downgrading in the
     per filter config searching.
-    More specifically, given http filter that configured with name ``custom-buffer-filter``, by default, the
-    ``custom-buffer-filter`` will be used to search :ref:`per filter config map
-    <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` for route or
-    virtual host level filter config. If no related entry is found by the key, we will downgrade to try the canonical name of
-    the filter, for example, ``envoy.filters.http.buffer``.
-    Now, this downgrading can be disabled by setting the ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to true.
-    See https://github.com/envoyproxy/envoy/issues/29461 for more detail and examples.
+    See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
+    issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
 - area: http
   change: |
     Switch from http_parser to BalsaParser for handling HTTP/1.1 traffic. See https://github.com/envoyproxy/envoy/issues/21245 for
