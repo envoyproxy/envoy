@@ -16,9 +16,7 @@ class ProxyProtocolFilterStateReflection : public StreamInfo::FilterState::Objec
 public:
   ProxyProtocolFilterStateReflection(const ProxyProtocolFilterState* object) : object_(object) {}
 
-  FieldType getField(absl::string_view tlv_type_str) const override {
-    // Returns field type and serialized string value
-    
+  FieldType getField(absl::string_view tlv_type_str) const override {    
     // Specified tlv_type must be parsable as an int.
     ASSERT(!tlv_type_str.empty());
     int tlv_type;
@@ -35,7 +33,7 @@ public:
                                       tlv_type_str));
     }
 
-    // Parse the TLVs with the given type from the filter state object
+    // Parse the TLVs with the given type from the filter state object.
     std::ostringstream oss;
     int match_count = 0;
     for (auto& tlv : object_->value().tlv_vector_) {
