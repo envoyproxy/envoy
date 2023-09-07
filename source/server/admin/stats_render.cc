@@ -53,8 +53,8 @@ void StatsTextRender::addDetail(const std::vector<Stats::ParentHistogram::Bucket
                                 Buffer::Instance& response) {
   absl::string_view delim = "";
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
-    response.addFragments({delim, absl::StrFormat("%.15g,%.15g:%lu", bucket.lower_bound_,
-                                                  bucket.width_, bucket.count_)});
+    response.addFragments(
+        {delim, absl::StrCat(bucket.lower_bound_, ",", bucket.width_, ":", bucket.count_)});
     delim = ", ";
   }
 }

@@ -53,7 +53,6 @@ envoy_cc_library(
     deps = [
         ":json_sanitizer_lib",
         "//envoy/buffer:buffer_interface",
-        "//source/common/buffer:buffer_util_lib",
         "//source/common/common:assert_lib",
     ],
 )
