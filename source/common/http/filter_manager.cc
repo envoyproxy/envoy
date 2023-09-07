@@ -300,7 +300,8 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
       ENVOY_LOG_FIRST_N(warn, 10,
                         "No per filter config is found by filter config name and fallback to use "
                         "filter canonical name. This is deprecated and will be forbidden very "
-                        "soon. Please use the filter config name to index per filter config.");
+                        "soon. Please use the filter config name to index per filter config. See "
+                        "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
     }
   }
   return result;
@@ -331,7 +332,8 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
         ENVOY_LOG_FIRST_N(warn, 10,
                           "No per filter config is found by filter config name and fallback to use "
                           "filter canonical name. This is deprecated and will be forbidden very "
-                          "soon. Please use the filter config name to index per filter config.");
+                          "soon. Please use the filter config name to index per filter config. See "
+                          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
         cb(config);
       });
 }
