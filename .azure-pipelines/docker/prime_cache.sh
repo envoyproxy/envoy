@@ -34,6 +34,18 @@ echo "==================================================="
 echo
 
 echo
+echo "================ Docker fetch ======================"
+if [[ "$DOCKER_RESTORED" != "true" ]]; then
+    echo "Fetching Docker"
+    ./ci/run_envoy_docker.sh uname -a
+    docker images
+else
+    echo "Not fetching Docker as it was restored"
+fi
+echo "==================================================="
+echo
+
+echo
 echo "================ Bazel fetch ======================"
 # Fetch bazel dependencies
 if [[ "$BAZEL_RESTORED" != "true" ]]; then
@@ -45,7 +57,6 @@ fi
 echo "==================================================="
 echo
 
-docker images
 df -h
 
 echo
