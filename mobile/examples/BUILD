@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 # Change to your Apple Developer Team ID as shown in
 # https://developer.apple.com/account/#!/membership
-TEAM_ID = "A8W96W266D"
+TEAM_ID = "X4ST43AL9W"
 
 # If needed, change to the name shown by clicking the (i) next to
 # "Xcode Managed Profile" in the "Signing and Capabilities" tab
