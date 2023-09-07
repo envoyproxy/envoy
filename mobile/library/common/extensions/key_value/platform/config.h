@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/common/key_value_store.h"
 #include "envoy/registry/registry.h"
 

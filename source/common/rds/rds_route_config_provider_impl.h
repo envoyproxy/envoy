@@ -32,7 +32,7 @@ public:
 
   const absl::optional<ConfigInfo>& configInfo() const override;
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
-  void onConfigUpdate() override;
+  absl::Status onConfigUpdate() override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
