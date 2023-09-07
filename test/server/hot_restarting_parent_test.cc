@@ -23,7 +23,8 @@ using HotRestartMessage = envoy::HotRestartMessage;
 class HotRestartingParentTest : public testing::Test {
 public:
   NiceMock<MockInstance> server_;
-  HotRestartingParent::Internal hot_restarting_parent_{&server_};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  HotRestartingParent::Internal hot_restarting_parent_{&server_, dispatcher_};
 };
 
 TEST_F(HotRestartingParentTest, ShutdownAdmin) {
