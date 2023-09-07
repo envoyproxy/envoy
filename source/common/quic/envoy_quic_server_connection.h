@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Quic {
 
-// A wrapper around the actual listener filter which checks against the given filter matcher.
+// A subclass to implement the QUIC listener filter interface.
 class GenericQuicListenerFilter
     : public Network::GenericListenerFilterImplBase<Network::QuicListenerFilter> {
 public:

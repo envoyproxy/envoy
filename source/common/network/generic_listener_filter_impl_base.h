@@ -5,6 +5,7 @@
 namespace Envoy {
 namespace Network {
 
+// A wrapper around the actual listener filter which checks against the given filter matcher.
 template <typename ListenerFilterType>
 class GenericListenerFilterImplBase : public ListenerFilterType {
 public:
