@@ -194,8 +194,8 @@ typed_config:
 )EOF";
 
     for (auto config : session_filters_configs) {
-        session_filters += fmt::format(
-            R"EOF(
+      session_filters += fmt::format(
+          R"EOF(
   - name: foo
     typed_config:
       '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.BufferingFilterConfig
@@ -203,8 +203,8 @@ typed_config:
       upstream_datagrams_to_buffer: {}
       continue_after_inject: {}
 )EOF",
-            config.downstream_datagrams_to_buffer_, config.upstream_datagrams_to_buffer_,
-            config.continue_after_inject_);
+          config.downstream_datagrams_to_buffer_, config.upstream_datagrams_to_buffer_,
+          config.continue_after_inject_);
     }
 
     return session_filters;
