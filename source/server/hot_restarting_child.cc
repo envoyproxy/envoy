@@ -171,7 +171,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
 
 void HotRestartingChild::onSocketEventUdpForwarding() {
   std::unique_ptr<HotRestartMessage> wrapped_request;
-  while ((wrapped_request = receiveHotRestartMessage(Blocking::No))) {
+  while ((wrapped_request = udp_forwarding_rpc_stream_.receiveHotRestartMessage(Blocking::No))) {
     if (wrapped_request->requestreply_case() == HotRestartMessage::kReply) {
       ENVOY_LOG(
           error,
