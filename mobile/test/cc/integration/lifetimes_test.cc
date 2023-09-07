@@ -19,9 +19,9 @@ struct Status {
 void sendRequest(Platform::EngineSharedPtr engine, Status& status,
                  absl::Notification& stream_complete) {
   auto stream_prototype = engine->streamClient()->newStreamPrototype();
-  auto stream = stream_prototype
-                    ->setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
-                                       envoy_stream_intel) {
+  auto stream = (*stream_prototype)
+                    .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
+                                      envoy_stream_intel) {
                       status.status_code = headers->httpStatus();
                       status.end_stream = end_stream;
                     })

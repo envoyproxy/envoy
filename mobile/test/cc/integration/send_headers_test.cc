@@ -32,8 +32,8 @@ TEST(SendHeadersTest, CanSendHeaders) {
   absl::Notification stream_complete;
   auto stream_prototype = engine->streamClient()->newStreamPrototype();
   Platform::StreamSharedPtr stream =
-      stream_prototype
-          ->setOnHeaders(
+      (*stream_prototype)
+          .setOnHeaders(
               [&](Platform::ResponseHeadersSharedPtr headers, bool end_stream, envoy_stream_intel) {
                 status.status_code = headers->httpStatus();
                 status.end_stream = end_stream;
