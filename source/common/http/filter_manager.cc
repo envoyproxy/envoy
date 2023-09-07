@@ -892,6 +892,13 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
 }
 
 void DownstreamFilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.on_local_reply_createfilterchain")) {
+    // To ensure we have filters over which we can iterate and call onLocalReply.
+    // If the filter chain already exists this will be a no-op.
+    createFilterChain();
+  }
+
   state_.under_on_local_reply_ = true;
   filter_manager_callbacks_.onLocalReply(data.code_);
 
