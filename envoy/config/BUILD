@@ -141,6 +141,7 @@ envoy_cc_library(
     deps = [
         ":subscription_interface",
         ":typed_config_interface",
+        "//envoy/api:api_interface",
         "//envoy/protobuf:message_validator_interface",
         "//source/common/protobuf",
         "@com_google_googleapis//google/rpc:status_cc_proto",

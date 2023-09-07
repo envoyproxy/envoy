@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
