@@ -46,6 +46,7 @@ class AutonomousHttpConnection : public FakeHttpConnection {
 public:
   AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,
                            SharedConnectionWrapper& shared_connection, Http::CodecType type,
+                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                            AutonomousUpstream& upstream);
 
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;

@@ -8,11 +8,13 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
+#include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_reason.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/socket_impl.h"
@@ -238,11 +240,9 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t responseFlags() const override { return response_flags_; }
 
-  void setRouteName(absl::string_view route_name) override {
-    route_name_ = std::string(route_name);
+  const std::string& getRouteName() const override {
+    return route_ != nullptr ? route_->routeName() : EMPTY_STRING;
   }
-
-  const std::string& getRouteName() const override { return route_name_; }
 
   void setVirtualClusterName(const absl::optional<std::string>& virtual_cluster_name) override {
     virtual_cluster_name_ = virtual_cluster_name;
@@ -296,7 +296,7 @@ struct StreamInfoImpl : public StreamInfo {
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
-       << DUMP_MEMBER(route_name_);
+       << DUMP_MEMBER(getRouteName());
     DUMP_DETAILS(upstream_info_);
   }
 
@@ -358,7 +358,6 @@ struct StreamInfoImpl : public StreamInfo {
   // * downstream_connection_info_provider_ is always set in the ctor.
   void setFrom(StreamInfo& info, const Http::RequestHeaderMap* request_headers) {
     setFromForRecreateStream(info);
-    route_name_ = info.getRouteName();
     virtual_cluster_name_ = info.virtualClusterName();
     response_code_ = info.responseCode();
     response_code_details_ = info.responseCodeDetails();
@@ -416,7 +415,6 @@ public:
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
-  std::string route_name_;
   absl::optional<uint32_t> attempt_count_;
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
