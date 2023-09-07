@@ -186,7 +186,7 @@ steps:
   condition: ${{ parameters.managedAgent }}
 
 - script: |
-    if [[ "${{ parameters.bazelUseBES }}" != 'true' ]]; then
+    if [[ "${{ parameters.bazelUseBES }}" == 'false' ]]; then
         unset GOOGLE_BES_PROJECT_ID
     fi
     ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ parameters.ciTarget }}'

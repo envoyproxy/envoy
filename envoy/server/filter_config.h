@@ -150,8 +150,9 @@ public:
    * unable to produce a factory with the provided parameters, it should throw an EnvoyException in
    * the case of general error. The returned callback should always be initialized.
    */
-  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                CommonFactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               UpstreamFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.filters.upstream_network"; }
 
@@ -291,7 +292,7 @@ public:
    */
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
-                               Server::Configuration::UpstreamHttpFactoryContext& context) PURE;
+                               Server::Configuration::UpstreamFactoryContext& context) PURE;
 };
 
 } // namespace Configuration

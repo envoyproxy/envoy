@@ -26,6 +26,9 @@ public:
   Http::HttpServerPropertiesCacheSharedPtr getAlternateProtocolCache(Event::Dispatcher& dispatcher);
 
   TimeSource& timeSource() { return time_source_; }
+  const Http::HttpServerPropertiesCacheManagerSharedPtr alternateProtocolCacheManager() {
+    return alternate_protocol_cache_manager_;
+  }
 
 private:
   const Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocol_cache_manager_;
@@ -50,8 +53,8 @@ public:
   void onDestroy() override;
 
 private:
-  const Http::HttpServerPropertiesCacheSharedPtr cache_;
-  TimeSource& time_source_;
+  FilterConfigSharedPtr config_;
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace AlternateProtocolsCache

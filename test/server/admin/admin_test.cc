@@ -72,7 +72,7 @@ TEST_P(AdminInstanceTest, AdminAddress) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS("info", "admin address:",
                       admin_address_out_path.startHttpListener(
@@ -88,7 +88,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "critical", "cannot open admin address output file " + bad_path + " for writing.",

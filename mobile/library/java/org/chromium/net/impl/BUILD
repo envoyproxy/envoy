@@ -21,6 +21,7 @@ android_library(
         "CronvoyEngineBuilderImpl.java",
         "CronvoyExceptionImpl.java",
         "CronvoyImplVersion.java",
+        "CronvoyLogger.java",
         "CronvoyMetrics.java",
         "CronvoyNetworkExceptionImpl.java",
         "CronvoyPreconditions.java",

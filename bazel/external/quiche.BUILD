@@ -1,4 +1,3 @@
-load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -10,6 +9,7 @@ load(
     "envoy_quiche_platform_impl_cc_library",
     "envoy_quiche_platform_impl_cc_test_library",
 )
+load("@rules_proto//proto:defs.bzl", "proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -3553,15 +3553,15 @@ envoy_cc_library(
     srcs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
-            "quiche/quic/core/io/event_loop_socket_factory.cc",
             "quiche/quic/core/io/event_loop_connecting_client_socket.cc",
+            "quiche/quic/core/io/event_loop_socket_factory.cc",
         ],
     }),
     hdrs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
-            "quiche/quic/core/io/event_loop_socket_factory.h",
             "quiche/quic/core/io/event_loop_connecting_client_socket.h",
+            "quiche/quic/core/io/event_loop_socket_factory.h",
         ],
     }),
     copts = quiche_copts,
