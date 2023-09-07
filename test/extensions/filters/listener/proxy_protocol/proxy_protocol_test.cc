@@ -2154,6 +2154,14 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   EXPECT_NE(dynamic_cast<ProxyProtocol::Filter*>(added_filter.get()), nullptr);
 }
 
+TEST(ProxyProtocolTest, ObjectFactory) {
+  const std::string name = "envoy.network.proxy_protocol_options";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+}
+
 } // namespace
 } // namespace ProxyProtocol
 } // namespace ListenerFilters

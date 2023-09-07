@@ -555,7 +555,9 @@ envoy_cc_library(
     hdrs = ["proxy_protocol_filter_state.h"],
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:base64_lib",
         "//source/common/common:macros",
     ],
 )
