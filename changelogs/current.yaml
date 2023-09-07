@@ -11,6 +11,13 @@ behavior_changes:
     :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
     the cached assignment and finish updating the warmed cluster. This change is disabled by default, and can be enabled by setting
     the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to true.
+- area: zone-aware routing
+  change: |
+    Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
+    This behavioral change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` to false.
+    Additionally, zone-aware routing now works correctly even when the originating and upstream cluster have different zone sets.
+    Previously, zone-aware routing would not route fairly in this case.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -31,11 +38,6 @@ minor_behavior_changes:
   change: |
     Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header`` to false.
-- area: zone-aware routing
-  change: |
-    Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
-    This behavioral change can be reverted by setting runtime guard
-    ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` to false.
 - area: router
   change: |
     Enable copying response_code from the upstream stream_info onto the downstream stream_info.
@@ -76,10 +78,6 @@ bug_fixes:
 - area: router check tool
   change: |
     Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
-- area: zone-aware routing
-  change: |
-    Fixed a bug where zone-aware routing doesn't proportion traffic evenly across upstream hosts
-    if the local and upstream clusters have the same number of zones, but the zone sets aren't identical.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
