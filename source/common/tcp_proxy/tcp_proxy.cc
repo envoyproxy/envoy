@@ -726,9 +726,8 @@ bool Filter::startUpstreamSecureTransport() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
-  const bool connection_closed = event == Network::ConnectionEvent::LocalClose ||
-                                 event == Network::ConnectionEvent::RemoteClose;
-  if (connection_closed) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
     downstream_closed_ = true;
     // Cancel the potential odcds callback.
     cluster_discovery_handle_ = nullptr;
@@ -745,14 +744,16 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                                   std::move(upstream_callbacks_), std::move(idle_timer_),
                                   read_callbacks_->upstreamHost());
     }
-    if (connection_closed) {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
       upstream_.reset();
       disableIdleTimer();
     }
   }
 
   if (generic_conn_pool_) {
-    if (connection_closed) {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
       // Cancel the conn pool request and close any excess pending requests.
       generic_conn_pool_.reset();
     }
