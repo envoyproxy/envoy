@@ -4,8 +4,6 @@ package envoy.extensions.bootstrap.internal_listener.v3;
 
 import "google/protobuf/wrappers.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
