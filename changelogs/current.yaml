@@ -59,6 +59,15 @@ minor_behavior_changes:
     Enable copying response_code from the upstream stream_info onto the downstream stream_info.
     This behavior can be reverted by setting runtime guard
     ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` to false.
+- area: xds
+  change: |
+    Set the lower bound of :ref:`fill_rate <envoy_v3_api_field_config.core.v3.RateLimitSettings.fill_rate>`
+    to once per year. Values lower than once per year will automatically be set to that value.
+- area: redis
+  change: |
+    The redis network filter :ref:`connection_rate_limit_per_sec
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
+    must be greater than 0. A config that sets this value to 0 will be rejected.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
