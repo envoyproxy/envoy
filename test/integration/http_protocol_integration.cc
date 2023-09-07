@@ -99,7 +99,7 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
                       http2ImplementationToString(params.param.http2_implementation),
                       params.param.defer_processing_backedup_streams ? "WithDeferredProcessing"
                                                                      : "NoDeferredProcessing",
-                      params.param.use_header_validator ? "Uhv" : "Legacy");
+                      params.param.use_universal_header_validator ? "Uhv" : "Legacy");
 }
 
 void HttpProtocolIntegrationTest::setUpstreamOverrideStreamErrorOnInvalidHttpMessage() {
