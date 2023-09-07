@@ -14,6 +14,7 @@ behavior_changes:
 - area: zone-aware routing
   change: |
     Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
+    Previously, zone-aware routing was disabled in that case and the ``lb_zone_number_differs`` stat on the cluster was incremented.
     This behavioral change can be reverted by setting runtime guard
     ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` to false.
     Additionally, zone-aware routing now works correctly even when the originating and upstream cluster have different zone sets.
