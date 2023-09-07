@@ -362,8 +362,8 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
       return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(), &arena_);
     }
   } else if (value == RouteName) {
-    if (info_.route() && info_.route()->routeEntry()) {
-      return CelValue::CreateString(&info_.route()->routeEntry()->routeName());
+    if (info_.route()) {
+      return CelValue::CreateString(&info_.route()->routeName());
     }
   } else if (value == RouteMetadata) {
     if (info_.route()) {

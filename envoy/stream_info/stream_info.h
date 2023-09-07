@@ -610,12 +610,8 @@ public:
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
-   * @param std::string name denotes the name of the route.
-   */
-  virtual void setRouteName(absl::string_view name) PURE;
-
-  /**
-   * @return std::string& the name of the route.
+   * @return std::string& the name of the route. The name is get from the route() and it is
+   *         empty if there is no route.
    */
   virtual const std::string& getRouteName() const PURE;
 

@@ -131,6 +131,8 @@ envoy_cc_test(
         ],
     }),
     deps = [
+        "//source/common/network:filter_state_dst_address_lib",
+        "//source/common/tcp_proxy",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
         "//test/mocks/http:http_mocks",
