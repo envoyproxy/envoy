@@ -71,7 +71,7 @@ public:
 
 // Verifies that the local reply persists the gRPC classification even if the request headers are
 // modified.
-TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
+TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassification) {
   initialize();
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -120,7 +120,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
 
 // Verifies that the local reply persists the gRPC classification even if the request headers are
 // modified when directly encoding a response.
-TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
+TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassification) {
   initialize();
 
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
@@ -231,6 +231,62 @@ TEST_F(FilterManagerTest, OnLocalReply) {
 
   // The reason for the response (in this case the reset) will still be tracked
   // but as no response is sent the response code will remain absent.
+  ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
+  EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
+  EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, ProtocolErrorOnLocalReply) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<MockStreamEncoderFilter> encoder_filter(new NiceMock<MockStreamEncoderFilter>());
+  std::shared_ptr<MockStreamFilter> stream_filter(new NiceMock<MockStreamFilter>());
+
+  RequestHeaderMapPtr headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "BAD"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
+        manager.applyFilterFactoryCb({}, decoder_factory);
+        auto stream_factory = createStreamFilterFactoryCb(stream_filter);
+        manager.applyFilterFactoryCb({}, stream_factory);
+        auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
+        manager.applyFilterFactoryCb({}, encoder_factory);
+        return true;
+      }));
+
+  // Make sure all 3 filters get onLocalReply, even though we short-circuited out of normal
+  // processing due to protocol error.
+  EXPECT_CALL(*decoder_filter, onLocalReply(_))
+      .WillOnce(
+          Invoke([&](const StreamFilterBase::LocalReplyData& local_reply_data) -> LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return LocalErrorStatus::Continue;
+          }));
+  EXPECT_CALL(*stream_filter, onLocalReply(_))
+      .WillOnce(
+          Invoke([&](const StreamFilterBase::LocalReplyData& local_reply_data) -> LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return LocalErrorStatus::Continue;
+          }));
+  EXPECT_CALL(*encoder_filter, onLocalReply(_))
+      .WillOnce(
+          Invoke([&](const StreamFilterBase::LocalReplyData& local_reply_data) -> LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return LocalErrorStatus::Continue;
+          }));
+
+  // call DownstreamFilterManager::sendLocalReply without calling decodeHeaders to imitate the call
+  // coming from a protocol error
+  filter_manager_->sendLocalReply(Code::InternalServerError, "body", nullptr,
+                                  Grpc::Status::Internal, "details");
+
   ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
