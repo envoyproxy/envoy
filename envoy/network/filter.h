@@ -404,22 +404,6 @@ public:
  */
 using ListenerFilterFactoryCb = std::function<void(ListenerFilterManager& filter_manager)>;
 
-#ifndef ENVOY_ENABLE_QUIC
-
-} // namespace Network
-} // namespace Envoy
-
-namespace quic {
-
-class QuicSocketAddress {};
-
-} // namespace quic
-
-namespace Envoy {
-namespace Network {
-
-#endif
-
 /**
  * QUIC Listener Filter
  */

@@ -228,6 +228,15 @@ public:
 };
 
 #ifdef ENVOY_ENABLE_QUIC
+
+} // namespace Network
+} // namespace Envoy
+
+#include "quiche/quic/platform/api/quic_socket_address.h"
+
+namespace Envoy {
+namespace Network {
+
 class MockQuicListenerFilter : public QuicListenerFilter {
 public:
   MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
