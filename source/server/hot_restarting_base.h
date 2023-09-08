@@ -29,7 +29,7 @@ class HotRestartingBase : public Logger::Loggable<Logger::Id::main> {
 protected:
   HotRestartingBase(uint64_t base_id)
       : main_rpc_stream_(base_id), udp_forwarding_rpc_stream_(base_id) {}
-  virtual ~HotRestartingBase();
+  virtual ~HotRestartingBase() = default;
 
   enum class Blocking { Yes, No };
 

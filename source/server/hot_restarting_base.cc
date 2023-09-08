@@ -212,6 +212,8 @@ HotRestartingBase::RpcStream::receiveHotRestartMessage(Blocking block) {
   msghdr message;
   uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
   std::unique_ptr<HotRestartMessage> ret = nullptr;
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  std::cerr << "receiveHotRestartMessage" << std::endl;
   while (!ret) {
     iov[0].iov_base = recv_buf_.data() + cur_msg_recvd_bytes_;
     iov[0].iov_len = MaxSendmsgSize;
@@ -224,31 +226,37 @@ HotRestartingBase::RpcStream::receiveHotRestartMessage(Blocking block) {
     message.msg_control = control_buffer;
     message.msg_controllen = CMSG_SPACE(sizeof(int));
 
-    const int recvmsg_rc = recvmsg(domain_socket_, &message, 0);
-    if (block == Blocking::No && recvmsg_rc == -1 && errno == SOCKET_ERROR_AGAIN) {
+    std::cerr << "recvmsg" << std::endl;
+    const Api::SysCallSizeResult recv_result = os_sys_calls.recvmsg(domain_socket_, &message, 0);
+    std::cerr << "rc2" << std::endl;
+    if (block == Blocking::No && recv_result.return_value_ == -1 &&
+        recv_result.errno_ == SOCKET_ERROR_AGAIN) {
       return nullptr;
     }
-    RELEASE_ASSERT(recvmsg_rc != -1, fmt::format("recvmsg() returned -1, errno = {}", errno));
+    RELEASE_ASSERT(recv_result.return_value_ != -1,
+                   fmt::format("recvmsg() returned -1, errno = {}", recv_result.errno_));
     RELEASE_ASSERT(message.msg_flags == 0,
                    fmt::format("recvmsg() left msg_flags = {}", message.msg_flags));
-    cur_msg_recvd_bytes_ += recvmsg_rc;
+    cur_msg_recvd_bytes_ += recv_result.return_value_;
 
     // If we don't already know 'length', we're at the start of a new length+protobuf message!
     if (!expected_proto_length_.has_value()) {
       // We are not ok with messages so fragmented that the length doesn't even come in one piece.
-      RELEASE_ASSERT(recvmsg_rc >= 8, "received a brokenly tiny message fragment.");
+      RELEASE_ASSERT(recv_result.return_value_ >= 8, "received a brokenly tiny message fragment.");
 
       expected_proto_length_ = be64toh(*reinterpret_cast<uint64_t*>(recv_buf_.data()));
       // Expand the buffer from its default 4096 if this message is going to be longer.
       if (expected_proto_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
         recv_buf_.resize(expected_proto_length_.value() + sizeof(uint64_t));
-        cur_msg_recvd_bytes_ = recvmsg_rc;
+        cur_msg_recvd_bytes_ = recv_result.return_value_;
       }
     }
     // If we have received beyond the end of the current in-flight proto, then next is misaligned.
     RELEASE_ASSERT(cur_msg_recvd_bytes_ <= sizeof(uint64_t) + expected_proto_length_.value(),
                    "received a length+protobuf message not aligned to start of sendmsg().");
 
+    std::cerr << "received " << cur_msg_recvd_bytes_ << ", expected "
+              << sizeof(uint64_t) + expected_proto_length_.value() << std::endl;
     if (cur_msg_recvd_bytes_ == sizeof(uint64_t) + expected_proto_length_.value()) {
       ret = parseProtoAndResetState();
     }
@@ -260,6 +268,7 @@ HotRestartingBase::RpcStream::receiveHotRestartMessage(Blocking block) {
                    fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
   }
   getPassedFdIfPresent(ret.get(), &message);
+  std::cerr << "end receive" << std::endl;
   return ret;
 }
 

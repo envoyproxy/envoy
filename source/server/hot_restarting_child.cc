@@ -35,7 +35,8 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                               socket_mode);
 }
 
-// Destructor must be specified in the cc file because UdpForwardingContext must be defined first.
+// Destructor must be specified in the cc file because UdpForwardingContext must be defined first
+// so that the destructor knows how to destroy it.
 HotRestartingChild::~HotRestartingChild() = default;
 
 void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
@@ -43,6 +44,7 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
       udp_forwarding_rpc_stream_.domain_socket_,
       [this](uint32_t events) -> void {
         ASSERT(events == Event::FileReadyType::Read);
+        std::cerr << "file event happened" << std::endl;
         onSocketEventUdpForwarding();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
