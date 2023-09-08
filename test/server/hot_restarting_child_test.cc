@@ -72,7 +72,7 @@ public:
 class HotRestartingChildTest : public testing::Test {
 public:
   void SetUp() override {
-    // Address stringification performs a socket call which we unfortunately
+    // Address-to-string conversion performs a socket call which we unfortunately
     // can't have bypass os_sys_calls_.
     EXPECT_CALL(os_sys_calls_, socket(_, _, _)).WillRepeatedly([this]() {
       static const int address_stringing_socket = 999;
