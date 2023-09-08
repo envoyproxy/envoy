@@ -18,7 +18,8 @@ public:
   // to support QUIC packet forwarding.
   class UdpForwardingContext {
   public:
-    using ForwardEntry = std::pair<const Network::Address::Instance*, Network::UdpListenerConfig*>;
+    using ForwardEntry = std::pair<Network::Address::InstanceConstSharedPtr,
+                                   std::shared_ptr<Network::UdpListenerConfig>>;
 
     // Returns the address and UdpListenerConfig associated with the given address.
     // The addresses are not necessarily identical, as e.g. the listener might be listening on
@@ -32,8 +33,8 @@ public:
     // Registers a UdpListenerConfig and address into the map, to be matched using
     // getListenerForDestination for UDP packet forwarding.
     // This is called from the main thread during listening socket creation.
-    void registerListener(const Network::Address::Instance& address,
-                          Network::UdpListenerConfig& listener_config);
+    void registerListener(Network::Address::InstanceConstSharedPtr address,
+                          std::shared_ptr<Network::UdpListenerConfig> listener_config);
 
   private:
     // Map keyed on address as a string, because Network::Address::Instance isn't hashable.
@@ -41,8 +42,8 @@ public:
   };
 
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
-  void registerUdpForwardingListener(const Network::Address::Instance& address,
-                                     Network::UdpListenerConfig& listener_config);
+  void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
+                                     std::shared_ptr<Network::UdpListenerConfig> listener_config);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();

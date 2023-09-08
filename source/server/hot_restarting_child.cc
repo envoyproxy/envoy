@@ -8,10 +8,10 @@ namespace Server {
 using HotRestartMessage = envoy::HotRestartMessage;
 
 void HotRestartingChild::UdpForwardingContext::registerListener(
-    const Network::Address::Instance& address, Network::UdpListenerConfig& listener_config) {
+    Network::Address::InstanceConstSharedPtr address,
+    std::shared_ptr<Network::UdpListenerConfig> listener_config) {
   const bool inserted =
-      listener_map_.try_emplace(address.asString(), ForwardEntry{&address, &listener_config})
-          .second;
+      listener_map_.try_emplace(address->asString(), ForwardEntry{address, listener_config}).second;
   ASSERT(inserted, "Two udp listeners on the same address shouldn't be possible");
 }
 
@@ -99,7 +99,8 @@ void HotRestartingChild::drainParentListeners() {
 }
 
 void HotRestartingChild::registerUdpForwardingListener(
-    const Network::Address::Instance& address, Network::UdpListenerConfig& listener_config) {
+    Network::Address::InstanceConstSharedPtr address,
+    std::shared_ptr<Network::UdpListenerConfig> listener_config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   udp_forwarding_context_.registerListener(address, listener_config);
 }

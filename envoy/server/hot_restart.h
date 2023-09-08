@@ -59,8 +59,9 @@ public:
    * @param listener_config is the UdpListenerConfig to receive packets forwarded for the given
    * address.
    */
-  virtual void registerUdpForwardingListener(const Network::Address::Instance& address,
-                                             Network::UdpListenerConfig& listener_config) PURE;
+  virtual void
+  registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
+                                std::shared_ptr<Network::UdpListenerConfig> listener_config) PURE;
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a
    * new child has begun. The hot restart implementation needs to be created early to deal with

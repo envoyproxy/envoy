@@ -592,7 +592,6 @@ void ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance
   }
   udp_listener_config_->listener_worker_routers_.emplace(
       address.asString(), std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency));
-  parent_.server_.hotRestart().registerUdpForwardingListener(address, *udp_listener_config_);
 }
 
 void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
@@ -1007,6 +1006,8 @@ void ListenerImpl::addSocketFactory(Network::ListenSocketFactoryPtr&& socket_fac
   buildConnectionBalancer(*socket_factory->localAddress());
   buildUdpListenerWorkerRouter(*socket_factory->localAddress(),
                                parent_.server_.options().concurrency());
+  parent_.server_.hotRestart().registerUdpForwardingListener(socket_factory->localAddress(),
+                                                             udp_listener_config_);
   socket_factories_.emplace_back(std::move(socket_factory));
 }
 
