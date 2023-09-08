@@ -5,6 +5,9 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/trace_driver.h"
 
+
+#include "samplers/sampler.h"
+
 #include "source/common/common/logger.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/tracers/common/factory_base.h"
@@ -52,6 +55,7 @@ private:
   const envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config_;
   ThreadLocal::SlotPtr tls_slot_ptr_;
   OpenTelemetryTracerStats tracing_stats_;
+  SamplerPtr sampler_;
 };
 
 } // namespace OpenTelemetry

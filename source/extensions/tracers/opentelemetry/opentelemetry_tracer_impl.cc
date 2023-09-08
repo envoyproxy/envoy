@@ -1,5 +1,6 @@
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
+#include <memory>
 #include <string>
 
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
@@ -27,6 +28,18 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))} {
   auto& factory_context = context.serverFactoryContext();
   // Create the tracer in Thread Local Storage.
+
+  // TODO: init sampler
+  if (opentelemetry_config.has_sampler()) {
+    auto sampler_config = opentelemetry_config.sampler();
+    auto* factory = Envoy::Config::Utility::getFactoryByName<SamplerFactory>(sampler_config.name());
+    if (!factory) {
+      throw EnvoyException(
+          fmt::format(" factory not found: '{}'", sampler_config.name()));
+    }
+    sampler_ = factory->createSampler(context);
+  }
+
   tls_slot_ptr_->set([opentelemetry_config, &factory_context, this](Event::Dispatcher& dispatcher) {
     OpenTelemetryGrpcTraceExporterPtr exporter;
     if (opentelemetry_config.has_grpc_service()) {
@@ -37,6 +50,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           factory->createUncachedRawAsyncClient();
       exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
     }
+
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
         factory_context.runtime(), dispatcher, tracing_stats_, opentelemetry_config.service_name());
@@ -50,14 +64,21 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const std::string& operation_name,
                                    const Tracing::Decision tracing_decision) {
+
   // Get tracer from TLS and start span.
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   SpanContextExtractor extractor(trace_context);
   if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
-    Tracing::SpanPtr new_open_telemetry_span =
+    if (sampler_ && !sampler_->sample(trace_context)) {
+      // we should start a span which has "sampled == false"
+      // we should pass the started span to the sampler. So, the sampler can call setTag() and add sampling related content
+      return std::make_unique<Tracing::NullSpan>();
+    }
+    std::unique_ptr<Tracing::Span> new_open_telemetry_span =
         tracer.startSpan(config, operation_name, stream_info.startTime(), tracing_decision);
     new_open_telemetry_span->setSampled(tracing_decision.traced);
+    // new_open_telemetry_span->setTag("sampling_key", "sampling_value");
     return new_open_telemetry_span;
   } else {
     // Try to extract the span context. If we can't, just return a null span.
