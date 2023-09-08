@@ -166,7 +166,8 @@ protected:
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                      testing::Unused) {
     if (final_expected_grpc_service_.has_value()) {
-      EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(), config_with_hash_key.config()));
+      EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(),
+                                          config_with_hash_key.config()));
       std::cout << final_expected_grpc_service_.value().DebugString();
       std::cout << config_with_hash_key.config().DebugString();
     }

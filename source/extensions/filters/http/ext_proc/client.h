@@ -39,9 +39,10 @@ public:
 class ExternalProcessorClient {
 public:
   virtual ~ExternalProcessorClient() = default;
-  virtual ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
-                                           const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                                           const StreamInfo::StreamInfo& stream_info) PURE;
+  virtual ExternalProcessorStreamPtr
+  start(ExternalProcessorCallbacks& callbacks,
+        const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+        const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

@@ -246,7 +246,8 @@ public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client,
          const envoy::config::core::v3::GrpcService& grpc_service)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        grpc_service_(grpc_service), config_with_hash_key_(grpc_service), decoding_state_(*this, config->processingMode()),
+        grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
+        decoding_state_(*this, config->processingMode()),
         encoding_state_(*this, config->processingMode()) {}
 
   const FilterConfig& config() const { return *config_; }
