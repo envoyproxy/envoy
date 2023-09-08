@@ -155,12 +155,15 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
   // Validate that header sanitization is only called once.
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3::HttpConnectionManager& hcm) {
-    hcm.mutable_delayed_close_timeout()->set_seconds(0);
-    hcm.set_via("via_value");
-    hcm.mutable_common_http_protocol_options()->mutable_max_requests_per_connection()->set_value(10);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_delayed_close_timeout()->set_seconds(0);
+        hcm.set_via("via_value");
+        hcm.mutable_common_http_protocol_options()
+            ->mutable_max_requests_per_connection()
+            ->set_value(10);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -197,8 +200,8 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -"));
 }
 
-// Test the buggy behavior where Envoy doesn't respond to "Connection: close" header in requests which get
-// redirected.
+// Test the buggy behavior where Envoy doesn't respond to "Connection: close" header in requests
+// which get redirected.
 // TODO(danzh) remove the test once the runtime guard is deprecated.
 TEST_P(RedirectIntegrationTest, ConnectionCloseHeaderDroppedInInternalRedirect) {
   config_helper_.addRuntimeOverride(
@@ -209,13 +212,16 @@ TEST_P(RedirectIntegrationTest, ConnectionCloseHeaderDroppedInInternalRedirect) 
   }
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
   // Validate that header sanitization is only called once.
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3::HttpConnectionManager& hcm) {
-    // The delay should be ignored in light of "Connection: close".
-    hcm.mutable_delayed_close_timeout()->set_seconds(1);
-    hcm.set_via("via_value");
-    hcm.mutable_common_http_protocol_options()->mutable_max_requests_per_connection()->set_value(10);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        // The delay should be ignored in light of "Connection: close".
+        hcm.mutable_delayed_close_timeout()->set_seconds(1);
+        hcm.set_via("via_value");
+        hcm.mutable_common_http_protocol_options()
+            ->mutable_max_requests_per_connection()
+            ->set_value(10);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -261,14 +267,17 @@ TEST_P(RedirectIntegrationTest, ConnectionCloseHeaderHonoredInInternalRedirect) 
   }
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
   // Validate that header sanitization is only called once.
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3::HttpConnectionManager& hcm) {
-    // The delay should be ignored in light of "Connection: close".
-    hcm.mutable_delayed_close_timeout()->set_seconds(10);
-    hcm.set_via("via_value");
-    // Make sure connection won't be closed because it only allows 1 request.
-    hcm.mutable_common_http_protocol_options()->mutable_max_requests_per_connection()->set_value(10);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        // The delay should be ignored in light of "Connection: close".
+        hcm.mutable_delayed_close_timeout()->set_seconds(10);
+        hcm.set_via("via_value");
+        // Make sure connection won't be closed because it only allows 1 request.
+        hcm.mutable_common_http_protocol_options()
+            ->mutable_max_requests_per_connection()
+            ->set_value(10);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
