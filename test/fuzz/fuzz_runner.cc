@@ -68,8 +68,9 @@ void addCleanupHook(std::function<void()> cleanup) {
 
 void runCleanupHooks() {
   if (cleanup_hooks != nullptr) {
-    for (std::function<void()> hook : *cleanup_hooks) {
-      hook();
+    // Run hooks in reverse order from how they were added.
+    for (auto iter = cleanup_hooks->rbegin(), end = cleanup_hooks->rend(); iter != end; ++iter) {
+      (*iter)();
     }
     delete cleanup_hooks;
     cleanup_hooks = nullptr;
