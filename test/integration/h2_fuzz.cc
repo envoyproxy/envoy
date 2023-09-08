@@ -170,7 +170,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
 void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCase& input,
                                    bool ignore_response) {
   struct Init {
-    Init(H1FuzzIntegrationTest* test) { test->initialize(); }
+    Init(H2FuzzIntegrationTest* test) { test->initialize(); }
   };
   PERSISTENT_FUZZ_VAR(Init, initialized, this);
   UNREFERENCED_PARAMETER(initialized);
