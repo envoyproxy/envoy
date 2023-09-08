@@ -37,7 +37,8 @@ fi
 
 use_bazel=1
 if [[ $# -gt 0 && "$1" == "-skip-bazel" ]]; then
-  echo Running Python script directly rather than going through Bazel.
+  echo "WARNING: not using bazel to invoke this script may result in "
+  echo -n "mismatched versions and incorrect formatting"
   shift
   use_bazel=0
 fi
