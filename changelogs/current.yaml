@@ -27,6 +27,8 @@ behavior_changes:
     ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` to false.
     Additionally, zone-aware routing now works correctly even when the originating and upstream cluster have different zone sets.
     Previously, zone-aware routing would not route fairly in this case.
+    To revert the entire change, set the runtime flag ``envoy.reloadable_features.locality_routing_use_new_routing_logic``
+    to false to get the old behavior and well-tested codepaths, undoing both changes.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
