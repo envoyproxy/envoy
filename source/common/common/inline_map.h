@@ -46,12 +46,11 @@ namespace Envoy {
  *   descriptor.finalize();
  *
  *   // Create the inline map.
- *   InlineMapPtr<std::string, std::string> inline_map = InlineMap<std::string,
- *     std::string>::create(descriptor);
+ *   InlineMap<std::string, std::string> inline_map(descriptor)
  *
  *   // Set value by handle.
- *   inline_map->set(handle, "value");
- *   EXPECT_EQ(*inline_map->lookup(handle), "value");
+ *   inline_map.set(handle, "value");
+ *   EXPECT_EQ(*inline_map.get(handle), "value");
  */
 
 /**
@@ -219,9 +218,7 @@ public:
     rhs.inline_entries_valid_ = nullptr;
   }
 
-  ~InlineMap() { /*clear()*/
-    ;
-  }
+  ~InlineMap() { clear(); }
 
   /**
    * Get the entry by the given key. Heterogeneous lookup is supported here.
