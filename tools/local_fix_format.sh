@@ -37,8 +37,8 @@ fi
 
 use_bazel=1
 if [[ $# -gt 0 && "$1" == "-skip-bazel" ]]; then
-  echo "WARNING: not using bazel to invoke this script may result in "
-  echo -n "mismatched versions and incorrect formatting"
+  echo -n "WARNING: not using bazel to invoke this script may result in "
+  echo "mismatched versions and incorrect formatting"
   shift
   use_bazel=0
 fi
