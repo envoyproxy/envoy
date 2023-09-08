@@ -33,7 +33,6 @@ envoy_cc_library(
     external_deps = ["maxmind"],
     deps = [
         "//envoy/geoip:geoip_provider_driver_interface",
-        "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/geoip_providers/maxmind/v3:pkg_cc_proto",
     ],
 )
