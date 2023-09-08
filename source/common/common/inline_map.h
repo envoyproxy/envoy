@@ -546,7 +546,7 @@ private:
   uint64_t inline_entries_size_{};
 
   // These are flags to indicate if the inline entries are valid. We keep pointer here to
-  // avoid calucating the offset every time.
+  // avoid computing the offset every time.
   bool* inline_entries_valid_{};
 };
 
