@@ -155,35 +155,35 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
                                    SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
-  Span new_span = Span(config, operation_name, start_time, time_source_, *this);
-  new_span.setSampled(tracing_decision.traced);
+  SpanPtr new_span = std::make_unique<Span>(config, operation_name, start_time, time_source_, *this);
+  new_span->setSampled(tracing_decision.traced);
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
-  new_span.setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
+  new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
   uint64_t span_id = random_.random();
-  new_span.setId(Hex::uint64ToHex(span_id));
-  return std::make_unique<Span>(new_span);
+  new_span->setId(Hex::uint64ToHex(span_id));
+  return new_span;
 }
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& operation_name,
                                    SystemTime start_time,
                                    const SpanContext& previous_span_context) {
   // Create a new span and populate details from the span context.
-  Span new_span = Span(config, operation_name, start_time, time_source_, *this);
-  new_span.setSampled(previous_span_context.sampled());
-  new_span.setTraceId(previous_span_context.traceId());
+  SpanPtr new_span = std::make_unique<Span>(config, operation_name, start_time, time_source_, *this);
+  new_span->setSampled(previous_span_context.sampled());
+  new_span->setTraceId(previous_span_context.traceId());
   if (!previous_span_context.parentId().empty()) {
-    new_span.setParentId(previous_span_context.parentId());
+    new_span->setParentId(previous_span_context.parentId());
   }
   // Generate a new identifier for the span id.
   uint64_t span_id = random_.random();
-  new_span.setId(Hex::uint64ToHex(span_id));
+  new_span->setId(Hex::uint64ToHex(span_id));
   // Respect the previous span's sampled flag.
-  new_span.setSampled(previous_span_context.sampled());
+  new_span->setSampled(previous_span_context.sampled());
   if (!previous_span_context.tracestate().empty()) {
-    new_span.setTracestate(std::string{previous_span_context.tracestate()});
+    new_span->setTracestate(std::string{previous_span_context.tracestate()});
   }
-  return std::make_unique<Span>(new_span);
+  return new_span;
 }
 
 } // namespace OpenTelemetry
