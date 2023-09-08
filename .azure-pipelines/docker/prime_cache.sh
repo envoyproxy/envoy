@@ -65,11 +65,11 @@ echo "================ Save caches ======================"
 if [[ "$DOCKER_RESTORED" != "true" ]]; then
     echo "Stopping docker"
     sudo systemctl stop docker docker.socket
-    sudo ./.azure-pipelines/docker/create_cache.sh "${DOCKER_CACHE_TARBALL}" /var/lib/docker
+    sudo ./.azure-pipelines/docker/create_cache.sh "${DOCKER_CACHE_TARBALL}" . /var/lib/docker
 fi
 
 if [[ "$BAZEL_RESTORED" != "true" ]]; then
-    sudo ./.azure-pipelines/docker/create_cache.sh "${BAZEL_CACHE_TARBALL}" "${BAZEL_PATH}"
+    sudo ./.azure-pipelines/docker/create_cache.sh "${BAZEL_CACHE_TARBALL}" . "${BAZEL_PATH}"
 fi
 sudo chmod o+r -R "${CACHE_PATH}"
 echo "==================================================="
