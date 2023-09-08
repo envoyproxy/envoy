@@ -1254,6 +1254,13 @@ envoy.upstreams.tcp.tcp_protocol_options:
   - envoy.upstreams
   security_posture: unknown
   status: alpha
+envoy.upstream.local_address_selector.default_local_address_selector:
+  categories:
+  - envoy.upstream.local_address_selector
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.config.upstream.local_address_selector.v3.DefaultLocalAddressSelector
 envoy.wasm.runtime.null:
   categories:
   - envoy.wasm.runtime
