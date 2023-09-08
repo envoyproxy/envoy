@@ -65,7 +65,13 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
           factory_context.sslContextManager()
               .privateKeyMethodManager()
               .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context);
-      if (private_key_method_ && !private_key_method_->isAvailable()) {
+      if (private_key_method_ == nullptr ||
+          (!private_key_method_->isAvailable() && !config.private_key_provider().fallback())) {
+        throw EnvoyException(fmt::format("Failed to load private key provider: {}",
+                                         config.private_key_provider().provider_name()));
+      }
+
+      if (!private_key_method_->isAvailable()) {
         private_key_method_ = nullptr;
       }
     }
@@ -73,11 +79,6 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       throw EnvoyException(
           fmt::format("Failed to load incomplete certificate from {}: certificate chain not set",
                       certificate_chain_path_));
-    }
-    if (config.has_private_key_provider() && !config.private_key_provider().fallback() &&
-        private_key_method_ == nullptr) {
-      throw EnvoyException(fmt::format("Failed to load private key provider: {}",
-                                       config.private_key_provider().provider_name()));
     }
 
     if (private_key_.empty() && private_key_method_ == nullptr) {
