@@ -10,15 +10,15 @@ namespace {
 
 envoy::config::overload::v3::OverloadManager
 generateMaxDownstreamConnectionsOverloadConfig(uint32_t max_cx) {
-  const static std::string yaml_config = R"EOF(
+  return TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(
+      fmt::format(R"EOF(
           resource_monitors:
             - name: "envoy.resource_monitors.global_downstream_max_connections"
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
                 max_active_downstream_connections: {}
-        )EOF";
-  return TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(
-      fmt::format(yaml_config, std::to_string(max_cx)));
+        )EOF",
+                  std::to_string(max_cx)));
 }
 
 class GlobalDownstreamCxLimitIntegrationTest : public testing::Test, public BaseIntegrationTest {
