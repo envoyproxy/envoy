@@ -94,7 +94,5 @@ int main(int argc, char** argv) {
   testing::InitGoogleMock(&argc, argv);
   Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);
 
-  int status = RUN_ALL_TESTS();
-  Envoy::Fuzz::runCleanupHooks();
-  return status;
+  return RUN_ALL_TESTS();
 }

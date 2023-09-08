@@ -52,18 +52,6 @@ private:
   static spdlog::level::level_enum log_level_;
 };
 
-/**
- * Establishes a function to run before the test process exits. This enables
- * threads, mocks, and other objects that are expensive to create to be shared
- * between test methods.
- */
-void addCleanupHook(std::function<void()>);
-
-/**
- * Runs all cleanup hooks.
- */
-void runCleanupHooks();
-
 } // namespace Fuzz
 } // namespace Envoy
 
@@ -75,13 +63,9 @@ extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv);
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
 #ifdef PERSISTENT_FUZZER
-template <typename T> T& initFuzzVar(T* ptr) {
-  Envoy::Fuzz::addCleanupHook([ptr]() { delete ptr; });
-  return *ptr;
-}
-#define PERSISTENT_FUZZ_VAR(type, var, args) static type& var = initFuzzVar(new type(args))
+#define PERSISTENT_FUZZ_VAR static
 #else
-#define PERSISTENT_FUZZ_VAR(type, var, args) type var args
+#define PERSISTENT_FUZZ_VAR
 #endif
 
 #define DEFINE_TEST_ONE_INPUT_IMPL                                                                 \
