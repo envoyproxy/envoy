@@ -172,7 +172,7 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
   struct Init {
     Init(H2FuzzIntegrationTest* test) { test->initialize(); }
   };
-  PERSISTENT_FUZZ_VAR(Init, initialized, this);
+  PERSISTENT_FUZZ_VAR(Init, initialized, (this));
   UNREFERENCED_PARAMETER(initialized);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
   FakeRawConnectionPtr fake_upstream_connection;
