@@ -190,13 +190,38 @@ private:
  */
 template <class Key, class Value> class InlineMap {
 private:
-  using TypedInlineMapDescriptor = InlineMapDescriptor<Key>;
-  using Hash = typename TypedInlineMapDescriptor::Hash;
+  using Descriptor = InlineMapDescriptor<Key>;
+  using Hash = typename Descriptor::Hash;
   using DynamicHashMap = absl::flat_hash_map<Key, Value, Hash>;
 
 public:
-  using Handle = typename TypedInlineMapDescriptor::Handle;
+  using Handle = typename Descriptor::Handle;
   using ValueRef = std::reference_wrapper<Value>;
+
+  /**
+   * Construct an inline map with the given descriptor.
+   */
+  InlineMap(const Descriptor& descriptor) : descriptor_(descriptor) {
+    ASSERT(descriptor_.finalized(), "Cannot create inline map before finalize()");
+  }
+
+  /**
+   * Construct an inline map by moving another inline map.
+   */
+  InlineMap(InlineMap&& rhs) noexcept
+      : descriptor_(rhs.descriptor_), dynamic_entries_(std::move(rhs.dynamic_entries_)),
+        inline_entries_(std::move(rhs.inline_entries_)),
+        inline_entries_size_(rhs.inline_entries_size_),
+        inline_entries_valid_(rhs.inline_entries_valid_) {
+
+    // Clear the moved map.
+    rhs.inline_entries_size_ = 0;
+    rhs.inline_entries_valid_ = nullptr;
+  }
+
+  ~InlineMap() { /*clear()*/
+    ;
+  }
 
   /**
    * Get the entry by the given key. Heterogeneous lookup is supported here.
@@ -215,7 +240,7 @@ public:
 
     if (absl::optional<uint64_t> entry_id = inlineLookup(key, hash); entry_id.has_value()) {
       if (inlineEntryValid(*entry_id)) {
-        return inline_entries_[*entry_id];
+        return inlineEntries()[*entry_id];
       }
     }
 
@@ -239,7 +264,7 @@ public:
 
     if (absl::optional<uint64_t> entry_id = inlineLookup(key, hash); entry_id.has_value()) {
       if (inlineEntryValid(*entry_id)) {
-        return inline_entries_[*entry_id];
+        return inlineEntries()[*entry_id];
       }
     }
 
@@ -254,7 +279,7 @@ public:
    */
   OptRef<const Value> get(Handle handle) const {
     if (inlineEntryValid(handle.inlineId())) {
-      return inline_entries_[handle.inlineId()];
+      return inlineEntries()[handle.inlineId()];
     }
     return {};
   }
@@ -267,7 +292,7 @@ public:
    */
   OptRef<Value> get(Handle handle) {
     if (inlineEntryValid(handle.inlineId())) {
-      return inline_entries_[handle.inlineId()];
+      return inlineEntries()[handle.inlineId()];
     }
     return {};
   }
@@ -287,11 +312,11 @@ public:
 
       // If the entry is already valid, insert will fail and return the ref of exist value.
       if (inlineEntryValid(*entry_id)) {
-        return {inline_entries_[*entry_id], false};
+        return {inlineEntries()[*entry_id], false};
       }
 
       resetInlineMapEntry(*entry_id, std::forward<SetValue>(value));
-      return {inline_entries_[*entry_id], true};
+      return {inlineEntries()[*entry_id], true};
     } else {
       // This key is not registered as inline key and try to insert the value to the normal map.
       auto result =
@@ -311,11 +336,11 @@ public:
   template <class SetValue> std::pair<ValueRef, bool> set(Handle handle, SetValue&& value) {
     // If the entry is already valid, insert will fail and return false.
     if (inlineEntryValid(handle.inlineId())) {
-      return {inline_entries_[handle.inlineId()], false};
+      return {inlineEntries()[handle.inlineId()], false};
     }
 
     resetInlineMapEntry(handle.inlineId(), std::forward<SetValue>(value));
-    return {inline_entries_[handle.inlineId()], true};
+    return {inlineEntries()[handle.inlineId()], true};
   }
 
   /**
@@ -357,7 +382,7 @@ public:
         continue;
       }
 
-      if (!callback(inline_keys[i], inline_entries_[i])) {
+      if (!callback(inline_keys[i], inlineEntries()[i])) {
         return;
       }
     }
@@ -367,14 +392,19 @@ public:
    * Clear all elements in the map.
    */
   void clear() {
-    // Destruct all inline entries.
+    // Clear the normal dynamic map.
+    dynamic_entries_.clear();
+
+    // Quick return if the inline entries is not allocated to avoid
+    // unnecessary iterations.
+    if (inline_entries_ == nullptr) {
+      return;
+    }
+
     const uint64_t inline_keys_num = descriptor_.inlineKeysNum();
     for (uint64_t i = 0; i < inline_keys_num; ++i) {
       clearInlineMapEntry(i);
     }
-
-    // Clear the normal map.
-    dynamic_entries_.clear();
   }
 
   /**
@@ -387,8 +417,6 @@ public:
    */
   bool empty() const { return size() == 0; }
 
-  ~InlineMap() { clear(); }
-
   /**
    * Override operator [] to support the dynamic key assignment.
    */
@@ -398,7 +426,7 @@ public:
       if (!inlineEntryValid(*entry_id)) {
         resetInlineMapEntry(*entry_id, Value());
       }
-      return inline_entries_[*entry_id];
+      return inlineEntries()[*entry_id];
     } else {
       // This key is not registered as inline key and try to add the value to the normal map.
       return dynamic_entries_[key];
@@ -412,37 +440,23 @@ public:
     if (!inlineEntryValid(handle.inlineId())) {
       resetInlineMapEntry(handle.inlineId(), Value());
     }
-    return inline_entries_[handle.inlineId()];
+    return inlineEntries()[handle.inlineId()];
   }
-
-  /**
-   * Construct an inline map with the given descriptor.
-   */
-  InlineMap(const TypedInlineMapDescriptor& descriptor) : descriptor_(descriptor) {
-    ASSERT(descriptor_.finalized(), "Cannot create inline map before finalize()");
-  }
-
-  /**
-   * Construct an inline map by moving another inline map.
-   */
-  InlineMap(InlineMap&&) noexcept = default;
 
 private:
   using StoragePtr = std::unique_ptr<uint8_t[]>;
   friend class InlineMapDescriptor<Key>;
 
   void lazyInitializeInlineEntriesMemory() {
-    if (inline_entries_storage_ == nullptr) {
+    if (inline_entries_ == nullptr) {
       const uint64_t value_memory_size = descriptor_.inlineKeysNum() * sizeof(Value);
       const uint64_t valid_memory_size = descriptor_.inlineKeysNum() * sizeof(bool);
       const uint64_t memory_size = value_memory_size + valid_memory_size;
 
-      inline_entries_storage_.reset(new uint8_t[memory_size]);
-      memset(inline_entries_storage_.get(), 0, memory_size);
+      inline_entries_.reset(new uint8_t[memory_size]);
+      memset(inline_entries_.get(), 0, memory_size);
 
-      inline_entries_ = reinterpret_cast<Value*>(inline_entries_storage_.get());
-      inline_entries_valid_ =
-          reinterpret_cast<bool*>(inline_entries_storage_.get() + value_memory_size);
+      inline_entries_valid_ = reinterpret_cast<bool*>(inline_entries_.get() + value_memory_size);
     }
   }
 
@@ -454,7 +468,7 @@ private:
     clearInlineMapEntry(inline_entry_id);
 
     // Construct the new entry in the inline array.
-    new (inline_entries_ + inline_entry_id) Value(std::forward<SetValue>(value));
+    new (inlineEntries() + inline_entry_id) Value(std::forward<SetValue>(value));
 
     setInlineEntryValid(inline_entry_id, true);
   }
@@ -465,7 +479,7 @@ private:
     // Destruct the old entry if it is valid.
     if (inlineEntryValid(inline_entry_id)) {
       setInlineEntryValid(inline_entry_id, false);
-      (inline_entries_ + inline_entry_id)->~Value();
+      (inlineEntries() + inline_entry_id)->~Value();
       return 1;
     }
 
@@ -492,15 +506,15 @@ private:
   bool inlineEntryValid(uint64_t inline_entry_id) const {
     ASSERT(inline_entry_id < descriptor_.inlineKeysNum());
 
-    if (inline_entries_storage_ == nullptr) {
-      // If the inline entries storage is not allocated, then the inline entry is not valid.
+    if (inline_entries_ == nullptr) {
+      // If the inline entries is not allocated, then the inline entry is not valid.
       return false;
     }
     return inline_entries_valid_[inline_entry_id];
   }
   void setInlineEntryValid(uint64_t inline_entry_id, bool flag) {
     ASSERT(inline_entry_id < descriptor_.inlineKeysNum());
-    ASSERT(inline_entries_storage_ != nullptr);
+    ASSERT(inline_entries_ != nullptr);
 
     if (flag) {
       inline_entries_size_++;
@@ -512,20 +526,28 @@ private:
     inline_entries_valid_[inline_entry_id] = flag;
   }
 
+  // Helper function to get the inline entries array by the inline entries storage.
+  // reinterpret_cast has no runtime cost.
+  Value* inlineEntries() {
+    ASSERT(inline_entries_ != nullptr);
+    return reinterpret_cast<Value*>(inline_entries_.get());
+  }
+
   // This is the reference of the descriptor that the inline map created by. This is used to
   // validate the inline handle validity and get the inline key set.
-  const TypedInlineMapDescriptor& descriptor_;
+  const Descriptor& descriptor_;
 
   // This is the underlay hash map for the dynamic map entries.
   DynamicHashMap dynamic_entries_;
+  // This is the memory that used to store the inline entries.
+  StoragePtr inline_entries_;
 
+  // This is the number of the valid inline entries.
   uint64_t inline_entries_size_{};
 
-  Value* inline_entries_{};
-  // These are flags to indicate if the inline entries are valid.
+  // These are flags to indicate if the inline entries are valid. We keep pointer here to
+  // avoid calucating the offset every time.
   bool* inline_entries_valid_{};
-
-  StoragePtr inline_entries_storage_;
 };
 
 } // namespace Envoy

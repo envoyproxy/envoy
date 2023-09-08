@@ -8,9 +8,117 @@ namespace Envoy {
 namespace {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_InlineMapFind(benchmark::State& state) {
-  size_t map_type = state.range(0);
-  size_t used_inline_handles = state.range(1);
+static void BM_InlineMapConstructAndDestruct(benchmark::State& state) {
+  const size_t map_type = state.range(0);
+
+  InlineMapDescriptor<std::string> descriptor_200;
+  // Create 200 inline keys.
+  for (size_t i = 0; i < 200; ++i) {
+    const std::string key = "key_" + std::to_string(i);
+    descriptor_200.addInlineKey(key);
+  }
+  InlineMapDescriptor<std::string> descriptor_0;
+
+  descriptor_200.finalize();
+  descriptor_0.finalize();
+
+  if (map_type == 0) {
+    // Normal map.
+    for (auto _ : state) { // NOLINT
+      for (size_t i = 0; i < 200; ++i) {
+        absl::flat_hash_map<std::string, std::string> normal_map;
+        benchmark::DoNotOptimize(normal_map.size());
+      }
+    }
+  } else if (map_type == 1) {
+    // Inline map without any inline keys.
+    for (auto _ : state) { // NOLINT
+      for (size_t i = 0; i < 200; ++i) {
+        InlineMap<std::string, std::string> inline_map(descriptor_0);
+        benchmark::DoNotOptimize(inline_map.size());
+      }
+    }
+  } else {
+    // Inline map with 200 inline keys.
+    for (auto _ : state) { // NOLINT
+      for (size_t i = 0; i < 200; ++i) {
+        InlineMap<std::string, std::string> inline_map(descriptor_200);
+        benchmark::DoNotOptimize(inline_map.size());
+      }
+    }
+  }
+}
+
+BENCHMARK(BM_InlineMapConstructAndDestruct)->Args({0})->Args({1})->Args({2});
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_InlineMapSet(benchmark::State& state) {
+  const size_t map_type = state.range(0);
+  const size_t used_inline_handles = state.range(1);
+
+  std::vector<std::string> normal_keys;
+  std::vector<std::string> normal_values;
+
+  InlineMapDescriptor<std::string> descriptor_200;
+  // Create 200 inline keys.
+  std::vector<InlineMapDescriptor<std::string>::Handle> inline_handles_200;
+  for (size_t i = 0; i < 200; ++i) {
+    const std::string key = "key_" + std::to_string(i);
+    inline_handles_200.push_back(descriptor_200.addInlineKey(key));
+    normal_keys.push_back(key);
+    normal_values.push_back("value_" + std::to_string(i));
+  }
+  InlineMapDescriptor<std::string> descriptor_0;
+
+  descriptor_200.finalize();
+  descriptor_0.finalize();
+
+  absl::flat_hash_map<std::string, std::string> normal_map;
+  InlineMap<std::string, std::string> inline_map_200(descriptor_200);
+  InlineMap<std::string, std::string> inline_map_0(descriptor_0);
+
+  if (map_type == 0) {
+    // Normal map.
+    for (auto _ : state) { // NOLINT
+      for (size_t i = 0; i < 200; ++i) {
+        normal_map.insert({normal_keys[i], normal_values[i]});
+      }
+      normal_map.clear();
+    }
+  } else if (map_type == 1) {
+    // Inline map without any inline keys.
+    for (auto _ : state) { // NOLINT
+      for (size_t i = 0; i < 200; ++i) {
+        inline_map_0.set(normal_keys[i], normal_values[i]);
+      }
+      inline_map_0.clear();
+    }
+  } else {
+    // Inline map with 200 inline keys.
+    if (used_inline_handles == 0) {
+      for (auto _ : state) { // NOLINT
+        for (size_t i = 0; i < 200; ++i) {
+          inline_map_200.set(normal_keys[i], normal_values[i]);
+        }
+        inline_map_200.clear();
+      }
+    } else {
+      for (auto _ : state) { // NOLINT
+        for (size_t i = 0; i < 200; ++i) {
+          inline_map_200.set(inline_handles_200[i], normal_values[i]);
+        }
+        inline_map_200.clear();
+      }
+    }
+  }
+}
+
+BENCHMARK(BM_InlineMapSet)->Args({0, 0})->Args({1, 0})->Args({2, 0})->Args({2, 1});
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_InlineMapGet(benchmark::State& state) {
+  const size_t map_type = state.range(0);
+  const size_t used_inline_handles = state.range(1);
 
   std::vector<std::string> normal_keys;
 
@@ -69,8 +177,7 @@ static void BM_InlineMapFind(benchmark::State& state) {
   }
 }
 
-// Additional `{0, 0}` is used to avoid the effect of the first run.
-BENCHMARK(BM_InlineMapFind)->Args({0, 0})->Args({0, 0})->Args({1, 0})->Args({2, 0})->Args({2, 1});
+BENCHMARK(BM_InlineMapGet)->Args({0, 0})->Args({1, 0})->Args({2, 0})->Args({2, 1});
 
 } // namespace
 } // namespace Envoy

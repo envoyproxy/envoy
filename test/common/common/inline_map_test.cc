@@ -295,5 +295,37 @@ TEST(InlineMapWith3InlineKey, TestInlineKeysAsString) {
   EXPECT_EQ(descriptor.inlineKeysAsString("-"), "key_0-key_1-key_2");
 }
 
+TEST(InlineMapWith3InlineKey, TestInlineMapMoveConstructor) {
+  InlineMapDescriptor<std::string> descriptor;
+  // Create 3 inline keys.
+  for (size_t i = 0; i < 3; ++i) {
+    descriptor.addInlineKey("key_" + std::to_string(i));
+  }
+
+  descriptor.finalize();
+
+  InlineMap<std::string, std::unique_ptr<std::string>> map(descriptor);
+  for (size_t i = 0; i < 10; ++i) {
+    map.set("key_" + std::to_string(i),
+            std::make_unique<std::string>("value_" + std::to_string(i)));
+  }
+
+  // Check values by the keys.
+  for (size_t i = 0; i < 10; ++i) {
+    EXPECT_EQ(*map.get("key_" + std::to_string(i)).ref(), "value_" + std::to_string(i));
+  }
+
+  InlineMap<std::string, std::unique_ptr<std::string>> map2(std::move(map));
+
+  // Check original map is empty.
+  EXPECT_EQ(map.size(), 0);
+  EXPECT_EQ(map2.size(), 10);
+
+  // Check values by the keys.
+  for (size_t i = 0; i < 10; ++i) {
+    EXPECT_EQ(*map2.get("key_" + std::to_string(i)).ref(), "value_" + std::to_string(i));
+  }
+}
+
 } // namespace
 } // namespace Envoy
