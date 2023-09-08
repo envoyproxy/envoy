@@ -35,6 +35,13 @@ if [[ $# -gt 0 && "$1" == "-run-build-setup" ]]; then
   . ci/build_setup.sh
 fi
 
+use_bazel=1
+if [[ $# -gt 0 && "$1" == "-skip-bazel" ]]; then
+  echo Running Python script directly rather than going through Bazel.
+  shift
+  use_bazel=0
+fi
+
 if [[ $# -gt 0 && "$1" == "-verbose" ]]; then
   verbose=1
   shift
@@ -49,8 +56,13 @@ function format_some() {
     if [[ "$verbose" == "1" ]]; then
       set -x
     fi
-    bazel run //tools/code_format:check_format -- fix "$@"
-    ./tools/spelling/check_spelling_pedantic.py fix "$@"
+    if [[ "$use_bazel" == "1" ]]; then
+      bazel run //tools/code_format:check_format -- fix "$@"
+    else
+      for arg in "$@"; do
+        ./tools/spelling/check_spelling_pedantic.py fix "$arg"
+      done
+    fi
   )
 }
 
