@@ -1,8 +1,7 @@
 #include "source/common/json/json_streamer.h"
 
+#include "source/common/buffer/buffer_util.h"
 #include "source/common/json/json_sanitizer.h"
-
-#include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace Json {
@@ -159,7 +158,7 @@ void Streamer::addNumber(double number) {
   if (std::isnan(number)) {
     response_.addFragments({"null"});
   } else {
-    response_.addFragments({absl::StrFormat("%.15g", number)});
+    Buffer::Util::serializeDouble(number, response_);
   }
 }
 
