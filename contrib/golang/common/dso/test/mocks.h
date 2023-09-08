@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 #include "contrib/golang/common/dso/dso.h"

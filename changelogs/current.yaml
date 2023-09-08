@@ -2,7 +2,10 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
+- area: jwt
+  change: |
+    Changed behavior of the jwt extraction, passing entire token for validation, instead cut him in the non-Base64 character.
+    This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.token_passed_entirely`` to false.
 - area: eds
   change: |
     Introduced caching of EDS assignments when used with ADS. Prior to this change, Envoy required that EDS assignments were sent
@@ -11,12 +14,28 @@ behavior_changes:
     :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
     the cached assignment and finish updating the warmed cluster. This change is disabled by default, and can be enabled by setting
     the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to true.
+- area: http
+  change: |
+    Introduced a new runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to disable the name downgrading in the
+    per filter config searching.
+    See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
+    issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
+- area: http
+  change: |
+    Switch from http_parser to BalsaParser for handling HTTP/1.1 traffic. See https://github.com/envoyproxy/envoy/issues/21245 for
+    details. This behavioral change can be reverted by setting runtime flag ``envoy.reloadable_features.http1_use_balsa_parser`` to
+    false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: ext_authz
   change: |
     removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
+- area: alternate_protocols_cache_filter
+  change: |
+    Changed the alternate protocols cache filter to get the cache from cluster config rather than filter config.
+    This allows one downstream filter to be used with multiple clusters with different caches. This change can be reverted by
+    setting runtime guard ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` to false.
 - area: ext_authz
   change: |
     Don't append the local address to ``x-forwarded-for`` header when sending an http (not gRPC) auth request.
@@ -31,11 +50,24 @@ minor_behavior_changes:
   change: |
     Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header`` to false.
+- area: http oauth2 filter
+  change: |
+    Change HMAC cookie encoding to base64-encoded only. This change can be reverted temporarily by
+    setting the runtime guard ``envoy.reloadable_features.hmac_base64_encoding_only`` to false.
 - area: router
   change: |
     Enable copying response_code from the upstream stream_info onto the downstream stream_info.
     This behavior can be reverted by setting runtime guard
     ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` to false.
+- area: xds
+  change: |
+    Set the lower bound of :ref:`fill_rate <envoy_v3_api_field_config.core.v3.RateLimitSettings.fill_rate>`
+    to once per year. Values lower than once per year will automatically be set to that value.
+- area: redis
+  change: |
+    The redis network filter :ref:`connection_rate_limit_per_sec
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
+    must be greater than 0. A config that sets this value to 0 will be rejected.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -57,6 +89,15 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where handshake may fail when both private key provider and cert validation are set.
+- area: dns
+  change: |
+    Fixed a bug where when respect_dns_ttl was set to true, c-ares dns resolver only considered address record for ttl calculation
+    while ignoring CNAME records TTL. Now when respect_dns_ttl is set to true minimum of all TTL records is considered.
+- area: dns
+  change: |
+    Fixed a bug where dns response was not always conforming [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181) for TTL values.
+    Previously a malicious user could add a TTL greater than 2^31 - 1, and with c-ares library using 32 bit signed int data type
+    would overflow and send a negative TTL.
 - area: healthcheck
   change: |
     The default behavior of unejecting outlier-detection-ejected host on successful active health checking can
@@ -89,7 +130,9 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
-
+- area: xDS
+  change: |
+    Removed ``envoy.restart_features.explicit_wildcard_resource`` and legacy code paths.
 - area: quic
   change: |
     Removed ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` and legacy code paths.
@@ -126,7 +169,6 @@ new_features:
 - area: access_log
   change: |
     added a field lookup to %FILTER_STATE% for objects that have reflection enabled.
-
 - area: http
   change: |
     added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
@@ -155,10 +197,23 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: udp_proxy
+  change: |
+    added :ref:`session_filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>` config to
+    support optional filters that will run for each upstream UDP session. More information can be found in the UDP proxy documentation.
+- area: otlp_stats_sink
+  change: |
+    added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
+    to OTLP stats sink that enables adding a static prefix to all stats flushed by this sink.
 - area: tap
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+
+- area: upstream
+  change: |
+    Added the ability to specify a custom upstream local address selector using
+    :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
 
 deprecated:
 - area: tracing

@@ -426,7 +426,7 @@ protected:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    VERBOSE_EXPECT_NO_THROW(callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, ""));
+    EXPECT_TRUE(callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
   }
 
   void addEndpoint(envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment,

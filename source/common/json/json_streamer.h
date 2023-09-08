@@ -5,9 +5,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/optref.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/variant.h"
 
@@ -169,14 +167,22 @@ public:
   };
 
   /**
-   * Makes a root map for the streamer. A similar function can be added
-   * easily if this class is to be used for a JSON structure with a
-   * top-level array.
+   * Makes a root map for the streamer.
    *
-   * You must create a root map before any of the JSON population functions
-   * can be called, as those are only available on Map and Array objects.
+   * You must create a root map or array before any of the JSON population
+   * functions can be called, as those are only available on Map and Array
+   * objects.
    */
   MapPtr makeRootMap();
+
+  /**
+   * Makes a root array for the streamer.
+   *
+   * You must create a root map or array before any of the JSON population
+   * functions can be called, as those are only available on Map and Array
+   * objects.
+   */
+  ArrayPtr makeRootArray();
 
 private:
   friend Level;

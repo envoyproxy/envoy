@@ -271,7 +271,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
   parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
 }
 
-bool ScopedRdsConfigSubscription::addOrUpdateScopes(
+absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
     const std::string& version_info) {
   bool any_applied = false;
@@ -284,7 +284,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
     if (scoped_route_config.route_configuration_name().empty()) {
-      throw EnvoyException("route_configuration_name is empty.");
+      return absl::InvalidArgumentError("route_configuration_name is empty.");
     }
     const std::string scope_name = scoped_route_config.name();
     if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
@@ -369,7 +369,7 @@ ScopedRdsConfigSubscription::removeScopes(
   return to_be_removed_rds_providers;
 }
 
-void ScopedRdsConfigSubscription::onConfigUpdate(
+absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
@@ -415,7 +415,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources =
       detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources, exception_msg);
   if (!exception_msg.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
+    return absl::InvalidArgumentError(
+        fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
   }
 
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
@@ -423,18 +424,24 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers = removeScopes(clean_removed_resources, version_info);
 
-  bool any_applied =
-      addOrUpdateScopes(added_resources,
-                        (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
-                        version_info) ||
-      !to_be_removed_rds_providers.empty();
-  ConfigSubscriptionCommonBase::onConfigUpdate();
-  if (any_applied) {
+  auto status_or_applied = addOrUpdateScopes(
+      added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
+      version_info);
+  if (!status_or_applied.status().ok()) {
+    return status_or_applied.status();
+  }
+  bool any_applied = status_or_applied.value();
+  auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
+  if (!status.ok()) {
+    return status;
+  }
+  if (any_applied || !to_be_removed_rds_providers.empty()) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
   }
   stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
   stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
+  return absl::OkStatus();
 }
 
 void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_name,
@@ -459,14 +466,14 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
 
 // TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
 // CdsApiImpl::onConfigUpdate.
-void ScopedRdsConfigSubscription::onConfigUpdate(
+absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& scoped_route : scoped_route_map_) {
     *to_remove_repeated.Add() = scoped_route.first;
   }
-  onConfigUpdate(resources, to_remove_repeated, version_info);
+  return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
 Protobuf::RepeatedPtrField<std::string>

@@ -32,7 +32,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 90
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: 'Java setup'
       uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
       with:
@@ -65,7 +65,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: 'Java setup'
       uses: actions/setup-java@cd89f46ac9d01407894225f350157564c9c7cee2
       with:
@@ -108,7 +108,7 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run Kotlin library integration tests'

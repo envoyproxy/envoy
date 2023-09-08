@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "source/common/grpc/common.h"
