@@ -21,6 +21,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
@@ -285,7 +286,6 @@ public:
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
   Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
-
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.ext_proc_disable_response_processing_on_local_reply")) {
       ENVOY_LOG(trace, "local reply; will skip ext_proc response processing requests");
