@@ -87,7 +87,6 @@ void GeoipProviderConfig::incCounter(Stats::StatName name) {
 
 GeoipProvider::~GeoipProvider() {
   ENVOY_LOG(debug, "Shutting down Maxmind geolocation provider");
-  // TODO(nezdolik) consider switching to atomic singleton for db objects
   if (city_db_) {
     MMDB_close(city_db_.get());
   }
@@ -123,8 +122,6 @@ void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
   cb(std::move(lookup_result));
 }
 
-// todo: document En as default and only language used for lookups. Document that region is selected
-// as least specific subdivision
 void GeoipProvider::lookupInCityDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {

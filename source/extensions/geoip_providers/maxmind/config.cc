@@ -53,9 +53,7 @@ private:
 
 SINGLETON_MANAGER_REGISTRATION(maxmind_geolocation_provider_singleton);
 
-MaxmindProviderFactory::MaxmindProviderFactory() : FactoryBase("envoy.geoip_providers.maxmind") {
-  std::cerr << "****Created instance of MaxmindProviderFactory" << std::endl;
-}
+MaxmindProviderFactory::MaxmindProviderFactory() : FactoryBase("envoy.geoip_providers.maxmind") {}
 
 DriverSharedPtr MaxmindProviderFactory::createGeoipProviderDriverTyped(
     const ConfigProto& proto_config, const std::string& stat_prefix,

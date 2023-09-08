@@ -2,9 +2,6 @@
 
 #include "envoy/geoip/geoip_provider_driver.h"
 
-// TODO(nezdolik) do we need this?
-#include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
-#include "envoy/extensions/filters/http/geoip/v3/geoip.pb.validate.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
 #include "source/common/common/logger.h"
 #include "maxminddb.h"
@@ -76,7 +73,6 @@ private:
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 
-// TODO(nezdolik) should this be std::atomic<ConstSingleton<std::unique_ptr<MMDB_s>>> instead?
 using MaxmindDbPtr = std::unique_ptr<MMDB_s>;
 class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {

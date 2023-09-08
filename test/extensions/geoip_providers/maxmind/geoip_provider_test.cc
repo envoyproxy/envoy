@@ -34,10 +34,10 @@ public:
   }
 
   void initializeProvider(const std::string& yaml) {
+    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(scope_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
-    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(scope_));
   }
 
   void expectStats(const std::string& db_type, const uint32_t total_times = 1,
@@ -97,8 +97,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         anon_vpn: "x-geo-anon-vpn"
-    anon_db_path: "{{ test_rundir
-    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -122,8 +121,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         anon_hosting: "x-geo-anon-hosting"
-    anon_db_path: "{{ test_rundir
-    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -147,8 +145,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         anon_tor: "x-geo-anon-tor"
-    anon_db_path: "{{ test_rundir
-    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -172,8 +169,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonProxySuccessfulLookup) {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         anon_proxy: "x-geo-anon-proxy"
-    anon_db_path: "{{ test_rundir
-    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -196,8 +192,7 @@ TEST_F(GeoipProviderTest, ValidConfigEmptyLookupResult) {
     common_provider_config:
       geo_headers_to_add:
         is_anon: "x-geo-anon"
-    anon_db_path: "{{ test_rundir
-    }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -218,8 +213,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
-    city_db_path: "{{ test_rundir
-    }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address1 =
@@ -250,8 +244,7 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
       geo_headers_to_add:
         city: "x-geo-city"
         asn: "x-geo-asn"
-    city_db_path: "{{ test_rundir
-    }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -263,6 +256,16 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
   EXPECT_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
                "assert failure: isp_db_. Details: Maxmind asn database is not initialized for "
                "performing lookups");
+}
+
+TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        city: "x-geo-city"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data_atc/GeoLite2-City-Test.mmdb"
+  )EOF";
+  EXPECT_DEATH(initializeProvider(config_yaml), ".*Unable to open Maxmind database file.*");
 }
 
 } // namespace Maxmind
