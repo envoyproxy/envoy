@@ -44,20 +44,12 @@ variables:
 
 ## Variable settings
 # Caches (tip: append a version suffix while testing caches)
-- name: cacheKeyName
-  value: envoy
 - name: cacheKeyVersion
-  value: v2
+  value: v0
 - name: cacheKeyBazel
   value: '.bazelversion | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 - name: cacheKeyDocker
   value: ".bazelrc"
-# Docker build uses separate docker cache
-- name: cacheKeyDockerBuild
-  # VERSION.txt is included to refresh Docker images for release
-  value: '"publish_docker" | ci/Dockerfile-envoy | VERSION.txt'
-- name: cacheKeyDockerBuildVersion
-  value: v0
 
 - name: pathCacheTemp
   value: /mnt/cache
