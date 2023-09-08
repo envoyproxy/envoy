@@ -2,7 +2,7 @@ parameters:
 - name: ciTarget
   displayName: "CI target"
   type: string
-  default: bazel.release
+  default: release
 - name: artifactSuffix
   displayName: "Suffix of artifact"
   type: string
@@ -18,6 +18,9 @@ parameters:
 - name: pathCacheTemp
   type: string
   default: $(pathCacheTemp)
+- name: cacheName
+  type: string
+  default:
 
 - name: tmpfsCacheDisabled
   type: string
@@ -145,19 +148,25 @@ steps:
 - bash: |
     set -e
     CACHE_DIRS=(
+        "$(Build.StagingDirectory)/envoy"
         "$(Build.StagingDirectory)/.cache/"
         "$(Build.StagingDirectory)/bazel_root/install/"
         "$(Build.StagingDirectory)/repository_cache/"
         "$(Build.StagingDirectory)/bazel_root/base/external")
     sudo mkdir -p "${CACHE_DIRS[@]}"
-    sudo chown -R vsts:vsts "${CACHE_DIRS[@]}" $(Build.StagingDirectory)/bazel_root/
-    echo "Created bazel cache directories: "${CACHE_DIRS[*]}""
+    if id -u vsts &> /dev/null; then
+        sudo chown -R vsts:vsts "${CACHE_DIRS[@]}" $(Build.StagingDirectory)/bazel_root/
+    else
+        sudo chown -R azure-pipelines:azure-pipelines "${CACHE_DIRS[@]}" $(Build.StagingDirectory)/bazel_root/
+    fi
+    echo "Created bazel directories: "${CACHE_DIRS[*]}""
   displayName: "Create bazel directories"
-  condition: and(succeeded(), eq('${{ parameters.managedAgent }}', true), eq('${{ parameters.tmpfsDockerDisabled }}', true))
+  condition: and(succeeded(), eq('${{ parameters.tmpfsDockerDisabled }}', true))
 
 # Caching
 - template: cached.yml
   parameters:
+    cacheName: "${{ parameters.cacheName }}"
     keyBazel: "${{ parameters.cacheKeyBazel }}"
     keyDocker: "${{ parameters.cacheKeyDocker }}"
     pathDockerBind: "${{ parameters.pathDockerBind }}"
@@ -166,6 +175,36 @@ steps:
     tmpfsDisabled: "${{ parameters.tmpfsCacheDisabled }}"
     tmpfsDockerDisabled: "${{ parameters.tmpfsDockerDisabled }}"
 
+- script: |
+    if [[ "${{ parameters.bazelUseBES }}" == 'false' ]]; then
+        unset GOOGLE_BES_PROJECT_ID
+    fi
+    ci/run_envoy_docker.sh 'ci/do_ci.sh fetch-${{ parameters.ciTarget }}'
+  condition: and(not(canceled()), not(failed()), ne('${{ parameters.cacheName }}', ''), ne(variables.CACHE_RESTORED, 'true'))
+  workingDirectory: $(Build.SourcesDirectory)
+  env:
+    ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+    GITHUB_TOKEN: "${{ parameters.authGithub }}"
+    BAZEL_STARTUP_EXTRA_OPTIONS: "${{ parameters.bazelStartupExtraOptions }}"
+    ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+      CI_TARGET_BRANCH: "origin/$(System.PullRequest.TargetBranch)"
+    ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+      CI_TARGET_BRANCH: "origin/$(Build.SourceBranchName)"
+    # Any PR or CI run in envoy-presubmit uses the fake SCM hash
+    ${{ if or(eq(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.DefinitionName'], 'envoy-presubmit')) }}:
+      # sha1sum of `ENVOY_PULL_REQUEST`
+      BAZEL_FAKE_SCM_REVISION: e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9
+    ${{ if parameters.rbe }}:
+      GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      ENVOY_RBE: "1"
+      BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelConfigRBE }} ${{ parameters.bazelBuildExtraOptions }}"
+    ${{ if eq(parameters.rbe, false) }}:
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=ci ${{ parameters.bazelBuildExtraOptions }}"
+      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
+    ${{ each var in parameters.env }}:
+      ${{ var.key }}: ${{ var.value }}
+  displayName: "Fetch assets (${{ parameters.ciTarget }})"
+
 - ${{ each step in parameters.stepsPre }}:
   - ${{ each pair in step }}:
       ${{ pair.key }}: ${{ pair.value }}
@@ -173,6 +212,13 @@ steps:
 - bash: |
     echo "disk space at beginning of build:"
     df -h
+    if [[ -e "$(Build.StagingDirectory)/bazel_root/base/external" ]]; then
+        du -sh "$(Build.StagingDirectory)/bazel_root/base/external"
+    fi
+    if [[ -e "$(Build.StagingDirectory)/repository_cache" ]]; then
+        du -sh "$(Build.StagingDirectory)/repository_cache"
+    fi
+
   displayName: "Check disk space at beginning"
 
 - bash: |
@@ -228,6 +274,9 @@ steps:
         cp -a $hprof $(Build.StagingDirectory)/envoy/hprof
     done
 
+    du -sh "$(Build.StagingDirectory)"/bazel_root/base/external
+    du -sh "$(Build.StagingDirectory)"/repository_cache
+
     cp -a "$(Build.StagingDirectory)/bazel_root/base/server/jvm.out" $(Build.StagingDirectory)/envoy
 
     if [[ "${{ parameters.artifactSuffix }}" == ".arm64" ]]; then
@@ -246,6 +295,18 @@ steps:
 - ${{ each step in parameters.stepsPost }}:
   - ${{ each pair in step }}:
       ${{ pair.key }}: ${{ pair.value }}
+
+- script: |
+    set -e
+    sudo .azure-pipelines/docker/save_cache.sh "$(Build.StagingDirectory)" /mnt/cache/all true true
+    if id -u vsts &> /dev/null; then
+        sudo chown -R vsts:vsts /mnt/cache/all
+    else
+        sudo chown -R azure-pipelines:azure-pipelines /mnt/cache/all
+    fi
+
+  displayName: "Cache/save (${{ parameters.cacheName}})"
+  condition: and(succeeded(), ne('${{ parameters.cacheName }}', ''), ne(variables.CACHE_RESTORED, 'true'))
 
 - task: PublishTestResults@2
   inputs:
