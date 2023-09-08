@@ -138,6 +138,11 @@ bug_fixes:
 - area: unix domain sockets
   change: |
     Fixed a crash on some versions of macOS when using a listener on a unix-domain socket.
+- area: filter manager
+  change: |
+    Fixed a bug where filters' ``onLocalReply`` callback would not be called in the event of a local reply caused by protocol error.
+    This behavior can be reverted by setting runtime guard
+    ``envoy.reloadable_features.on_local_reply_createfilterchain`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
