@@ -507,6 +507,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, onLocalReply(_)).WillRepeatedly(Return(LocalErrorStatus::Continue));
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(*filter, encodeComplete());
@@ -554,6 +555,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, onLocalReply(_)).WillRepeatedly(Return(LocalErrorStatus::Continue));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
@@ -2663,6 +2665,7 @@ public:
         }));
     EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
     EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+    EXPECT_CALL(*filter, onLocalReply(_)).WillRepeatedly(Return(LocalErrorStatus::Continue));
 
     // codec stream error
     EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
