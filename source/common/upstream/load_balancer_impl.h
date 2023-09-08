@@ -389,7 +389,7 @@ private:
    * This gets recalculated on update callback.
    *
    * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to derisk changes.
+   * as an alternate code-path to reduce the risk of changes.
    */
   bool earlyExitNonLocalityRoutingLegacy();
 
@@ -414,7 +414,7 @@ private:
    * Caller is responsible for allocation/de-allocation of `ret`.
    *
    * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to derisk changes.
+   * as an alternate code-path to reduce the risk of changes.
    */
   void calculateLocalityPercentageLegacy(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
 
@@ -427,7 +427,7 @@ private:
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
    *
    * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to derisk changes.
+   * as an alternate code-path to reduce the risk of changes.
    */
   void regenerateLocalityRoutingStructuresLegacy();
 
