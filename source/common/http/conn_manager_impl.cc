@@ -1127,6 +1127,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http1_connection_close_header_in_redirect")) {
     if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
+      // Only mark the connection to be closed if the request indicates so. The connection might already be marked so before this step, in which case if shouldCloseConnection() returns false, the stream info value shouldn't be overridden.
       filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
     }
   } else {
