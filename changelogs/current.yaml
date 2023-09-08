@@ -16,6 +16,12 @@ behavior_changes:
     the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to true.
 - area: http
   change: |
+    Introduced a new runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to disable the name downgrading in the
+    per filter config searching.
+    See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
+    issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
+- area: http
+  change: |
     Switch from http_parser to BalsaParser for handling HTTP/1.1 traffic. See https://github.com/envoyproxy/envoy/issues/21245 for
     details. This behavioral change can be reverted by setting runtime flag ``envoy.reloadable_features.http1_use_balsa_parser`` to
     false.
@@ -53,6 +59,15 @@ minor_behavior_changes:
     Enable copying response_code from the upstream stream_info onto the downstream stream_info.
     This behavior can be reverted by setting runtime guard
     ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` to false.
+- area: xds
+  change: |
+    Set the lower bound of :ref:`fill_rate <envoy_v3_api_field_config.core.v3.RateLimitSettings.fill_rate>`
+    to once per year. Values lower than once per year will automatically be set to that value.
+- area: redis
+  change: |
+    The redis network filter :ref:`connection_rate_limit_per_sec
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
+    must be greater than 0. A config that sets this value to 0 will be rejected.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -188,6 +203,10 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: udp_proxy
+  change: |
+    added :ref:`session_filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>` config to
+    support optional filters that will run for each upstream UDP session. More information can be found in the UDP proxy documentation.
 - area: otlp_stats_sink
   change: |
     added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
@@ -196,6 +215,11 @@ new_features:
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+
+- area: upstream
+  change: |
+    Added the ability to specify a custom upstream local address selector using
+    :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
 
 deprecated:
 - area: tracing

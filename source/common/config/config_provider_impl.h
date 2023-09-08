@@ -172,9 +172,10 @@ public:
    * Must be called by derived classes when the onConfigUpdate() callback associated with the
    * underlying subscription is issued.
    */
-  void onConfigUpdate() {
+  absl::Status onConfigUpdate() {
     setLastUpdated();
     local_init_target_.ready();
+    return absl::OkStatus();
   }
 
   /**

@@ -27,6 +27,7 @@ builtin:
 - envoy.matching.inputs.subject
 - envoy.regex_engines.google_re2
 - envoy.filters.http.upstream_codec
+- envoy.upstream.local_address_selector.default_local_address_selector
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -107,6 +108,7 @@ categories:
 - envoy.transport_sockets.upstream
 - envoy.tls.cert_validator
 - envoy.upstreams
+- envoy.upstream.local_address_selector
 - envoy.udp_packet_writer
 - envoy.wasm.runtime
 - envoy.xds_delegates

@@ -28,7 +28,17 @@ public:
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
-class ReadFilterCallbacks : public FilterCallbacks {};
+class ReadFilterCallbacks : public FilterCallbacks {
+public:
+  ~ReadFilterCallbacks() override = default;
+
+  /**
+   * If a read filter stopped filter iteration, continueFilterChain() can be called to continue the
+   * filter chain. It will have onNewSession() called if it was not previously called.
+   */
+  virtual void continueFilterChain() PURE;
+};
+
 class WriteFilterCallbacks : public FilterCallbacks {};
 
 /**
@@ -50,7 +60,7 @@ public:
 
   /**
    * Called when a new UDP session is first established. Filters should do one time long term
-   * processing that needs to be done when a connection is established. Filter chain iteration
+   * processing that needs to be done when a session is established. Filter chain iteration
    * can be stopped if needed.
    * @return status used by the filter manager to manage further filter iteration.
    */
@@ -68,7 +78,7 @@ public:
    * called by the filter manager a single time when the filter is first registered.
    *
    * IMPORTANT: No outbound networking or complex processing should be done in this function.
-   *            That should be done in the context of onNewConnection() if needed.
+   *            That should be done in the context of onNewSession() if needed.
    *
    * @param callbacks supplies the callbacks.
    */
@@ -106,7 +116,7 @@ public:
    * called by the filter manager a single time when the filter is first registered.
    *
    * IMPORTANT: No outbound networking or complex processing should be done in this function.
-   *            That should be done in the context of ReadFilter::onNewConnection() if needed.
+   *            That should be done in the context of ReadFilter::onNewSession() if needed.
    *
    * @param callbacks supplies the callbacks.
    */
