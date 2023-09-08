@@ -44,7 +44,6 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
       udp_forwarding_rpc_stream_.domain_socket_,
       [this](uint32_t events) -> void {
         ASSERT(events == Event::FileReadyType::Read);
-        std::cerr << "file event happened" << std::endl;
         onSocketEventUdpForwarding();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);

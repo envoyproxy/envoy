@@ -44,27 +44,22 @@ public:
         .WillOnce([this, buffer](int, const msghdr* msg, int) {
           *buffer =
               std::string{static_cast<char*>(msg->msg_iov[0].iov_base), msg->msg_iov[0].iov_len};
-          std::cerr << "calling callback" << std::endl;
           udp_file_ready_callback_(Event::FileReadyType::Read);
-          std::cerr << "called callback" << std::endl;
           return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
         });
     EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).WillRepeatedly([buffer](int, msghdr* msg, int) {
       if (buffer->empty()) {
         return Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN};
       }
-      std::cerr << "mock recv" << std::endl;
       msg->msg_control = nullptr;
       msg->msg_controllen = 0;
       msg->msg_flags = 0;
-      std::cerr << "mock recv 2" << std::endl;
       RELEASE_ASSERT(msg->msg_iovlen == 1,
                      fmt::format("recv buffer iovlen={}, expected 1", msg->msg_iovlen));
       size_t sz = std::min(buffer->size(), msg->msg_iov[0].iov_len);
       buffer->copy(static_cast<char*>(msg->msg_iov[0].iov_base), sz);
       *buffer = buffer->substr(sz);
       msg->msg_iov[0].iov_len = sz;
-      std::cerr << "mock recv 3" << std::endl;
       return Api::SysCallSizeResult{static_cast<ssize_t>(sz), 0};
     });
     udp_forwarding_rpc_stream_.sendHotRestartMessage(child_address_udp_forwarding_, message);
@@ -77,6 +72,14 @@ public:
 class HotRestartingChildTest : public testing::Test {
 public:
   void SetUp() override {
+    // Address stringification performs a socket call which we unfortunately
+    // can't have bypass os_sys_calls_.
+    EXPECT_CALL(os_sys_calls_, socket(_, _, _)).WillRepeatedly([this]() {
+      static const int address_stringing_socket = 999;
+      EXPECT_CALL(os_sys_calls_, close(address_stringing_socket))
+          .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+      return Api::SysCallIntResult{address_stringing_socket, 0};
+    });
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
     EXPECT_CALL(os_sys_calls_, close(_)).Times(4);
     fake_parent_ = std::make_unique<FakeHotRestartingParent>(os_sys_calls_, 0, 0, socket_path_);

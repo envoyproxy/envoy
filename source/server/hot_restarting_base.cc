@@ -213,7 +213,6 @@ HotRestartingBase::RpcStream::receiveHotRestartMessage(Blocking block) {
   uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
   std::unique_ptr<HotRestartMessage> ret = nullptr;
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-  std::cerr << "receiveHotRestartMessage" << std::endl;
   while (!ret) {
     iov[0].iov_base = recv_buf_.data() + cur_msg_recvd_bytes_;
     iov[0].iov_len = MaxSendmsgSize;
@@ -226,9 +225,7 @@ HotRestartingBase::RpcStream::receiveHotRestartMessage(Blocking block) {
     message.msg_control = control_buffer;
     message.msg_controllen = CMSG_SPACE(sizeof(int));
 
-    std::cerr << "recvmsg" << std::endl;
     const Api::SysCallSizeResult recv_result = os_sys_calls.recvmsg(domain_socket_, &message, 0);
-    std::cerr << "rc2" << std::endl;
     if (block == Blocking::No && recv_result.return_value_ == -1 &&
         recv_result.errno_ == SOCKET_ERROR_AGAIN) {
       return nullptr;
@@ -255,8 +252,6 @@ HotRestartingBase::RpcStream::receiveHotRestartMessage(Blocking block) {
     RELEASE_ASSERT(cur_msg_recvd_bytes_ <= sizeof(uint64_t) + expected_proto_length_.value(),
                    "received a length+protobuf message not aligned to start of sendmsg().");
 
-    std::cerr << "received " << cur_msg_recvd_bytes_ << ", expected "
-              << sizeof(uint64_t) + expected_proto_length_.value() << std::endl;
     if (cur_msg_recvd_bytes_ == sizeof(uint64_t) + expected_proto_length_.value()) {
       ret = parseProtoAndResetState();
     }
@@ -268,7 +263,6 @@ HotRestartingBase::RpcStream::receiveHotRestartMessage(Blocking block) {
                    fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
   }
   getPassedFdIfPresent(ret.get(), &message);
-  std::cerr << "end receive" << std::endl;
   return ret;
 }
 
