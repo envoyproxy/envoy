@@ -382,7 +382,7 @@ private:
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
    */
-  bool earlyExitNonLocalityRouting();
+  bool earlyExitNonLocalityRoutingNew();
 
   /**
    * @return decision on quick exit from locality aware routing based on cluster configuration.
@@ -391,7 +391,7 @@ private:
    * This is the legacy version of the function from previous versions of Envoy, kept temporarily
    * as an alternate code-path to reduce the risk of changes.
    */
-  bool earlyExitNonLocalityRoutingLegacy();
+  bool earlyExitNonLocalityRouting();
 
   /**
    * Try to select upstream hosts from the same locality.
@@ -405,7 +405,7 @@ private:
    * matches the ordering of upstream localities in the input upstream_hosts_per_locality.
    */
   absl::FixedArray<LocalityPercentages>
-  calculateLocalityPercentages(const HostsPerLocality& local_hosts_per_locality,
+  calculateLocalityPercentagesNew(const HostsPerLocality& local_hosts_per_locality,
                                const HostsPerLocality& upstream_hosts_per_locality);
 
   /**
@@ -416,12 +416,12 @@ private:
    * This is the legacy version of the function from previous versions of Envoy, kept temporarily
    * as an alternate code-path to reduce the risk of changes.
    */
-  void calculateLocalityPercentageLegacy(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
+  void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
 
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
    */
-  void regenerateLocalityRoutingStructures();
+  void regenerateLocalityRoutingStructuresNew();
 
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
@@ -429,7 +429,7 @@ private:
    * This is the legacy version of the function from previous versions of Envoy, kept temporarily
    * as an alternate code-path to reduce the risk of changes.
    */
-  void regenerateLocalityRoutingStructuresLegacy();
+  void regenerateLocalityRoutingStructures();
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 

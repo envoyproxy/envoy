@@ -445,9 +445,9 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
         // disabled at all other levels.
         if (local_priority_set_ && priority == 0) {
           if (use_new_locality_routing_) {
-            regenerateLocalityRoutingStructures();
+            regenerateLocalityRoutingStructuresNew();
           } else {
-            regenerateLocalityRoutingStructuresLegacy();
+            regenerateLocalityRoutingStructures();
           }
         }
       });
@@ -463,15 +463,15 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
           // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
           // based routing.
           if (use_new_locality_routing_) {
-            regenerateLocalityRoutingStructures();
+            regenerateLocalityRoutingStructuresNew();
           } else {
-            regenerateLocalityRoutingStructuresLegacy();
+            regenerateLocalityRoutingStructures();
           }
         });
   }
 }
 
-void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
+void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructuresNew() {
   ASSERT(local_priority_set_);
   stats_.lb_recalculate_zone_structures_.inc();
   // resizePerPriorityState should ensure these stay in sync.
@@ -482,7 +482,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   PerPriorityState& state = *per_priority_state_[priority];
   // Do not perform any calculations if we cannot perform locality routing based on non runtime
   // params.
-  if (earlyExitNonLocalityRouting()) {
+  if (earlyExitNonLocalityRoutingNew()) {
     state.locality_routing_state_ = LocalityRoutingState::NoLocalityRouting;
     return;
   }
@@ -502,7 +502,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // localities across priorities is not.
   const HostsPerLocality& localHostsPerLocality = localHostSet().healthyHostsPerLocality();
   auto locality_percentages =
-      calculateLocalityPercentages(localHostsPerLocality, upstreamHostsPerLocality);
+      calculateLocalityPercentagesNew(localHostsPerLocality, upstreamHostsPerLocality);
 
   // If we have lower percent of hosts in the local cluster in the same locality,
   // we can push all of the requests directly to upstream cluster in the same locality.
@@ -565,7 +565,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   }
 }
 
-void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructuresLegacy() {
+void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   ASSERT(local_priority_set_);
   stats_.lb_recalculate_zone_structures_.inc();
   // resizePerPriorityState should ensure these stay in sync.
@@ -576,7 +576,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructuresLegacy() {
   PerPriorityState& state = *per_priority_state_[priority];
   // Do not perform any calculations if we cannot perform locality routing based on non runtime
   // params.
-  if (earlyExitNonLocalityRoutingLegacy()) {
+  if (earlyExitNonLocalityRouting()) {
     state.locality_routing_state_ = LocalityRoutingState::NoLocalityRouting;
     return;
   }
@@ -595,10 +595,10 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructuresLegacy() {
   // Basically, fairness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
   absl::FixedArray<uint64_t> local_percentage(num_localities);
-  calculateLocalityPercentageLegacy(localHostSet().healthyHostsPerLocality(),
+  calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(),
                                     local_percentage.begin());
   absl::FixedArray<uint64_t> upstream_percentage(num_localities);
-  calculateLocalityPercentageLegacy(host_set.healthyHostsPerLocality(),
+  calculateLocalityPercentage(host_set.healthyHostsPerLocality(),
                                     upstream_percentage.begin());
 
   // If we have lower percent of hosts in the local cluster in the same locality,
@@ -656,7 +656,7 @@ void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
   }
 }
 
-bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
+bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRoutingNew() {
   // We only do locality routing for P=0.
   HostSet& host_set = *priority_set_.hostSetsPerPriority()[0];
   if (host_set.healthyHostsPerLocality().get().size() < 2) {
@@ -705,7 +705,7 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRoutingLegacy() {
+bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   // We only do locality routing for P=0.
   HostSet& host_set = *priority_set_.hostSetsPerPriority()[0];
   if (host_set.healthyHostsPerLocality().get().size() < 2) {
@@ -775,7 +775,7 @@ bool LoadBalancerBase::isHostSetInPanic(const HostSet& host_set) const {
 }
 
 absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>
-ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
+ZoneAwareLoadBalancerBase::calculateLocalityPercentagesNew(
     const HostsPerLocality& local_hosts_per_locality,
     const HostsPerLocality& upstream_hosts_per_locality) {
   uint64_t total_local_hosts = 0;
@@ -819,7 +819,7 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
   return percentages;
 }
 
-void ZoneAwareLoadBalancerBase::calculateLocalityPercentageLegacy(
+void ZoneAwareLoadBalancerBase::calculateLocalityPercentage(
     const HostsPerLocality& hosts_per_locality, uint64_t* ret) {
   uint64_t total_hosts = 0;
   for (const auto& locality_hosts : hosts_per_locality.get()) {
