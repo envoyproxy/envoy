@@ -11,7 +11,7 @@ parameters:
 # caching
 - name: cacheKeyDocker
   type: string
-  default: ".devcontainer/Dockerfile"
+  default: ".bazelrc"
 - name: cacheKeyVersion
   type: string
   default: $(cacheKeyVersion)

@@ -766,6 +766,8 @@ public:
   absl::Mutex& lock() { return lock_; }
 
 protected:
+  const FakeUpstreamConfig& config() const { return config_; }
+
   Stats::IsolatedStoreImpl stats_store_;
   const Http::CodecType http_type_;
 

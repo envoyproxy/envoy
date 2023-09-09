@@ -48,6 +48,11 @@ Streamer::MapPtr Streamer::makeRootMap() {
   return std::make_unique<Map>(*this);
 }
 
+Streamer::ArrayPtr Streamer::makeRootArray() {
+  ASSERT_LEVELS_EMPTY;
+  return std::make_unique<Array>(*this);
+}
+
 Streamer::MapPtr Streamer::Level::addMap() {
   ASSERT_THIS_IS_TOP_LEVEL;
   nextField();

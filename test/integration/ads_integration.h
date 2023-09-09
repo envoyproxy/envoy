@@ -16,30 +16,25 @@
 
 namespace Envoy {
 
-// Support parameterizing over old DSS vs new DSS. Can be dropped when old DSS goes away.
-enum class OldDssOrNewDss { Old, New };
-
 // Base class that supports parameterizing over old DSS vs new DSS. Can be replaced with
 // Grpc::BaseGrpcClientIntegrationParamTest when old DSS is removed.
 class AdsDeltaSotwIntegrationSubStateParamTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Grpc::ClientType,
-                                               Grpc::SotwOrDelta, OldDssOrNewDss>> {
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>> {
 public:
   ~AdsDeltaSotwIntegrationSubStateParamTest() override = default;
   static std::string protocolTestParamsToString(
-      const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType,
-                                                Grpc::SotwOrDelta, OldDssOrNewDss>>& p) {
+      const ::testing::TestParamInfo<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>>& p) {
     return fmt::format(
-        "{}_{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
         std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld",
-        std::get<3>(p.param) == OldDssOrNewDss::Old ? "OldDSS" : "NewDSS");
+        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
   Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
-  OldDssOrNewDss oldDssOrNewDss() const { return std::get<3>(GetParam()); }
 };
 
 class AdsIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
@@ -96,7 +91,6 @@ public:
 #define ADS_INTEGRATION_PARAMS                                                                     \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
-                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta),             \
-                   testing::Values(OldDssOrNewDss::Old, OldDssOrNewDss::New))
+                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta))
 
 } // namespace Envoy

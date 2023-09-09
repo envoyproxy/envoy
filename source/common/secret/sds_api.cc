@@ -79,8 +79,8 @@ void SdsApi::onWatchUpdate() {
   });
 }
 
-void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                            const std::string& version_info) {
+absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                    const std::string& version_info) {
   validateUpdateSize(resources.size());
   const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
       resources[0].get().resource());
@@ -129,12 +129,14 @@ void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resou
   secret_data_.last_updated_ = time_source_.systemTime();
   secret_data_.version_info_ = version_info;
   init_target_.ready();
+  return absl::OkStatus();
 }
 
-void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                    const Protobuf::RepeatedPtrField<std::string>&,
+                                    const std::string&) {
   validateUpdateSize(added_resources.size());
-  onConfigUpdate(added_resources, added_resources[0].get().version());
+  return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
 void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

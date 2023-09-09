@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"

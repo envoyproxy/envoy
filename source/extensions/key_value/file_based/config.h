@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/common/key_value_store.h"
 #include "envoy/config/common/key_value/v3/config.pb.h"
 #include "envoy/config/common/key_value/v3/config.pb.validate.h"
