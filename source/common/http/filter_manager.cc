@@ -892,6 +892,10 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
 }
 
 void DownstreamFilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+  // DO NOT MERGE
+  // this change is required for the functionality and is outstanding in PR
+  // https://github.com/envoyproxy/envoy/pull/29501
+  createFilterChain();
   state_.under_on_local_reply_ = true;
   filter_manager_callbacks_.onLocalReply(data.code_);
 

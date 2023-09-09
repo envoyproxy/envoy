@@ -681,25 +681,6 @@ void HttpIntegrationTest::testRouterUpstreamProtocolError(const std::string& exp
   EXPECT_THAT(log, HasSubstr(expected_flag));
 }
 
-void HttpIntegrationTest::testDownstreamProtocolError() {
-  useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS%");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "BAD"}, {":path", "/test/long/url"}, {":authority", "sni.lyft.com"}});
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("400", response->headers().getStatusValue());
-  std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, HasSubstr("400"));
-  EXPECT_THAT(log, HasSubstr("DPE"));
-}
-
 IntegrationStreamDecoderPtr
 HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
                                            int upstream_index, const std::string& path,

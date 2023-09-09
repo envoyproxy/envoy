@@ -247,7 +247,6 @@ protected:
   void testRouterVirtualClusters();
   void testRouteStats();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);
-  void testDownstreamProtocolError();
 
   void testRouterRequestAndResponseWithBody(
       uint64_t request_size, uint64_t response_size, bool big_header,

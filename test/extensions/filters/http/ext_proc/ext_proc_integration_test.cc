@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <exception>
 
+#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
@@ -136,6 +138,52 @@ protected:
     });
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
+  }
+
+  void injectCustomResponse() {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+      // Construct a configuration proto for custom error message filter and then re-write it
+      // to JSON so that we can add it to the overall config
+      const std::string custom_response_config = R"EOF(
+  custom_response_matcher:
+    matcher_list:
+      matchers:
+        # Apply a locally stored custom response to any 4xx response.
+      - predicate:
+          single_predicate:
+            input:
+              name: 4xx_response
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeClassMatchInput
+            value_match:
+              exact: "4xx"
+        on_match:
+          action:
+            name: 4xx_action
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+              status_code: 499
+              body:
+                inline_string: "not allowed"
+              response_headers_to_add:
+              - header:
+                  key: "foo"
+                  value: "x-bar")EOF";
+      auto custom_response_message = TestUtility::parseYaml<
+          envoy::extensions::filters::http::custom_response::v3::CustomResponse>(
+          custom_response_config);
+      const std::string custom_response_name = "envoy.filters.http.custom_response";
+      envoy::config::listener::v3::Filter custom_response_filter;
+      custom_response_filter.set_name(custom_response_name);
+      custom_response_filter.mutable_typed_config()->PackFrom(custom_response_message);
+      auto message_or_error = MessageUtil::getJsonStringFromMessageOrError(custom_response_filter);
+      try {
+        config_helper_.prependFilter(message_or_error);
+      } catch (std::exception const& e) {
+        std::cout << e.what() << std::endl;
+        std::cout << message_or_error << std::endl;
+      }
+    });
   }
 
   void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg) {
@@ -3118,4 +3166,57 @@ TEST_P(ExtProcIntegrationTest, SendBodyBufferedPartialWithTrailer) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// check that we actually get a 400 Bad Response from the server. If external processing is not
+// disabled for local replies, we see an empty response from the server on a bad protocol request
+TEST_P(ExtProcIntegrationTest, DownstreamProtocolError) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  useListenerAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  initializeConfig();
+  config_helper_.setClientCodec(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+          CodecType::HttpConnectionManager_CodecType_HTTP1);
+  HttpIntegrationTest::initialize();
+
+  auto addr_instance =
+      std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.1", lookupPort("http"));
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(addr_instance, "BAD", "/", "", Http::CodecType::HTTP1);
+
+  std::string log = waitForAccessLog(access_log_name_);
+
+  std::string expected_response_code = std::to_string(int(Http::Code::BadRequest));
+  EXPECT_EQ(response->body(), "Bad Request");
+  EXPECT_EQ(response->headers().getStatusValue(), expected_response_code);
+
+  EXPECT_THAT(log, testing::HasSubstr(expected_response_code));
+  EXPECT_THAT(log, testing::HasSubstr("DPE"));
+}
+
+// check that we can still manipulate the response with a custom response filter
+// since external processing is disabled for local replies
+TEST_P(ExtProcIntegrationTest, DownstreamProtocolErrorCustomResponseFilter) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  initializeConfig();
+  injectCustomResponse();
+  config_helper_.setClientCodec(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+          CodecType::HttpConnectionManager_CodecType_HTTP1);
+  HttpIntegrationTest::initialize();
+
+  auto addr_instance =
+      std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.1", lookupPort("http"));
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(addr_instance, "BAD", "/", "", Http::CodecType::HTTP1);
+
+  std::string log = waitForAccessLog(access_log_name_);
+
+  EXPECT_EQ(response->body(), "not allowed");
+  EXPECT_EQ(response->headers().getStatusValue(), "499");
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("foo")).empty());
+  EXPECT_EQ(response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView(),
+            "x-bar");
+
+  EXPECT_THAT(log, testing::HasSubstr("499"));
+  EXPECT_THAT(log, testing::HasSubstr("DPE"));
+}
 } // namespace Envoy
