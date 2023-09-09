@@ -406,7 +406,7 @@ private:
    */
   absl::FixedArray<LocalityPercentages>
   calculateLocalityPercentagesNew(const HostsPerLocality& local_hosts_per_locality,
-                               const HostsPerLocality& upstream_hosts_per_locality);
+                                  const HostsPerLocality& upstream_hosts_per_locality);
 
   /**
    * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
