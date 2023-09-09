@@ -46,15 +46,22 @@ Protobuf upgrade support
 ------------------------
 
 The filter will automatically frame requests with content-type ``application/x-protobuf`` as gRPC requests if
-:ref:`upgrade_protobuf_to_grpc <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.upgrade_protobuf_to_grpc>` is set.
-In this case the filter will prepend the body with the gRPC frame described above, and update the content-type header to
-``application/grpc`` before sending the request to the gRPC server.
+:ref:`upgrade_protobuf_to_grpc <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.upgrade_protobuf_to_grpc>` is set. In this case the filter will prepend the body with the gRPC frame header described above, and update the content-type header to ``application/grpc`` before sending the request to the gRPC server.
+
+The response body returned to the client will not contain the gRPC frame header for requests that are upgraded in this
+fashion, i.e. the body will contain only the encoded Protobuf.
+
+JSON upgrade support
+--------------------
+
+Likewise, the filter will frame requests with content-type ``application/json`` as gRPC+JSON requests if
+:ref:`upgrade_json_to_grpc_json <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.upgrade_json_to_grpc_json>` is set. In this case the filter will prepend the body with the gRPC frame header described above, and update the content-type header to ``application/grpc+json`` before sending the request to the gRPC server.
 
 In case the client sends a ``content-length`` header it will be removed before proceeding, as the value may conflict with
 the size specified in the gRPC frame.
 
-The response body returned to the client will not contain the gRPC header frame for requests that are upgraded in this
-fashion, i.e. the body will contain only the encoded Protobuf.
+The response body returned to the client will not contain the gRPC frame header for requests that are upgraded in this
+fashion, i.e. the body will contain only the encoded JSON.
 
 Statistics
 ----------

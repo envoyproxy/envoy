@@ -21,10 +21,16 @@ namespace GrpcHttp1Bridge {
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const bool protobuf_request = Grpc::Common::isProtobufRequestHeaders(headers);
-  if (upgrade_protobuf_ && protobuf_request) {
+  const bool json_request = Grpc::Common::isJsonRequestHeaders(headers);
+  if ((upgrade_protobuf_ && protobuf_request) || (upgrade_json_ && json_request)) {
     do_framing_ = true;
-    headers.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
-    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
+    if (upgrade_protobuf_) {
+      headers.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
+      headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
+    } else {
+      headers.setContentType(Http::Headers::get().ContentTypeValues.GrpcJson);
+      headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcJson);
+    }
     headers.removeContentLength(); // message length part of the gRPC frame
     decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }

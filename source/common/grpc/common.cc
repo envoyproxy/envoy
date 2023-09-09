@@ -51,6 +51,10 @@ bool Common::hasProtobufContentType(const Http::RequestOrResponseHeaderMap& head
   return headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Protobuf;
 }
 
+bool Common::hasJsonContentType(const Http::RequestOrResponseHeaderMap& headers) {
+  return headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Json;
+}
+
 bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
   if (!headers.Path()) {
     return false;
@@ -77,6 +81,13 @@ bool Common::isProtobufRequestHeaders(const Http::RequestHeaderMap& headers) {
     return false;
   }
   return hasProtobufContentType(headers);
+}
+
+bool Common::isJsonRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
+  return hasJsonContentType(headers);
 }
 
 bool Common::isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {

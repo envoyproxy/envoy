@@ -31,9 +31,10 @@ namespace {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 protected:
-  void initialize(bool upgrade_protobuf = false) {
+  void initialize(bool upgrade_protobuf = false, bool upgrade_json = false) {
     envoy::extensions::filters::http::grpc_http1_bridge::v3::Config config;
     config.set_upgrade_protobuf_to_grpc(upgrade_protobuf);
+    config.set_upgrade_json_to_grpc_json(upgrade_json);
     filter_ = std::make_unique<Http1BridgeFilter>(context_, config);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -293,6 +294,68 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedHeaderSanitized) {
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
+  EXPECT_EQ("", request_headers.getContentLengthValue());
+}
+
+TEST_F(GrpcHttp1BridgeFilterTest, ProtobufNotUpgradedToGrpc) {
+  initialize(false, false); // disable <upgrade_json_to_grpc_json>
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
+                                                 {":path", "/v1/spotify.Concat/Concat"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
+  Http::TestResponseTrailerMapImpl response_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  EXPECT_EQ("200", response_headers.get_(":status"));
+}
+
+// Verifies that requests with Json content are framed as gRPC+Json when the filter is configured as
+// such
+TEST_F(GrpcHttp1BridgeFilterTest, JsonUpgradedToGrpcJson) {
+  initialize(false, true); // enable <upgrade_json_to_grpc_json>
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/json"},
+                                                 {":path", "/v1/spotify.Concat/Concat"}};
+  Buffer::OwnedImpl data("helloworld");
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcJson, request_headers.getContentTypeValue());
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) { ASSERT_EQ(data.length(), d.length()); })));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
+  Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(data, false));
+  EXPECT_EQ("world", data.toString());
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(data, false));
+  EXPECT_EQ("world", data.toString());
+  Http::TestResponseTrailerMapImpl response_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  EXPECT_EQ("200", response_headers.get_(":status"));
+}
+
+TEST_F(GrpcHttp1BridgeFilterTest, JsonUpgradedHeaderSanitized) {
+  initialize(false, true); // enable <upgrade_json_to_grpc_json>
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/json"},
+                                                 {"content-length", "5"},
+                                                 {":path", "/v1/spotify.Concat/Concat"}};
+  Buffer::OwnedImpl data("hello");
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcJson, request_headers.getContentTypeValue());
+  // Verifies that the Content-Length header is removed during a Json upgrade
   EXPECT_EQ("", request_headers.getContentLengthValue());
 }
 

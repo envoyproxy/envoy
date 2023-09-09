@@ -337,6 +337,16 @@ TEST(GrpcContextTest, IsProtobufRequestHeader) {
   EXPECT_FALSE(Common::isProtobufRequestHeaders(is_not));
 }
 
+TEST(GrpcContextTest, IsJsonRequestHeader) {
+  Http::TestRequestHeaderMapImpl is{
+      {":method", "GET"}, {":path", "/"}, {"content-type", "application/json"}};
+  EXPECT_TRUE(Common::isJsonRequestHeaders(is));
+
+  Http::TestRequestHeaderMapImpl is_not{{":method", "CONNECT"},
+                                        {"content-type", "application/json"}};
+  EXPECT_FALSE(Common::isJsonRequestHeaders(is_not));
+}
+
 TEST(GrpcContextTest, ValidateResponse) {
   {
     Http::ResponseMessageImpl response(

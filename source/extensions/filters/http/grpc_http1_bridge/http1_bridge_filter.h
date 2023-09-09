@@ -22,7 +22,8 @@ public:
   explicit Http1BridgeFilter(
       Grpc::Context& context,
       const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config)
-      : context_(context), upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()) {}
+      : context_(context), upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()),
+        upgrade_json_(proto_config.upgrade_json_to_grpc_json()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -64,6 +65,7 @@ private:
   bool do_framing_{};
   Grpc::Context& context_;
   bool upgrade_protobuf_{};
+  bool upgrade_json_{};
 };
 
 } // namespace GrpcHttp1Bridge

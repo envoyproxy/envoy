@@ -258,6 +258,7 @@ public:
     const std::string Connect{"application/connect"};
     const std::string ConnectProto{"application/connect+proto"};
     const std::string Grpc{"application/grpc"};
+    const std::string GrpcJson{"application/grpc+json"};
     const std::string GrpcWeb{"application/grpc-web"};
     const std::string GrpcWebProto{"application/grpc-web+proto"};
     const std::string GrpcWebText{"application/grpc-web-text"};
