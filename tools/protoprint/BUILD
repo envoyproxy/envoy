@@ -1,8 +1,8 @@
-load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("@base_pip3//:requirements.bzl", "requirement")
-load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_binary")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_py_data")
 load("//tools/protoprint:protoprint.bzl", "protoprint_rule")
 

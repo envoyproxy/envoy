@@ -11,6 +11,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/common/dso/dso.h"
@@ -165,6 +166,7 @@ struct httpRequestInternal;
  */
 class Filter : public Http::StreamFilter,
                public std::enable_shared_from_this<Filter>,
+               public Filters::Common::Expr::StreamActivation,
                Logger::Loggable<Logger::Id::http>,
                public AccessLog::Instance {
 public:
@@ -236,6 +238,7 @@ public:
   CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
                                   int life_span, int stream_sharing);
   CAPIStatus getStringFilterState(absl::string_view key, GoString* value_str);
+  CAPIStatus getStringProperty(absl::string_view path, GoString* value_str, GoInt32* rc);
 
 private:
   bool hasDestroyed() {
@@ -270,6 +273,13 @@ private:
   void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
                                  GoSlice* buf_slice);
 
+  CAPIStatus getStringPropertyCommon(absl::string_view path, GoString* value_str,
+                                     ProcessorState& state);
+  CAPIStatus getStringPropertyInternal(absl::string_view path, std::string* result);
+  absl::optional<google::api::expr::runtime::CelValue> findValue(absl::string_view name,
+                                                                 Protobuf::Arena* arena);
+  CAPIStatus serializeStringValue(Filters::Common::Expr::CelValue value, std::string* result);
+
   const FilterConfigSharedPtr config_;
   Dso::HttpFilterDsoPtr dynamic_lib_;
 
@@ -279,6 +289,10 @@ private:
   // save temp values from local reply
   Http::RequestOrResponseHeaderMap* local_headers_{nullptr};
   Http::HeaderMap* local_trailers_{nullptr};
+
+  // save temp values for fetching request attributes in the later phase,
+  // like getting request size
+  Http::RequestOrResponseHeaderMap* request_headers_{nullptr};
 
   // The state of the filter on both the encoding and decoding side.
   DecodingProcessorState decoding_state_;

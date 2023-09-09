@@ -7,7 +7,7 @@ coloredlogs
 cryptography>=41.0.1
 dependatool>=0.2.2
 envoy.base.utils>=0.4.11
-envoy.code.check>=0.5.4
+envoy.code.check>=0.5.7
 envoy.dependency.check>=0.1.7
 envoy.distribution.release>=0.0.9
 envoy.distribution.repo>=0.0.8

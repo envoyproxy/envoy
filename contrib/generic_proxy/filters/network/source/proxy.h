@@ -56,13 +56,14 @@ public:
                    Rds::RouteConfigProviderSharedPtr route_config_provider,
                    std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
                    Tracing::ConnectionManagerTracingConfigPtr tracing_config,
+                   std::vector<AccessLogInstanceSharedPtr>&& access_logs,
                    Envoy::Server::Configuration::FactoryContext& context)
       : stat_prefix_(stat_prefix),
         stats_(GenericFilterStats::generateStats(stat_prefix_, context.scope())),
         codec_factory_(std::move(codec)), route_config_provider_(std::move(route_config_provider)),
         factories_(std::move(factories)), drain_decision_(context.drainDecision()),
         tracer_(std::move(tracer)), tracing_config_(std::move(tracing_config)),
-        time_source_(context.timeSource()) {}
+        access_logs_(std::move(access_logs)), time_source_(context.timeSource()) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
@@ -77,8 +78,10 @@ public:
   OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const override {
     return makeOptRefFromPtr<const Tracing::ConnectionManagerTracingConfig>(tracing_config_.get());
   }
-
   GenericFilterStats& stats() override { return stats_; }
+  const std::vector<AccessLogInstanceSharedPtr>& accessLogs() const override {
+    return access_logs_;
+  }
 
   // FilterChainFactory
   void createFilterChain(FilterChainManager& manager) override {
@@ -104,6 +107,7 @@ private:
 
   Tracing::TracerSharedPtr tracer_;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
+  std::vector<AccessLogInstanceSharedPtr> access_logs_;
 
   TimeSource& time_source_;
 };
@@ -321,6 +325,7 @@ public:
   void onDecodingSuccess(ResponsePtr response, ExtendedOptions options) override;
   void onDecodingFailure() override;
   void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> connection() override;
 
   // UpstreamManager
   void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) override;
@@ -362,7 +367,8 @@ public:
   // RequestDecoderCallback
   void onDecodingSuccess(RequestPtr request, ExtendedOptions options) override;
   void onDecodingFailure() override;
-  void writeToConnection(Buffer::Instance& data) override;
+  void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> connection() override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
@@ -377,7 +383,7 @@ public:
     // If these is bound upstream connection, clean it up.
     if (upstream_manager_ != nullptr) {
       upstream_manager_->cleanUp(true);
-      connection().dispatcher().deferredDelete(std::move(upstream_manager_));
+      downstreamConnection().dispatcher().deferredDelete(std::move(upstream_manager_));
       upstream_manager_ = nullptr;
     }
   }
@@ -386,7 +392,7 @@ public:
 
   void sendReplyDownstream(Response& response, ResponseEncoderCallback& callback);
 
-  Network::Connection& connection() {
+  Network::Connection& downstreamConnection() {
     ASSERT(callbacks_ != nullptr);
     return callbacks_->connection();
   }

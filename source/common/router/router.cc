@@ -418,7 +418,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (direct_response != nullptr) {
     stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers, !config_.suppress_envoy_headers_);
-    callbacks_->streamInfo().setRouteName(direct_response->routeName());
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
@@ -446,7 +445,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // limits, apply the new cap.
   retry_shadow_buffer_limit_ =
       std::min(retry_shadow_buffer_limit_, route_entry_->retryShadowBufferLimit());
-  callbacks_->streamInfo().setRouteName(route_entry_->routeName());
   if (debug_config && debug_config->append_cluster_) {
     // The cluster name will be appended to any local or upstream responses from this point.
     modify_headers = [this, debug_config](Http::ResponseHeaderMap& headers) {
@@ -1815,8 +1813,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     return false;
   }
 
-  const auto& route_name = route->directResponseEntry() ? route->directResponseEntry()->routeName()
-                                                        : route->routeEntry()->routeName();
+  const auto& route_name = route->routeName();
   for (const auto& predicate : policy.predicates()) {
     if (!predicate->acceptTargetRoute(*filter_state, route_name, !scheme_is_http,
                                       !target_is_http)) {

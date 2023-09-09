@@ -45,6 +45,7 @@ void expectDeltaUpdate(
         for (size_t i = 0; i < expected_removals.size(); i++) {
           EXPECT_EQ(expected_removals[i], removed_resources[i]);
         }
+        return absl::OkStatus();
       }));
 }
 
@@ -65,6 +66,7 @@ void expectDeltaAndSotwUpdate(
           EXPECT_TRUE(
               TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
         }
+        return absl::OkStatus();
       }));
   expectDeltaUpdate(callbacks, expected_resources, expected_removals, version);
 }
@@ -77,8 +79,11 @@ void expectNoUpdate(MockSubscriptionCallbacks& callbacks, const std::string& ver
 void expectEmptySotwNoDeltaUpdate(MockSubscriptionCallbacks& callbacks,
                                   const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-      .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& gotten_resources,
-                          const std::string&) { EXPECT_EQ(gotten_resources.size(), 0); }));
+      .WillOnce(
+          Invoke([](const std::vector<DecodedResourceRef>& gotten_resources, const std::string&) {
+            EXPECT_EQ(gotten_resources.size(), 0);
+            return absl::OkStatus();
+          }));
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, version)).Times(0);
 }
 
@@ -364,11 +369,12 @@ public:
     watch_map_.updateWatchInterest(watch2_, {"alice"});
   }
 
-  void removeAllInterest() {
-    ASSERT_FALSE(watch_cb_invoked_);
+  absl::Status removeAllInterest() {
+    EXPECT_FALSE(watch_cb_invoked_);
     watch_cb_invoked_ = true;
     watch_map_.removeWatch(watch1_);
     watch_map_.removeWatch(watch2_);
+    return absl::OkStatus();
   }
 
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
@@ -386,10 +392,10 @@ public:
 TEST_F(SameWatchRemoval, SameWatchRemovalSotw) {
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _))
       .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
   EXPECT_CALL(callbacks2_, onConfigUpdate(_, _))
       .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
   watch_map_.onConfigUpdate(updated_resources_, "version1");
 }
 
@@ -400,10 +406,10 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
 
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
       .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
   EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
       .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
   watch_map_.onConfigUpdate(delta_resources, removed_names_proto, "version1");
 }
 
@@ -412,10 +418,10 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
   *removed_names_proto.Add() = "alice";
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
       .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
   EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
       .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
   watch_map_.onConfigUpdate({}, removed_names_proto, "version1");
 }
 
@@ -757,6 +763,7 @@ TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
           EXPECT_FALSE(gotten_resources[0].get().hasResource());
           EXPECT_EQ(gotten_resources[0].get().name(), not_resolved);
           EXPECT_EQ(gotten_resources[0].get().aliases(), std::vector<std::string>{not_resolved});
+          return absl::OkStatus();
         }));
 
     Protobuf::RepeatedPtrField<std::string> removed_names_proto;

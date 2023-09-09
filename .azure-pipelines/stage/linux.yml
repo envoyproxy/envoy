@@ -48,7 +48,8 @@ jobs:
   - template: ../bazel.yml
     parameters:
       managedAgent: ${{ parameters.managedAgent }}
-      ciTarget: bazel.release
+      ciTarget: release
+      cacheName: "release"
       bazelBuildExtraOptions: ${{ parameters.bazelBuildExtraOptions }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)
