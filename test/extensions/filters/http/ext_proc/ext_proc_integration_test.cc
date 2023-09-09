@@ -80,9 +80,6 @@ protected:
     scoped_runtime_.mergeValues(
         {{"envoy_reloadable_features_immediate_response_use_filter_mutation_rule",
           filter_mutation_rule_}});
-    scoped_runtime_.mergeValues(
-        {{"envoy_reloadable_features_ext_proc_disable_response_processing_on_local_reply",
-          disable_on_local_reply_}});
 
     config_helper_.addConfigModifier([this, config_option](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -493,7 +490,6 @@ protected:
   TestScopedRuntime scoped_runtime_;
   std::string header_raw_value_{"false"};
   std::string filter_mutation_rule_{"false"};
-  std::string disable_on_local_reply_{"false"};
 };
 
 INSTANTIATE_TEST_SUITE_P(

@@ -141,10 +141,7 @@ bug_fixes:
 - area: ext_proc
   change: |
     Fixed a bug where external processing requests on the encode path were causing Envoy to return empty reply
-    in the event of a local reply. This bug was fixed by disabling encoder-path external processing. This behavior
-    can be reverted by setting runtime guard
-    ``envoy.reloadable_features.ext_proc_disable_response_processing_on_local_reply`` to false. In doing so, one must
-    at least disable response headers processing requests via config to see the bug fixed.
+    in the event of a local reply. This bug was fixed by disabling encoder-path external processing. 
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
