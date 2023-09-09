@@ -21,7 +21,7 @@ void Util::serializeDouble(double number, Buffer::Instance& buffer) {
   //     generate the string_view, and does not work on all platforms yet.
   //
   // The accuracy is checked in buffer_util_test.
-#if __cplusplus < 201703L // C++16 and below
+#if !defined(__clang_major__) || (__clang_major__ < 14)
   // On older compilers, such as those found on Apple, and gcc, std::to_chars
   // does not work with 'double', so we revert to the next fastest correct
   // implementation.
