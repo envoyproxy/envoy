@@ -595,11 +595,9 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // Basically, fairness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
   absl::FixedArray<uint64_t> local_percentage(num_localities);
-  calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(),
-                                    local_percentage.begin());
+  calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage.begin());
   absl::FixedArray<uint64_t> upstream_percentage(num_localities);
-  calculateLocalityPercentage(host_set.healthyHostsPerLocality(),
-                                    upstream_percentage.begin());
+  calculateLocalityPercentage(host_set.healthyHostsPerLocality(), upstream_percentage.begin());
 
   // If we have lower percent of hosts in the local cluster in the same locality,
   // we can push all of the requests directly to upstream cluster in the same locality.
