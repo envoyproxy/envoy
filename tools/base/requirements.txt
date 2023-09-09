@@ -439,9 +439,9 @@ envoy-base-utils==0.4.11 \
     #   envoy-docs-sphinx-runner
     #   envoy-github-release
     #   envoy-gpg-sign
-envoy-code-check==0.5.7 \
-    --hash=sha256:5cd2c5a6a9e4b85bc3342cea58f1b6200ebf5ef926e7b8320a1f73bd49145811 \
-    --hash=sha256:628b8ff787278e130cc576302a9f383c3a0a645841e5f7323c72359dc59c2935
+envoy-code-check==0.5.8 \
+    --hash=sha256:03f32588cc9ed98ab6703cbca6f81df1527db71c3a0f962be6a6084ded40d528 \
+    --hash=sha256:2b12c51098c78d393823cf055a54e9308c37321d769041f01a2f35b04074d6f3
     # via -r requirements.in
 envoy-dependency-check==0.1.8 \
     --hash=sha256:ac9820e446bb44e05121e5c93c210f40ca37076580b0d082da2c63e7784c338a \
