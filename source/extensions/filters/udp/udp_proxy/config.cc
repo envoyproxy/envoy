@@ -17,6 +17,11 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       // Default prefer_gro to true for upstream client traffic.
       upstream_socket_config_(config.upstream_socket_config(), true),
       random_(context.api().randomGenerator()) {
+  if (use_per_packet_load_balancing_ && config.session_filters().size() > 0) {
+    throw EnvoyException(
+        "Only one of use_per_packet_load_balancing or session_filters can be used.");
+  }
+
   if (use_original_src_ip_ &&
       !Api::OsSysCallsSingleton::get().supportsIpTransparent(
           context.getServerFactoryContext().options().localAddressIpVersion())) {

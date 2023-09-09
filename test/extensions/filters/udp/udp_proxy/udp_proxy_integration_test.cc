@@ -194,8 +194,8 @@ typed_config:
 )EOF";
 
     for (auto config : session_filters_configs) {
-        session_filters += fmt::format(
-            R"EOF(
+      session_filters += fmt::format(
+          R"EOF(
   - name: foo
     typed_config:
       '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.BufferingFilterConfig
@@ -203,8 +203,8 @@ typed_config:
       upstream_datagrams_to_buffer: {}
       continue_after_inject: {}
 )EOF",
-            config.downstream_datagrams_to_buffer_, config.upstream_datagrams_to_buffer_,
-            config.continue_after_inject_);
+          config.downstream_datagrams_to_buffer_, config.upstream_datagrams_to_buffer_,
+          config.continue_after_inject_);
     }
 
     return session_filters;
@@ -531,21 +531,18 @@ TEST_P(UdpProxyIntegrationTest, BidirectionalSessionFilter) {
   requestResponseWithListenerAddress(*listener_address, "hello", "lo", "world1", "ld1");
 }
 
-TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewConnection) {
-  // In the test filter, the onNewSession() call will increase the amount of bytes to drain by 1,
-  // if it's set to return StopIteration.
-  // Therefore we have two read filters where the first one should return StopIteration,
-  // so we expect the overall amount of bytes to drain to increase by 1, instead of 2.
+TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSession) {
+  // In both filters, the onNewSession() call will increase the amount of bytes to drain by 1.
   setup(1, absl::nullopt,
-        getDrainerSessionFilterConfig({{"read", 2, 0, true, false, false, false},
-                                       {"read", 0, 0, true, false, false, false}}));
+        getDrainerSessionFilterConfig(
+            {{"read", 2, 0, true, false, true, false}, {"read", 0, 0, true, false, true, false}}));
 
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   std::string request = "hello";
-  std::string expected_request = "lo"; // We expect 3 bytes to drain.
+  std::string expected_request = "o"; // We expect 4 bytes to drain.
   std::string response = "world";
   std::string expected_response = "world";
 
@@ -594,7 +591,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
   EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
 }
 
-TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewConnectionAndLaterContinue) {
+TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionAndLaterContinue) {
   // In the test filter, the onNewSession() call will increase the amount of bytes to drain by 1,
   // if it's set to return StopIteration.
   // The first filter will StopIteration in onNewSession(), so the count will increase by 1. Then,
