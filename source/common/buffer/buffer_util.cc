@@ -21,13 +21,14 @@ void Util::serializeDouble(double number, Buffer::Instance& buffer) {
   //     generate the string_view, and does not work on all platforms yet.
   //
   // The accuracy is checked in buffer_util_test.
-#if defined(__APPLE__) || defined(GCC_COMPILER)
-  // On Apple and gcc, std::to_chars does not work with 'double', so we revert
-  // to the next fastest correct implementation.
+#if __cplusplus < 201703L // C++16 and below
+  // On older compilers, such as those found on Apple, and gcc, std::to_chars
+  // does not work with 'double', so we revert to the next fastest correct
+  // implementation.
   buffer.addFragments({fmt::to_string(number)});
 #else
-  // This version is awkward, and doesn't work on Apple as of August 2023, but
-  // it is the fastest correct option on other platforms.
+  // This version is awkward, and doesn't work on all platforms used in Envoy CI
+  // as of August 2023, but it is the fastest correct option on modern compilers.
   char buf[100];
   std::to_chars_result result = std::to_chars(buf, buf + sizeof(buf), number);
   ENVOY_BUG(result.ec == std::errc{}, std::make_error_code(result.ec).message());
