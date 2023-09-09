@@ -854,7 +854,7 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamPeriodic) {
       });
   initializeBasicFilter(ACCESSLOG, "test.com");
 
-  auto path = "/test";
+  auto path = "/test?periodic=1";
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},        {":path", path},  {":scheme", "http"},

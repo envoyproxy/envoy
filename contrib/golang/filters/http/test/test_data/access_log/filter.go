@@ -28,6 +28,20 @@ type filter struct {
 }
 
 func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
+	if counter == 0 {
+		query, _ := f.callbacks.GetProperty("request.query")
+		if query == "periodic=1" {
+			go func() {
+				defer f.callbacks.RecoverPanic()
+
+				// trigger AccessLogDownstreamPeriodic
+				time.Sleep(110 * time.Millisecond)
+				f.callbacks.Continue(api.Continue)
+			}()
+			return api.Running
+		}
+	}
+
 	if counter > 0 {
 		wg.Wait()
 		header.Set("respCode", respCode)
@@ -40,16 +54,10 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		referers = []string{}
 		// the counter will be 0 when this request is ended
 		counter = -1
+
 	}
 
-	go func() {
-		defer f.callbacks.RecoverPanic()
-
-		// trigger AccessLogDownstreamPeriodic
-		time.Sleep(110 * time.Millisecond)
-		f.callbacks.Continue(api.Continue)
-	}()
-	return api.Running
+	return api.Continue
 }
 
 func (f *filter) OnLogDownstreamStart() {
