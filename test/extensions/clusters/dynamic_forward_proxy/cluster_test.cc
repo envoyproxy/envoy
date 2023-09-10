@@ -64,6 +64,7 @@ public:
 
     ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(&downstream_headers_));
     ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(lb_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
     ON_CALL(lb_context_, downstreamConnection()).WillByDefault(Return(&connection_));
 
     member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
@@ -119,7 +120,7 @@ public:
 
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
     StreamInfo::FilterState& filter_state = const_cast<StreamInfo::FilterState&>(
-        lb_context_.downstreamConnection()->streamInfo().filterState());
+        lb_context_.requestStreamInfo()->filterState());
 
     filter_state.setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
