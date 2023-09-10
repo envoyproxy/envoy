@@ -97,6 +97,11 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       }
     }
 
+    // Always remove the content length in STREAMED body processing mode.
+    if (body_mode_ == ProcessingMode::STREAMED) {
+      headers_->removeContentLength();
+    }
+
     clearRouteCache(common_response);
     onFinishProcessorCall(Grpc::Status::Ok);
 

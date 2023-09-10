@@ -235,13 +235,18 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     decoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (!decoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "decodeHeaders: Skipped");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (decoding_state_.sendHeaders()) {
+    status = onHeaders(decoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   }
 
-  const auto status = onHeaders(decoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
+  // Always remove the content length in STREAMED body processing mode.
+  // It is because in this mode, ext_proc filter can not guarantee to set the content length
+  // correctly if request body is mutated by external processor later.
+  if (decoding_state_.bodyMode() == ProcessingMode::STREAMED) {
+    headers.removeContentLength();
+  }
   return status;
 }
 
@@ -521,13 +526,16 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     encoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (processing_complete_ || !encoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "encodeHeaders: Continue");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (!processing_complete_ && encoding_state_.sendHeaders()) {
+    status = onHeaders(encoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
   }
 
-  const auto status = onHeaders(encoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
+  // Always remove the content length in STREAMED body processing mode.
+  if (encoding_state_.bodyMode() == ProcessingMode::STREAMED) {
+    headers.removeContentLength();
+  }
   return status;
 }
 

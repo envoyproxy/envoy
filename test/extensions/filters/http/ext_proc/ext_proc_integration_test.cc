@@ -47,6 +47,7 @@ using namespace std::chrono_literals;
 struct ConfigOptions {
   bool valid_grpc_server = true;
   bool add_logging_filter = false;
+  bool http1_codec = false;
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -134,8 +135,14 @@ protected:
       config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                         deferredProcessing() ? "true" : "false");
     });
-    setUpstreamProtocol(Http::CodecType::HTTP2);
-    setDownstreamProtocol(Http::CodecType::HTTP2);
+
+    if (config_option.http1_codec) {
+      setUpstreamProtocol(Http::CodecType::HTTP1);
+      setDownstreamProtocol(Http::CodecType::HTTP1);
+    } else {
+      setUpstreamProtocol(Http::CodecType::HTTP2);
+      setDownstreamProtocol(Http::CodecType::HTTP2);
+    }
   }
 
   void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg) {
@@ -166,7 +173,8 @@ protected:
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
       absl::string_view body,
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
+      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
+      bool add_content_length = false) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
@@ -174,6 +182,10 @@ protected:
     headers.setMethod("POST");
     if (modify_headers) {
       (*modify_headers)(headers);
+    }
+
+    if (add_content_length) {
+      headers.setContentLength(body.size());
     }
     return codec_client_->makeRequestWithBody(headers, std::string(body));
   }
@@ -907,6 +919,130 @@ TEST_P(ExtProcIntegrationTest, GetBufferedButNoBodies) {
                                 });
 
   verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, RemoveContentLengthInRequestHeader) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response =
+      sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::Headers::get().TransferEncoding,
+                            Http::Headers::get().TransferEncodingValues.Chunked));
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, World!");
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterRequestProcessing) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto* content_length =
+            headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_header()->set_key("content-length");
+        content_length->mutable_header()->set_value("13");
+        return true;
+      });
+
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::Headers::get().TransferEncoding,
+                            Http::Headers::get().TransferEncodingValues.Chunked));
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, World!");
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, RemoveContentLengthInResponseHeader) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response =
+      sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
+
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(response->headers().ContentLength(), nullptr);
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().TransferEncoding,
+                            Http::Headers::get().TransferEncodingValues.Chunked));
+  EXPECT_EQ(response->body(), "Hello, World!");
+}
+
+TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterResponseProcessing) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("test!", absl::nullopt);
+
+  handleUpstreamRequest();
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto* content_length =
+            headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_header()->set_key("content-length");
+        content_length->mutable_header()->set_value("13");
+        return true;
+      });
+
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(response->headers().ContentLength(), nullptr);
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().TransferEncoding,
+                            Http::Headers::get().TransferEncodingValues.Chunked));
+  EXPECT_EQ(response->body(), "Hello, World!");
 }
 
 // Test the filter using the default configuration by connecting to
