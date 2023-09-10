@@ -23,7 +23,7 @@ using BufferingFilterConfig =
 
 using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
 
-class BufferingSessionFilter : public Filter  {
+class BufferingSessionFilter : public Filter {
 public:
   BufferingSessionFilter(int downstream_datagrams_to_buffer, int upstream_datagrams_to_buffer,
                          bool continue_after_inject)
@@ -39,9 +39,7 @@ public:
     write_callbacks_ = &callbacks;
   }
 
-  ReadFilterStatus onNewSession() override {
-    return ReadFilterStatus::Continue;
-  }
+  ReadFilterStatus onNewSession() override { return ReadFilterStatus::Continue; }
 
   ReadFilterStatus onData(Network::UdpRecvData& data) override {
     if (downstream_buffer_.size() < downstream_datagrams_to_buffer_) {
@@ -89,7 +87,7 @@ private:
   void bufferRead(Network::UdpRecvData& data) {
     auto buffered_datagram = std::make_unique<Network::UdpRecvData>();
     buffered_datagram->addresses_ = {std::move(data.addresses_.local_),
-                                      std::move(data.addresses_.peer_)};
+                                     std::move(data.addresses_.peer_)};
     buffered_datagram->buffer_ = std::move(data.buffer_);
     buffered_datagram->receive_time_ = data.receive_time_;
     downstream_buffer_.push(std::move(buffered_datagram));
@@ -98,7 +96,7 @@ private:
   void bufferWrite(Network::UdpRecvData& data) {
     auto buffered_datagram = std::make_unique<Network::UdpRecvData>();
     buffered_datagram->addresses_ = {std::move(data.addresses_.local_),
-                                      std::move(data.addresses_.peer_)};
+                                     std::move(data.addresses_.peer_)};
     buffered_datagram->buffer_ = std::move(data.buffer_);
     buffered_datagram->receive_time_ = data.receive_time_;
     upstream_buffer_.push(std::move(buffered_datagram));
