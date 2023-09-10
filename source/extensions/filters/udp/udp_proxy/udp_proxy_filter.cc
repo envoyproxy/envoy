@@ -323,7 +323,8 @@ void UdpProxyFilter::ActiveSession::createSocket(const Upstream::HostConstShared
 UdpProxyFilter::ActiveSession::~ActiveSession() {
   ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
-            host_->address()->asStringView());
+            host_ != nullptr ? host_->address()->asStringView() : "unknown");
+
   cluster_.filter_.config_->stats().downstream_sess_active_.dec();
   cluster_.cluster_.info()
       ->resourceManager(Upstream::ResourcePriority::Default)
