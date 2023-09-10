@@ -119,8 +119,8 @@ public:
   }
 
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
-    StreamInfo::FilterState& filter_state = const_cast<StreamInfo::FilterState&>(
-        lb_context_.requestStreamInfo()->filterState());
+    StreamInfo::FilterState& filter_state =
+        const_cast<StreamInfo::FilterState&>(lb_context_.requestStreamInfo()->filterState());
 
     filter_state.setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
