@@ -1,7 +1,7 @@
 #include "source/common/buffer/buffer_util.h"
 
 #include <charconv>
-#include <version>
+#include <cstddef>
 
 #include "source/common/common/macros.h"
 
