@@ -160,10 +160,11 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   all_new_hosts.emplace(address_as_string);
 }
 
-void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                    const std::string&) {
+absl::Status
+EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                               const std::string&) {
   if (!validateUpdateSize(resources.size())) {
-    return;
+    return absl::OkStatus();
   }
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
@@ -218,6 +219,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     eds_resources_cache_->removeCallback(edsServiceName(), this);
     using_cached_resource_ = false;
   }
+  return absl::OkStatus();
 }
 
 void EdsClusterImpl::update(
@@ -280,15 +282,16 @@ void EdsClusterImpl::update(
 
   BatchUpdateHelper helper(*this, *used_load_assignment);
   priority_set_.batchHostUpdate(helper);
+  return;
 }
 
-void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                    const Protobuf::RepeatedPtrField<std::string>&,
-                                    const std::string&) {
+absl::Status
+EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                               const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   if (!validateUpdateSize(added_resources.size())) {
-    return;
+    return absl::OkStatus();
   }
-  onConfigUpdate(added_resources, added_resources[0].get().version());
+  return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {
@@ -444,14 +447,14 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
   onPreInitComplete();
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 EdsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                      ClusterFactoryContext& context) {
   // TODO(kbaichoo): EDS cluster should be able to support loading it's
   // configuration from the CustomClusterType protobuf. Currently it does not.
   // See: https://github.com/envoyproxy/envoy/issues/28752
   if (!cluster.has_eds_cluster_config()) {
-    throw EnvoyException("cannot create an EDS cluster without an EDS config");
+    return absl::InvalidArgumentError("cannot create an EDS cluster without an EDS config");
   }
 
   return std::make_pair(std::make_unique<EdsClusterImpl>(cluster, context), nullptr);

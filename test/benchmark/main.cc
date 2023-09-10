@@ -14,6 +14,7 @@
 using namespace Envoy;
 
 static bool skip_expensive_benchmarks = false;
+static std::function<void()> cleanup_hook = []() {};
 
 // Boilerplate main(), which discovers benchmarks and runs them. This uses two
 // different flag parsers, so the order of flags matters: flags defined here
@@ -103,6 +104,8 @@ int main(int argc, char** argv) {
         "Expensive benchmarks are being skipped; see test/README.md for more information");
   }
   ::benchmark::RunSpecifiedBenchmarks();
+  cleanup_hook();
 }
 
+void Envoy::benchmark::setCleanupHook(std::function<void()> hook) { cleanup_hook = hook; }
 bool Envoy::benchmark::skipExpensiveBenchmarks() { return skip_expensive_benchmarks; }

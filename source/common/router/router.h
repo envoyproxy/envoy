@@ -645,7 +645,7 @@ private:
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
-  const VirtualCluster* request_vcluster_;
+  const VirtualCluster* request_vcluster_{};
   RouteStatsContextOptRef route_stats_context_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;

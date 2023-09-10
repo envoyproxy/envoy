@@ -3,6 +3,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/http.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/logger.h"
@@ -23,14 +24,24 @@ public:
                     Server::Configuration::FactoryContext& context);
 
   // TapFilter::HttpTapConfig
-  HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) override;
+  HttpPerRequestTapperPtr
+  createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
+                         uint64_t stream_id) override;
+
+  TimeSource& timeSource() const override { return time_source_; }
+
+private:
+  TimeSource& time_source_;
 };
 
 class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<Logger::Id::tap> {
 public:
-  HttpPerRequestTapperImpl(HttpTapConfigSharedPtr config, uint64_t stream_id)
-      : config_(std::move(config)), stream_id_(stream_id),
-        sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
+  HttpPerRequestTapperImpl(HttpTapConfigSharedPtr config,
+                           const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
+                           uint64_t stream_id)
+      : config_(std::move(config)),
+        should_record_headers_received_time_(tap_config.record_headers_received_time()),
+        stream_id_(stream_id), sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
         statuses_(config_->createMatchStatusVector()) {
     config_->rootMatcher().onNewStream(statuses_);
   }
@@ -73,11 +84,21 @@ private:
   void streamResponseHeaders();
   void streamBufferedResponseBody();
 
+  // Functions for request/response caught time stamp
+  void setTimeStamp(long& pTimeStamp) {
+    pTimeStamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                     config_->timeSource().systemTime().time_since_epoch())
+                     .count();
+  }
+
   HttpTapConfigSharedPtr config_;
+  const bool should_record_headers_received_time_;
   const uint64_t stream_id_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;
   bool started_streaming_trace_{};
+  long request_headers_received_time_;
+  long response_headers_received_time_;
   const Http::RequestHeaderMap* request_headers_{};
   const Http::HeaderMap* request_trailers_{};
   const Http::ResponseHeaderMap* response_headers_{};
