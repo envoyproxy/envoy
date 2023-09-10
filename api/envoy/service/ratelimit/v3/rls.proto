@@ -50,6 +50,12 @@ message RateLimitRequest {
   // Rate limit requests can optionally specify the number of hits a request adds to the matched
   // limit. If the value is not set in the message, a request increases the matched limit by 1.
   uint32 hits_addend = 3;
+
+  // Rate limit requests can optionally specify if they want to check the limit without actually
+  // consuming a hit. This is useful for clients that want to check if a request is over limit
+  // without consuming a hit. This is also useful for clients that want to "peek" at the headers
+  // that would be returned in a response for a given request.
+  bool check_only = 4;
 }
 
 // A response from a ShouldRateLimit call.
