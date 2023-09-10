@@ -591,6 +591,21 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
   EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
 }
 
+TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionButNotOnData) {
+  setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 0, 0, true}}));
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  // Filter chain did not iteration all onNewSession(), so socket is not created.
+  Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+  client.write("hello1", *listener_address);
+
+  // One datagram should be received, but none sent upstream because socket was not created.
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
+}
+
 TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionAndLaterContinue) {
   // In the test filter, the onNewSession() call will increase the amount of bytes to drain by 1,
   // if it's set to return StopIteration.
