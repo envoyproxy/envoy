@@ -313,8 +313,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   const Router::StringAccessor* dynamic_host_filter_state = nullptr;
   if (context->requestStreamInfo()) {
     dynamic_host_filter_state =
-        context->requestStreamInfo()->filterState()
-            .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
+        context->requestStreamInfo()->filterState().getDataReadOnly<Router::StringAccessor>(
+            "envoy.upstream.dynamic_host");
   }
 
   absl::string_view raw_host;
@@ -338,8 +338,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   uint32_t port = is_secure ? 443 : 80;
   if (context->requestStreamInfo()) {
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->requestStreamInfo()->filterState()
-            .getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
+        context->requestStreamInfo()->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+            "envoy.upstream.dynamic_port");
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
       port = dynamic_port_filter_state->value();
