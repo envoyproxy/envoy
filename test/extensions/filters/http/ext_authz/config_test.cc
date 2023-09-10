@@ -70,7 +70,7 @@ public:
                        Stats::Scope& scope, bool skip_cluster_check) {
               return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
                   config_with_hash_key, scope, skip_cluster_check);
-        }));
+            }));
     ExtAuthzFilterFactory factory;
     return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_);
   }

@@ -67,8 +67,8 @@ Http::FilterFactoryCb ExtAuthzFilterFactory::createFilterFactoryFromProtoTyped(
     Config::Utility::checkTransportVersion(proto_config);
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
-    callback = [&context, filter_config, timeout_ms,
-                config_with_hash_key, dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
+    callback = [&context, filter_config, timeout_ms, config_with_hash_key,
+                dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
               config_with_hash_key, dual_info.scope, true),
