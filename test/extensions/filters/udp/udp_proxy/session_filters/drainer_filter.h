@@ -40,7 +40,7 @@ public:
       return ReadFilterStatus::StopIteration;
     } else {
       // Make sure that we are able to call continueFilterChain() here without
-      // inpacting the filter chain iteration.
+      // impacting the filter chain iteration.
       read_callbacks_->continueFilterChain();
       return ReadFilterStatus::Continue;
     }
