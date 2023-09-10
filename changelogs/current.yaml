@@ -217,6 +217,11 @@ new_features:
   change: |
     added :ref:`session_filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>` config to
     support optional filters that will run for each upstream UDP session. More information can be found in the UDP proxy documentation.
+- area: udp_proxy
+  change: |
+    added ``injectDatagramToFilterChain()`` callback to UDP session filters that allows session filters to inject datagrams downstream
+    or upstream the filter chain during a filter chain iteration. This can be used, for example, by session filters that are required
+    to buffer datagrams due to an asynchronous call.
 - area: otlp_stats_sink
   change: |
     added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`

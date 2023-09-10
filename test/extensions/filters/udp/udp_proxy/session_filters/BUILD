@@ -40,3 +40,21 @@ envoy_cc_test_library(
     ],
     alwayslink = 1,
 )
+
+envoy_proto_library(
+    name = "buffer_filter_proto",
+    srcs = ["buffer_filter.proto"],
+)
+
+envoy_cc_test_library(
+    name = "buffer_filter_config_lib",
+    srcs = ["buffer_filter.h"],
+    deps = [
+        ":buffer_filter_proto_cc_proto",
+        "//envoy/registry",
+        "//source/extensions/filters/udp/udp_proxy/session_filters:factory_base_lib",
+        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
+        "//test/test_common:utility_lib",
+    ],
+    alwayslink = 1,
+)

@@ -475,6 +475,44 @@ void UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filt
   }
 }
 
+void UdpProxyFilter::ActiveSession::onInjectReadDatagramToFilterChain(ActiveReadFilter* filter,
+                                                                      Network::UdpRecvData& data) {
+  ASSERT(filter != nullptr);
+
+  std::list<ActiveReadFilterPtr>::iterator entry = std::next(filter->entry());
+  for (; entry != read_filters_.end(); entry++) {
+    if (!(*entry)->read_filter_) {
+      continue;
+    }
+
+    auto status = (*entry)->read_filter_->onData(data);
+    if (status == ReadFilterStatus::StopIteration) {
+      return;
+    }
+  }
+
+  writeUpstream(data);
+}
+
+void UdpProxyFilter::ActiveSession::onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter,
+                                                                       Network::UdpRecvData& data) {
+  ASSERT(filter != nullptr);
+
+  std::list<ActiveWriteFilterPtr>::iterator entry = std::next(filter->entry());
+  for (; entry != write_filters_.end(); entry++) {
+    if (!(*entry)->write_filter_) {
+      continue;
+    }
+
+    auto status = (*entry)->write_filter_->onWrite(data);
+    if (status == WriteFilterStatus::StopIteration) {
+      return;
+    }
+  }
+
+  writeDownstream(data);
+}
+
 void UdpProxyFilter::ActiveSession::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
@@ -496,6 +534,10 @@ void UdpProxyFilter::ActiveSession::processPacket(
     }
   }
 
+  writeDownstream(recv_data);
+}
+
+void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_data) {
   const uint64_t tx_buffer_length = recv_data.buffer_->length();
   ENVOY_LOG(trace, "writing {} byte datagram downstream: downstream={} local={} upstream={}",
             tx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
