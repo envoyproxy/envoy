@@ -241,9 +241,11 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   }
 
-  // Always remove the content length in STREAMED body processing mode.
-  // It is because in this mode, ext_proc filter can not guarantee to set the content length
-  // correctly if request body is mutated by external processor later.
+  // Always remove the content length in STREAMED body processing mode. In this mode, ext_proc
+  // filter can not guarantee to set the content length correctly if request body is mutated by
+  // external processor later.
+  // In http1 codec, removing content length will let it enable chunked encoding whenever
+  // feasible.
   if (decoding_state_.bodyMode() == ProcessingMode::STREAMED) {
     headers.removeContentLength();
   }

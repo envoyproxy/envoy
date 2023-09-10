@@ -196,11 +196,16 @@ protected:
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
 
-  void handleUpstreamRequest() {
+  void handleUpstreamRequest(bool add_content_length = false) {
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    Http::TestResponseHeaderMapImpl response_headers =
+        Http::TestResponseHeaderMapImpl{{":status", "200"}};
+    if (add_content_length) {
+      response_headers.setContentLength(100);
+    }
+    upstream_request_->encodeHeaders(response_headers, false);
     upstream_request_->encodeData(100, true);
   }
 
@@ -924,10 +929,12 @@ TEST_P(ExtProcIntegrationTest, GetBufferedButNoBodies) {
 TEST_P(ExtProcIntegrationTest, RemoveContentLengthInRequestHeader) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
   ConfigOptions config_option = {};
   config_option.http1_codec = true;
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
+
   auto response =
       sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
@@ -951,10 +958,12 @@ TEST_P(ExtProcIntegrationTest, RemoveContentLengthInRequestHeader) {
 TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterRequestProcessing) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
   ConfigOptions config_option = {};
   config_option.http1_codec = true;
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
+
   auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
@@ -984,14 +993,15 @@ TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterRequestProcessing) {
 TEST_P(ExtProcIntegrationTest, RemoveContentLengthInResponseHeader) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+
   ConfigOptions config_option = {};
   config_option.http1_codec = true;
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
-  auto response =
-      sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
 
-  handleUpstreamRequest();
+  auto response = sendDownstreamRequestWithBody("test!", absl::nullopt);
+
+  handleUpstreamRequest(/*add_content_length=*/true);
   processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
 
   processResponseBodyMessage(
@@ -1012,6 +1022,7 @@ TEST_P(ExtProcIntegrationTest, RemoveContentLengthInResponseHeader) {
 TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterResponseProcessing) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+
   ConfigOptions config_option = {};
   config_option.http1_codec = true;
   initializeConfig(config_option);
