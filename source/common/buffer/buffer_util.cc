@@ -1,6 +1,7 @@
 #include "source/common/buffer/buffer_util.h"
 
 #include <charconv>
+#include <version>
 
 #include "source/common/common/macros.h"
 
@@ -21,12 +22,7 @@ void Util::serializeDouble(double number, Buffer::Instance& buffer) {
   //     generate the string_view, and does not work on all platforms yet.
   //
   // The accuracy is checked in buffer_util_test.
-#if !defined(__clang_major__) || (__clang_major__ < 14)
-  // On older compilers, such as those found on Apple, and gcc, std::to_chars
-  // does not work with 'double', so we revert to the next fastest correct
-  // implementation.
-  buffer.addFragments({fmt::to_string(number)});
-#else
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 14000
   // This version is awkward, and doesn't work on all platforms used in Envoy CI
   // as of August 2023, but it is the fastest correct option on modern compilers.
   char buf[100];
@@ -37,6 +33,11 @@ void Util::serializeDouble(double number, Buffer::Instance& buffer) {
   // Note: there is room to speed this up further by serializing the number directly
   // into the buffer. However, buffer does not currently make it easy and fast
   // to get (say) 100 characters of raw buffer to serialize into.
+#else
+  // On older compilers, such as those found on Apple, and gcc, std::to_chars
+  // does not work with 'double', so we revert to the next fastest correct
+  // implementation.
+  buffer.addFragments({fmt::to_string(number)});
 #endif
 }
 
