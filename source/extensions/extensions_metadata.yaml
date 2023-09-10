@@ -314,6 +314,7 @@ envoy.filters.http.ext_authz:
   - envoy.filters.http.upstream
   security_posture: robust_to_untrusted_downstream
   status: stable
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
   - envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
