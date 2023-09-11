@@ -95,7 +95,7 @@ else
     if [[ $# -gt 0 && "$1" == "-main" ]]; then
         shift
         echo "Checking all files that have changed since the main branch."
-        args=$(git diff --name-only upstream/main)
+        args=$(git diff --name-only main)
     elif [[ $# == 0 ]]; then
         args=$(git status|grep -E '(modified:|added:)'|awk '{print $2}')
         args+=$(git status|grep -E 'new file:'|awk '{print $3}')
