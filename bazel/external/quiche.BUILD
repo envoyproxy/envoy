@@ -10,6 +10,7 @@ load(
     "envoy_quiche_platform_impl_cc_test_library",
 )
 load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_http3")
 
 licenses(["notice"])  # Apache 2
 
@@ -4247,7 +4248,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_core_session_lib",
-    srcs = [
+    srcs = envoy_select_enable_http3([
         "quiche/quic/core/legacy_quic_stream_id_manager.cc",
         "quiche/quic/core/quic_control_frame_manager.cc",
         "quiche/quic/core/quic_crypto_handshaker.cc",
@@ -4260,8 +4261,8 @@ envoy_cc_library(
         "quiche/quic/core/quic_stream_sequencer.cc",
         "quiche/quic/core/tls_handshaker.cc",
         "quiche/quic/core/uber_quic_stream_id_manager.cc",
-    ],
-    hdrs = [
+    ], "@envoy"),
+    hdrs = envoy_select_enable_http3([
         "quiche/quic/core/handshaker_delegate_interface.h",
         "quiche/quic/core/legacy_quic_stream_id_manager.h",
         "quiche/quic/core/quic_control_frame_manager.h",
@@ -4278,7 +4279,7 @@ envoy_cc_library(
         "quiche/quic/core/tls_client_handshaker.h",  # required by tls_handshaker.cc
         "quiche/quic/core/tls_handshaker.h",
         "quiche/quic/core/uber_quic_stream_id_manager.h",
-    ],
+    ], "@envoy"),
     copts = quiche_copts,
     external_deps = ["ssl"],
     repository = "@envoy",
@@ -5338,7 +5339,7 @@ envoy_cc_library(
     ],
 )
 
-# Use the QUICHE default implmentation once the WIN32 compiler error is resolved.
+# Use the QUICHE default implementation once the WIN32 compiler error is resolved.
 # envoy_quiche_platform_impl_cc_library(
 #    name = "quiche_common_platform_default_quiche_platform_impl_export_impl_lib",
 #    hdrs = [
