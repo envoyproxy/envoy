@@ -12,8 +12,9 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/geo
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common Geolocation Provider Configuration]
-//
 // Common configuration shared across geolocation providers.
+
+// [#next-free-field: 2]
 message CommonGeoipProviderConfig {
   // The set of geolocation headers to add to request. If any of the configured headers is present
   // in the incoming request, it will be overridden by the :ref:`Geoip filter <config_http_filters_geoip>`.
