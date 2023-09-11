@@ -56,17 +56,14 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
-  void createDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name,
-      Server::Configuration::ServerFactoryContext& server_context,
-      Server::Configuration::FactoryContext& factory_context,
-      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {}
+  void createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
+                                         const std::string&,
+                                         Server::Configuration::ServerFactoryContext&,
+                                         Server::Configuration::FactoryContext&,
+                                         Upstream::ClusterManager&, bool, const std::string&,
+                                         const Network::ListenerFilterMatcherSharedPtr&) override {}
 
-  OptRef<Http::FilterFactoryCb>
-  dynamicProviderConfig(const std::string& filter_config_name) override {
+  OptRef<Http::FilterFactoryCb> dynamicProviderConfig(const std::string&) override {
     return absl::nullopt;
   }
 
