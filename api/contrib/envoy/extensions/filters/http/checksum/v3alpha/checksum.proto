@@ -34,8 +34,8 @@ message ChecksumConfig {
   }
 
   // A set of matcher and checksum pairs for which, if a path matching ``path_matcher``
-  // is requested and the checksum of the body does not match the ``sha256``, the
-  // response will be a 403 Forbidden status.
+  // is requested and the checksum of the response body does not match the ``sha256``, the
+  // response will be replaced with a 403 Forbidden status.
   //
   // If multiple matchers match the same path, the first to match takes precedence.
   repeated Checksum checksums = 1;
