@@ -82,6 +82,13 @@ These kinds of filters run seprately on each upstream UDP session and support a 
 at the start of an upstream UDP session, when a UDP datagram is received from the downstream and when a UDP datagram is received from the
 upstream, similar to network filters.
 
+Envoy has the following builtin UDP session filters.
+
+.. toctree::
+  :maxdepth: 2
+
+  session_filters/http_capsule
+
 Example configuration
 ---------------------
 

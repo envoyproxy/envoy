@@ -125,5 +125,6 @@ message UdpProxyConfig {
   repeated config.accesslog.v3.AccessLog proxy_access_log = 10;
 
   // Optional session filters that will run for each UDP session.
+  // [#extension-category: envoy.filters.udp.session]
   repeated SessionFilter session_filters = 11;
 }
