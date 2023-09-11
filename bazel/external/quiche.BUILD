@@ -4,13 +4,13 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
 )
+load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_http3")
 load(
     "@envoy//bazel/external:quiche.bzl",
     "envoy_quiche_platform_impl_cc_library",
     "envoy_quiche_platform_impl_cc_test_library",
 )
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@envoy//bazel:envoy_select.bzl", "envoy_select_enable_http3")
 
 licenses(["notice"])  # Apache 2
 
@@ -4248,38 +4248,44 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_core_session_lib",
-    srcs = envoy_select_enable_http3([
-        "quiche/quic/core/legacy_quic_stream_id_manager.cc",
-        "quiche/quic/core/quic_control_frame_manager.cc",
-        "quiche/quic/core/quic_crypto_handshaker.cc",
-        "quiche/quic/core/quic_crypto_stream.cc",
-        "quiche/quic/core/quic_datagram_queue.cc",
-        "quiche/quic/core/quic_flow_controller.cc",
-        "quiche/quic/core/quic_session.cc",
-        "quiche/quic/core/quic_stream.cc",
-        "quiche/quic/core/quic_stream_id_manager.cc",
-        "quiche/quic/core/quic_stream_sequencer.cc",
-        "quiche/quic/core/tls_handshaker.cc",
-        "quiche/quic/core/uber_quic_stream_id_manager.cc",
-    ], "@envoy"),
-    hdrs = envoy_select_enable_http3([
-        "quiche/quic/core/handshaker_delegate_interface.h",
-        "quiche/quic/core/legacy_quic_stream_id_manager.h",
-        "quiche/quic/core/quic_control_frame_manager.h",
-        "quiche/quic/core/quic_crypto_client_stream.h",  # required by tls_client_handshaker.h
-        "quiche/quic/core/quic_crypto_handshaker.h",
-        "quiche/quic/core/quic_crypto_stream.h",
-        "quiche/quic/core/quic_datagram_queue.h",
-        "quiche/quic/core/quic_flow_controller.h",
-        "quiche/quic/core/quic_session.h",
-        "quiche/quic/core/quic_stream.h",
-        "quiche/quic/core/quic_stream_id_manager.h",
-        "quiche/quic/core/quic_stream_sequencer.h",
-        "quiche/quic/core/stream_delegate_interface.h",
-        "quiche/quic/core/tls_client_handshaker.h",  # required by tls_handshaker.cc
-        "quiche/quic/core/tls_handshaker.h",
-        "quiche/quic/core/uber_quic_stream_id_manager.h",
-    ], "@envoy"),
+    srcs = envoy_select_enable_http3(
+        [
+            "quiche/quic/core/legacy_quic_stream_id_manager.cc",
+            "quiche/quic/core/quic_control_frame_manager.cc",
+            "quiche/quic/core/quic_crypto_handshaker.cc",
+            "quiche/quic/core/quic_crypto_stream.cc",
+            "quiche/quic/core/quic_datagram_queue.cc",
+            "quiche/quic/core/quic_flow_controller.cc",
+            "quiche/quic/core/quic_session.cc",
+            "quiche/quic/core/quic_stream.cc",
+            "quiche/quic/core/quic_stream_id_manager.cc",
+            "quiche/quic/core/quic_stream_sequencer.cc",
+            "quiche/quic/core/tls_handshaker.cc",
+            "quiche/quic/core/uber_quic_stream_id_manager.cc",
+        ],
+        "@envoy",
+    ),
+    hdrs = envoy_select_enable_http3(
+        [
+            "quiche/quic/core/handshaker_delegate_interface.h",
+            "quiche/quic/core/legacy_quic_stream_id_manager.h",
+            "quiche/quic/core/quic_control_frame_manager.h",
+            "quiche/quic/core/quic_crypto_client_stream.h",  # required by tls_client_handshaker.h
+            "quiche/quic/core/quic_crypto_handshaker.h",
+            "quiche/quic/core/quic_crypto_stream.h",
+            "quiche/quic/core/quic_datagram_queue.h",
+            "quiche/quic/core/quic_flow_controller.h",
+            "quiche/quic/core/quic_session.h",
+            "quiche/quic/core/quic_stream.h",
+            "quiche/quic/core/quic_stream_id_manager.h",
+            "quiche/quic/core/quic_stream_sequencer.h",
+            "quiche/quic/core/stream_delegate_interface.h",
+            "quiche/quic/core/tls_client_handshaker.h",  # required by tls_handshaker.cc
+            "quiche/quic/core/tls_handshaker.h",
+            "quiche/quic/core/uber_quic_stream_id_manager.h",
+        ],
+        "@envoy",
+    ),
     copts = quiche_copts,
     external_deps = ["ssl"],
     repository = "@envoy",

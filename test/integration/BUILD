@@ -1783,7 +1783,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/udp/v3:pkg_cc_proto",
-    ] +  envoy_select_enable_http3([
+    ] + envoy_select_enable_http3([
         "//source/extensions/upstreams/http/udp:config",
     ]),
 )

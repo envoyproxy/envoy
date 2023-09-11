@@ -2,6 +2,7 @@
 
 #include "source/extensions/upstreams/http/http/upstream_request.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
+
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/extensions/upstreams/http/udp/upstream_request.h"
 #endif
@@ -34,7 +35,8 @@ Router::GenericConnPoolPtr GenericGenericConnPoolFactory::createGenericConnPool(
     conn_pool = std::make_unique<Upstreams::Http::Udp::UdpConnPool>(thread_local_cluster, ctx);
     return (conn_pool->valid() ? std::move(conn_pool) : nullptr);
 #else
-    RELEASE_ASSERT(false, "UDP connection pool shouldn't be configured while QUIC code is compiled out.");
+    RELEASE_ASSERT(false,
+                   "UDP connection pool shouldn't be configured while QUIC code is compiled out.");
 #endif
   }
 
