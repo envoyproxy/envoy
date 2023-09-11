@@ -81,15 +81,10 @@ void SdsApi::onWatchUpdate() {
 
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                     const std::string& version_info) {
-  if (resources.size() == 0) {
-    return absl::InvalidArgumentError(
-        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
+  absl::Status status = validateUpdateSize(resources.size());
+  if (!status.ok()) {
+    return status;
   }
-  if (resources.size() != 1) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secrets length: {}", resources.size()));
-  }
-
   const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
       resources[0].get().resource());
 
@@ -143,13 +138,9 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                     const Protobuf::RepeatedPtrField<std::string>&,
                                     const std::string&) {
-  if (added_resources.size() == 0) {
-    return absl::InvalidArgumentError(
-        fmt::format("Missing SDS added_resources for {} in onConfigUpdate()", sds_config_name_));
-  }
-  if (added_resources.size() != 1) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secrets length: {}", added_resources.size()));
+  absl::Status status = validateUpdateSize(added_resources.size());
+  if (!status.ok()) {
+    return status;
   }
   return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
@@ -159,6 +150,18 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad config.
   init_target_.ready();
+}
+
+absl::Status SdsApi::validateUpdateSize(int num_resources) {
+  if (num_resources == 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
+  }
+  if (num_resources != 1) {
+    return absl::InvalidArgumentError(
+        fmt::format("Unexpected SDS secrets length: {}", num_resources));
+  }
+  return absl::OkStatus();
 }
 
 void SdsApi::initialize() {
