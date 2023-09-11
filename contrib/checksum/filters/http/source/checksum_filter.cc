@@ -14,8 +14,9 @@ static std::vector<ChecksumFilterConfig::ChecksumMatcher> buildMatchers(
     const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config) {
   std::vector<ChecksumFilterConfig::ChecksumMatcher> matchers;
   for (const auto& checksum : proto_config.checksums()) {
+    std::vector<uint8_t> bytes = Hex::decode(checksum.sha256());
     matchers.emplace_back(std::make_unique<Matchers::PathMatcher>(checksum.path_matcher()),
-                          Hex::decode(checksum.sha256()));
+                          Sha256Checksum{bytes.begin(), bytes.end()});
   }
   return matchers;
 }
@@ -24,7 +25,7 @@ ChecksumFilterConfig::ChecksumFilterConfig(
     const envoy::extensions::filters::http::checksum::v3alpha::ChecksumConfig& proto_config)
     : matchers_(buildMatchers(proto_config)), reject_unmatched_(proto_config.reject_unmatched()) {}
 
-OptRef<const std::vector<uint8_t>> ChecksumFilterConfig::expectedChecksum(absl::string_view path) {
+OptRef<const Sha256Checksum> ChecksumFilterConfig::expectedChecksum(absl::string_view path) {
   for (const auto& m : matchers_) {
     if (m.first->match(path)) {
       return m.second;
@@ -49,8 +50,9 @@ Http::FilterHeadersStatus ChecksumFilter::decodeHeaders(Http::RequestHeaderMap& 
 Http::FilterHeadersStatus ChecksumFilter::encodeHeaders(Http::ResponseHeaderMap& /*headers*/,
                                                         bool end_stream) {
   if (end_stream && expected_checksum_.has_value()) {
-    encoder_callbacks_->sendLocalReply(Http::Code::Forbidden, "Mismatched checksum", nullptr,
-                                       absl::nullopt, "mismatched_checksum");
+    encoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
+                                       "Expected checksum has value but response has no body",
+                                       nullptr, absl::nullopt, "checksum_but_no_body");
     return Http::FilterHeadersStatus::StopIteration;
   }
   SHA256_Init(&sha_);

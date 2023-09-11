@@ -57,7 +57,7 @@ TEST_F(ChecksumFilterTest, RejectsUnmatched) {
 }
 
 TEST_F(ChecksumFilterTest, RejectsMatchedNoData) {
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, "mismatched_checksum"));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, "checksum_but_no_body"));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/123"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -71,6 +71,16 @@ TEST_F(ChecksumFilterTest, RejectsMatchedWithMismatchedData) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   Buffer::OwnedImpl wrong_buffer{"aaa"};
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(wrong_buffer, true));
+}
+
+TEST_F(ChecksumFilterTest, RejectsMatchedWithMismatchedDataAndTrailers) {
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, "mismatched_checksum"));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/123"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  Buffer::OwnedImpl wrong_buffer{"aaa"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(wrong_buffer, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
 }
 
 TEST_F(ChecksumFilterTest, AcceptsMatchedWithMatchingData) {
