@@ -64,9 +64,10 @@ public:
       Server::Configuration::FactoryContext& factory_context,
       Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {}
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {}
 
-  OptRef<Http::FilterFactoryCb> dynamicProviderConfig(const std::string& filter_config_name) {
+  OptRef<Http::FilterFactoryCb>
+  dynamicProviderConfig(const std::string& filter_config_name) override {
     return absl::nullopt;
   }
 
