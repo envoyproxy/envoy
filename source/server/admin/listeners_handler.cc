@@ -27,13 +27,11 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
     // already started.
     if (!server_.drainManager().draining()) {
       server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
-        Network::ExtraShutdownListenerOptions empty_options;
-        server_.listenerManager().stopListeners(stop_listeners_type, empty_options);
+        server_.listenerManager().stopListeners(stop_listeners_type, {});
       });
     }
   } else {
-    Network::ExtraShutdownListenerOptions empty_options;
-    server_.listenerManager().stopListeners(stop_listeners_type, empty_options);
+    server_.listenerManager().stopListeners(stop_listeners_type, {});
   }
 
   response.add("OK\n");

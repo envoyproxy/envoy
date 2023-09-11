@@ -106,9 +106,8 @@ TEST_F(WorkerImplTest, BasicFlow) {
       }));
 
   ConditionalInitializer ci2;
-  Network::ExtraShutdownListenerOptions empty_options;
   // Verify that callback is called from the other thread.
-  worker_.stopListener(listener2, empty_options, [current_thread_id, &ci2]() {
+  worker_.stopListener(listener2, {}, [current_thread_id, &ci2]() {
     EXPECT_NE(current_thread_id, std::this_thread::get_id());
     ci2.setReady();
   });

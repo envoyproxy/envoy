@@ -593,8 +593,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
   const uint64_t listener_tag = draining_it->listener_->listenerTag();
-  Network::ExtraShutdownListenerOptions empty_options;
-  stopListener(*draining_it->listener_, empty_options, [this, listener_tag]() {
+  stopListener(*draining_it->listener_, {}, [this, listener_tag]() {
     for (auto& listener : draining_listeners_) {
       if (listener.listener_->listenerTag() == listener_tag) {
         maybeCloseSocketsForListener(*listener.listener_);

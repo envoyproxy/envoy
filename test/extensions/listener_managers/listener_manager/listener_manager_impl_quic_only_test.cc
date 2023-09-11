@@ -172,8 +172,7 @@ filter_chain_matcher:
   EXPECT_CALL(*worker_, stopListener(_, _, _))
       .WillOnce(Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
                           std::function<void()> completion) { completion(); }));
-  Network::ExtraShutdownListenerOptions empty_options;
-  manager_->stopListeners(ListenerManager::StopListenersType::All, empty_options);
+  manager_->stopListeners(ListenerManager::StopListenersType::All, {});
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
   EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }

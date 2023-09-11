@@ -298,8 +298,18 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
   }
 }
 
+MATCHER_P(UdpPacketHandlerPtrIs, expected_handler, "") {
+  bool matched = arg->non_dispatched_udp_packet_handler_.ptr() == expected_handler;
+  if (!matched) {
+    *result_listener << "\n&non_dispatched_udp_packet_handler_ == "
+                     << arg->non_dispatched_udp_packet_handler_.ptr()
+                     << "\nexpected_handler == " << expected_handler;
+  }
+  return matched;
+}
+
 TEST_F(HotRestartingParentTest, DrainListeners) {
-  EXPECT_CALL(server_, drainListeners(_));
+  EXPECT_CALL(server_, drainListeners(UdpPacketHandlerPtrIs(&hot_restarting_parent_)));
   hot_restarting_parent_.drainListeners();
 }
 

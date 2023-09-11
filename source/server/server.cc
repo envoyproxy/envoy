@@ -186,9 +186,9 @@ const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
 
 void InstanceImpl::drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) {
   ENVOY_LOG(info, "closing and draining listeners");
-  Network::ExtraShutdownListenerOptions empty_options;
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
-                                   options.has_value() ? *options : empty_options);
+                                   options.has_value() ? *options
+                                                       : Network::ExtraShutdownListenerOptions{});
   drain_manager_->startDrainSequence([] {});
 }
 
