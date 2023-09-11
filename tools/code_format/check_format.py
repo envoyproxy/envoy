@@ -217,8 +217,6 @@ class FormatChecker:
             nargs="+",
             default=[],
             help="exclude paths from bazel_tools check.")
-        parser.add_argument(
-            "--clang_format_path", type=str, help="Path to clang-format executable.")
         parser.add_argument("--buildifier_path", type=str, help="Path to buildifier executable.")
         parser.add_argument("--buildozer_path", type=str, help="Path to buildozer executable.")
         parser.add_argument(
