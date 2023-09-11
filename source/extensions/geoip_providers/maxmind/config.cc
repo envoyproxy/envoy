@@ -47,7 +47,7 @@ private:
   // We keep weak_ptr here so the providers can be destroyed if the config is updated to stop using
   // that config of the provider. Each provider stores shared_ptrs to this singleton, which keeps
   // the singleton from being destroyed unless it's no longer keeping track of any providers. (The
-  // singleton shared_ptr is *only* held by cache instances.)
+  // singleton shared_ptr is *only* held by driver instances.)
   absl::flat_hash_map<uint64_t, std::weak_ptr<GeoipProvider>> drivers_ ABSL_GUARDED_BY(mu_);
 };
 
