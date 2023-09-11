@@ -55,7 +55,10 @@ class FormatConfig:
     @cached_property
     def clang_format_path(self) -> str:
         """Path to the clang-format binary."""
-        return os.getenv("CLANG_FORMAT", "clang-format-14")
+        path = (
+            os.path.join(self.source_path, self.args.clang_format_path)
+            if self.source_path else self.args.clang_format_path)
+        return path
 
     @cached_property
     def config(self) -> Dict:
@@ -128,7 +131,6 @@ class FormatChecker:
         self.source_path = os.getcwd()
         if self.args.path:
             os.chdir(self.args.path)
-        os.environ["BAZEL_EXECROOT"] = self.source_path
         self._include_dir_order = self.args.include_dir_order
 
     @property
@@ -217,6 +219,8 @@ class FormatChecker:
             nargs="+",
             default=[],
             help="exclude paths from bazel_tools check.")
+        parser.add_argument(
+            "--clang_format_path", type=str, help="Path to clang-format executable.")
         parser.add_argument("--buildifier_path", type=str, help="Path to buildifier executable.")
         parser.add_argument("--buildozer_path", type=str, help="Path to buildozer executable.")
         parser.add_argument(
@@ -313,55 +317,6 @@ class FormatChecker:
     def executable_by_others(self, executable):
         st = os.stat(os.path.expandvars(executable))
         return bool(st.st_mode & stat.S_IXOTH)
-
-    # Check whether all needed external tools (clang-format, buildifier, buildozer) are
-    # available.
-    def check_tools(self):
-        error_messages = []
-        clang_format_abs_path = self.look_path(self.config.clang_format_path)
-
-        if clang_format_abs_path:
-            if not self.executable_by_others(clang_format_abs_path):
-                error_messages.append(
-                    "command {} exists, but cannot be executed by other "
-                    "users".format(self.config.clang_format_path))
-        else:
-            error_messages.append(
-                "Command {} not found. If you have clang-format in version 12.x.x "
-                "installed, but the binary name is different or it's not available in "
-                "PATH, please use CLANG_FORMAT environment variable to specify the path. "
-                "Examples:\n"
-                "    export CLANG_FORMAT=clang-format-14.0.0\n"
-                "    export CLANG_FORMAT=/opt/bin/clang-format-14\n"
-                "    export CLANG_FORMAT=/usr/local/opt/llvm@14/bin/clang-format".format(
-                    self.config.clang_format_path))
-
-        def check_bazel_tool(name, path, var):
-            bazel_tool_abs_path = self.look_path(path)
-            if bazel_tool_abs_path:
-                if not self.executable_by_others(bazel_tool_abs_path):
-                    error_messages.append(
-                        "command {} exists, but cannot be executed by other "
-                        "users".format(path))
-            elif self.path_exists(path):
-                if not self.executable_by_others(path):
-                    error_messages.append(
-                        "command {} exists, but cannot be executed by other "
-                        "users".format(path))
-            else:
-                error_messages.append(
-                    "Command {} not found. If you have {} installed, but the binary "
-                    "name is different or it's not available in $GOPATH/bin, please use "
-                    "{} environment variable to specify the path. Example:\n"
-                    "    export {}=`which {}`\n"
-                    "If you don't have {} installed, you can install it by:\n"
-                    "    go get -u github.com/bazelbuild/buildtools/{}".format(
-                        path, name, var, var, name, name, name))
-
-        check_bazel_tool('buildifier', self.config.buildifier_path, 'BUILDIFIER_BIN')
-        check_bazel_tool('buildozer', self.config.buildozer_path, 'BUILDOZER_BIN')
-
-        return error_messages
 
     def check_namespace(self, file_path):
         for excluded_path in self.namespace_check_excluded_paths:
@@ -899,7 +854,6 @@ class FormatChecker:
 
     def check_source_path(self, file_path):
         error_messages = self.check_file_contents(file_path, self.check_source_line)
-
         if not file_path.endswith(self.config.suffixes["proto"]):
             error_messages += self.check_namespace(file_path)
             command = (
@@ -908,8 +862,7 @@ class FormatChecker:
                     file_path))
             error_messages += self.execute_command(
                 command, "header_order.py check failed", file_path)
-        command = ("%s %s | diff %s -" % (self.config.clang_format_path, file_path, file_path))
-        error_messages += self.execute_command(command, "clang-format check failed", file_path)
+        error_messages.extend(self.clang_format(file_path, check=True))
         return error_messages
 
     # Example target outputs are:
@@ -940,11 +893,19 @@ class FormatChecker:
             return ["header_order.py rewrite error: %s" % (file_path)]
         return []
 
-    def clang_format(self, file_path):
-        command = "%s -i %s" % (self.config.clang_format_path, file_path)
-        if os.system(command) != 0:
-            return ["clang-format rewrite error: %s" % (file_path)]
-        return []
+    def clang_format(self, file_path, check=False):
+        result = []
+        command = (
+            f"{self.config.clang_format_path} {file_path} | diff {file_path} -"
+            if check else f"{self.config.clang_format_path} -i {file_path}")
+
+        if check:
+            result = self.execute_command(command, "clang-format check failed", file_path)
+        else:
+            if os.system(command) != 0:
+                result = [f"clang-format rewrite error: {file_path}"]
+
+        return result
 
     def check_format(self, file_path, fail_on_diff=False):
         error_messages = []
