@@ -137,6 +137,30 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
    "upstream" TLS loopback connection to encrypt it, then have a TCP listener take the encrypted payload and
    send the ``CONNECT`` upstream.
 
+``CONNECT-UDP`` support
+^^^^^^^^^^^^^^^^^^^
+.. note::
+   ``CONNECT-UDP`` is in an alpha status and may not be stable enough for use in production.
+   We recommend to use this feature with caution.
+
+``CONNECT-UDP`` allows HTTP clients to create UDP tunnels through an HTTP proxy server. Unlike
+``CONNECT``, which is limited to tunneling TCP, ``CONNECT-UDP`` can be used to proxy UDP-based
+protocols such as HTTP/3.
+
+``CONNECT-UDP`` support is disabled by default in Envoy. Similar to ``CONNECT``, it can be enabled
+through the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
+by setting the value to the special keyword ``CONNECT-UDP``. Like ``CONNECT``, CONNECT-UDP requests
+are forwarded to the upstream by default.
+:ref:`connect_config <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>`
+must be set to terminate the requests and forward the payload as UDP datagrams to the upstream.
+
+.. tip::
+   For an example of forwarding ``CONNECT-UDP``, please see
+   :repo:`configs/proxy_connect_udp.yaml <configs/proxy_connect_udp.yaml>`
+
+   For an example of terminating ``CONNECT-UDP``, please see
+   :repo:`configs/terminate_http3_connect_udp.yaml <configs/terminate_http3_connect_udp.yaml>`
+
 .. _tunneling-tcp-over-http:
 
 Tunneling TCP over HTTP
