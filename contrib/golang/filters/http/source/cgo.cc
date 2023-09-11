@@ -268,6 +268,15 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value
                                      });
 }
 
+CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key, void* value, int* rc) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key, value, rc](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto key_str = referGoString(key);
+        auto value_str = reinterpret_cast<GoString*>(value);
+        return filter->getStringProperty(key_str, value_str, rc);
+      });
+}
+
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name,
                                          void* metric_id) {
   return envoyGoConfigHandlerWrapper(
@@ -291,6 +300,13 @@ CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value) 
       c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
         auto value_int = reinterpret_cast<uint64_t*>(value);
         return filter_config->getMetric(metric_id, value_int);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        return filter_config->recordMetric(metric_id, value);
       });
 }
 

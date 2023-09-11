@@ -130,6 +130,10 @@ func (r *httpRequest) LogLevel() api.LogType {
 	return cAPI.HttpLogLevel()
 }
 
+func (r *httpRequest) GetProperty(key string) (string, error) {
+	return cAPI.HttpGetStringProperty(unsafe.Pointer(r), key)
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &streamInfo{
 		request: r,
@@ -281,6 +285,10 @@ func (m *counterMetric) Get() uint64 {
 	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
 }
 
+func (m *counterMetric) Record(value uint64) {
+	cAPI.HttpRecordMetric(unsafe.Pointer(m.config), m.metricId, value)
+}
+
 type gaugeMetric struct {
 	config   *httpConfig
 	metricId uint32
@@ -292,4 +300,8 @@ func (m *gaugeMetric) Increment(offset int64) {
 
 func (m *gaugeMetric) Get() uint64 {
 	return cAPI.HttpGetMetric(unsafe.Pointer(m.config), m.metricId)
+}
+
+func (m *gaugeMetric) Record(value uint64) {
+	cAPI.HttpRecordMetric(unsafe.Pointer(m.config), m.metricId, value)
 }

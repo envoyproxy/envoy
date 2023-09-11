@@ -338,9 +338,9 @@ private:
     struct State {
       State()
           : codec_saw_local_complete_(false), codec_encode_complete_(false),
-            on_reset_stream_called_(false), is_zombie_stream_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_destroyed_(false),
-            is_internally_created_(false), is_tunneling_(false), decorated_propagate_(true) {}
+            on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
+            is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
+            decorated_propagate_(true) {}
 
       // It's possibly for the codec to see the completed response but not fully
       // encode it.
@@ -351,7 +351,6 @@ private:
       bool on_reset_stream_called_ : 1;   // Whether the stream has been reset.
       bool is_zombie_stream_ : 1;         // Whether stream is waiting for signal
                                           // the underlying codec to be destroyed.
-      bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
 
       // True if this stream was the original externally created stream, but was

@@ -63,8 +63,7 @@ if [[ -n "$AZP_BRANCH" ]]; then
 fi
 
 CURRENT=check_format
-echo "Running ${ENVOY_SRCDIR}/tools/code_format/check_format.py"
-time "${ENVOY_SRCDIR}/tools/code_format/check_format.py" fix --fail_on_diff
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:check_format -- fix --fail_on_diff
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2

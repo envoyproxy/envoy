@@ -37,7 +37,7 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Add safe directory
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Add safe directory

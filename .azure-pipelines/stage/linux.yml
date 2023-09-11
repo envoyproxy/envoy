@@ -48,7 +48,8 @@ jobs:
   - template: ../bazel.yml
     parameters:
       managedAgent: ${{ parameters.managedAgent }}
-      ciTarget: bazel.release
+      ciTarget: release
+      cacheName: "release"
       bazelBuildExtraOptions: ${{ parameters.bazelBuildExtraOptions }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)
@@ -59,7 +60,8 @@ jobs:
 - job: released
   displayName: Complete
   dependsOn: ["release"]
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:

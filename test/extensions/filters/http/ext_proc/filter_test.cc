@@ -163,10 +163,13 @@ protected:
   }
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const envoy::config::core::v3::GrpcService& grpc_service,
+                                     const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                      testing::Unused) {
     if (final_expected_grpc_service_.has_value()) {
-      EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(), grpc_service));
+      EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(),
+                                          config_with_hash_key.config()));
+      std::cout << final_expected_grpc_service_.value().DebugString();
+      std::cout << config_with_hash_key.config().DebugString();
     }
 
     stream_callbacks_ = &callbacks;
@@ -463,6 +466,7 @@ protected:
   }
 
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
@@ -1180,7 +1184,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedPartialMultiChunk) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty_data, true));
   upstream_request_body.move(empty_data);
 
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false))
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
       .WillRepeatedly(Invoke([&upstream_request_body](Buffer::Instance& data, Unused) {
         upstream_request_body.move(data);
       }));
@@ -1212,7 +1216,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedPartialMultiChunk) {
   expected_response_body.add(resp_data_3.toString());
 
   Buffer::OwnedImpl downstream_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
       .WillRepeatedly(Invoke([&downstream_response_body](Buffer::Instance& data, Unused) {
         downstream_response_body.move(data);
       }));
@@ -1641,7 +1645,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
 
   Buffer::OwnedImpl want_request_body;
   Buffer::OwnedImpl got_request_body;
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false))
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
       .WillRepeatedly(Invoke(
           [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
 
@@ -1666,7 +1670,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
@@ -1735,7 +1739,7 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
 
   Buffer::OwnedImpl want_request_body;
   Buffer::OwnedImpl got_request_body;
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false))
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
       .WillRepeatedly(Invoke(
           [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
 
@@ -1958,6 +1962,11 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
   Buffer::OwnedImpl resp_chunk;
   TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
   want_response_body.add(resp_chunk.toString());
+
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, true));
   got_response_body.move(resp_chunk);
 
@@ -2457,6 +2466,7 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
             cb(route_config);
           }));
   final_expected_grpc_service_.emplace(route_proto.overrides().grpc_service());
+  config_with_hash_key_.setConfig(route_proto.overrides().grpc_service());
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
