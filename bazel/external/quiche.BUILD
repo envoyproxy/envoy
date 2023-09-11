@@ -3347,6 +3347,7 @@ envoy_cc_library(
         "quiche/quic/core/http/quic_spdy_session.cc",
         "quiche/quic/core/http/quic_spdy_stream.cc",
         "quiche/quic/core/http/web_transport_http3.cc",
+        "quiche/quic/core/web_transport_stats.cc",
         "quiche/quic/core/http/web_transport_stream_adapter.cc",
     ],
     hdrs = [
@@ -3356,6 +3357,7 @@ envoy_cc_library(
         "quiche/quic/core/http/quic_spdy_session.h",
         "quiche/quic/core/http/quic_spdy_stream.h",
         "quiche/quic/core/http/web_transport_http3.h",
+        "quiche/quic/core/web_transport_stats.h",
         "quiche/quic/core/http/web_transport_stream_adapter.h",
     ],
     copts = quiche_copts,
