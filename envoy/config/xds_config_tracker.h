@@ -101,7 +101,7 @@ public:
   virtual XdsConfigTrackerPtr
   createXdsConfigTracker(const ProtobufWkt::Any& config,
                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                         Event::Dispatcher& dispatcher, Stats::Scope& stats) PURE;
+                         Event::Dispatcher& dispatcher) PURE;
 
   std::string category() const override { return "envoy.config.xds_tracker"; }
 };
