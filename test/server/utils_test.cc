@@ -80,8 +80,8 @@ TEST(UtilsTest, MaybeSetApplicationLogFormat) {
     auto* format = log_config.mutable_log_format()->mutable_json_format();
     format->mutable_fields()->operator[]("Message").set_string_value("%v");
     EXPECT_EQ(Utility::maybeSetApplicationLogFormat(log_config).message(),
-                              "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is "
-                              "unavailable for JSON log formats");
+              "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is "
+              "unavailable for JSON log formats");
   }
 
   {
@@ -89,8 +89,8 @@ TEST(UtilsTest, MaybeSetApplicationLogFormat) {
     auto* format = log_config.mutable_log_format()->mutable_json_format();
     format->mutable_fields()->operator[]("Message").set_string_value("%_");
     EXPECT_EQ(Utility::maybeSetApplicationLogFormat(log_config).message(),
-                              "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is "
-                              "unavailable for JSON log formats");
+              "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is "
+              "unavailable for JSON log formats");
   }
 }
 

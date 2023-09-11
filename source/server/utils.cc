@@ -46,7 +46,8 @@ absl::Status maybeSetApplicationLogFormat(
         Logger::Registry::setJsonLogFormat(application_log_config.log_format().json_format());
 
     if (!status.ok()) {
-      return absl::InvalidArgumentError(fmt::format("setJsonLogFormat error: {}", status.ToString()));
+      return absl::InvalidArgumentError(
+          fmt::format("setJsonLogFormat error: {}", status.ToString()));
     }
   }
   return absl::OkStatus();
