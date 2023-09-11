@@ -97,7 +97,7 @@ public:
 
 private:
   LibQatCryptoSharedPtr libqat_{};
-  bool qat_is_supported{true};
+  bool qat_is_supported_{true};
 };
 
 /**
