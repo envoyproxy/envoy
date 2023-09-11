@@ -114,7 +114,7 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
 absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  Http::HeaderMap& headers, bool replacing_message,
                                                  const Checker& checker,
-                                                 Counter& rejected_mutations) {
+                                                 Counter& rejected_mutations, absl::optional<bool> is_streamed_mode) {
   // Check whether the remove_headers or set_headers size exceed the HTTP connection manager limit.
   // Reject the mutation and return error status if either one does.
   const auto result = responseHeaderSizeCheck(headers, mutation, rejected_mutations);
@@ -148,6 +148,13 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
 
   for (const auto& sh : mutation.set_headers()) {
     if (!sh.has_header()) {
+      continue;
+    }
+
+    // Always skip setting content length header in STREAMED body mode (i.e., `is_streamed_mode` is
+    // true).
+    if (sh.header().key() == "content-length" && is_streamed_mode.has_value() &&
+        is_streamed_mode.value()) {
       continue;
     }
 

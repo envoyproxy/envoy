@@ -91,15 +91,10 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       const auto mut_status = MutationUtils::applyHeaderMutations(
           common_response.header_mutation(), *headers_,
           common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, body_mode_ == ProcessingMode::STREAMED);
       if (!mut_status.ok()) {
         return mut_status;
       }
-    }
-
-    // Always remove the content length in STREAMED body processing mode.
-    if (body_mode_ == ProcessingMode::STREAMED) {
-      headers_->removeContentLength();
     }
 
     clearRouteCache(common_response);
@@ -234,7 +229,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           const auto mut_status = MutationUtils::applyHeaderMutations(
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, body_mode_ == ProcessingMode::STREAMED);
           if (!mut_status.ok()) {
             return mut_status;
           }
@@ -300,7 +295,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           const auto mut_status = MutationUtils::applyHeaderMutations(
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_);
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, body_mode_ == ProcessingMode::STREAMED);
           if (!mut_status.ok()) {
             return mut_status;
           }
@@ -366,7 +361,7 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
     if (response.has_header_mutation()) {
       auto mut_status = MutationUtils::applyHeaderMutations(
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
-          filter_.stats().rejected_header_mutations_);
+          filter_.stats().rejected_header_mutations_, body_mode_ == ProcessingMode::STREAMED);
       if (!mut_status.ok()) {
         return mut_status;
       }
