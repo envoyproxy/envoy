@@ -75,16 +75,16 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
         onSocketEventUdpForwarding();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
-  udp_forwarding_context_ = std::make_unique<UdpForwardingContext>();
 }
 
 void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
 
 void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data) {
-  auto addr_and_listener = udp_forwarding_context_->getListenerForUdpPacket(worker_index, data);
+  auto addr_and_listener =
+      udp_forwarding_context_.getListenerForDestination(*data.addresses_.local_);
   if (addr_and_listener.has_value()) {
     auto [addr, listener_config] = *addr_and_listener;
-    listener_config.listenerWorkerRouter(addr).deliver(worker_index, std::move(data));
+    listener_config->listenerWorkerRouter(*addr).deliver(worker_index, std::move(data));
   }
 }
 

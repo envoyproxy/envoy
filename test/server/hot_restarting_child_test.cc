@@ -8,16 +8,20 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
+#include "test/server/hot_restart_udp_forwarding_test_helper.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
+using testing::AllOf;
 using testing::DoAll;
+using testing::Eq;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::WhenDynamicCastTo;
 
 namespace Envoy {
 namespace Server {
@@ -124,17 +128,61 @@ TEST_F(HotRestartingChildTest, DoesNothingOnForwardedUdpMessageWithNoMatchingLis
   EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
 }
 
-TEST_F(HotRestartingChildTest, ForwardsPacketToListenerOnMatch) {
+MATCHER_P4(IsUdpWith, local_addr, peer_addr, buffer, timestamp, "") {
+  bool local_matched = *arg.addresses_.local_ == *local_addr;
+  if (!local_matched) {
+    *result_listener << "\nUdpRecvData::addresses_.local_ == "
+                     << arg.addresses_.local_->asStringView()
+                     << "\nexpected == " << local_addr->asStringView();
+  }
+  bool peer_matched = *arg.addresses_.peer_ == *peer_addr;
+  if (!peer_matched) {
+    *result_listener << "\nUdpRecvData::addresses_.local_ == "
+                     << arg.addresses_.peer_->asStringView()
+                     << "\nexpected == " << peer_addr->asStringView();
+  }
+  std::string buffer_contents = arg.buffer_->toString();
+  bool buffer_matched = buffer_contents == buffer;
+  if (!buffer_matched) {
+    *result_listener << "\nUdpRecvData::buffer_ contains " << buffer_contents << "\nexpected "
+                     << buffer;
+  }
+  uint64_t ts =
+      std::chrono::duration_cast<std::chrono::microseconds>(arg.receive_time_.time_since_epoch())
+          .count();
+  bool timestamp_matched = ts == timestamp;
+  if (!timestamp_matched) {
+    *result_listener << "\nUdpRecvData::received_time_ == " << ts << "\nexpected: " << timestamp;
+  }
+  return local_matched && peer_matched && buffer_matched && timestamp_matched;
+}
+
+TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
+  uint32_t worker_index = 12;
+  uint64_t packet_timestamp = 987654321;
+  std::string udp_contents = "beep boop";
   envoy::HotRestartMessage msg;
   auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
-  // TODO(ravenblack): once #29137 is in, add an address to the map.
-  //
-  packet->set_local_addr("127.0.0.1:1234");
-  packet->set_peer_addr("127.0.0.1:4321");
-  packet->set_packet("hello");
-  // TODO(ravenblack): once #29137 is in:
-  // EXPECT_CALL(mock_listener, listenerWorkerRouter(addr)).WillOnce(Return(mock_worker_router));
-  // EXPECT_CALL(mock_worker_router, deliver(worker_index, expected_udp_recv_data));
+  auto mock_udp_listener_config = std::make_shared<Network::MockUdpListenerConfig>();
+  auto test_listener_addr = Network::Utility::parseInternetAddressAndPort("127.0.0.1:1234");
+  auto test_remote_addr = Network::Utility::parseInternetAddressAndPort("127.0.0.1:4321");
+  HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
+      .registerUdpForwardingListener(
+          test_listener_addr,
+          std::dynamic_pointer_cast<Network::UdpListenerConfig>(mock_udp_listener_config));
+  packet->set_local_addr(test_listener_addr->asStringView());
+  packet->set_peer_addr(test_remote_addr->asStringView());
+  packet->set_worker_index(worker_index);
+  packet->set_packet(udp_contents);
+  packet->set_receive_time_epoch_microseconds(packet_timestamp);
+  Network::MockUdpListenerWorkerRouter mock_worker_router;
+  EXPECT_CALL(*mock_udp_listener_config,
+              listenerWorkerRouter(WhenDynamicCastTo<const Network::Address::Ipv4Instance&>(
+                  Eq(dynamic_cast<const Network::Address::Ipv4Instance&>(*test_listener_addr)))))
+      .WillOnce(ReturnRef(mock_worker_router));
+  EXPECT_CALL(mock_worker_router,
+              deliver(worker_index, IsUdpWith(test_listener_addr, test_remote_addr, udp_contents,
+                                              packet_timestamp)));
   EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
 }
 

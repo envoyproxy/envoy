@@ -61,6 +61,7 @@ protected:
   void onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data);
 
 private:
+  friend class HotRestartUdpForwardingTestHelper;
   const int restart_epoch_;
   bool parent_terminated_{};
   sockaddr_un parent_address_;
@@ -68,8 +69,7 @@ private:
   std::unique_ptr<Stats::StatMerger> stat_merger_{};
   Stats::StatName hot_restart_generation_stat_name_;
   Event::FileEventPtr socket_event_udp_forwarding_;
-  std::unique_ptr<UdpForwardingContext> udp_forwarding_context_;
-  friend class HotRestartUdpForwardingTestHelper;
+  UdpForwardingContext udp_forwarding_context_;
 };
 
 } // namespace Server

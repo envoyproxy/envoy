@@ -10,6 +10,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/hot_restart.h"
+#include "test/server/hot_restart_udp_forwarding_test_helper.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -140,23 +141,6 @@ TEST_P(DomainSocketErrorTest, DomainSocketError) {
 
   EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0), EnvoyException);
 }
-
-class HotRestartUdpForwardingTestHelper {
-public:
-  explicit HotRestartUdpForwardingTestHelper(HotRestartImpl& hot_restart)
-      : hot_restart_(hot_restart) {}
-  void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
-                                     std::shared_ptr<Network::UdpListenerConfig> listener_config) {
-    hot_restart_.as_child_.registerUdpForwardingListener(address, listener_config);
-  }
-  absl::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
-  getListenerForDestination(const Network::Address::Instance& address) {
-    return hot_restart_.as_child_.udp_forwarding_context_.getListenerForDestination(address);
-  }
-
-private:
-  HotRestartImpl& hot_restart_;
-};
 
 class HotRestartUdpForwardingContextTest : public HotRestartImplTest {
 public:
