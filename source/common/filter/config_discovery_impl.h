@@ -540,32 +540,6 @@ public:
       Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
-    return createDynamicFilterConfigProviderInternal(
-        config_source, filter_config_name, server_context, factory_context, cluster_manager,
-        last_filter_in_filter_chain, filter_chain_type, listener_filter_matcher);
-  }
-
-  void registerDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name,
-      Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
-    auto provider = createDynamicFilterConfigProviderInternal(
-        config_source, filter_config_name, server_context, factory_context, cluster_manager,
-        last_filter_in_filter_chain, filter_chain_type, listener_filter_matcher);
-    dynamic_providers_[filter_config_name] = std::move(provider);
-  }
-
-  std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>>
-  createDynamicFilterConfigProviderInternal(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name,
-      Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
     subscription_stat_prefix = provider_stat_prefix = subscription_stat_prefix;
@@ -610,14 +584,6 @@ public:
     return std::make_unique<StaticFilterConfigProviderImpl<FactoryCb>>(config, filter_config_name);
   }
 
-  OptRef<FactoryCb> dynamicProviderConfig(const std::string& filter_config_name) override {
-    auto provider = dynamic_providers_.find(filter_config_name);
-    if (provider == dynamic_providers_.end()) {
-      return absl::nullopt;
-    }
-    return provider->second->config();
-  }
-
   absl::string_view statPrefix() const override PURE;
 
   std::tuple<ProtobufTypes::MessagePtr, std::string>
@@ -631,9 +597,6 @@ public:
   }
 
 protected:
-  absl::flat_hash_map<std::string, std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>>>
-      dynamic_providers_;
-
   virtual void validateFilters(const std::string&, const std::string&, const std::string&, bool,
                                bool) const {};
   virtual bool isTerminalFilter(Factory*, Protobuf::Message&,

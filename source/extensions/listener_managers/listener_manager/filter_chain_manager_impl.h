@@ -17,6 +17,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
@@ -50,6 +51,9 @@ public:
   explicit PerFilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context,
                                             Init::Manager& init_manager);
 
+  ~PerFilterChainFactoryContextImpl() {
+    std::cout << "Destructing PerFilterChainFactoryContextImpl >>>>>>>>>>>>>>>>>>>>" << std::endl;
+  }
   // DrainDecision
   bool drainClose() const override;
   Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
@@ -89,6 +93,16 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
+  void createDynamicFilterConfigProvider(
+      const envoy::config::core::v3::ExtensionConfigSource& config_source,
+      const std::string& filter_config_name,
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::FactoryContext& factory_context,
+      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override;
+  OptRef<Http::FilterFactoryCb>
+  dynamicProviderConfig(const std::string& filter_config_name) override;
 
   void startDraining() override { is_draining_.store(true); }
 
@@ -100,6 +114,14 @@ private:
   Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
+  // TODO(ramaraochavali): Move DownstreamFilterConfigProviderManager usages to use this instead of
+  // current singleton.
+  std::shared_ptr<Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+                                                      Server::Configuration::FactoryContext>>
+      filter_config_provider_manager_{};
+  absl::flat_hash_map<std::string, std::unique_ptr<Config::DynamicExtensionConfigProvider<
+                                       Envoy::Filter::NamedHttpFilterFactoryCb>>>
+      dynamic_providers_;
 };
 
 using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;

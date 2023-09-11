@@ -68,28 +68,6 @@ public:
    * Get the stat prefix for the scope of the filter provider manager.
    */
   virtual absl::string_view statPrefix() const PURE;
-
-  /**
-   * Get an FilterConfigProviderPtr for a filter config. The config providers may share
-   * the underlying subscriptions to the filter config discovery service.
-   * @param config_source supplies the extension configuration source for the filter configs.
-   * @param filter_config_name the filter config resource name.
-   * @param factory_context is the context to use for the filter config provider.
-   * @param last_filter_in_filter_chain indicates whether this filter is the last filter in the
-   * configured chain
-   * @param filter_chain_type is the filter chain type
-   * @param listener_filter_matcher is the filter matcher for TCP listener filter. nullptr for other
-   * filter types.
-   */
-  virtual void registerDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ExtensionConfigSource& config_source,
-      const std::string& filter_config_name,
-      Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) PURE;
-
-  virtual OptRef<FactoryCb> dynamicProviderConfig(const std::string& filter_config_name) PURE;
 };
 
 } // namespace Filter

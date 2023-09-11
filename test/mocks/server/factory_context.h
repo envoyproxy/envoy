@@ -57,6 +57,19 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
+  void createDynamicFilterConfigProvider(
+      const envoy::config::core::v3::ExtensionConfigSource& config_source,
+      const std::string& filter_config_name,
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::FactoryContext& factory_context,
+      Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {}
+
+  OptRef<Http::FilterFactoryCb> dynamicProviderConfig(const std::string& filter_config_name) {
+    return absl::nullopt;
+  }
+
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
