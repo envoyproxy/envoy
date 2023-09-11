@@ -1,5 +1,5 @@
 # This will proxy CONNECT-UDP requests from a downstream connecting on 127.0.0.1:10001 to an
-# upstream listening on 127.0.0.1:10002. Note that the downstream client uses TCP in this example. 
+# upstream listening on 127.0.0.1:10002. Note that the downstream client uses TCP in this example.
 admin:
   address:
     socket_address:
