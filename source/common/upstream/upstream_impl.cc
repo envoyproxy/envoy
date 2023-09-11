@@ -370,7 +370,6 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
 const absl::string_view ClusterImplBase::DoNotValidateAlpnRuntimeKey =
     "config.do_not_validate_alpn_support";
 
-
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
 // stat name into every host that receives a copy of that metric. This can be improved by putting
 // a single copy of the stat name into a thread-local key->index map so that the lock can be avoided
