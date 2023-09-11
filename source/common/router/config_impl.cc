@@ -82,38 +82,32 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
 
   RouteEntryImplBaseConstSharedPtr route;
   switch (route_config.match().path_specifier_case()) {
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
     route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                    factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
     route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                  factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
     route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                   factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
     route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                     factory_context, validator);
     break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
     route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
     route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
-  }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // throw the error below.
-  }
   }
   if (!route) {
     throw EnvoyException("Invalid route config");
@@ -2174,8 +2168,8 @@ PerFilterConfigs::PerFilterConfigs(
   const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
 
-  absl::string_view filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
+  std::string filter_config_type =
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;

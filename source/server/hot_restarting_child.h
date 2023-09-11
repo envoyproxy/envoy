@@ -19,7 +19,36 @@ public:
 
   void initialize(Event::Dispatcher& dispatcher);
   void shutdown();
+  // A structure to record the set of registered UDP listeners keyed on their addresses,
+  // to support QUIC packet forwarding.
+  class UdpForwardingContext {
+  public:
+    using ForwardEntry = std::pair<Network::Address::InstanceConstSharedPtr,
+                                   std::shared_ptr<Network::UdpListenerConfig>>;
+
+    // Returns the address and UdpListenerConfig associated with the given address.
+    // The addresses are not necessarily identical, as e.g. the listener might be listening on
+    // 0.0.0.0.
+    // This is called from the thread to which the hot restart Event::Dispatcher
+    // dispatches, which is expected to be the same main thread as registerListener
+    // is called from.
+    absl::optional<ForwardEntry>
+    getListenerForDestination(const Network::Address::Instance& address);
+
+    // Registers a UdpListenerConfig and address into the map, to be matched using
+    // getListenerForDestination for UDP packet forwarding.
+    // This is called from the main thread during listening socket creation.
+    void registerListener(Network::Address::InstanceConstSharedPtr address,
+                          std::shared_ptr<Network::UdpListenerConfig> listener_config);
+
+  private:
+    // Map keyed on address as a string, because Network::Address::Instance isn't hashable.
+    absl::flat_hash_map<std::string, ForwardEntry> listener_map_;
+  };
+
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
+  void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
+                                     std::shared_ptr<Network::UdpListenerConfig> listener_config);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
@@ -28,7 +57,6 @@ public:
                         const envoy::HotRestartMessage::Reply::Stats& stats_proto);
 
 protected:
-  class UdpForwardingContext;
   void onSocketEventUdpForwarding();
   void onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data);
 
@@ -41,6 +69,7 @@ private:
   Stats::StatName hot_restart_generation_stat_name_;
   Event::FileEventPtr socket_event_udp_forwarding_;
   std::unique_ptr<UdpForwardingContext> udp_forwarding_context_;
+  friend class HotRestartUdpForwardingTestHelper;
 };
 
 } // namespace Server

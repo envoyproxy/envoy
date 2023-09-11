@@ -851,7 +851,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTe
   )EOF",
                             key_mapping);
   EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping), EnvoyException,
-                            "Invalid filter state serialize type, only support PLAIN/TYPED.");
+                            "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD.");
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSpeciferTest) {
@@ -882,7 +882,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSp
   )EOF",
                             key_mapping);
   EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping), EnvoyException,
-                            "Invalid filter state serialize type, only support PLAIN/TYPED.");
+                            "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD.");
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterStartTimeTest) {

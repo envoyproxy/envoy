@@ -1,9 +1,9 @@
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_python//python:defs.bzl", "py_binary")
-load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -43,8 +43,8 @@ filegroup(
         "//bazel:disable_admin_functionality": [],
         "//conditions:default": [
             "envoy-demo.yaml",
-            "freebind/freebind.yaml",
             "envoy-tap-config.yaml",
+            "freebind/freebind.yaml",
         ],
     }),
 )

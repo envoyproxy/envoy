@@ -28,21 +28,6 @@ def upstream_envoy_overrides():
 
 def swift_repos():
     http_archive(
-        name = "build_bazel_rules_apple",
-        sha256 = "687644bf48ccf91286f31c4ec26cf6591800b39bee8a630438626fc9bb4042de",
-        strip_prefix = "rules_apple-a0f8748ce89698a599149d984999eaefd834c004",
-        url = "https://github.com/bazelbuild/rules_apple/archive/a0f8748ce89698a599149d984999eaefd834c004.tar.gz",
-    )
-
-    # https://github.com/bazelbuild/rules_swift/pull/922
-    http_archive(
-        name = "build_bazel_rules_swift",
-        sha256 = "422558831da7719658ab0ffb3c994d92ddc6541e3610a751613a324bb5d10ffe",
-        strip_prefix = "rules_swift-e769f8d6a4adae93c244f244480a3ae740f24384",
-        url = "https://github.com/bazelbuild/rules_swift/archive/e769f8d6a4adae93c244f244480a3ae740f24384.tar.gz",
-    )
-
-    http_archive(
         name = "DrString",
         build_file_content = """exports_files(["drstring"])""",
         sha256 = "860788450cf9900613454a51276366ea324d5bfe71d1844106e9c1f1d7dfd82b",
