@@ -215,20 +215,29 @@ void Filter::log(const Http::RequestHeaderMap* headers, const Http::ResponseHead
                  const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
                  Envoy::AccessLog::AccessLogType type) {
   // `log` may be called multiple times with different log type
-  auto& state = getProcessorState();
+  switch (type) {
+  case Envoy::AccessLog::AccessLogType::DownstreamStart:
+  case Envoy::AccessLog::AccessLogType::DownstreamPeriodic:
+  case Envoy::AccessLog::AccessLogType::DownstreamEnd: {
+    auto& state = getProcessorState();
 
-  if (req_ == nullptr) {
-    // log called by AccessLogDownstreamStart will happen before doHeaders
-    initRequest(state);
+    if (req_ == nullptr) {
+      // log called by AccessLogDownstreamStart will happen before doHeaders
+      initRequest(state);
 
-    request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
-        const_cast<Http::RequestHeaderMap*>(headers));
+      request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
+          const_cast<Http::RequestHeaderMap*>(headers));
+    }
+
+    state.enterLog();
+    req_->phase = static_cast<int>(state.phase());
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(type));
+    state.leaveLog();
+  } break;
+  default:
+    // skip calling with unsupported log types
+    break;
   }
-
-  state.enterLog();
-  req_->phase = static_cast<int>(state.phase());
-  dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(type));
-  state.leaveLog();
 }
 
 /*** common APIs for filter, both decode and encode ***/

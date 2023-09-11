@@ -107,10 +107,12 @@ func getRequest(r *C.httpRequest) *httpRequest {
 func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
 	var req *httpRequest
 	phase := api.EnvoyRequestPhase(r.phase)
+	// early SendLocalReply or OnLogDownstreamStart may run before the header handling
 	req = getRequest(r)
 	if req == nil {
 		req = createRequest(r)
 	}
+
 	if req.pInfo.paniced {
 		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
 		// to prevent error from spreading.
