@@ -62,7 +62,7 @@ a deployment of the form:
 In this case, if a client is for example using WebSocket, we want the Websocket to arrive at the
 upstream server functionally intact, which means it needs to traverse the HTTP/2+ hop.
 
-This is accomplished for HTTP/2 via `Extended CONNECT (RFC8441) <https://tools.ietf.org/html/rfc8441>`_ support,
+This is accomplished for HTTP/2 via `Extended CONNECT (RFC 8441) <https://tools.ietf.org/html/rfc8441>`_ support,
 turned on by setting :ref:`allow_connect <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.allow_connect>`
 to ``true`` at the second layer Envoy.
 
@@ -143,9 +143,9 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
    ``CONNECT-UDP`` is in an alpha status and may not be stable enough for use in production.
    We recommend to use this feature with caution.
 
-``CONNECT-UDP`` allows HTTP clients to create UDP tunnels through an HTTP proxy server. Unlike
-``CONNECT``, which is limited to tunneling TCP, ``CONNECT-UDP`` can be used to proxy UDP-based
-protocols such as HTTP/3.
+``CONNECT-UDP`` (`RFC 9298 <https://datatracker.ietf.org/doc/html/rfc9298>`_) allows HTTP clients
+to create UDP tunnels through an HTTP proxy server. Unlike ``CONNECT``, which is limited to
+tunneling TCP, ``CONNECT-UDP`` can be used to proxy UDP-based protocols such as HTTP/3.
 
 ``CONNECT-UDP`` support is disabled by default in Envoy. Similar to ``CONNECT``, it can be enabled
 through the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
