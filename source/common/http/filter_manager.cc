@@ -284,9 +284,25 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
 
   auto* result = current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 
-  if (result == nullptr && filter_context_.filter_name != filter_context_.config_name) {
-    // Fallback to use filter name.
+  /**
+   * If:
+   * 1. no per filter config is found for the filter config name.
+   * 2. filter config name is different from the filter canonical name.
+   * 3. downgrade feature is not disabled.
+   * we fallback to use the filter canonical name.
+   */
+  if (result == nullptr && !parent_.no_downgrade_to_canonical_name_ &&
+      filter_context_.filter_name != filter_context_.config_name) {
+    // Fallback to use filter canonical name.
     result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
+
+    if (result != nullptr) {
+      ENVOY_LOG_FIRST_N(warn, 10,
+                        "No per filter config is found by filter config name and fallback to use "
+                        "filter canonical name. This is deprecated and will be forbidden very "
+                        "soon. Please use the filter config name to index per filter config. See "
+                        "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+    }
   }
   return result;
 }
@@ -306,11 +322,20 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
         cb(config);
       });
 
-  if (handled || filter_context_.filter_name == filter_context_.config_name) {
+  if (handled || parent_.no_downgrade_to_canonical_name_ ||
+      filter_context_.filter_name == filter_context_.config_name) {
     return;
   }
 
-  current_route->traversePerFilterConfig(filter_context_.filter_name, cb);
+  current_route->traversePerFilterConfig(
+      filter_context_.filter_name, [&cb](const Router::RouteSpecificFilterConfig& config) {
+        ENVOY_LOG_FIRST_N(warn, 10,
+                          "No per filter config is found by filter config name and fallback to use "
+                          "filter canonical name. This is deprecated and will be forbidden very "
+                          "soon. Please use the filter config name to index per filter config. See "
+                          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.");
+        cb(config);
+      });
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOptions() {
@@ -917,8 +942,7 @@ void DownstreamFilterManager::sendLocalReply(
 
     // We only prepare a local reply to execute later if we're actively
     // invoking filters to avoid re-entrant in filters.
-    if (avoid_reentrant_filter_invocation_during_local_reply_ &&
-        (state_.filter_call_state_ & FilterCallState::IsDecodingMask)) {
+    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                       grpc_status, details);
     } else {

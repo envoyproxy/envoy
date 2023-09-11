@@ -95,8 +95,11 @@ absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
 
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(cluster, context);
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+      status_or_cluster = createClusterImpl(cluster, context);
+  RETURN_IF_STATUS_NOT_OK(status_or_cluster);
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>& new_cluster_pair =
+      status_or_cluster.value();
 
   auto& server_context = context.serverFactoryContext();
 
@@ -117,7 +120,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       server_context.runtime(), context.outlierEventLogger(),
       server_context.api().randomGenerator()));
 
-  return new_cluster_pair;
+  return status_or_cluster;
 }
 
 } // namespace Upstream

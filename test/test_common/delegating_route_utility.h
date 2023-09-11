@@ -1,3 +1,5 @@
+#pragma once
+
 #include <chrono>
 
 #include "source/common/router/delegating_route_impl.h"

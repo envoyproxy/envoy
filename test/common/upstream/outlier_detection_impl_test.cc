@@ -357,7 +357,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
 /*
  Tests scenario when active health check clears the FAILED_OUTLIER_CHECK flag.
 */
-TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
+TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost) {
   ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
@@ -428,7 +428,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
-  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Unchanged);
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -450,6 +450,75 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
   EXPECT_EQ(3UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(
       3UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_consecutive_gateway_failure")
+                     .value());
+}
+
+/*
+ Tests scenario when active health check is disabled from clearing the FAILED_OUTLIER_CHECK flag.
+*/
+TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCDoNotUnejectHost) {
+  const std::string yaml = R"EOF(
+successful_active_health_check_uneject_host: false
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+
+  // Add health checker to cluster and validate that host call back is not called.
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  // The host check complete callback is not triggered.
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(0);
+  ON_CALL(cluster_, healthChecker()).WillByDefault(Return(health_checker.get()));
+
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection, dispatcher_, runtime_, time_system_, event_logger_, random_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  addHosts({"tcp://127.0.0.1:81"});
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({hosts_[1]}, {});
+
+  // Cause a consecutive 5xx error on host[0] by reporting HTTP codes.
+  loadRq(hosts_[0], 1, 500);
+  loadRq(hosts_[0], 1, 200);
+  hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  loadRq(hosts_[0], 4, 500);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Interval that doesn't bring the host back in.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  // The health checker callbacks won't be triggered with "Changed" status. The host is unejected.
+  EXPECT_CALL(checker_, check(hosts_[0])).Times(0);
+  // Uneject doesn't happen
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])))
+      .Times(0);
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, hosts_);
+
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(
+      1UL,
       cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
   EXPECT_EQ(0UL, cluster_.info_->stats_store_
                      .counter("outlier_detection.ejections_consecutive_gateway_failure")

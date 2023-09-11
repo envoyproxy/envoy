@@ -116,9 +116,13 @@ public:
   MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClient,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
                bool skip_cluster_check));
+
+  MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClientWithHashKey,
+              (const GrpcServiceConfigWithHashKey& config_with_hash_key, Stats::Scope& scope,
+               bool skip_cluster_check));
 };
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 MATCHER_P(ProtoBufferEq, expected, "") {
   typename std::remove_const<decltype(expected)>::type proto;
   if (!proto.ParseFromString(arg->toString())) {

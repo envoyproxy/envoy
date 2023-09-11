@@ -987,9 +987,9 @@ export PATH=$PATH:$PWD/bin/
 Once this is set up, you can run clang-format without docker:
 
 ```shell
-./tools/code_format/check_format.py check
+bazel run //tools/code_format:check_format -- check
 ./tools/spelling/check_spelling_pedantic.py check
-./tools/code_format/check_format.py fix
+bazel run //tools/code_format:check_format -- fix
 ./tools/spelling/check_spelling_pedantic.py fix
 ```
 

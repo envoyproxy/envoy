@@ -31,8 +31,7 @@ public:
   HttpFilterDso(const std::string dso_name) : Dso(dso_name){};
   virtual ~HttpFilterDso() = default;
 
-  virtual GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
-                                                    GoUint64 p3) PURE;
+  virtual GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) PURE;
   virtual GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                                       GoUint64 p3) PURE;
   virtual void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) PURE;
@@ -50,8 +49,7 @@ public:
   HttpFilterDsoImpl(const std::string dso_name);
   ~HttpFilterDsoImpl() override = default;
 
-  GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
-                                            GoUint64 p3) override;
+  GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) override;
   GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                               GoUint64 p3) override;
   void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0) override;
@@ -63,8 +61,7 @@ public:
   void envoyGoRequestSemaDec(httpRequest* p0) override;
 
 private:
-  GoUint64 (*envoy_go_filter_new_http_plugin_config_)(GoUint64 p0, GoUint64 p1, GoUint64 p2,
-                                                      GoUint64 p3) = {nullptr};
+  GoUint64 (*envoy_go_filter_new_http_plugin_config_)(httpConfig* p0) = {nullptr};
   GoUint64 (*envoy_go_filter_merge_http_plugin_config_)(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                                         GoUint64 p3) = {nullptr};
   void (*envoy_go_filter_destroy_http_plugin_config_)(GoUint64 p0) = {nullptr};

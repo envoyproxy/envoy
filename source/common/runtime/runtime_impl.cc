@@ -594,32 +594,41 @@ void RtdsSubscription::createSubscription() {
       {});
 }
 
-void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                      const std::string&) {
-  validateUpdateSize(resources.size(), 0);
+absl::Status
+RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                 const std::string&) {
+  absl::Status valid = validateUpdateSize(resources.size(), 0);
+  if (!valid.ok()) {
+    return valid;
+  }
   const auto& runtime =
       dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
   if (runtime.name() != resource_name_) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
   }
   ENVOY_LOG(debug, "Reloading RTDS snapshot for onConfigUpdate");
   proto_.CopyFrom(runtime.layer());
   parent_.loadNewSnapshot();
   init_target_.ready();
+  return absl::OkStatus();
 }
 
-void RtdsSubscription::onConfigUpdate(
-    const std::vector<Config::DecodedResourceRef>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
-  validateUpdateSize(added_resources.size(), removed_resources.size());
+absl::Status
+RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                 const std::string&) {
+  absl::Status valid = validateUpdateSize(added_resources.size(), removed_resources.size());
+  if (!valid.ok()) {
+    return valid;
+  }
 
   // This is a singleton subscription, so we can only have the subscribed resource added or removed,
   // but not both.
   if (!added_resources.empty()) {
-    onConfigUpdate(added_resources, added_resources[0].get().version());
+    return onConfigUpdate(added_resources, added_resources[0].get().version());
   } else {
-    onConfigRemoved(removed_resources);
+    return onConfigRemoved(removed_resources);
   }
 }
 
@@ -633,20 +642,22 @@ void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
 
 void RtdsSubscription::start() { subscription_->start({resource_name_}); }
 
-void RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
-                                          uint32_t removed_resources_num) {
+absl::Status RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
+                                                  uint32_t removed_resources_num) {
   if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
-    throw EnvoyException(fmt::format("Unexpected RTDS resource length, number of added recources "
-                                     "{}, number of removed recources {}",
-                                     added_resources_num, removed_resources_num));
+    return absl::InvalidArgumentError(
+        fmt::format("Unexpected RTDS resource length, number of added recources "
+                    "{}, number of removed recources {}",
+                    added_resources_num, removed_resources_num));
   }
+  return absl::OkStatus();
 }
 
-void RtdsSubscription::onConfigRemoved(
+absl::Status RtdsSubscription::onConfigRemoved(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   if (removed_resources[0] != resource_name_) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Unexpected removal of unknown RTDS runtime layer {}, expected {}",
                     removed_resources[0], resource_name_));
   }
@@ -654,6 +665,7 @@ void RtdsSubscription::onConfigRemoved(
   proto_.Clear();
   parent_.loadNewSnapshot();
   init_target_.ready();
+  return absl::OkStatus();
 }
 
 void LoaderImpl::loadNewSnapshot() {

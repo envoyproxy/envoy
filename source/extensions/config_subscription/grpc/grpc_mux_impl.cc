@@ -389,7 +389,7 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     // Listener) even if the message does not have resources so that update_empty stat
     // is properly incremented and state-of-the-world semantics are maintained.
     if (watch->resources_.empty()) {
-      watch->callbacks_.onConfigUpdate(all_resource_refs, version_info);
+      THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(all_resource_refs, version_info));
       continue;
     }
     std::vector<DecodedResourceRef> found_resources;
@@ -416,7 +416,7 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     // onConfigUpdate should be called only on watches(clusters/listeners) that have
     // updates in the message for EDS/RDS.
     if (!found_resources.empty()) {
-      watch->callbacks_.onConfigUpdate(found_resources, version_info);
+      THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(found_resources, version_info));
       // Resource cache is only used for EDS resources.
       if (eds_resources_cache_ &&
           (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
@@ -513,7 +513,7 @@ void GrpcMuxImpl::expiryCallback(absl::string_view type_url,
       }
     }
 
-    watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, "");
+    THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, ""));
   }
 }
 
