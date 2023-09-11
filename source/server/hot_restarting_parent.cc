@@ -34,7 +34,7 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
 
 void HotRestartingParent::onSocketEvent() {
   std::unique_ptr<HotRestartMessage> wrapped_request;
-  while ((wrapped_request = main_rpc_stream_.receiveHotRestartMessage(Blocking::No))) {
+  while ((wrapped_request = main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::No))) {
     if (wrapped_request->requestreply_case() == HotRestartMessage::kReply) {
       ENVOY_LOG(error, "child sent us a HotRestartMessage reply (we want requests); ignoring.");
       HotRestartMessage wrapped_reply;

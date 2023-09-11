@@ -16,7 +16,7 @@ static constexpr uint64_t MaxSendmsgSize = 4096;
 static constexpr absl::Duration CONNECTION_REFUSED_RETRY_DELAY = absl::Seconds(1);
 static constexpr int SENDMSG_MAX_RETRIES = 10;
 
-HotRestartingBase::RpcStream::~RpcStream() {
+RpcStream::~RpcStream() {
   if (domain_socket_ != -1) {
     Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
     Api::SysCallIntResult result = os_sys_calls.close(domain_socket_);
@@ -24,15 +24,14 @@ HotRestartingBase::RpcStream::~RpcStream() {
   }
 }
 
-void HotRestartingBase::RpcStream::initDomainSocketAddress(sockaddr_un* address) {
+void RpcStream::initDomainSocketAddress(sockaddr_un* address) {
   memset(address, 0, sizeof(*address));
   address->sun_family = AF_UNIX;
 }
 
-sockaddr_un HotRestartingBase::RpcStream::createDomainSocketAddress(uint64_t id,
-                                                                    const std::string& role,
-                                                                    const std::string& socket_path,
-                                                                    mode_t socket_mode) {
+sockaddr_un RpcStream::createDomainSocketAddress(uint64_t id, const std::string& role,
+                                                 const std::string& socket_path,
+                                                 mode_t socket_mode) {
   // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the third
   // starts up it will kill the oldest parent.
   static constexpr uint64_t MaxConcurrentProcesses = 3;
@@ -47,9 +46,8 @@ sockaddr_un HotRestartingBase::RpcStream::createDomainSocketAddress(uint64_t id,
   return address;
 }
 
-void HotRestartingBase::RpcStream::bindDomainSocket(uint64_t id, const std::string& role,
-                                                    const std::string& socket_path,
-                                                    mode_t socket_mode) {
+void RpcStream::bindDomainSocket(uint64_t id, const std::string& role,
+                                 const std::string& socket_path, mode_t socket_mode) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
@@ -69,8 +67,7 @@ void HotRestartingBase::RpcStream::bindDomainSocket(uint64_t id, const std::stri
   }
 }
 
-void HotRestartingBase::RpcStream::sendHotRestartMessage(sockaddr_un& address,
-                                                         const HotRestartMessage& proto) {
+void RpcStream::sendHotRestartMessage(sockaddr_un& address, const HotRestartMessage& proto) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const uint64_t serialized_size = proto.ByteSizeLong();
   const uint64_t total_size = sizeof(uint64_t) + serialized_size;
@@ -149,8 +146,8 @@ void HotRestartingBase::RpcStream::sendHotRestartMessage(sockaddr_un& address,
                  fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
 }
 
-bool HotRestartingBase::RpcStream::replyIsExpectedType(
-    const HotRestartMessage* proto, HotRestartMessage::Reply::ReplyCase oneof_type) const {
+bool RpcStream::replyIsExpectedType(const HotRestartMessage* proto,
+                                    HotRestartMessage::Reply::ReplyCase oneof_type) const {
   return proto != nullptr && proto->requestreply_case() == HotRestartMessage::kReply &&
          proto->reply().reply_case() == oneof_type;
 }
@@ -159,7 +156,7 @@ bool HotRestartingBase::RpcStream::replyIsExpectedType(
 // PassListenSocketReply proto; the higher level code will see a listening fd that Just Works. We
 // should only get control data in a PassListenSocketReply, it should only be the fd passing type,
 // and there should only be one at a time. Crash on any other control data.
-void HotRestartingBase::RpcStream::getPassedFdIfPresent(HotRestartMessage* out, msghdr* message) {
+void RpcStream::getPassedFdIfPresent(HotRestartMessage* out, msghdr* message) {
   cmsghdr* cmsg = CMSG_FIRSTHDR(message);
   if (cmsg != nullptr) {
     RELEASE_ASSERT(cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS &&
@@ -177,7 +174,7 @@ void HotRestartingBase::RpcStream::getPassedFdIfPresent(HotRestartMessage* out, 
 
 // While in use, recv_buf_ is always >= MaxSendmsgSize. In between messages, it is kept empty,
 // to be grown back to MaxSendmsgSize at the start of the next message.
-void HotRestartingBase::RpcStream::initRecvBufIfNewMessage() {
+void RpcStream::initRecvBufIfNewMessage() {
   if (recv_buf_.empty()) {
     ASSERT(cur_msg_recvd_bytes_ == 0);
     ASSERT(!expected_proto_length_.has_value());
@@ -187,7 +184,7 @@ void HotRestartingBase::RpcStream::initRecvBufIfNewMessage() {
 
 // Must only be called when recv_buf_ contains a full proto. Returns that proto, and resets all of
 // our receive-buffering state back to empty, to await a new message.
-std::unique_ptr<HotRestartMessage> HotRestartingBase::RpcStream::parseProtoAndResetState() {
+std::unique_ptr<HotRestartMessage> RpcStream::parseProtoAndResetState() {
   auto ret = std::make_unique<HotRestartMessage>();
   RELEASE_ASSERT(
       ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t), expected_proto_length_.value()),
@@ -198,8 +195,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::RpcStream::parseProtoAndRe
   return ret;
 }
 
-std::unique_ptr<HotRestartMessage>
-HotRestartingBase::RpcStream::receiveHotRestartMessage(Blocking block) {
+std::unique_ptr<HotRestartMessage> RpcStream::receiveHotRestartMessage(Blocking block) {
   // By default the domain socket is non blocking. If we need to block, make it blocking first.
   if (block == Blocking::Yes) {
     RELEASE_ASSERT(fcntl(domain_socket_, F_SETFL, 0) != -1,
