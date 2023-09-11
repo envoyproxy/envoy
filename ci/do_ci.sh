@@ -4,7 +4,6 @@
 
 set -e
 
-
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
@@ -29,6 +28,44 @@ FETCH_TARGETS=(
     @nodejs//...
     @envoy_api//...
     @envoy_build_tools//...)
+
+FETCH_TARGETS=(
+    @bazel_tools//tools/jdk:remote_jdk11
+    @com_github_bufbuild_buf//:bin/buf
+    @envoy_build_tools//...
+    //docs/...
+    //tools/proto_format/...
+    //tools/zstd
+    //tools/gsutil
+    //tools/code_format/...)
+
+FETCH_BUILD_TARGETS=(
+    @com_github_google_quiche//:ci_tests
+    //contrib/exe/...
+    //distribution/...
+    //source/exe/...
+    //test/tools/schema_validator/...
+    //test/...)
+
+retry () {
+    local n wait iterations
+    wait="${1}"
+    iterations="${2}"
+    shift 2
+    n=0
+    until [ "$n" -ge "$iterations" ]; do
+        "${@}" \
+            && break
+        n=$((n+1))
+        if [[ "$n" -lt "$iterations" ]]; then
+            sleep "$wait"
+            echo "Retrying ..."
+        else
+            echo "Fetch failed"
+            exit 1
+        fi
+    done
+}
 
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -181,23 +218,25 @@ function run_ci_verify () {
 CI_TARGET=$1
 shift
 
+if [[ "$CI_TARGET" =~ bazel.* ]]; then
+    ORIG_CI_TARGET="$CI_TARGET"
+    CI_TARGET="$(echo "${CI_TARGET}" | cut -d. -f2-)"
+    echo "Using \`${ORIG_CI_TARGET}\` is deprecated, please use \`${CI_TARGET}\`"
+fi
+
 if [[ $# -ge 1 ]]; then
   COVERAGE_TEST_TARGETS=("$@")
   TEST_TARGETS=("$@")
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-  if [[ "$CI_TARGET" == "bazel.release" ]]; then
+  if [[ "${CI_TARGET}" == "release" ]]; then
     # We test contrib on release only.
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
-  elif [[ "${CI_TARGET}" == "bazel.msan" ]]; then
+  elif [[ "${CI_TARGET}" == "msan" ]]; then
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
   fi
   TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
-fi
-
-if [[ "$CI_TARGET" =~ bazel.* ]]; then
-    CI_TARGET="$(echo "${CI_TARGET}" | cut -d. -f2-)"
 fi
 
 case $CI_TARGET in
@@ -509,9 +548,9 @@ case $CI_TARGET in
         # Extract the Envoy binary from the tarball
         mkdir -p distribution/custom
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            ENVOY_RELEASE_TARBALL="/build/bazel.release/x64/bin/release.tar.zst"
+            ENVOY_RELEASE_TARBALL="/build/release/x64/bin/release.tar.zst"
         else
-            ENVOY_RELEASE_TARBALL="/build/bazel.release/arm64/bin/release.tar.zst"
+            ENVOY_RELEASE_TARBALL="/build/release/arm64/bin/release.tar.zst"
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/zstd \
@@ -567,29 +606,31 @@ case $CI_TARGET in
         cat bazel-bin/distribution/dockerhub/readme.md
         ;;
 
-    fetch)
+    fetch|fetch-*)
+        case $CI_TARGET in
+            fetch)
+                targets=("${FETCH_TARGETS[@]}")
+                ;;
+            fetch-release)
+                targets=("${FETCH_BUILD_TARGETS[@]}")
+                ;;
+            *)
+                exit 0
+                ;;
+        esac
         setup_clang_toolchain
-        echo "Fetching ${FETCH_TARGETS[*]} ..."
         FETCH_ARGS=(
             --noshow_progress
             --noshow_loading_progress)
-        # TODO(phlax): separate out retry logic
-        n=0
-        until [ "$n" -ge 10 ]; do
-            bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" \
-                  "${FETCH_ARGS[@]}" \
-                  "${FETCH_TARGETS[@]}" \
-                && break
-            n=$((n+1))
-            if [[ "$n" -lt 10 ]]; then
-                sleep 15
-                echo "Retrying fetch ..."
-            else
-                echo "Fetch failed"
-                exit 1
-            fi
-        done
+        echo "Fetching ${targets[*]} ..."
+        retry 15 10 bazel \
+              fetch \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              "${FETCH_ARGS[@]}" \
+              "${targets[@]}"
         ;;
+
+
 
     fix_proto_format)
         # proto_format.sh needs to build protobuf.
@@ -724,7 +765,7 @@ case $CI_TARGET in
         setup_clang_toolchain
         # The default config expects these files
         mkdir -p distribution/custom
-        cp -a /build/bazel.*/*64 distribution/custom/
+        cp -a /build/*/*64 distribution/custom/
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release
@@ -774,9 +815,9 @@ case $CI_TARGET in
         # this can be required if any python deps require compilation
         setup_clang_toolchain
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            PACKAGE_BUILD=/build/bazel.distribution/x64/packages.x64.tar.gz
+            PACKAGE_BUILD=/build/distribution/x64/packages.x64.tar.gz
         else
-            PACKAGE_BUILD=/build/bazel.distribution/arm64/packages.arm64.tar.gz
+            PACKAGE_BUILD=/build/distribution/arm64/packages.arm64.tar.gz
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //distribution:verify_packages \
