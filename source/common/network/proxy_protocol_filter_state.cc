@@ -29,18 +29,15 @@ public:
       return absl::monostate();
     }
 
-    // Parse the TLVs with the given type from the filter state object.
-    std::ostringstream oss;
-    int match_count = 0;
+    // Parse a TLV with the given type from the filter state.
+    // (only returns first one found with given type)
     for (auto& tlv : object_->value().tlv_vector_) {
       if (tlv.type == tlv_type) {
-        if (match_count > 0)
-          oss << ", ";
-        oss << Base64::encode(reinterpret_cast<const char*>(tlv.value.data()), tlv.value.size());
-        match_count++;
+        return Base64::encode(reinterpret_cast<const char*>(tlv.value.data()), tlv.value.size());
       }
     }
-    return oss.str();
+    // TLV with given type was not found.
+    return absl::monostate();
   }
 
 private:
