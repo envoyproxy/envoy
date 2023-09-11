@@ -12,6 +12,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_check_host_monitor.h"
@@ -19,6 +20,7 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/resolver_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
@@ -27,6 +29,7 @@
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/common/upstream/test_local_address_selector.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -2875,7 +2878,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         EnvoyException,
         "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
         "different IP version source addresses can be supported in BindConfig's source_address and "
-        "extra_source_addresses fields");
+        "extra_source_addresses/additional_source_addresses fields");
   }
 
   {
@@ -2899,8 +2902,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
         EnvoyException,
-        "Bootstrap's upstream binding config has more than one extra source addresses. Only "
-        "one extra source can be supported in BindConfig's extra_source_addresses field");
+        "Bootstrap's upstream binding config has more than one extra/additional source addresses. "
+        "Only one extra/additional source can be supported in BindConfig's "
+        "extra_source_addresses/additional_source_addresses field");
   }
 
   {
@@ -2980,12 +2984,12 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
 
-    EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
-                                  createCluster(config, factory_context),
-                              EnvoyException,
-                              "Cluster staticcluster's upstream binding config has more than one "
-                              "extra source addresses. Only one extra source can be "
-                              "supported in BindConfig's extra_source_addresses field");
+    EXPECT_THROW_WITH_MESSAGE(
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
+        EnvoyException,
+        "Cluster staticcluster's upstream binding config has more than one "
+        "extra/additional source addresses. Only one extra/additional source can be "
+        "supported in BindConfig's extra_source_addresses/additional_source_addresses field");
   }
 
   {
@@ -3141,7 +3145,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         EnvoyException,
         "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
         "different IP version source addresses can be supported in BindConfig's source_address and "
-        "additional_source_addresses fields");
+        "extra_source_addresses/additional_source_addresses fields");
   }
 
   {
@@ -3159,11 +3163,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    EXPECT_THROW_WITH_MESSAGE(
-        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
-        EnvoyException,
-        "Bootstrap's upstream binding config has more than one additional source addresses. Only "
-        "one additional source can be supported in BindConfig's additional_source_addresses field");
+    EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
+                                  createCluster(config, factory_context),
+                              EnvoyException,
+                              "Bootstrap's upstream binding config has more than one "
+                              "extra/additional source addresses. Only "
+                              "one extra/additional source can be supported in BindConfig's "
+                              "extra_source_addresses/additional_source_addresses field");
   }
 
   {
@@ -3200,12 +3206,12 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     ;
-    EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
-                                  createCluster(config, factory_context),
-                              EnvoyException,
-                              "Cluster staticcluster's upstream binding config has more than one "
-                              "additional source addresses. Only one additional source can be "
-                              "supported in BindConfig's additional_source_addresses field");
+    EXPECT_THROW_WITH_MESSAGE(
+        std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
+        EnvoyException,
+        "Cluster staticcluster's upstream binding config has more than one "
+        "extra/additional source addresses. Only one extra/additional source can be "
+        "supported in BindConfig's extra_source_addresses/additional_source_addresses field");
   }
 
   {
@@ -3249,6 +3255,54 @@ TEST_F(StaticClusterImplTest, LedsUnsupported) {
       std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context),
       EnvoyException,
       "LEDS is only supported when EDS is used. Static cluster staticcluster cannot use LEDS.");
+}
+
+// Test ability to register custom local address selector.
+TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
+
+  TestUpstreamLocalAddressSelectorFactory factory;
+  Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> registration(factory);
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  ProtobufWkt::Empty empty;
+  auto address_selector_config =
+      server_context_.cluster_manager_.mutableBindConfig().mutable_local_address_selector();
+  address_selector_config->mutable_typed_config()->PackFrom(empty);
+  address_selector_config->set_name("test.upstream.local.address.selector");
+  server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+      "1.2.3.5");
+  server_context_.cluster_manager_.mutableBindConfig()
+      .add_extra_source_addresses()
+      ->mutable_address()
+      ->set_address("2001::1");
+  server_context_.cluster_manager_.mutableBindConfig()
+      .add_extra_source_addresses()
+      ->mutable_address()
+      ->set_address("1.2.3.6");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
+
+  Network::Address::InstanceConstSharedPtr v6_remote_address =
+      std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
+  EXPECT_EQ("[2001::1]:0", cluster->info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
+  Network::Address::InstanceConstSharedPtr remote_address =
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+  EXPECT_EQ("1.2.3.6:0", cluster->info()
+                             ->getUpstreamLocalAddressSelector()
+                             ->getUpstreamLocalAddress(remote_address, nullptr)
+                             .address_->asString());
+  EXPECT_EQ("1.2.3.5:0", cluster->info()
+                             ->getUpstreamLocalAddressSelector()
+                             ->getUpstreamLocalAddress(remote_address, nullptr)
+                             .address_->asString());
 }
 
 class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -4510,6 +4564,88 @@ TEST_F(ClusterInfoImplTest, Http3) {
                 san_type: IP_ADDRESS
   )EOF",
                                                        Network::Address::IpVersion::v4);
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+
+  const std::string explicit_http3 = R"EOF(
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http3_protocol_options:
+            quic_protocol_options:
+              max_concurrent_streams: 2
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
+
+  const std::string downstream_http3 = R"EOF(
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
+
+  auto explicit_h3 = makeCluster(yaml + explicit_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(
+      explicit_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(),
+      2);
+
+  auto downstream_h3 = makeCluster(yaml + downstream_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
+  EXPECT_FALSE(
+      downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
+}
+
+TEST_F(ClusterInfoImplTest, Http3WithHttp11WrappedSocket) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.http_11_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport
+        transport_socket:
+          name: envoy.transport_sockets.quic
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+            upstream_tls_context:
+              common_tls_context:
+                tls_certificates:
+                - certificate_chain:
+                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+                  private_key:
+                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+                validation_context:
+                  trusted_ca:
+                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+                  match_typed_subject_alt_names:
+                  - matcher:
+                      exact: localhost
+                    san_type: URI
+                  - matcher:
+                      exact: 127.0.0.1
+                    san_type: IP_ADDRESS
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
   auto cluster1 = makeCluster(yaml);
   ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
   EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());

@@ -35,6 +35,14 @@ if [[ $# -gt 0 && "$1" == "-run-build-setup" ]]; then
   . ci/build_setup.sh
 fi
 
+use_bazel=1
+if [[ $# -gt 0 && "$1" == "-skip-bazel" ]]; then
+  echo -n "WARNING: not using bazel to invoke this script may result in "
+  echo "mismatched versions and incorrect formatting"
+  shift
+  use_bazel=0
+fi
+
 if [[ $# -gt 0 && "$1" == "-verbose" ]]; then
   verbose=1
   shift
@@ -44,13 +52,18 @@ fi
 
 # Runs the formatting functions on the specified args, echoing commands
 # if -vergbose was supplied to the script.
-function format_one() {
+function format_some() {
   (
     if [[ "$verbose" == "1" ]]; then
       set -x
     fi
-    bazel run //tools/code_format:check_format -- fix "${1}"
-    ./tools/spelling/check_spelling_pedantic.py fix "$1"
+    if [[ "$use_bazel" == "1" ]]; then
+      bazel run //tools/code_format:check_format -- fix "$@"
+    else
+      for arg in "$@"; do
+        ./tools/spelling/check_spelling_pedantic.py fix "$arg"
+      done
+    fi
   )
 }
 
@@ -65,25 +78,27 @@ function format_all() {
 }
 
 if [[ $# -gt 0 && "$1" == "-all" ]]; then
-  echo "Checking all files in the repo...this may take a while."
-  format_all
+    echo "Checking all files in the repo...this may take a while."
+    format_all
 else
-  if [[ $# -gt 0 && "$1" == "-main" ]]; then
-    shift
-    echo "Checking all files that have changed since the main branch."
-    args=$(git diff main | grep ^diff | awk '{print $3}' | cut -c 3-)
-  elif [[ $# == 0 ]]; then
-    args=$(git status|grep -E '(modified:|added:)'|awk '{print $2}')
-    args+=$(git status|grep -E 'new file:'|awk '{print $3}')
-  else
-    args="$*"
-  fi
+    if [[ $# -gt 0 && "$1" == "-main" ]]; then
+        shift
+        echo "Checking all files that have changed since the main branch."
+        args=$(git diff main | grep ^diff | awk '{print $3}' | cut -c 3-)
+    elif [[ $# == 0 ]]; then
+        args=$(git status|grep -E '(modified:|added:)'|awk '{print $2}')
+        args+=$(git status|grep -E 'new file:'|awk '{print $3}')
+    else
+        args="$*"
+    fi
 
-  if [[ "$args" == "" ]]; then
-    echo No files selected. Bailing out.
-    exit 0
-  fi
-  for arg in $args; do
-    format_one "$arg"
-  done
+    if [[ -z "$args" ]]; then
+        echo No files selected. Bailing out.
+        exit 0
+    fi
+
+    _changes="$(echo "$args" | tr '\n' ' ')"
+    IFS=' ' read -ra changes <<< "$_changes"
+
+    format_some "${changes[@]}"
 fi
