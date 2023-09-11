@@ -43,6 +43,10 @@ if [[ $# -gt 0 && "$1" == "-skip-bazel" ]]; then
     shift
     use_bazel=0
 
+    CLANG_FORMAT_BIN="$(command -v clang-format)" || {
+        echo "Local clang-format not found, exiting" >&2
+        exit 1
+    }
     BUILDIFIER_BIN="$(command -v buildifier)" || {
         echo "Local buildifier not found, exiting" >&2
         exit 1
@@ -72,7 +76,10 @@ format_some () {
         ./tools/spelling/check_spelling_pedantic.py fix "$@"
     else
       for arg in "$@"; do
-          ./tools/code_format/check_format.py --buildozer_path "$BUILDOZER_BIN" --buildifier_path "$BUILDIFIER_BIN" fix "$arg"
+          ./tools/code_format/check_format.py \
+              --clang_format_path "$CLANG_FORMAT_BIN" \
+              --buildozer_path "$BUILDOZER_BIN" \
+              --buildifier_path "$BUILDIFIER_BIN" fix "$arg"
           ./tools/spelling/check_spelling_pedantic.py fix "$arg"
       done
     fi

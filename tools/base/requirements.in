@@ -2,6 +2,8 @@ abstracts>=0.0.12
 aio.api.bazel
 aiohttp>=3.8.1
 cffi>=1.15.0
+clang-format==14.0.6
+clang-tidy==14.0.6
 colorama
 coloredlogs
 cryptography>=41.0.1
