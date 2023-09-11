@@ -138,7 +138,7 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
    send the ``CONNECT`` upstream.
 
 ``CONNECT-UDP`` support
-^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
 .. note::
    ``CONNECT-UDP`` is in an alpha status and may not be stable enough for use in production.
    We recommend to use this feature with caution.
