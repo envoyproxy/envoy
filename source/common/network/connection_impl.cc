@@ -146,7 +146,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
                        data_to_write, enumToInt(type));
 
   // RST will be sent only if enable_rst_detect_send_ is true, otherwise it is converted to normal
-  // ConnectionCloseType::Abort
+  // ConnectionCloseType::Abort.
   if (!enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) {
     type = ConnectionCloseType::Abort;
   }
@@ -154,7 +154,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   // The connection is closed by Envoy by sending RST, and the connection is closed immediately.
   if (type == ConnectionCloseType::AbortReset) {
     ENVOY_CONN_LOG(
-        debug, "connection closing type=AbortReset, setting LocalReset to the detected close type.",
+        trace, "connection closing type=AbortReset, setting LocalReset to the detected close type.",
         *this);
     setDetectedCloseType(DetectedCloseType::LocalReset);
     closeSocket(ConnectionEvent::LocalClose);
