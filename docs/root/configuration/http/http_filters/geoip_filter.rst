@@ -14,12 +14,17 @@ Configuration
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip>`
 
+.. _config_geoip_providers_maxmind:
+
 Geolocation Providers
 ---------------------
 Currently only `Maxmind <https://www.maxmind.com/en/geoip2-services-and-databases>` geolocation provider is supported.
 This provider should be configured with the type URL ``type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig``.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
+
+.. _config_geoip_providers_common:
+
 * :ref:`Common provider configuration <envoy_v3_api_msg_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig>`
 
 Configuration example

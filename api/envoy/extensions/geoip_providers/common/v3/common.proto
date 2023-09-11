@@ -12,6 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/geo
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common Geolocation Provider Configuration]
+// Common geolocation provider :ref:`configuration overview <config_geoip_providers_common>`.
 // Common configuration shared across geolocation providers.
 
 message CommonGeoipProviderConfig {
