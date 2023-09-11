@@ -557,7 +557,7 @@ public:
   MOCK_METHOD(Rds::ConfigConstSharedPtr, config, (), (const));
   MOCK_METHOD(const absl::optional<ConfigInfo>&, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
-  MOCK_METHOD(void, onConfigUpdate, ());
+  MOCK_METHOD(absl::Status, onConfigUpdate, ());
   MOCK_METHOD(ConfigConstSharedPtr, configCast, (), (const));
   MOCK_METHOD(void, requestVirtualHostsUpdate,
               (const std::string&, Event::Dispatcher&,

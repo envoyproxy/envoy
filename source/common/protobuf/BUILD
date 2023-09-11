@@ -121,6 +121,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto_descriptor",

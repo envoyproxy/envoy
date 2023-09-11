@@ -43,12 +43,15 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_connect_udp_support);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
 RUNTIME_GUARD(envoy_reloadable_features_enable_update_listener_socket_options);
+RUNTIME_GUARD(envoy_reloadable_features_enable_zone_routing_different_zone_counts);
 RUNTIME_GUARD(envoy_reloadable_features_expand_agnostic_stream_lifetime);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_send_original_xff);
 RUNTIME_GUARD(envoy_reloadable_features_format_ports_as_numbers);
 RUNTIME_GUARD(envoy_reloadable_features_handle_uppercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_hmac_base64_encoding_only);
 RUNTIME_GUARD(envoy_reloadable_features_http1_allow_codec_error_response_after_1xx_headers);
+RUNTIME_GUARD(envoy_reloadable_features_http1_connection_close_header_in_redirect);
+RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_decode_metadata_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http2_validate_authority_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http_allow_partial_urls_in_referer);
@@ -60,6 +63,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ignore_optional_option_from_hcm_for_rout
 RUNTIME_GUARD(envoy_reloadable_features_immediate_response_use_filter_mutation_rule);
 RUNTIME_GUARD(envoy_reloadable_features_initialize_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_keep_endpoint_active_hc_status_on_locality_update);
+RUNTIME_GUARD(envoy_reloadable_features_locality_routing_use_new_routing_logic);
 RUNTIME_GUARD(envoy_reloadable_features_lowercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
@@ -82,6 +86,7 @@ RUNTIME_GUARD(envoy_reloadable_features_token_passed_entirely);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_allow_connect_with_2xx);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wait_for_response_headers_before_disabling_read);
+RUNTIME_GUARD(envoy_reloadable_features_use_cluster_cache_for_alt_protocols_filter);
 RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses);
@@ -101,8 +106,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 // TODO(birenroy) flip after a burn-in period
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
-// TODO(bencebeky): Flip true after sufficient canarying.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Flip this to true and/or remove completely once verified by Envoy Mobile.
@@ -117,6 +120,12 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // TODO(adisuissa): enable by default once this is tested in prod.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
+// TODO(#10646) change to true when UHV is sufficiently tested
+// For more information about Universal Header Validation, please see
+// https://github.com/envoyproxy/envoy/issues/10646
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
+// TODO(wbpcode): enable by default after a complete deprecation period.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
