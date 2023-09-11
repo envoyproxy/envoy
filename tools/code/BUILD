@@ -21,6 +21,8 @@ jq(
 envoy_entry_point(
     name = "check",
     args = [
+        "--codeowners=$(location //:CODEOWNERS)",
+        "--owners=$(location //:OWNERS.md)",
         "--extensions_build_config=$(location :extensions_build_config)",
         "--path=%s" % PATH,
         "-b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck)",
@@ -28,6 +30,8 @@ envoy_entry_point(
     ],
     data = [
         ":extensions_build_config",
+        "//:CODEOWNERS",
+        "//:OWNERS.md",
         "@com_github_aignas_rules_shellcheck//:shellcheck",
         "@go_sdk//:bin/gofmt",
     ],
@@ -42,6 +46,8 @@ genrule(
         --fix \
         -v warn \
         -x mobile/dist/envoy-pom.xml \
+        --codeowners=$(location //:CODEOWNERS) \
+        --owners=$(location //:OWNERS.md) \
         --extensions_build_config=$(location :extensions_build_config) \
         --path=%s \
         -b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck) \
@@ -52,6 +58,8 @@ genrule(
     tools = [
         ":check",
         ":extensions_build_config",
+        "//:CODEOWNERS",
+        "//:OWNERS.md",
         "//bazel:volatile-scm-hash",
         "@com_github_aignas_rules_shellcheck//:shellcheck",
         "@go_sdk//:bin/gofmt",
