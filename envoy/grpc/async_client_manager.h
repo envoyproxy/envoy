@@ -34,7 +34,7 @@ using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
 class GrpcServiceConfigWithHashKey {
 public:
-  GrpcServiceConfigWithHashKey(){};
+  GrpcServiceConfigWithHashKey() = default;
 
   explicit GrpcServiceConfigWithHashKey(const envoy::config::core::v3::GrpcService& config)
       : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)){};
@@ -55,7 +55,7 @@ public:
 
   const envoy::config::core::v3::GrpcService& config() const { return config_; }
 
-  void mergeConfig(const envoy::config::core::v3::GrpcService g) {
+  void setConfig(const envoy::config::core::v3::GrpcService g) {
     config_ = g;
     pre_computed_hash_ = Envoy::MessageUtil::hash(g);
   }

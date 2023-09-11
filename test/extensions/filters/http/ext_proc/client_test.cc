@@ -30,7 +30,7 @@ public:
 protected:
   void SetUp() override {
     grpc_service_.mutable_envoy_grpc()->set_cluster_name("test");
-    config_with_hash_key_.mergeConfig(grpc_service_);
+    config_with_hash_key_.setConfig(grpc_service_);
 
     EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));

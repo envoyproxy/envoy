@@ -874,7 +874,7 @@ void Filter::mergePerRouteConfig() {
   if (merged_config->grpcService()) {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *merged_config->grpcService();
-    config_with_hash_key_.mergeConfig(*merged_config->grpcService());
+    config_with_hash_key_.setConfig(*merged_config->grpcService());
   }
 }
 

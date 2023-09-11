@@ -2466,7 +2466,7 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
             cb(route_config);
           }));
   final_expected_grpc_service_.emplace(route_proto.overrides().grpc_service());
-  config_with_hash_key_.mergeConfig(route_proto.overrides().grpc_service());
+  config_with_hash_key_.setConfig(route_proto.overrides().grpc_service());
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
