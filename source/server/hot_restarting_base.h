@@ -63,6 +63,12 @@ private:
   void getPassedFdIfPresent(envoy::HotRestartMessage* out, msghdr* message);
   std::unique_ptr<envoy::HotRestartMessage> parseProtoAndResetState();
   void initRecvBufIfNewMessage();
+  // An int in [0, MaxConcurrentProcesses). As hot restarts happen, each next process gets the
+  // next of 0,1,2,0,1,...
+  // A HotRestartingBase's domain socket's name contains its base_id_ value, and so we can use
+  // this value to determine which domain socket name to treat as our parent, and which to treat
+  // as our child. (E.g. if we are 2, 1 is parent and 0 is child).
+  const uint64_t base_id_;
   // State for the receiving half of the protocol.
   //
   // When filled, the size in bytes that the in-flight HotRestartMessage should be.
@@ -77,12 +83,6 @@ private:
   // expected_proto_length_. The protobuf partial data starts at byte 8.
   // Should be resized to 0 in between messages, to indicate readiness for a new message.
   std::vector<uint8_t> recv_buf_;
-  // An int in [0, MaxConcurrentProcesses). As hot restarts happen, each next process gets the
-  // next of 0,1,2,0,1,...
-  // A HotRestartingBase's domain socket's name contains its base_id_ value, and so we can use
-  // this value to determine which domain socket name to treat as our parent, and which to treat
-  // as our child. (E.g. if we are 2, 1 is parent and 0 is child).
-  const uint64_t base_id_;
 };
 
 /**
