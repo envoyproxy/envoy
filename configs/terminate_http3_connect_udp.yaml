@@ -13,8 +13,23 @@ static_resources:
         protocol: UDP
         address: 127.0.0.1
         port_value: 10001
+    udp_listener_config:
+      quic_options: {}
+      downstream_socket_config:
+        prefer_gro: true
     filter_chains:
-    - filters:
+    - transport_socket:
+        name: envoy.transport_sockets.quic
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+          downstream_tls_context:
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: certs/servercert.pem
+                private_key:
+                  filename: certs/serverkey.pem
+      filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
