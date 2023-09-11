@@ -139,6 +139,9 @@ private:
     uint64_t sessionId() const override { return parent_.sessionId(); };
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
     void continueFilterChain() override { parent_.onContinueFilterChain(this); }
+    void injectDatagramToFilterChain(Network::UdpRecvData& data) override {
+      parent_.onInjectReadDatagramToFilterChain(this, data);
+    }
 
     ActiveSession& parent_;
     ReadFilterSharedPtr read_filter_;
@@ -154,6 +157,9 @@ private:
     // SessionFilters::WriteFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); };
+    void injectDatagramToFilterChain(Network::UdpRecvData& data) override {
+      parent_.onInjectWriteDatagramToFilterChain(this, data);
+    }
 
     ActiveSession& parent_;
     WriteFilterSharedPtr write_filter_;
@@ -179,6 +185,7 @@ private:
     void onNewSession();
     void onData(Network::UdpRecvData& data);
     void writeUpstream(Network::UdpRecvData& data);
+    void writeDownstream(Network::UdpRecvData& data);
 
     void createFilterChain() {
       cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
@@ -187,6 +194,8 @@ private:
     uint64_t sessionId() const { return session_id_; };
     StreamInfo::StreamInfo& streamInfo() { return udp_session_info_; };
     void onContinueFilterChain(ActiveReadFilter* filter);
+    void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
+    void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {

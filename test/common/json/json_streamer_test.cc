@@ -96,6 +96,14 @@ TEST_F(JsonStreamerTest, SubArray) {
   EXPECT_EQ(R"EOF({"a":[1,"two",3.5,null],"embedded\"quote":"value"})EOF", buffer_.toString());
 }
 
+TEST_F(JsonStreamerTest, TopArray) {
+  {
+    Streamer::ArrayPtr array = streamer_.makeRootArray();
+    array->addEntries({1.0, "two", 3.5, std::nan("")});
+  }
+  EXPECT_EQ(R"EOF([1,"two",3.5,null])EOF", buffer_.toString());
+}
+
 TEST_F(JsonStreamerTest, SubMap) {
   Streamer::MapPtr map = streamer_.makeRootMap();
   map->addKey("a");

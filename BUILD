@@ -6,6 +6,8 @@ exports_files([
     ".clang-format",
     "pytest.ini",
     ".coveragerc",
+    "CODEOWNERS",
+    "OWNERS.md",
 ])
 
 alias(

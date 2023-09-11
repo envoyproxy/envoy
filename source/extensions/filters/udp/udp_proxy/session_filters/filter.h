@@ -26,6 +26,14 @@ public:
    * @return StreamInfo for logging purposes.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * Allows a filter to inject a datagram to successive filters in the session filter chain.
+   * The injected datagram will be iterated as a regular received datagram, and may also be
+   * stopped by further filters. This can be used, for example, to continue processing previously
+   * buffered datagrams by a filter after an asynchronous operation ended.
+   */
+  virtual void injectDatagramToFilterChain(Network::UdpRecvData& data) PURE;
 };
 
 class ReadFilterCallbacks : public FilterCallbacks {
