@@ -296,9 +296,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
         envoy::config::core::v3::SocketOption::STATE_LISTENING);
     if (!ok) {
-      ENVOY_CONN_LOG(warn, "rst setting so_linger=0 socket options failed", *this);
-    } else {
-      ENVOY_CONN_LOG(debug, "rst setting so_linger=0 socket options succeeded", *this);
+      ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 socket options failed", *this);
     }
   }
 
