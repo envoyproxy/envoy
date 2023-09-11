@@ -21,16 +21,12 @@ public:
     ASSERT(!tlv_type_str.empty());
     int tlv_type;
     if (!absl::SimpleAtoi(tlv_type_str, &tlv_type)) {
-    throw EnvoyException(fmt::format(
-        "Invalid parameter provided for FIELD value: {}. The proxy protocol TLV type must be parsable as int.",
-        tlv_type_str));
+      return absl::monostate();
     }
 
     // Check if a valid TLV type was passed in.
     if (tlv_type >= 256 || tlv_type <= 0) {
-      throw EnvoyException(fmt::format("Invalid parameter provided for FIELD value: "
-                                      "{}. The proxy protocol TLV type must be a positive integer less than 256.",
-                                      tlv_type_str));
+      return absl::monostate();
     }
 
     // Parse the TLVs with the given type from the filter state object.
@@ -58,7 +54,8 @@ public:
   std::unique_ptr<StreamInfo::FilterState::Object>
   createFromBytes(absl::string_view) const override {
     // Note: we do not parse the proxy protocol data from the given string because this
-    // isn't relevant to the functionality of this factory. 
+    // isn't relevant to the functionality of this factory.
+    PANIC("not implemented");
     return nullptr;
   }
 
