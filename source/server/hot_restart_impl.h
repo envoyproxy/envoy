@@ -123,6 +123,7 @@ public:
   static std::string hotRestartVersion();
 
 private:
+  friend class HotRestartUdpForwardingTestHelper;
   uint32_t base_id_;
   uint32_t scaled_base_id_;
   HotRestartingChild as_child_;
@@ -132,7 +133,6 @@ private:
   SharedMemory* shmem_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
-  friend class HotRestartUdpForwardingTestHelper;
 };
 
 } // namespace Server
