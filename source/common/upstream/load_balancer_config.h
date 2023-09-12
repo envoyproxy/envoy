@@ -24,9 +24,7 @@ namespace Upstream {
  */
 class LegacyTypedRoundRobinLbConfig : public LoadBalancerConfig {
 public:
-  LegacyTypedRoundRobinLbConfig(
-      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>& lb_config);
-  LegacyTypedRoundRobinLbConfig() = default;
+  LegacyTypedRoundRobinLbConfig(const envoy::config::cluster::v3::Cluster& config);
 
   absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_config_;
 };
@@ -47,9 +45,7 @@ public:
  */
 class LegacyTypedLeastRequestLbConfig : public LoadBalancerConfig {
 public:
-  LegacyTypedLeastRequestLbConfig(
-      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>& lb_config);
-  LegacyTypedLeastRequestLbConfig() = default;
+  LegacyTypedLeastRequestLbConfig(const envoy::config::cluster::v3::Cluster& config);
 
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> lb_config_;
 };
@@ -86,8 +82,7 @@ public:
  */
 class LegacyTypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
 public:
-  LegacyTypedMaglevLbConfig(const envoy::config::cluster::v3::Cluster::MaglevLbConfig& config);
-  LegacyTypedMaglevLbConfig() = default;
+  LegacyTypedMaglevLbConfig(const envoy::config::cluster::v3::Cluster& config);
 
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_config_;
 };
@@ -107,8 +102,7 @@ public:
  */
 class LegacyTypedRingHashLbConfig : public Upstream::LoadBalancerConfig {
 public:
-  LegacyTypedRingHashLbConfig(const envoy::config::cluster::v3::Cluster::RingHashLbConfig& config);
-  LegacyTypedRingHashLbConfig() = default;
+  LegacyTypedRingHashLbConfig(const envoy::config::cluster::v3::Cluster& config);
 
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_config_;
 };

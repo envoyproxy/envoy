@@ -76,18 +76,6 @@ using UpstreamNetworkFilterConfigProviderManager =
                                         Server::Configuration::UpstreamFactoryContext>;
 
 /**
- * Convert legacy LB configuration to new LB configuration.
- */
-class LBPolicyConfigConverter {
-public:
-  /**
-   * Convert legacy configuration to new LB configuration.
-   */
-  static std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
-  getTypedLbConfigFromLegacy(const envoy::config::cluster::v3::Cluster& config);
-};
-
-/**
  * Class for LBPolicies
  * Uses a absl::variant to store pointers for the LBPolicy
  */

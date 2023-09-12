@@ -6,16 +6,22 @@ namespace Envoy {
 namespace Upstream {
 
 LegacyTypedRoundRobinLbConfig::LegacyTypedRoundRobinLbConfig(
-    const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>& lb_config)
-    : lb_config_(lb_config) {}
+    const envoy::config::cluster::v3::Cluster& config) {
+  if (config.has_round_robin_lb_config()) {
+    lb_config_ = config.round_robin_lb_config();
+  }
+}
 
 TypedRoundRobinLbConfig::TypedRoundRobinLbConfig(
     const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin& lb_config)
     : lb_config_(lb_config) {}
 
 LegacyTypedLeastRequestLbConfig::LegacyTypedLeastRequestLbConfig(
-    const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>& lb_config)
-    : lb_config_(lb_config) {}
+    const envoy::config::cluster::v3::Cluster& config) {
+  if (config.has_least_request_lb_config()) {
+    lb_config_ = config.least_request_lb_config();
+  }
+}
 
 TypedLeastRequestLbConfig::TypedLeastRequestLbConfig(
     const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest& lb_config)
@@ -26,16 +32,22 @@ TypedRandomLbConfig::TypedRandomLbConfig(
     : lb_config_(lb_config) {}
 
 LegacyTypedMaglevLbConfig::LegacyTypedMaglevLbConfig(
-    const envoy::config::cluster::v3::Cluster::MaglevLbConfig& config)
-    : lb_config_(config) {}
+    const envoy::config::cluster::v3::Cluster& config) {
+  if (config.has_maglev_lb_config()) {
+    lb_config_ = config.maglev_lb_config();
+  }
+}
 
 TypedMaglevLbConfig::TypedMaglevLbConfig(
     const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config)
     : lb_config_(config) {}
 
 LegacyTypedRingHashLbConfig::LegacyTypedRingHashLbConfig(
-    const envoy::config::cluster::v3::Cluster::RingHashLbConfig& config)
-    : lb_config_(config) {}
+    const envoy::config::cluster::v3::Cluster& config) {
+  if (config.has_ring_hash_lb_config()) {
+    lb_config_ = config.ring_hash_lb_config();
+  }
+}
 
 TypedRingHashLbConfig::TypedRingHashLbConfig(
     const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& config)
