@@ -11,7 +11,8 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: UDP HTTP Capsule filter]
-
+// UDP to HTTP capsules :ref:`overview <config_udp_session_filters_http_capsule>`.
 // [#extension: envoy.filters.udp.session.http_capsule]
+
 message FilterConfig {
 }
