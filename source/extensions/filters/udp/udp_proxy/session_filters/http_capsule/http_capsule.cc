@@ -39,6 +39,7 @@ WriteFilterStatus HttpCapsuleFilter::onWrite(Network::UdpRecvData& data) {
 
   // We always stop here as OnCapsule() callback will be responsible to inject
   // datagrams to the filter chain once they are ready.
+  data.buffer_->drain(data.buffer_->length());
   return WriteFilterStatus::StopIteration;
 }
 

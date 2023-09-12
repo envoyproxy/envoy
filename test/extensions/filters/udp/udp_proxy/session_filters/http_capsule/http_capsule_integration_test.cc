@@ -66,15 +66,16 @@ TEST_P(HttpCapsuleIntegrationTest, BasicFlow) {
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   const std::string request = "hello";
-  const std::string expected_request = absl::HexStringToBytes("00" // DATAGRAM Capsule Type
-                                                              "06" // Capsule Length = length(hello)
-                                                              "00" // Context ID
-                                                              ) +
-                                        request;
+  const std::string expected_request =
+      absl::HexStringToBytes("00" // DATAGRAM Capsule Type
+                             "06" // Capsule Length = length(hello) + 1
+                             "00" // Context ID
+                             ) +
+      request;
 
   const std::string expected_response = "world";
   const std::string response = absl::HexStringToBytes("00" // DATAGRAM Capsule Type
-                                                      "06" // Capsule Length = length(world)
+                                                      "06" // Capsule Length = length(world) + 1
                                                       "00" // Context ID
                                                       ) +
                                expected_response;
