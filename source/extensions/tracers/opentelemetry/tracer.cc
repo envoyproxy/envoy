@@ -1,5 +1,7 @@
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
+#include "source/extensions/tracers/opentelemetry/span.h"
+
 #include <cstdint>
 #include <string>
 
