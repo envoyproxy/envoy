@@ -57,8 +57,8 @@ envoy.access_loggers.wasm:
 envoy.bootstrap.internal_listener:
   categories:
   - envoy.bootstrap
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
   type_urls:
   - envoy.extensions.bootstrap.internal_listener.v3.InternalListener
 envoy.bootstrap.wasm:
@@ -872,8 +872,8 @@ envoy.internal_redirect_predicates.safe_cross_scheme:
 envoy.io_socket.user_space:
   categories:
   - envoy.io_socket
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
   undocumented: true
 envoy.matching.common_inputs.environment_variable:
   categories:
@@ -1159,8 +1159,8 @@ envoy.transport_sockets.alts:
 envoy.transport_sockets.internal_upstream:
   categories:
   - envoy.transport_sockets.upstream
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
   type_urls:
   - envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
 envoy.transport_sockets.raw_buffer:
