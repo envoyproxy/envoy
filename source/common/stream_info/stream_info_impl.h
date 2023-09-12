@@ -18,6 +18,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
 
@@ -349,6 +350,10 @@ struct StreamInfoImpl : public StreamInfo {
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
     bytes_retransmitted_ = info.bytesRetransmitted();
     packets_retransmitted_ = info.packetsRetransmitted();
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http1_connection_close_header_in_redirect")) {
+      should_drain_connection_ = info.shouldDrainConnectionUponCompletion();
+    }
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a
@@ -395,6 +400,12 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::string_view downstreamTransportFailureReason() const override {
     return downstream_transport_failure_reason_;
+  }
+
+  bool shouldDrainConnectionUponCompletion() const override { return should_drain_connection_; }
+
+  void setShouldDrainConnectionUponCompletion(bool should_drain) override {
+    should_drain_connection_ = should_drain;
   }
 
   TimeSource& time_source_;
@@ -455,6 +466,7 @@ private:
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
+  bool should_drain_connection_{false};
 };
 
 } // namespace StreamInfo

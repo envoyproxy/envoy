@@ -43,43 +43,44 @@ jobs:
     matrix:
       # These are ordered by most time-consuming first.
       coverage:
-        CI_TARGET: "bazel.coverage"
+        CI_TARGET: "coverage"
       fuzz_coverage:
-        CI_TARGET: "bazel.fuzz_coverage"
+        CI_TARGET: "fuzz_coverage"
       compile_time_options:
-        CI_TARGET: "bazel.compile_time_options"
+        CI_TARGET: "compile_time_options"
         ENVOY_FILTER_EXAMPLE: true
       tsan:
-        CI_TARGET: "bazel.tsan"
+        CI_TARGET: "tsan"
       asan:
-        CI_TARGET: "bazel.asan"
+        CI_TARGET: "asan"
         ENVOY_FILTER_EXAMPLE: true
       # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
       # api_compat:
-      #  CI_TARGET: "bazel.api_compat"
+      #  CI_TARGET: "api_compat"
       gcc:
-        CI_TARGET: "bazel.gcc"
+        CI_TARGET: "gcc"
       msan:
-        CI_TARGET: "bazel.msan"
+        CI_TARGET: "msan"
         ENVOY_FILTER_EXAMPLE: true
       #
       # Temporarily disabled to facilitate release CI, should be resolved
       #    as part of https://github.com/envoyproxy/envoy/issues/28566
       #
       # clang_tidy:
-      #   CI_TARGET: "bazel.clang_tidy"
+      #   CI_TARGET: "clang_tidy"
       #   REPO_FETCH_DEPTH: 0
       #   REPO_FETCH_TAGS: true
       #   PUBLISH_TEST_RESULTS: false
       #   PUBLISH_ENVOY: false
       api:
-        CI_TARGET: "bazel.api"
+        CI_TARGET: "api"
   timeoutInMinutes: 180
   pool: envoy-x64-small
   steps:
   - template: ../bazel.yml
     parameters:
       ciTarget: $(CI_TARGET)
+      cacheName: $(CI_TARGET)
       envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
       cacheTestResults: ${{ parameters.cacheTestResults }}
       managedAgent: false
@@ -95,10 +96,10 @@ jobs:
           pathtoPublish: "$(Build.StagingDirectory)/tmp/lint-fixes"
           artifactName: "$(CI_TARGET).fixes"
         timeoutInMinutes: 10
-        condition: and(failed(), eq(variables['CI_TARGET'], 'bazel.clang_tidy'))
+        condition: and(failed(), eq(variables['CI_TARGET'], 'clang_tidy'))
       - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)-upload'
         displayName: "Upload $(CI_TARGET) Report to GCS"
-        condition: and(not(canceled()), or(eq(variables['CI_TARGET'], 'bazel.coverage'), eq(variables['CI_TARGET'], 'bazel.fuzz_coverage')))
+        condition: and(not(canceled()), or(eq(variables['CI_TARGET'], 'coverage'), eq(variables['CI_TARGET'], 'fuzz_coverage')))
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"

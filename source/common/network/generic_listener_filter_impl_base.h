@@ -22,7 +22,7 @@ public:
 
 protected:
   /**
-   * Check if this filter filter should be disabled on the incoming socket.
+   * Check if this listener filter should be disabled on the incoming socket.
    * @param cb the callbacks the filter instance can use to communicate with the filter chain.
    **/
   bool isDisabled(ListenerFilterCallbacks& cb) {
