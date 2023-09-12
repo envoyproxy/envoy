@@ -1,5 +1,5 @@
-#include <memory>
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include "envoy/common/scope_tracker.h"
