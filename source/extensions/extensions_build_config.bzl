@@ -217,7 +217,7 @@ EXTENSIONS = {
     # UDP Session filters
     #
 
-    "envoy.filters.udp_session.http_capsule":           "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
+    "envoy.filters.udp.session.http_capsule":           "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
 
     #
     # Resource monitors

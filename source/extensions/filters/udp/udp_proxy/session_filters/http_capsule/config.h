@@ -12,8 +12,8 @@ namespace UdpProxy {
 namespace SessionFilters {
 namespace HttpCapsule {
 
-using FilterConfig = envoy::extensions::filters::udp::udp_proxy::session::
-    http_capsule::v3::FilterConfig;
+using FilterConfig =
+    envoy::extensions::filters::udp::udp_proxy::session::http_capsule::v3::FilterConfig;
 
 /**
  * Config registration for the http_capsule filter. @see
@@ -21,7 +21,7 @@ using FilterConfig = envoy::extensions::filters::udp::udp_proxy::session::
  */
 class HttpCapsuleFilterConfigFactory : public FactoryBase<FilterConfig> {
 public:
-  HttpCapsuleFilterConfigFactory() : FactoryBase("envoy.filters.udp.session.http_capsule") {};
+  HttpCapsuleFilterConfigFactory() : FactoryBase("envoy.filters.udp.session.http_capsule"){};
 
 private:
   FilterFactoryCb

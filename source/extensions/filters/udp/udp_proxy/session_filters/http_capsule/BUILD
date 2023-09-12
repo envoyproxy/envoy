@@ -17,10 +17,10 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
-        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/session_filters/http_capsule/v3:pkg_cc_proto",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quiche_common_connect_udp_datagram_payload_lib",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/session_filters/http_capsule/v3:pkg_cc_proto",
     ],
 )
 

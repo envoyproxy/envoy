@@ -1,13 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
 licenses(["notice"])  # Apache 2
 
 envoy_package()
@@ -15,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "http_capsule_filter_test",
     srcs = ["http_capsule_filter_test.cc"],
-    extension_names = ["envoy.filters.udp_session.http_capsule"],
+    extension_names = ["envoy.filters.udp.session.http_capsule"],
     deps = [
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//test/extensions/filters/udp/udp_proxy:mocks",
@@ -27,7 +26,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "http_capsule_integration_test",
     srcs = ["http_capsule_integration_test.cc"],
-    extension_names = ["envoy.filters.udp_session.http_capsule"],
+    extension_names = ["envoy.filters.udp.session.http_capsule"],
     deps = [
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",

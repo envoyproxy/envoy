@@ -31,9 +31,7 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
-TEST_F(HttpCapsuleFilterTest, DefaultConfig) {
-  setup();
-}
+TEST_F(HttpCapsuleFilterTest, DefaultConfig) { setup(); }
 
 } // namespace
 } // namespace HttpCapsule

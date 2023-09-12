@@ -12,8 +12,7 @@ namespace UdpProxy {
 namespace SessionFilters {
 namespace HttpCapsule {
 
-FilterFactoryCb
-HttpCapsuleFilterConfigFactory::createFilterFactoryFromProtoTyped(
+FilterFactoryCb HttpCapsuleFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const FilterConfig&, Server::Configuration::FactoryContext& context) {
   return [&context](FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addFilter(std::make_shared<HttpCapsuleFilter>(context.timeSource()));

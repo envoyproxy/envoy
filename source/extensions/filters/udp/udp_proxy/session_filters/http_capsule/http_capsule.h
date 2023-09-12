@@ -15,8 +15,9 @@ namespace UdpProxy {
 namespace SessionFilters {
 namespace HttpCapsule {
 
-class HttpCapsuleFilter : public Filter, Logger::Loggable<Logger::Id::http>,
-                          public quiche::CapsuleParser::Visitor {
+class HttpCapsuleFilter : public Filter,
+                          public quiche::CapsuleParser::Visitor,
+                          Logger::Loggable<Logger::Id::http> {
 public:
   HttpCapsuleFilter(TimeSource& time_source) : time_source_(time_source) {}
 
