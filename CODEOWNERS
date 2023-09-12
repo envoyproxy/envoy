@@ -363,7 +363,6 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @realtimetodie @realtimetodie
-# TODO(phlax): move this extension (https://github.com/envoyproxy/envoy/issues/29550)
-/contrib/network/connection_balance/dlb @mattklein123 @daixiang0
+/contrib/dlb @mattklein123 @daixiang0
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch
