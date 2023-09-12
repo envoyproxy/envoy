@@ -151,7 +151,7 @@ class FormatChecker:
             self.config.paths["excluded"] + tuple(self.args.add_excluded_prefixes)
             if self.args.add_excluded_prefixes else self.config.paths["excluded"])
 
-    @property
+    @cached_property
     def error_messages(self):
         return []
 
