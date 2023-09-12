@@ -259,22 +259,21 @@ typed_config:
     EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
 
-    EXPECT_EQ(request.size(), test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
-    EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
-    EXPECT_EQ(expected_request.size(),
-              test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_bytes", request.size());
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 1);
+    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_tx_bytes_total",
+                                   expected_request.size());
+    test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", 1);
 
-    EXPECT_EQ(response.size(),
-              test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value());
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
+    test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_rx_bytes_total", response.size());
+    test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 1);
     // The stat is incremented after the send so there is a race condition and we must wait for
     // the counter to be incremented.
     test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", expected_response.size());
     test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
 
-    EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_total")->value());
-    EXPECT_EQ(1, test_server_->gauge("udp.foo.downstream_sess_active")->value());
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_total", 1);
+    test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
   }
 
   UdpReverseFilterConfigFactory factory_;
@@ -684,8 +683,8 @@ TEST_P(UdpProxyIntegrationTest, BufferingFilterBasicFlow) {
   EXPECT_EQ("hello2", request_datagram.buffer_->toString());
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("hello3", request_datagram.buffer_->toString());
-  EXPECT_EQ(3, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
-  EXPECT_EQ(3, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 3);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", 3);
 
   // Two upstream datagrams should be received, but none sent downstream due to filter buffering.
   fake_upstreams_[0]->sendUdpDatagram("response1", request_datagram.addresses_.peer_);
@@ -704,8 +703,8 @@ TEST_P(UdpProxyIntegrationTest, BufferingFilterBasicFlow) {
   EXPECT_EQ("response2", response_datagram.buffer_->toString());
   client.recv(response_datagram);
   EXPECT_EQ("response3", response_datagram.buffer_->toString());
-  EXPECT_EQ(3, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
-  EXPECT_EQ(3, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 3);
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 3);
 }
 
 TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
@@ -731,8 +730,8 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   Network::UdpRecvData request_datagram;
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("hello1", request_datagram.buffer_->toString());
-  EXPECT_EQ(3, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 3);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", 1);
 
   // 'hello2' will flush upstream, 'hello3' will proceed to second filter. 'hello4' will
   // buffer in the first filter.
@@ -741,8 +740,8 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   // Wait for the upstream datagram.
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("hello2", request_datagram.buffer_->toString());
-  EXPECT_EQ(4, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
-  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_rx_datagrams", 4);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tx_datagrams", 2);
 
   // Testing the upstream to downstream direction.
   // Two upstream datagrams should be received, but none sent downstream due to filter buffering.
@@ -760,16 +759,16 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   Network::UdpRecvData response_datagram;
   client.recv(response_datagram);
   EXPECT_EQ("response1", response_datagram.buffer_->toString());
-  EXPECT_EQ(3, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
-  EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_tx_datagrams")->value());
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 3);
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
 
   // 'response2' will flush downstream, 'response3' will proceed to second filter. 'response4' will
   // buffer in the first filter.
   fake_upstreams_[0]->sendUdpDatagram("response4", request_datagram.addresses_.peer_);
   client.recv(response_datagram);
   EXPECT_EQ("response2", response_datagram.buffer_->toString());
-  EXPECT_EQ(4, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
-  EXPECT_EQ(2, test_server_->counter("udp.foo.downstream_sess_tx_datagrams")->value());
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 4);
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 2);
 }
 
 } // namespace

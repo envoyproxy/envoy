@@ -151,7 +151,7 @@ class FormatChecker:
             self.config.paths["excluded"] + tuple(self.args.add_excluded_prefixes)
             if self.args.add_excluded_prefixes else self.config.paths["excluded"])
 
-    @property
+    @cached_property
     def error_messages(self):
         return []
 
@@ -480,6 +480,9 @@ class FormatChecker:
         if self.has_invalid_angle_bracket_directory(line):
             line = line.replace("<", '"').replace(">", '"')
 
+        if "[[fallthrough]];" in line:
+            line = line.replace("[[fallthrough]];", "FALLTHRU;")
+
         # Fix incorrect protobuf namespace references.
         for invalid_construct, valid_construct in self.config.replacements[
                 "protobuf_type_errors"].items():
@@ -709,6 +712,8 @@ class FormatChecker:
             report_error("Don't use 'using testing::Test;, elaborate the type instead")
         if line.startswith("using testing::TestWithParams;"):
             report_error("Don't use 'using testing::Test;, elaborate the type instead")
+        if "[[fallthrough]];" in line:
+            report_error("Use 'FALLTHRU;' instead like the other parts of the code")
         if self.config.re["test_name_starting_lc"].search(line):
             # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
             # with a lowercase letter.
