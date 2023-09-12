@@ -358,6 +358,10 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view 
   connections_[0]->close(type, details);
 }
 
+DetectedCloseType MultiConnectionBaseImpl::detectedCloseType() const {
+  return connections_[0]->detectedCloseType();
+};
+
 Event::Dispatcher& MultiConnectionBaseImpl::dispatcher() const {
   ASSERT(&dispatcher_ == &connections_[0]->dispatcher());
   return connections_[0]->dispatcher();

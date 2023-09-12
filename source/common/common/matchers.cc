@@ -31,9 +31,10 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::v3::
     return std::make_shared<const PresentMatcher>(v.present_match());
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kListMatch:
     return std::make_shared<const ListMatcher>(v.list_match());
-  default:
-    throw EnvoyException("Uncaught default");
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
+    break; // Fall through to PANIC.
   }
+  PANIC("unexpected");
 }
 
 bool NullMatcher::match(const ProtobufWkt::Value& value) const {
