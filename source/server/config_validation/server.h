@@ -84,7 +84,7 @@ public:
         Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
     return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
   }
-  void drainListeners() override {}
+  void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions>) override {}
   DrainManager& drainManager() override { PANIC("not implemented"); }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool) override {}

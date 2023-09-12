@@ -179,7 +179,7 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
                             Filesystem::fileSystemForTest());
 
   // Execute dummy methods.
-  server.drainListeners();
+  server.drainListeners(absl::nullopt);
   server.failHealthcheck(true);
   server.lifecycleNotifier();
   server.secretManager();
