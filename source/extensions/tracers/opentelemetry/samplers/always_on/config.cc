@@ -2,7 +2,7 @@
 
 #include "source/common/config/utility.h"
 
-#include "all_sampler.h"
+#include "always_on_sampler.h"
 
 namespace Envoy {
 namespace Extensions {

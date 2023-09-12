@@ -1,4 +1,4 @@
-#include "all_sampler.h"
+#include "always_on_sampler.h"
 
 #include <sstream>
 #include <string>

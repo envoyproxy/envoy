@@ -14,16 +14,16 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":all_sampler_lib",
+        ":always_on_sampler_lib",
         "//envoy/registry",
         "//source/common/config:utility_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "all_sampler_lib",
-    srcs = ["all_sampler.cc"],
-    hdrs = ["all_sampler.h"],
+    name = "always_on_sampler_lib",
+    srcs = ["always_on_sampler.cc"],
+    hdrs = ["always_on_sampler.h"],
     deps = [
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
