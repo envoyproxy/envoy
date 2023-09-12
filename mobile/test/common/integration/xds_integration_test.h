@@ -30,7 +30,7 @@ protected:
 
   // Initializes the xDS connection and creates a gRPC bi-directional stream for receiving
   // DiscoveryRequests and sending DiscoveryResponses.
-  void initializeXdsStream();
+  virtual void initializeXdsStream();
 
   // Returns the IP version that the test is running with (IPv4 or IPv6).
   Network::Address::IpVersion ipVersion() const override;
