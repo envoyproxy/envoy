@@ -1,22 +1,20 @@
 #pragma once
 
-#include "envoy/upstream/load_balancer.h"
-
 #include "envoy/config/cluster/v3/cluster.pb.h"
-
 #include "envoy/extensions/load_balancing_policies/common/v3/common.pb.h"
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.validate.h"
-#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
-#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.validate.h"
-#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
-#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
-#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
-#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.validate.h"
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.validate.h"
+#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
+#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.validate.h"
+#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
+#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.validate.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
+#include "envoy/upstream/load_balancer.h"
 
 namespace Envoy {
 namespace Upstream {

@@ -84,7 +84,6 @@ SubsetSelectorImpl::SubsetSelectorImpl(
   }
 }
 
-
 SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
     const SubsetLoadbalancingPolicyProto& subset_config,
     ProtobufMessage::ValidationVisitor& visitor)
