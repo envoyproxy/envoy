@@ -20,7 +20,7 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quiche_common_connect_udp_datagram_payload_lib",
-        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/session_filters/http_capsule/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3:pkg_cc_proto",
     ],
 )
 
@@ -31,6 +31,6 @@ envoy_cc_extension(
     deps = [
         ":http_capsule_filter_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/session_filters/http_capsule/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3:pkg_cc_proto",
     ],
 )
