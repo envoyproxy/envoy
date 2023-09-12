@@ -99,7 +99,9 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
     //    will think the gauge is NeverImport due to a code change. But for
     //    now we will leave the gauge in the child process as
     //    import_mode==Uninitialized, and accumulate the parent value in
-    //    gauge_ref.add().
+    //    gauge_ref.add(). Gauges in this mode will be included in
+    //    stats-sinks or the admin /stats calls, until the child initializes
+    //    the gauge, in which case:
     // 3a. Child later initializes gauges as NeverImport: the parent value is
     //     cleared during the mergeImportMode call.
     // 3b. Child later initializes gauges as Accumulate: the parent value is
