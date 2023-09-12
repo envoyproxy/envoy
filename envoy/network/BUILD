@@ -184,6 +184,7 @@ envoy_cc_library(
         ":io_handle_interface",
         ":post_io_action_interface",
         ":proxy_protocol_options_lib",
+        "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/ssl:connection_interface",
