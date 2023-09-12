@@ -23,8 +23,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch
-/*/extensions/filters/common/mutation_rules @gbrail @chaoqin-li1123 @tyxia @mattklein123 @htuch
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch @yanavlasov
+/*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @htuch @yanavlasov
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_field_extraction http filter extension
@@ -75,7 +75,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
-/*/extensions/filters/http/composite @mattklein123 @mattklein123
+/*/extensions/filters/http/composite @mattklein123 @tyxia @yanavlasov
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
 # previous hosts
@@ -170,13 +170,13 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # runtime fraction input matcher
 /*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @UNOWNED
 # CEL input matcher
-/*/extensions/matching/input_matchers/cel_matcher @tyxia @UNOWNED
+/*/extensions/matching/input_matchers/cel_matcher @tyxia @yanavlasov
 # environment generic input
 /*/extensions/matching/common_inputs/environment @donyu @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @UNOWNED
 # CEL data input
-/*/extensions/matching/http/cel_input @tyxia @UNOWNED
+/*/extensions/matching/http/cel_input @tyxia @yanavlasov
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @UNOWNED
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
@@ -363,6 +363,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @realtimetodie @realtimetodie
-/contrib/dlb/ @mattklein123 @daixiang0
+# TODO(phlax): move this extension (https://github.com/envoyproxy/envoy/issues/29550)
+/contrib/network/connection_balance/dlb @mattklein123 @daixiang0
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch
