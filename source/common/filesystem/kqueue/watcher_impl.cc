@@ -49,7 +49,9 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
       return nullptr;
     }
 
-    watch_fd = open(std::string(file_system_.splitPathFromFilename(path).directory_).c_str(), 0);
+    const auto result_or_error = file_system_.splitPathFromFilename(path);
+    THROW_IF_STATUS_NOT_OK(result_or_error, throw);
+    watch_fd = open(std::string(result_or_error.value().directory_).c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;
     }

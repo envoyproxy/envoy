@@ -197,9 +197,10 @@ protected:
     api_ = Api::createApiForTest(filesystem_);
     setupMocks();
     EXPECT_CALL(filesystem_, splitPathFromFilename(_))
-        .WillRepeatedly(Invoke([](absl::string_view path) -> Filesystem::PathSplitResult {
-          return Filesystem::fileSystemForTest().splitPathFromFilename(path);
-        }));
+        .WillRepeatedly(
+            Invoke([](absl::string_view path) -> absl::StatusOr<Filesystem::PathSplitResult> {
+              return Filesystem::fileSystemForTest().splitPathFromFilename(path);
+            }));
   }
 
   Secret::MockSecretCallbacks secret_callback_;

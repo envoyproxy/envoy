@@ -19,7 +19,7 @@ struct MemFileInfo {
   FileInfo toFileInfo(absl::string_view path) {
     absl::MutexLock lock(&lock_);
     return {
-        std::string{fileSystemForTest().splitPathFromFilename(path).file_},
+        std::string{fileSystemForTest().splitPathFromFilename(path).value().file_},
         data_.length(),
         FileType::Regular,
         create_time_,

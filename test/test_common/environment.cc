@@ -98,7 +98,7 @@ void TestEnvironment::createPath(const std::string& path) {
     return;
   }
   const Filesystem::PathSplitResult parent =
-      Filesystem::fileSystemForTest().splitPathFromFilename(path);
+      Filesystem::fileSystemForTest().splitPathFromFilename(path).value();
   if (parent.file_.length() > 0) {
     TestEnvironment::createPath(std::string(parent.directory_));
   }
@@ -357,7 +357,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
 }
 
 std::string TestEnvironment::readFileToStringForTest(const std::string& filename) {
-  return Filesystem::fileSystemForTest().fileReadToEnd(filename);
+  return Filesystem::fileSystemForTest().fileReadToEnd(filename).value();
 }
 
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
@@ -385,7 +385,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   // Substitute paths and other common things.
   out_json_string = substitute(out_json_string, version);
 
-  auto name = Filesystem::fileSystemForTest().splitPathFromFilename(path).file_;
+  auto name = Filesystem::fileSystemForTest().splitPathFromFilename(path).value().file_;
   const std::string extension = std::string(name.substr(name.rfind('.')));
   const std::string out_json_path =
       TestEnvironment::temporaryPath(name) + ".with.ports" + extension;

@@ -203,10 +203,10 @@ public:
 
   /**
    * @path file path to split
-   * @return PathSplitResult containing the parent directory of the input path and the file name
-   * @note will throw an exception if path does not contain any path separator character
+   * @return PathSplitResult containing the parent directory of the input path and the file name or
+   * an error status.
    */
-  virtual PathSplitResult splitPathFromFilename(absl::string_view path) PURE;
+  virtual absl::StatusOr<PathSplitResult> splitPathFromFilename(absl::string_view path) PURE;
 
   /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This

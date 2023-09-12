@@ -18,9 +18,10 @@ static constexpr uint32_t RetryCount = 1;
 std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
                  Api::Api& api) {
   std::string data;
+  absl::StatusOr<std::string> file_or_error;
   switch (source.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename:
-    auto file_or_error = api.fileSystem().fileReadToEnd(path);
+    file_or_error = api.fileSystem().fileReadToEnd(source.filename());
     THROW_IF_STATUS_NOT_OK(file_or_error, throw);
     data = file_or_error.value();
     break;

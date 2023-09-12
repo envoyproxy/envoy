@@ -16,7 +16,7 @@ FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
     ENVOY_LOG(info, "File for key value store does not yet exist: {}", filename);
     return;
   }
-  auto file_or_error = api.fileSystem().fileReadToEnd(filename_);
+  auto file_or_error = file_system_.fileReadToEnd(filename_);
   THROW_IF_STATUS_NOT_OK(file_or_error, throw);
   const std::string contents = file_or_error.value();
   if (!parseContents(contents)) {
