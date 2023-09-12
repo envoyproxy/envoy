@@ -45,8 +45,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/http/cache/simple_http_cache:95.9"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"
-"source/extensions/stat_sinks/graphite_statsd:82.1"
-"source/extensions/stat_sinks/statsd:84.6"
+"source/extensions/stat_sinks/graphite_statsd:78.6" # Death tests don't report LCOV
+"source/extensions/stat_sinks/statsd:80.8" # Death tests don't report LCOV
 "source/extensions/tracers:95.8"
 "source/extensions/tracers/common:73.8"
 "source/extensions/tracers/common/ot:71.8"

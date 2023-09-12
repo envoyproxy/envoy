@@ -23,21 +23,21 @@ TEST(UtilsTest, AssertExclusiveLogFormatMethod) {
   {
     testing::NiceMock<MockOptions> options;
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
-    EXPECT_NO_THROW(Utility::assertExclusiveLogFormatMethod(options, log_config));
+    EXPECT_TRUE(Utility::assertExclusiveLogFormatMethod(options, log_config).ok());
   }
 
   {
     testing::NiceMock<MockOptions> options;
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     EXPECT_CALL(options, logFormatSet()).WillRepeatedly(Return(true));
-    EXPECT_NO_THROW(Utility::assertExclusiveLogFormatMethod(options, log_config));
+    EXPECT_TRUE(Utility::assertExclusiveLogFormatMethod(options, log_config).ok());
   }
 
   {
     testing::NiceMock<MockOptions> options;
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     log_config.mutable_log_format();
-    EXPECT_NO_THROW(Utility::assertExclusiveLogFormatMethod(options, log_config));
+    EXPECT_TRUE(Utility::assertExclusiveLogFormatMethod(options, log_config).ok());
   }
 
   {
@@ -45,8 +45,8 @@ TEST(UtilsTest, AssertExclusiveLogFormatMethod) {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     EXPECT_CALL(options, logFormatSet()).WillRepeatedly(Return(true));
     log_config.mutable_log_format();
-    EXPECT_THROW_WITH_MESSAGE(
-        Utility::assertExclusiveLogFormatMethod(options, log_config), EnvoyException,
+    EXPECT_EQ(
+        Utility::assertExclusiveLogFormatMethod(options, log_config).message(),
         "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
   }
 }
@@ -54,43 +54,43 @@ TEST(UtilsTest, AssertExclusiveLogFormatMethod) {
 TEST(UtilsTest, MaybeSetApplicationLogFormat) {
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
-    EXPECT_NO_THROW(Utility::maybeSetApplicationLogFormat(log_config));
+    EXPECT_TRUE(Utility::maybeSetApplicationLogFormat(log_config).ok());
   }
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     log_config.mutable_log_format();
-    EXPECT_NO_THROW(Utility::maybeSetApplicationLogFormat(log_config));
+    EXPECT_TRUE(Utility::maybeSetApplicationLogFormat(log_config).ok());
   }
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     log_config.mutable_log_format()->mutable_json_format();
-    EXPECT_NO_THROW(Utility::maybeSetApplicationLogFormat(log_config));
+    EXPECT_TRUE(Utility::maybeSetApplicationLogFormat(log_config).ok());
   }
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     log_config.mutable_log_format()->mutable_text_format();
-    EXPECT_NO_THROW(Utility::maybeSetApplicationLogFormat(log_config));
+    EXPECT_TRUE(Utility::maybeSetApplicationLogFormat(log_config).ok());
   }
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     auto* format = log_config.mutable_log_format()->mutable_json_format();
     format->mutable_fields()->operator[]("Message").set_string_value("%v");
-    EXPECT_THROW_WITH_MESSAGE(Utility::maybeSetApplicationLogFormat(log_config), EnvoyException,
-                              "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is "
-                              "unavailable for JSON log formats");
+    EXPECT_EQ(Utility::maybeSetApplicationLogFormat(log_config).message(),
+              "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is "
+              "unavailable for JSON log formats");
   }
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     auto* format = log_config.mutable_log_format()->mutable_json_format();
     format->mutable_fields()->operator[]("Message").set_string_value("%_");
-    EXPECT_THROW_WITH_MESSAGE(Utility::maybeSetApplicationLogFormat(log_config), EnvoyException,
-                              "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is "
-                              "unavailable for JSON log formats");
+    EXPECT_EQ(Utility::maybeSetApplicationLogFormat(log_config).message(),
+              "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is "
+              "unavailable for JSON log formats");
   }
 }
 
