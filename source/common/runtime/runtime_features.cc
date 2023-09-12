@@ -120,6 +120,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // TODO(adisuissa): enable by default once this is tested in prod.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
+// TODO(#10646) change to true when UHV is sufficiently tested
+// For more information about Universal Header Validation, please see
+// https://github.com/envoyproxy/envoy/issues/10646
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
 // TODO(wbpcode): enable by default after a complete deprecation period.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 

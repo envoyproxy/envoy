@@ -17,21 +17,6 @@ using Envoy::Api::SysCallSizeResult;
 namespace Envoy {
 
 namespace {
-/**
- * On different platforms the sockaddr struct for unix domain
- * sockets is different. We use this function to get the
- * length of the platform specific struct.
- */
-constexpr socklen_t udsAddressLength() {
-#if defined(__APPLE__)
-  return sizeof(sockaddr);
-#elif defined(WIN32)
-  return sizeof(sockaddr_un);
-#else
-  return sizeof(sa_family_t);
-#endif
-}
-
 constexpr int messageTypeContainsIP() {
 #ifdef IP_RECVDSTADDR
   return IP_RECVDSTADDR;
@@ -575,7 +560,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
         fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
-  if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
+  if (ss_len >= (offsetof(sockaddr_storage, ss_family) + sizeof(ss.ss_family)) &&
+      ss.ss_family == AF_UNIX) {
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other
     // mechanisms to hide things, of which there are many).
