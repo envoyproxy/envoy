@@ -80,6 +80,13 @@ retry () {
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
+  # TODO(phlax): move these to per-job fetch
+  FETCH_TARGETS+=(
+    //docs/...
+    //tools/proto_format/...
+    //tools/zstd
+    //tools/gsutil
+    //tools/code_format/...)
 elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
   BUILD_ARCH_DIR="/linux/arm64"
 else
