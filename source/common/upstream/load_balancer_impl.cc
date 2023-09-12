@@ -1,19 +1,23 @@
+#include "load_balancer_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
 #include <atomic>
 #include <bitset>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -427,6 +431,8 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
+      use_new_locality_routing_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.locality_routing_use_new_routing_logic")),
       locality_weighted_balancing_(locality_config.has_value() &&
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
@@ -438,7 +444,11 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
         // If P=0 changes, regenerate locality routing structures. Locality based routing is
         // disabled at all other levels.
         if (local_priority_set_ && priority == 0) {
-          regenerateLocalityRoutingStructures();
+          if (use_new_locality_routing_) {
+            regenerateLocalityRoutingStructuresNew();
+          } else {
+            regenerateLocalityRoutingStructures();
+          }
         }
       });
   if (local_priority_set_) {
@@ -452,8 +462,106 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
           ASSERT(priority == 0);
           // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
           // based routing.
-          regenerateLocalityRoutingStructures();
+          if (use_new_locality_routing_) {
+            regenerateLocalityRoutingStructuresNew();
+          } else {
+            regenerateLocalityRoutingStructures();
+          }
         });
+  }
+}
+
+void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructuresNew() {
+  ASSERT(local_priority_set_);
+  stats_.lb_recalculate_zone_structures_.inc();
+  // resizePerPriorityState should ensure these stay in sync.
+  ASSERT(per_priority_state_.size() == priority_set_.hostSetsPerPriority().size());
+
+  // We only do locality routing for P=0
+  uint32_t priority = 0;
+  PerPriorityState& state = *per_priority_state_[priority];
+  // Do not perform any calculations if we cannot perform locality routing based on non runtime
+  // params.
+  if (earlyExitNonLocalityRoutingNew()) {
+    state.locality_routing_state_ = LocalityRoutingState::NoLocalityRouting;
+    return;
+  }
+  HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
+  const HostsPerLocality& upstreamHostsPerLocality = host_set.healthyHostsPerLocality();
+  const size_t num_upstream_localities = upstreamHostsPerLocality.get().size();
+  ASSERT(num_upstream_localities >= 2);
+
+  // It is worth noting that all of the percentages calculated are orthogonal from
+  // how much load this priority level receives, percentageLoad(priority).
+  //
+  // If the host sets are such that 20% of load is handled locally and 80% is residual, and then
+  // half the hosts in all host sets go unhealthy, this priority set will
+  // still send half of the incoming load to the local locality and 80% to residual.
+  //
+  // Basically, fairness across localities within a priority is guaranteed. Fairness across
+  // localities across priorities is not.
+  const HostsPerLocality& localHostsPerLocality = localHostSet().healthyHostsPerLocality();
+  auto locality_percentages =
+      calculateLocalityPercentagesNew(localHostsPerLocality, upstreamHostsPerLocality);
+
+  // If we have lower percent of hosts in the local cluster in the same locality,
+  // we can push all of the requests directly to upstream cluster in the same locality.
+  if (upstreamHostsPerLocality.hasLocalLocality() &&
+      locality_percentages[0].upstream_percentage > 0 &&
+      locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) {
+    state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
+    return;
+  }
+
+  state.locality_routing_state_ = LocalityRoutingState::LocalityResidual;
+
+  // If we cannot route all requests to the same locality, calculate what percentage can be routed.
+  // For example, if local percentage is 20% and upstream is 10%
+  // we can route only 50% of requests directly.
+  // Local percent can be 0% if there are no upstream hosts in the local locality.
+  state.local_percent_to_route_ =
+      upstreamHostsPerLocality.hasLocalLocality() && locality_percentages[0].local_percentage > 0
+          ? locality_percentages[0].upstream_percentage * 10000 /
+                locality_percentages[0].local_percentage
+          : 0;
+
+  // Local locality does not have additional capacity (we have already routed what we could).
+  // Now we need to figure out how much traffic we can route cross locality and to which exact
+  // locality we should route. Percentage of requests routed cross locality to a specific locality
+  // needed be proportional to the residual capacity upstream locality has.
+  //
+  // residual_capacity contains capacity left in a given locality, we keep accumulating residual
+  // capacity to make search for sampled value easier.
+  // For example, if we have the following upstream and local percentage:
+  // local_percentage: 40000 40000 20000
+  // upstream_percentage: 25000 50000 25000
+  // Residual capacity would look like: 0 10000 5000. Now we need to sample proportionally to
+  // bucket sizes (residual capacity). For simplicity of finding where specific
+  // sampled value is, we accumulate values in residual capacity. This is what it will look like:
+  // residual_capacity: 0 10000 15000
+  // Now to find a locality to route (bucket) we could simply iterate over residual_capacity
+  // searching where sampled value is placed.
+  state.residual_capacity_.resize(num_upstream_localities);
+  for (uint64_t i = 0; i < num_upstream_localities; ++i) {
+    uint64_t last_residual_capacity = i > 0 ? state.residual_capacity_[i - 1] : 0;
+    LocalityPercentages this_locality_percentages = locality_percentages[i];
+    if (i == 0 && upstreamHostsPerLocality.hasLocalLocality()) {
+      // This is a local locality, we have already routed what we could.
+      state.residual_capacity_[i] = last_residual_capacity;
+      continue;
+    }
+
+    // Only route to the localities that have additional capacity.
+    if (this_locality_percentages.upstream_percentage >
+        this_locality_percentages.local_percentage) {
+      state.residual_capacity_[i] = last_residual_capacity +
+                                    this_locality_percentages.upstream_percentage -
+                                    this_locality_percentages.local_percentage;
+    } else {
+      // Locality with index "i" does not have residual capacity, but we keep accumulating previous
+      // values to make search easier on the next step.
+      state.residual_capacity_[i] = last_residual_capacity;
+    }
   }
 }
 
@@ -546,6 +654,55 @@ void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
   }
 }
 
+bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRoutingNew() {
+  // We only do locality routing for P=0.
+  HostSet& host_set = *priority_set_.hostSetsPerPriority()[0];
+  if (host_set.healthyHostsPerLocality().get().size() < 2) {
+    return true;
+  }
+
+  // Do not perform locality routing if there are too few local localities for zone routing to have
+  // an effect.
+  if (localHostSet().hostsPerLocality().get().size() < 2) {
+    return true;
+  }
+
+  // Do not perform locality routing if the local cluster doesn't have any hosts in the current
+  // envoy's local locality. This breaks our assumptions about the local cluster being correctly
+  // configured, so we don't have enough information to perform locality routing. Note: If other
+  // envoys do exist according to the local cluster, they will still be able to perform locality
+  // routing correctly. This will not cause a traffic imbalance because other envoys will not know
+  // about the current one, so they will not factor it into locality routing calculations.
+  if (!localHostSet().hostsPerLocality().hasLocalLocality() ||
+      localHostSet().hostsPerLocality().get()[0].empty()) {
+    stats_.lb_local_cluster_not_ok_.inc();
+    return true;
+  }
+
+  // If the runtime guard is not enabled, keep the old behavior of not performing locality routing
+  // if the number of localities in the local cluster is different from the number of localities
+  // in the upstream cluster.
+  // The lb_zone_number_differs stat is only relevant if the runtime guard is disabled,
+  // so it is only incremented in that case.
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_zone_routing_different_zone_counts") &&
+      host_set.healthyHostsPerLocality().get().size() !=
+          localHostSet().healthyHostsPerLocality().get().size()) {
+    stats_.lb_zone_number_differs_.inc();
+    return true;
+  }
+
+  // Do not perform locality routing for small clusters.
+  const uint64_t min_cluster_size =
+      runtime_.snapshot().getInteger(RuntimeMinClusterSize, min_cluster_size_);
+  if (host_set.healthyHosts().size() < min_cluster_size) {
+    stats_.lb_zone_cluster_too_small_.inc();
+    return true;
+  }
+
+  return false;
+}
+
 bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   // We only do locality routing for P=0.
   HostSet& host_set = *priority_set_.hostSetsPerPriority()[0];
@@ -615,6 +772,51 @@ bool LoadBalancerBase::isHostSetInPanic(const HostSet& host_set) const {
   return false;
 }
 
+absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>
+ZoneAwareLoadBalancerBase::calculateLocalityPercentagesNew(
+    const HostsPerLocality& local_hosts_per_locality,
+    const HostsPerLocality& upstream_hosts_per_locality) {
+  uint64_t total_local_hosts = 0;
+  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> local_counts;
+  for (const auto& locality_hosts : local_hosts_per_locality.get()) {
+    total_local_hosts += locality_hosts.size();
+    // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
+    if (!locality_hosts.empty()) {
+      local_counts.insert(std::make_pair(locality_hosts[0]->locality(), locality_hosts.size()));
+    }
+  }
+  uint64_t total_upstream_hosts = 0;
+  for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
+    total_upstream_hosts += locality_hosts.size();
+  }
+
+  absl::FixedArray<LocalityPercentages> percentages(upstream_hosts_per_locality.get().size());
+  for (uint32_t i = 0; i < upstream_hosts_per_locality.get().size(); ++i) {
+    const auto& upstream_hosts = upstream_hosts_per_locality.get()[i];
+    if (upstream_hosts.empty()) {
+      // If there are no upstream hosts in a given locality, the upstream percentage is 0.
+      // We can't determine the locality of this group, so we can't find the corresponding local
+      // count. However, if there are no upstream hosts in a locality, the local percentage doesn't
+      // matter.
+      percentages[i] = LocalityPercentages{0, 0};
+      continue;
+    }
+    const auto& locality = upstream_hosts[0]->locality();
+
+    const auto& local_count_it = local_counts.find(locality);
+    const uint64_t local_count = local_count_it == local_counts.end() ? 0 : local_count_it->second;
+
+    const uint64_t local_percentage =
+        total_local_hosts > 0 ? 10000ULL * local_count / total_local_hosts : 0;
+    const uint64_t upstream_percentage =
+        total_upstream_hosts > 0 ? 10000ULL * upstream_hosts.size() / total_upstream_hosts : 0;
+
+    percentages[i] = LocalityPercentages{local_percentage, upstream_percentage};
+  }
+
+  return percentages;
+}
+
 void ZoneAwareLoadBalancerBase::calculateLocalityPercentage(
     const HostsPerLocality& hosts_per_locality, uint64_t* ret) {
   uint64_t total_hosts = 0;
@@ -634,18 +836,20 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   PerPriorityState& state = *per_priority_state_[host_set.priority()];
   ASSERT(state.locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
 
-  // At this point it's guaranteed to be at least 2 localities & local exists.
+  // At this point it's guaranteed to be at least 2 localities in the upstream host set.
   const size_t number_of_localities = host_set.healthyHostsPerLocality().get().size();
   ASSERT(number_of_localities >= 2U);
-  ASSERT(host_set.healthyHostsPerLocality().hasLocalLocality());
 
-  // Try to push all of the requests to the same locality first.
+  // Try to push all of the requests to the same locality if possible.
   if (state.locality_routing_state_ == LocalityRoutingState::LocalityDirect) {
+    ASSERT(host_set.healthyHostsPerLocality().hasLocalLocality());
     stats_.lb_zone_routing_all_directly_.inc();
     return 0;
   }
 
   ASSERT(state.locality_routing_state_ == LocalityRoutingState::LocalityResidual);
+  ASSERT(host_set.healthyHostsPerLocality().hasLocalLocality() ||
+         state.local_percent_to_route_ == 0);
 
   // If we cannot route all requests to the same locality, we already calculated how much we can
   // push to the local locality, check if we can push to local locality on current iteration.
@@ -670,10 +874,13 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 
   // This potentially can be optimized to be O(log(N)) where N is the number of localities.
   // Linear scan should be faster for smaller N, in most of the scenarios N will be small.
-  // TODO(htuch): is there a bug here when threshold == 0? Seems like we pick
-  // local locality in that situation. Probably should start iterating at 1.
+  //
+  // Bucket 1: [0, state.residual_capacity_[0] - 1]
+  // Bucket 2: [state.residual_capacity_[0], state.residual_capacity_[1] - 1]
+  // ...
+  // Bucket N: [state.residual_capacity_[N-2], state.residual_capacity_[N-1] - 1]
   int i = 0;
-  while (threshold > state.residual_capacity_[i]) {
+  while (threshold >= state.residual_capacity_[i]) {
     i++;
   }
 

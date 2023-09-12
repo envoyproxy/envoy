@@ -12,7 +12,8 @@ namespace RateLimitQuota {
 using ::envoy::type::v3::RateLimitStrategy;
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-                                                              bool) {
+                                                              bool end_stream) {
+  ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   // First, perform the request matching.
   absl::StatusOr<Matcher::ActionPtr> match_result = requestMatching(headers);
   if (!match_result.ok()) {
