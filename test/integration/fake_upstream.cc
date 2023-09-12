@@ -425,6 +425,16 @@ AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
       timeout);
 }
 
+AssertionResult FakeConnectionBase::close(Network::ConnectionCloseType close_type,
+                                          std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeConnectionBase close type={}", static_cast<int>(close_type));
+  if (!shared_connection_.connected()) {
+    return AssertionSuccess();
+  }
+  return shared_connection_.executeOnDispatcher(
+      [&close_type](Network::Connection& connection) { connection.close(close_type); }, timeout);
+}
+
 AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milliseconds timeout) {
   return shared_connection_.executeOnDispatcher(
       [disable](Network::Connection& connection) { connection.readDisable(disable); }, timeout);
@@ -517,6 +527,24 @@ AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
     return AssertionFailure() << "Timed out waiting for disconnect.";
   }
   ENVOY_LOG(trace, "FakeConnectionBase done waiting for disconnect");
+  return AssertionSuccess();
+}
+
+AssertionResult FakeConnectionBase::waitForRstDisconnect(std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeConnectionBase waiting for RST disconnect");
+  absl::MutexLock lock(&lock_);
+  const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+    return shared_connection_.rstDisconnected();
+  };
+
+  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
+    if (timeout == TestUtility::DefaultTimeout) {
+      ADD_FAILURE()
+          << "Please don't waitForRstDisconnect with a 5s timeout if failure is expected\n";
+    }
+    return AssertionFailure() << "Timed out waiting for RST disconnect.";
+  }
+  ENVOY_LOG(trace, "FakeConnectionBase done waiting for RST disconnect");
   return AssertionSuccess();
 }
 

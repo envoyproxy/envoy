@@ -349,6 +349,9 @@ const (
 	FlushWriteAndDelay ConnectionCloseType = 2
 	// Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
 	Abort ConnectionCloseType = 3
+	// Do not write/flush any pending data and immediately raise
+	// ConnectionEvent::LocalClose. Envoy will try to close the connection with RST flag.
+	AbortReset ConnectionCloseType = 4
 )
 
 func (t ConnectionCloseType) String() string {
@@ -361,6 +364,8 @@ func (t ConnectionCloseType) String() string {
 		return "FlushWriteAndDelay"
 	case Abort:
 		return "Abort"
+	case AbortReset:
+		return "AbortReset"
 	}
 	return "unknown"
 }

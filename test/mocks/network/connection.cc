@@ -79,8 +79,15 @@ template <class T> static void initializeMockConnection(T& connection) {
       .WillByDefault(Invoke([&connection](Network::Connection::BytesSentCb cb) {
         connection.bytes_sent_callbacks_.emplace_back(cb);
       }));
-  ON_CALL(connection, close(_)).WillByDefault(Invoke([&connection](ConnectionCloseType) -> void {
-    connection.raiseEvent(Network::ConnectionEvent::LocalClose);
+  ON_CALL(connection, close(_))
+      .WillByDefault(Invoke([&connection](ConnectionCloseType type) -> void {
+        if (type == ConnectionCloseType::AbortReset) {
+          connection.detected_close_type_ = DetectedCloseType::LocalReset;
+        }
+        connection.raiseEvent(Network::ConnectionEvent::LocalClose);
+      }));
+  ON_CALL(connection, detectedCloseType()).WillByDefault(Invoke([&connection]() {
+    return connection.detected_close_type_;
   }));
   ON_CALL(connection, close(_, _))
       .WillByDefault(Invoke([&connection](ConnectionCloseType, absl::string_view details) -> void {

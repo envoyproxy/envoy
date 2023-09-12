@@ -343,12 +343,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   const Router::StringAccessor* dynamic_host_filter_state = nullptr;
-  if (context->downstreamConnection()) {
+  if (context->requestStreamInfo()) {
     dynamic_host_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<Router::StringAccessor>(DynamicHostFilterStateKey);
+        context->requestStreamInfo()->filterState().getDataReadOnly<Router::StringAccessor>(
+            DynamicHostFilterStateKey);
   }
 
   absl::string_view raw_host;
@@ -370,12 +368,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                              .resolve(nullptr)
                              .factory_.implementsSecureTransport();
   uint32_t port = is_secure ? 443 : 80;
-  if (context->downstreamConnection()) {
+  if (context->requestStreamInfo()) {
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<StreamInfo::UInt32Accessor>(DynamicPortFilterStateKey);
+        context->requestStreamInfo()->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+            DynamicPortFilterStateKey);
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
       port = dynamic_port_filter_state->value();
