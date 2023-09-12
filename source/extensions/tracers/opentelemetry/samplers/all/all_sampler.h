@@ -20,8 +20,7 @@ class AllSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
 public:
   AllSampler(Server::Configuration::TracerFactoryContext& context)
       : context_(context) {}
-  bool sample(SpanPtr& span) override;
-
+  bool sample(Tracing::TraceContext& trace_context) override;
 
 private:
   Server::Configuration::TracerFactoryContext&

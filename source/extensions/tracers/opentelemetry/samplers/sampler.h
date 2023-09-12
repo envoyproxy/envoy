@@ -8,8 +8,6 @@
 
 #include "envoy/tracing/trace_context.h"
 
-#include "source/extensions/tracers/opentelemetry/span.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -29,7 +27,7 @@ public:
    *
    * @return true if trace should be sampled, false otherwise
    */
-  virtual bool sample(SpanPtr &span) = 0;
+  virtual bool sample(Tracing::TraceContext& trace_context) = 0;
 };
 
 using SamplerPtr = std::shared_ptr<Sampler>;
