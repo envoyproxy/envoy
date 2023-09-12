@@ -15,8 +15,8 @@ namespace SessionFilters {
 namespace HttpCapsule {
 
 ReadFilterStatus HttpCapsuleFilter::onData(Network::UdpRecvData& data) {
-  std::string data = data.buffer_->toString();
-  quiche::ConnectUdpDatagramUdpPacketPayload payload(data);
+  std::string buffer = data.buffer_->toString();
+  quiche::ConnectUdpDatagramUdpPacketPayload payload(buffer);
   quiche::QuicheBuffer serialized_capsule =
       SerializeCapsule(quiche::Capsule::Datagram(payload.Serialize()), &capsule_buffer_allocator_);
 
