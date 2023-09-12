@@ -14,9 +14,9 @@ namespace HttpCapsule {
 
 FilterFactoryCb
 HttpCapsuleFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig&, Server::Configuration::FactoryContext&) {
-  return [](FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addFilter(std::make_shared<HttpCapsuleFilter>());
+    const FilterConfig&, Server::Configuration::FactoryContext& context) {
+  return [&context](FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addFilter(std::make_shared<HttpCapsuleFilter>(context.timeSource()));
   };
 }
 

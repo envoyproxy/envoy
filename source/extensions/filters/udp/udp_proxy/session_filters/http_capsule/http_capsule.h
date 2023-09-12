@@ -5,6 +5,9 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
+#include "quiche/common/simple_buffer_allocator.h"
+#include "quiche/quic/core/http/quic_spdy_stream.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -12,10 +15,13 @@ namespace UdpProxy {
 namespace SessionFilters {
 namespace HttpCapsule {
 
-class HttpCapsuleFilter : public Filter, Logger::Loggable<Logger::Id::http> {
+class HttpCapsuleFilter : public Filter, Logger::Loggable<Logger::Id::http>,
+                          public quiche::CapsuleParser::Visitor {
 public:
+  HttpCapsuleFilter(TimeSource& time_source) : time_source_(time_source) {}
+
   // ReadFilter
-  ReadFilterStatus onNewSession() override;
+  ReadFilterStatus onNewSession() override { return ReadFilterStatus::Continue; }
   ReadFilterStatus onData(Network::UdpRecvData& data) override;
   void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
@@ -27,9 +33,18 @@ public:
     write_callbacks_ = &callbacks;
   }
 
+  // quiche::CapsuleParser::Visitor
+  bool OnCapsule(const quiche::Capsule& capsule) override;
+  void OnCapsuleParseFailure(absl::string_view error_message) override;
+
 private:
   ReadFilterCallbacks* read_callbacks_{};
   WriteFilterCallbacks* write_callbacks_{};
+  quiche::CapsuleParser capsule_parser_{this};
+  quiche::SimpleBufferAllocator capsule_buffer_allocator_;
+  Network::Address::InstanceConstSharedPtr local_address_;
+  Network::Address::InstanceConstSharedPtr peer_address_;
+  TimeSource& time_source_;
 };
 
 } // namespace HttpCapsule

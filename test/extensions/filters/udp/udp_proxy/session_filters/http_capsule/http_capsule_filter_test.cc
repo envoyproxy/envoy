@@ -20,7 +20,7 @@ namespace {
 class HttpCapsuleFilterTest : public testing::Test {
 public:
   void setup() {
-    filter_ = std::make_unique<HttpCapsuleFilter>();
+    filter_ = std::make_unique<HttpCapsuleFilter>(server_context_.timeSource());
     filter_->initializeReadFilterCallbacks(callbacks_);
     ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }

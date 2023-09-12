@@ -1,5 +1,3 @@
-#include <memory>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
@@ -62,6 +60,39 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HttpCapsuleIntegrationTest,
 
 TEST_P(HttpCapsuleIntegrationTest, BasicFlow) {
   setup();
+
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  const std::string request = "hello";
+  const std::string expected_request =
+      absl::HexStringToBytes("00"      // DATAGRAM Capsule Type
+                             "06"      // Capsule Length = length(hello)
+                             "00"      // Context ID
+      ) + request;
+
+  const std::string expected_response = "world";
+  const std::string response =
+      absl::HexStringToBytes("00"      // DATAGRAM Capsule Type
+                             "06"      // Capsule Length
+                             "00"      // Context ID
+      ) + expected_response;
+
+  // Send datagram to be encapsulated.
+  Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+  client.write(request, *listener_address);
+
+  // Wait for the upstream datagram.
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ(expected_request, request_datagram.buffer_->toString());
+
+  // Respond from the upstream.
+  fake_upstreams_[0]->sendUdpDatagram(response, request_datagram.addresses_.peer_);
+  Network::UdpRecvData response_datagram;
+  client.recv(response_datagram);
+  EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
 }
 
 } // namespace
