@@ -160,10 +160,11 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   all_new_hosts.emplace(address_as_string);
 }
 
-void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                    const std::string&) {
+absl::Status
+EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                               const std::string&) {
   if (!validateUpdateSize(resources.size())) {
-    return;
+    return absl::OkStatus();
   }
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
@@ -218,6 +219,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     eds_resources_cache_->removeCallback(edsServiceName(), this);
     using_cached_resource_ = false;
   }
+  return absl::OkStatus();
 }
 
 void EdsClusterImpl::update(
@@ -280,15 +282,16 @@ void EdsClusterImpl::update(
 
   BatchUpdateHelper helper(*this, *used_load_assignment);
   priority_set_.batchHostUpdate(helper);
+  return;
 }
 
-void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                    const Protobuf::RepeatedPtrField<std::string>&,
-                                    const std::string&) {
+absl::Status
+EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                               const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   if (!validateUpdateSize(added_resources.size())) {
-    return;
+    return absl::OkStatus();
   }
-  onConfigUpdate(added_resources, added_resources[0].get().version());
+  return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {

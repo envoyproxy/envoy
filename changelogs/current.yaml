@@ -14,12 +14,45 @@ behavior_changes:
     :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
     the cached assignment and finish updating the warmed cluster. This change is disabled by default, and can be enabled by setting
     the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to true.
+- area: http
+  change: |
+    Introduced a new runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` to disable the name downgrading in the
+    per filter config searching.
+    See doc :ref:`Http filter route specific config <arch_overview_http_filters_per_filter_config>` or
+    issue https://github.com/envoyproxy/envoy/issues/29461 for more specific detail and examples.
+- area: http
+  change: |
+    Switch from http_parser to BalsaParser for handling HTTP/1.1 traffic. See https://github.com/envoyproxy/envoy/issues/21245 for
+    details. This behavioral change can be reverted by setting runtime flag ``envoy.reloadable_features.http1_use_balsa_parser`` to
+    false.
+- area: zone-aware routing
+  change: |
+    Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
+    Previously, zone-aware routing was disabled in that case and the ``lb_zone_number_differs`` stat on the cluster was incremented.
+    This behavioral change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` to false.
+    Additionally, zone-aware routing now works correctly even when the originating and upstream cluster have different zone sets.
+    Previously, zone-aware routing would not route fairly in this case.
+    To revert the entire change, set the runtime flag ``envoy.reloadable_features.locality_routing_use_new_routing_logic``
+    to false to get the old behavior and well-tested codepaths, undoing both changes.
+
+- area: UHV
+  change: |
+    Introduced runtime flag ``envoy.reloadable_features.enable_universal_header_validator`` for toggling Universal Header Validator
+    (UHV) on and off.
+    The default value is off. This option is currently functional only when the ``ENVOY_ENABLE_UHV`` build flag is enabled.
+    See https://github.com/envoyproxy/envoy/issues/10646 for more information about UHV.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: ext_authz
   change: |
     removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
+- area: alternate_protocols_cache_filter
+  change: |
+    Changed the alternate protocols cache filter to get the cache from cluster config rather than filter config.
+    This allows one downstream filter to be used with multiple clusters with different caches. This change can be reverted by
+    setting runtime guard ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` to false.
 - area: ext_authz
   change: |
     Don't append the local address to ``x-forwarded-for`` header when sending an http (not gRPC) auth request.
@@ -43,6 +76,15 @@ minor_behavior_changes:
     Enable copying response_code from the upstream stream_info onto the downstream stream_info.
     This behavior can be reverted by setting runtime guard
     ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` to false.
+- area: xds
+  change: |
+    Set the lower bound of :ref:`fill_rate <envoy_v3_api_field_config.core.v3.RateLimitSettings.fill_rate>`
+    to once per year. Values lower than once per year will automatically be set to that value.
+- area: redis
+  change: |
+    The redis network filter :ref:`connection_rate_limit_per_sec
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
+    must be greater than 0. A config that sets this value to 0 will be rejected.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -55,6 +97,12 @@ bug_fixes:
     :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
     :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
     values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
+- area: http1
+  change: |
+    Fixed a bug where HTTP/1.1 requests with "Connection: close" header is handled differently if the requested is internally redirected.
+    Without internal redirect, the response will also have a "Connection: close" header and the connection will be closed after finishing
+    that request. Requests with internal redirect should be handled in the same way. This behavior can be reverted by setting runtime
+    ``envoy.reloadable_features.http1_connection_close_header_in_redirect`` to false.
 - area: redis
   change: |
     fixed a bug where redis key formatter is using the closed stream because of life time issues.
@@ -87,6 +135,9 @@ bug_fixes:
 - area: router check tool
   change: |
     Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
+- area: unix domain sockets
+  change: |
+    Fixed a crash on some versions of macOS when using a listener on a unix-domain socket.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -144,7 +195,6 @@ new_features:
 - area: access_log
   change: |
     added a field lookup to %FILTER_STATE% for objects that have reflection enabled.
-
 - area: http
   change: |
     added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
@@ -173,10 +223,32 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: udp_proxy
+  change: |
+    added :ref:`session_filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>` config to
+    support optional filters that will run for each upstream UDP session. More information can be found in the UDP proxy documentation.
+- area: udp_proxy
+  change: |
+    added ``injectDatagramToFilterChain()`` callback to UDP session filters that allows session filters to inject datagrams downstream
+    or upstream the filter chain during a filter chain iteration. This can be used, for example, by session filters that are required
+    to buffer datagrams due to an asynchronous call.
+- area: otlp_stats_sink
+  change: |
+    added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
+    to OTLP stats sink that enables adding a static prefix to all stats flushed by this sink.
 - area: tap
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: tcp
+  change: |
+    added the support to detect and send TCP RST for raw buffer socket based connections. This is currently supported on Linux only.
+    It can be disabled by the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
+
+- area: upstream
+  change: |
+    Added the ability to specify a custom upstream local address selector using
+    :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
 
 deprecated:
 - area: tracing

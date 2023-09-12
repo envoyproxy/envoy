@@ -38,17 +38,18 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
   }
 }
 
-void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                  const std::string& version_info) {
+absl::Status OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                          const std::string& version_info) {
   UNREFERENCED_PARAMETER(resources);
   UNREFERENCED_PARAMETER(version_info);
   // On-demand cluster updates are only supported for delta, not sotw.
   PANIC("not supported");
 }
 
-void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                  const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                  const std::string& system_version_info) {
+absl::Status
+OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                             const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                             const std::string& system_version_info) {
   auto exception_msgs =
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   sendAwaiting();
@@ -65,6 +66,7 @@ void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&
     throw EnvoyException(
         fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
+  return absl::OkStatus();
 }
 
 void OdCdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

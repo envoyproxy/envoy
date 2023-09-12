@@ -308,7 +308,7 @@ bool Filter::doData(ProcessorState& state, Buffer::Instance& data, bool end_stre
       break;
     }
     // NP: not break, continue
-    [[fallthrough]];
+    FALLTHRU;
   case FilterState::ProcessingHeader:
   case FilterState::ProcessingData:
     ENVOY_LOG(debug, "golang filter appending data to buffer");

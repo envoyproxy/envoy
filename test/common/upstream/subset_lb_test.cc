@@ -1977,6 +1977,177 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 }
 
+TEST_F(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsets) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillRepeatedly(Return(2));
+
+  // L=local cluster host
+  // U=upstream host
+  //
+  //              residuals
+  //     A: 2L 0U  0.00%
+  //     B: 2L 2U  6.67%
+  //     C: 2L 2U  6.67%
+  //     D: 0L 1U 20.00%
+  // total: 6L 5U 33.33%
+
+  zoneAwareInit({{
+                     {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:86", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:87", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:88", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:89", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:90", {{"version", "1.1"}}},
+                 }},
+                {{
+                     {"tcp://127.0.0.1:91", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:92", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:93", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:94", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:95", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:96", {{"version", "1.1"}}},
+                 }});
+
+  TestLoadBalancerContext context({{"version", "1.1"}});
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(666));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(667));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1334));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+}
+
+TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillRepeatedly(Return(2));
+
+  // Before update:
+  //
+  // L=local cluster host
+  // U=upstream host
+  //
+  //              residuals
+  //     A: 2L 0U  0.00%
+  //     B: 2L 2U  6.67%
+  //     C: 2L 2U  6.67%
+  //     D: 0L 1U 20.00%
+  // total: 6L 5U 33.33%
+
+  zoneAwareInit({{
+                     {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:86", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:87", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:88", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:89", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:90", {{"version", "1.1"}}},
+                 }},
+                {{
+                     {"tcp://127.0.0.1:91", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:92", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:93", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:94", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:95", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:96", {{"version", "1.1"}}},
+                 }});
+
+  TestLoadBalancerContext context({{"version", "1.1"}});
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(666));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(667));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1334));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+
+  envoy::config::core::v3::Locality local_locality;
+  local_locality.set_zone("0");
+  envoy::config::core::v3::Locality locality_2;
+  locality_2.set_zone("2");
+
+  modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)}, {},
+              absl::optional<uint32_t>(0));
+
+  modifyLocalHosts({makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, locality_2)}, {}, 2);
+
+  // After update:
+  //
+  // L=local cluster host
+  // U=upstream host
+  //
+  //              residuals
+  //     A: 2L 1U  0.00%
+  //     B: 2L 2U  4.76%
+  //     C: 3L 2U  0.00%
+  //     D: 0L 1U 16.67%
+  // total: 7L 6U 21.42%
+  //
+  // Chance of sampling local host in zone 0: 58.34%
+
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(5830)); // 58.31% local routing chance due to rounding error
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(5831)).WillOnce(Return(475));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(476));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2143));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+}
+
 TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));

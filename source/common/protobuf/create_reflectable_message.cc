@@ -77,6 +77,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/config/trace/v3/trace_descriptor.pb.h"
 #include "envoy/config/trace/v3/xray_descriptor.pb.h"
 #include "envoy/config/trace/v3/zipkin_descriptor.pb.h"
+#include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector_descriptor.pb.h"
 #include "envoy/data/accesslog/v3/accesslog_descriptor.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event_descriptor.pb.h"
 #include "envoy/data/core/v3/health_check_event_descriptor.pb.h"
@@ -255,6 +256,9 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::envoy_config_trace_v3_trace::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_xray::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_zipkin::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_config_upstream_local_address_selector_v3_default_local_address_selector::
+              kFileDescriptorInfo,
       protobuf::reflection::envoy_data_accesslog_v3_accesslog::kFileDescriptorInfo,
       protobuf::reflection::envoy_data_cluster_v3_outlier_detection_event::kFileDescriptorInfo,
       protobuf::reflection::envoy_data_core_v3_health_check_event::kFileDescriptorInfo,
