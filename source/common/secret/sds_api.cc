@@ -81,7 +81,7 @@ void SdsApi::onWatchUpdate() {
 
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                     const std::string& version_info) {
-  absl::Status status = validateUpdateSize(resources.size());
+  const absl::Status status = validateUpdateSize(resources.size());
   if (!status.ok()) {
     return status;
   }
@@ -138,7 +138,7 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                     const Protobuf::RepeatedPtrField<std::string>&,
                                     const std::string&) {
-  absl::Status status = validateUpdateSize(added_resources.size());
+  const absl::Status status = validateUpdateSize(added_resources.size());
   if (!status.ok()) {
     return status;
   }

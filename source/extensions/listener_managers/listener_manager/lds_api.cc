@@ -75,7 +75,7 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
     auto onError = [&](std::string error_message) {
       failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
       auto& state = failure_state.back();
-      state->set_details(message);
+      state->set_details(error_message);
       state->mutable_failed_configuration()->PackFrom(resource.get().resource());
       absl::StrAppend(&message, listener.name(), ": ", error_message, "\n");
     };
