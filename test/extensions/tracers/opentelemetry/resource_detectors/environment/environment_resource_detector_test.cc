@@ -1,5 +1,6 @@
 #include <string>
 
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/tracers/opentelemetry/resource_detectors/environment/environment_resource_detector.h"
@@ -26,7 +27,10 @@ TEST(EnvironmentResourceDetectorTest, Detection) {
     NiceMock<Server::Configuration::MockTracerFactoryContext> context;
     TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 
-    auto detector = std::make_shared<EnvironmentResourceDetector>(context);
+    envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+        EnvironmentResourceDetectorConfig config;
+
+    auto detector = std::make_shared<EnvironmentResourceDetector>(config, context);
     Resource resource = detector->detect();
 
     EXPECT_EQ(resource.schemaUrl, "");
@@ -37,7 +41,10 @@ TEST(EnvironmentResourceDetectorTest, Detection) {
     NiceMock<Server::Configuration::MockTracerFactoryContext> context;
     TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "", 1);
 
-    auto detector = std::make_shared<EnvironmentResourceDetector>(context);
+    envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+        EnvironmentResourceDetectorConfig config;
+
+    auto detector = std::make_shared<EnvironmentResourceDetector>(config, context);
     Resource resource = detector->detect();
 
     EXPECT_EQ(resource.schemaUrl, "");
@@ -53,7 +60,10 @@ TEST(EnvironmentResourceDetectorTest, Detection) {
     Api::ApiPtr api = Api::createApiForTest();
     EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(ReturnRef(*api));
 
-    auto detector = std::make_shared<EnvironmentResourceDetector>(context);
+    envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+        EnvironmentResourceDetectorConfig config;
+
+    auto detector = std::make_shared<EnvironmentResourceDetector>(config, context);
     Resource resource = detector->detect();
 
     EXPECT_EQ(resource.schemaUrl, "");

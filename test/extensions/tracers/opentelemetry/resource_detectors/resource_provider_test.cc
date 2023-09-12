@@ -25,19 +25,9 @@ public:
   MOCK_METHOD(Resource, detect, ());
 };
 
-class UntypedDetectorFactory : public ResourceDetectorFactory {
+class DetectorFactoryA : public ResourceDetectorFactory {
 public:
   MOCK_METHOD(ResourceDetectorPtr, createResourceDetector,
-              (Server::Configuration::TracerFactoryContext & context));
-
-  std::string name() const override {
-    return "envoy.tracers.opentelemetry.resource_detectors.untyped";
-  }
-};
-
-class TypedDetectorFactory : public ResourceDetectorTypedFactory {
-public:
-  MOCK_METHOD(ResourceDetectorPtr, createTypedResourceDetector,
               (const Protobuf::Message& message,
                Server::Configuration::TracerFactoryContext& context));
 
@@ -45,9 +35,20 @@ public:
     return std::make_unique<ProtobufWkt::Struct>();
   }
 
-  std::string name() const override {
-    return "envoy.tracers.opentelemetry.resource_detectors.typed";
+  std::string name() const override { return "envoy.tracers.opentelemetry.resource_detectors.a"; }
+};
+
+class DetectorFactoryB : public ResourceDetectorFactory {
+public:
+  MOCK_METHOD(ResourceDetectorPtr, createResourceDetector,
+              (const Protobuf::Message& message,
+               Server::Configuration::TracerFactoryContext& context));
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
   }
+
+  std::string name() const override { return "envoy.tracers.opentelemetry.resource_detectors.b"; }
 };
 
 const std::string kOtelResourceAttributesEnv = "OTEL_RESOURCE_ATTRIBUTES";
@@ -55,12 +56,12 @@ const std::string kOtelResourceAttributesEnv = "OTEL_RESOURCE_ATTRIBUTES";
 class ResourceProviderTest : public testing::Test {
 public:
   ResourceProviderTest() {
-    resource_untyped_.attributes.insert(std::pair<std::string, std::string>("key1", "val1"));
-    resource_typed_.attributes.insert(std::pair<std::string, std::string>("key2", "val2"));
+    resource_a_.attributes.insert(std::pair<std::string, std::string>("key1", "val1"));
+    resource_b_.attributes.insert(std::pair<std::string, std::string>("key2", "val2"));
   }
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
-  Resource resource_untyped_;
-  Resource resource_typed_;
+  Resource resource_a_;
+  Resource resource_b_;
 };
 
 TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
@@ -105,20 +106,20 @@ TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
 }
 
 TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
-  auto detector_untyped = std::make_shared<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_untyped, detect()).WillOnce(Return(resource_untyped_));
+  auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(resource_a_));
 
-  auto detector_typed = std::make_shared<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_typed, detect()).WillOnce(Return(resource_typed_));
+  auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(resource_b_));
 
-  UntypedDetectorFactory untyped_factory;
-  Registry::InjectFactory<ResourceDetectorFactory> untyped_factory_registration(untyped_factory);
+  DetectorFactoryA factory_a;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-  TypedDetectorFactory typed_factory;
-  Registry::InjectFactory<ResourceDetectorTypedFactory> typed_factory_registration(typed_factory);
+  DetectorFactoryB factory_b;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-  EXPECT_CALL(untyped_factory, createResourceDetector(_)).WillOnce(Return(detector_untyped));
-  EXPECT_CALL(typed_factory, createTypedResourceDetector(_, _)).WillOnce(Return(detector_typed));
+  EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
+  EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
 
   // Expected merged attributes from all detectors
   ResourceAttributes expected_attributes = {
@@ -131,10 +132,12 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
       timeout: 0.250s
     service_name: my-service
     resource_detectors:
-      - name: envoy.tracers.opentelemetry.resource_detectors.untyped
-      - name: envoy.tracers.opentelemetry.resource_detectors.typed
+      - name: envoy.tracers.opentelemetry.resource_detectors.a
         typed_config:
-            "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.tracers.opentelemetry.resource_detectors.b
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -157,9 +160,7 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
 }
 
 TEST_F(ResourceProviderTest, UnknownResourceDetectors) {
-  // untyped resource detector
-  {
-    const std::string yaml_string = R"EOF(
+  const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
@@ -167,46 +168,25 @@ TEST_F(ResourceProviderTest, UnknownResourceDetectors) {
     service_name: my-service
     resource_detectors:
       - name: envoy.tracers.opentelemetry.resource_detectors.UnkownResourceDetector
-    )EOF";
-    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
-
-    ResourceProviderImpl resource_provider;
-    EXPECT_THROW_WITH_MESSAGE(
-        resource_provider.getResource(opentelemetry_config, context_), EnvoyException,
-        "Resource detector factory not found: "
-        "'envoy.tracers.opentelemetry.resource_detectors.UnkownResourceDetector'");
-  }
-  // typed resource detector
-  {
-    const std::string yaml_string = R"EOF(
-    grpc_service:
-      envoy_grpc:
-        cluster_name: fake-cluster
-      timeout: 0.250s
-    service_name: my-service
-    resource_detectors:
-      - name: envoy.tracers.opentelemetry.resource_detectors.AnotherUnkownResourceDetector
         typed_config:
-            "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/google.protobuf.Struct
     )EOF";
-    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-    ResourceProviderImpl resource_provider;
-    EXPECT_THROW_WITH_MESSAGE(
-        resource_provider.getResource(opentelemetry_config, context_), EnvoyException,
-        "Resource detector factory not found: "
-        "'envoy.tracers.opentelemetry.resource_detectors.AnotherUnkownResourceDetector'");
-  }
+  ResourceProviderImpl resource_provider;
+  EXPECT_THROW_WITH_MESSAGE(
+      resource_provider.getResource(opentelemetry_config, context_), EnvoyException,
+      "Resource detector factory not found: "
+      "'envoy.tracers.opentelemetry.resource_detectors.UnkownResourceDetector'");
 }
 
 TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
-  UntypedDetectorFactory factory;
+  DetectorFactoryA factory;
   Registry::InjectFactory<ResourceDetectorFactory> factory_registration(factory);
 
   // Simulating having a problem when creating the resource detector
-  EXPECT_CALL(factory, createResourceDetector(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(factory, createResourceDetector(_, _)).WillOnce(Return(nullptr));
 
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -215,7 +195,9 @@ TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
       timeout: 0.250s
     service_name: my-service
     resource_detectors:
-      - name: envoy.tracers.opentelemetry.resource_detectors.untyped
+      - name: envoy.tracers.opentelemetry.resource_detectors.a
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
     )EOF";
 
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
@@ -225,32 +207,32 @@ TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
   EXPECT_THROW_WITH_MESSAGE(resource_provider.getResource(opentelemetry_config, context_),
                             EnvoyException,
                             "Resource detector could not be created: "
-                            "'envoy.tracers.opentelemetry.resource_detectors.untyped'");
+                            "'envoy.tracers.opentelemetry.resource_detectors.a'");
 }
 
 TEST_F(ResourceProviderTest, SchemaUrl) {
   // old resource schema is empty but updating is not. should keep updating schema
   {
     std::string expected_schema_url = "my.schema/v1";
-    Resource old_resource = resource_untyped_;
+    Resource old_resource = resource_a_;
 
-    Resource updating_resource = resource_typed_;
+    Resource updating_resource = resource_b_;
     updating_resource.schemaUrl = expected_schema_url;
 
-    auto detector_untyped = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_untyped, detect()).WillOnce(Return(old_resource));
+    auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
+    EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
 
-    auto detector_typed = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_typed, detect()).WillOnce(Return(updating_resource));
+    auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
+    EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
 
-    UntypedDetectorFactory untyped_factory;
-    Registry::InjectFactory<ResourceDetectorFactory> untyped_factory_registration(untyped_factory);
+    DetectorFactoryA factory_a;
+    Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-    TypedDetectorFactory typed_factory;
-    Registry::InjectFactory<ResourceDetectorTypedFactory> typed_factory_registration(typed_factory);
+    DetectorFactoryB factory_b;
+    Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-    EXPECT_CALL(untyped_factory, createResourceDetector(_)).WillOnce(Return(detector_untyped));
-    EXPECT_CALL(typed_factory, createTypedResourceDetector(_, _)).WillOnce(Return(detector_typed));
+    EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
+    EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
 
     const std::string yaml_string = R"EOF(
     grpc_service:
@@ -259,10 +241,12 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
       timeout: 0.250s
     service_name: my-service
     resource_detectors:
-      - name: envoy.tracers.opentelemetry.resource_detectors.untyped
-      - name: envoy.tracers.opentelemetry.resource_detectors.typed
+      - name: envoy.tracers.opentelemetry.resource_detectors.a
         typed_config:
-            "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.tracers.opentelemetry.resource_detectors.b
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -275,26 +259,26 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
   // old resource schema is not empty and updating one is. should keep old schema
   {
     std::string expected_schema_url = "my.schema/v1";
-    Resource old_resource = resource_untyped_;
+    Resource old_resource = resource_a_;
     old_resource.schemaUrl = expected_schema_url;
 
-    Resource updating_resource = resource_typed_;
+    Resource updating_resource = resource_b_;
     updating_resource.schemaUrl = "";
 
-    auto detector_untyped = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_untyped, detect()).WillOnce(Return(old_resource));
+    auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
+    EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
 
-    auto detector_typed = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_typed, detect()).WillOnce(Return(updating_resource));
+    auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
+    EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
 
-    UntypedDetectorFactory untyped_factory;
-    Registry::InjectFactory<ResourceDetectorFactory> untyped_factory_registration(untyped_factory);
+    DetectorFactoryA factory_a;
+    Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-    TypedDetectorFactory typed_factory;
-    Registry::InjectFactory<ResourceDetectorTypedFactory> typed_factory_registration(typed_factory);
+    DetectorFactoryB factory_b;
+    Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-    EXPECT_CALL(untyped_factory, createResourceDetector(_)).WillOnce(Return(detector_untyped));
-    EXPECT_CALL(typed_factory, createTypedResourceDetector(_, _)).WillOnce(Return(detector_typed));
+    EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
+    EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
 
     const std::string yaml_string = R"EOF(
     grpc_service:
@@ -303,10 +287,12 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
       timeout: 0.250s
     service_name: my-service
     resource_detectors:
-      - name: envoy.tracers.opentelemetry.resource_detectors.untyped
-      - name: envoy.tracers.opentelemetry.resource_detectors.typed
+      - name: envoy.tracers.opentelemetry.resource_detectors.a
         typed_config:
-            "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.tracers.opentelemetry.resource_detectors.b
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -319,26 +305,26 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
   // old and updating resource schema are the same. should keep old schema
   {
     std::string expected_schema_url = "my.schema/v1";
-    Resource old_resource = resource_untyped_;
+    Resource old_resource = resource_a_;
     old_resource.schemaUrl = expected_schema_url;
 
-    Resource updating_resource = resource_typed_;
+    Resource updating_resource = resource_b_;
     updating_resource.schemaUrl = expected_schema_url;
 
-    auto detector_untyped = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_untyped, detect()).WillOnce(Return(old_resource));
+    auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
+    EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
 
-    auto detector_typed = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_typed, detect()).WillOnce(Return(updating_resource));
+    auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
+    EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
 
-    UntypedDetectorFactory untyped_factory;
-    Registry::InjectFactory<ResourceDetectorFactory> untyped_factory_registration(untyped_factory);
+    DetectorFactoryA factory_a;
+    Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-    TypedDetectorFactory typed_factory;
-    Registry::InjectFactory<ResourceDetectorTypedFactory> typed_factory_registration(typed_factory);
+    DetectorFactoryB factory_b;
+    Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-    EXPECT_CALL(untyped_factory, createResourceDetector(_)).WillOnce(Return(detector_untyped));
-    EXPECT_CALL(typed_factory, createTypedResourceDetector(_, _)).WillOnce(Return(detector_typed));
+    EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
+    EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
 
     const std::string yaml_string = R"EOF(
     grpc_service:
@@ -347,10 +333,12 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
       timeout: 0.250s
     service_name: my-service
     resource_detectors:
-      - name: envoy.tracers.opentelemetry.resource_detectors.untyped
-      - name: envoy.tracers.opentelemetry.resource_detectors.typed
+      - name: envoy.tracers.opentelemetry.resource_detectors.a
         typed_config:
-            "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.tracers.opentelemetry.resource_detectors.b
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -363,26 +351,26 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
   // old and updating resource schema are not empty and are different. should keep old schema
   {
     std::string expected_schema_url = "my.schema/v1";
-    Resource old_resource = resource_untyped_;
+    Resource old_resource = resource_a_;
     old_resource.schemaUrl = expected_schema_url;
 
-    Resource updating_resource = resource_typed_;
+    Resource updating_resource = resource_b_;
     updating_resource.schemaUrl = "my.schema/v2";
 
-    auto detector_untyped = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_untyped, detect()).WillOnce(Return(old_resource));
+    auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
+    EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
 
-    auto detector_typed = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_typed, detect()).WillOnce(Return(updating_resource));
+    auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
+    EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
 
-    UntypedDetectorFactory untyped_factory;
-    Registry::InjectFactory<ResourceDetectorFactory> untyped_factory_registration(untyped_factory);
+    DetectorFactoryA factory_a;
+    Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-    TypedDetectorFactory typed_factory;
-    Registry::InjectFactory<ResourceDetectorTypedFactory> typed_factory_registration(typed_factory);
+    DetectorFactoryB factory_b;
+    Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-    EXPECT_CALL(untyped_factory, createResourceDetector(_)).WillOnce(Return(detector_untyped));
-    EXPECT_CALL(typed_factory, createTypedResourceDetector(_, _)).WillOnce(Return(detector_typed));
+    EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
+    EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
 
     const std::string yaml_string = R"EOF(
     grpc_service:
@@ -391,10 +379,12 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
       timeout: 0.250s
     service_name: my-service
     resource_detectors:
-      - name: envoy.tracers.opentelemetry.resource_detectors.untyped
-      - name: envoy.tracers.opentelemetry.resource_detectors.typed
+      - name: envoy.tracers.opentelemetry.resource_detectors.a
         typed_config:
-            "@type": type.googleapis.com/google.protobuf.Struct
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.tracers.opentelemetry.resource_detectors.b
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);

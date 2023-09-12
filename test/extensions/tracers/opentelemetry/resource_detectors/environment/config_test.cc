@@ -17,8 +17,16 @@ TEST(EnvironmentResourceDetectorFactoryTest, Basic) {
       "envoy.tracers.opentelemetry.resource_detectors.environment");
   ASSERT_NE(factory, nullptr);
 
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  const std::string yaml = R"EOF(
+    name: envoy.tracers.opentelemetry.resource_detectors.environment
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig
+  )EOF";
+  TestUtility::loadFromYaml(yaml, typed_config);
+
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  EXPECT_NE(factory->createResourceDetector(context), nullptr);
+  EXPECT_NE(factory->createResourceDetector(typed_config.typed_config(), context), nullptr);
 }
 
 } // namespace OpenTelemetry
