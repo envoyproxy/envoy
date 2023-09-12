@@ -581,17 +581,18 @@ void ListenerImpl::buildInternalListener() {
   }
 }
 
-void ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+bool ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                                 uint32_t concurrency) {
   if (socket_type_ != Network::Socket::Type::Datagram) {
-    return;
+    return false;
   }
   auto iter = udp_listener_config_->listener_worker_routers_.find(address.asString());
   if (iter != udp_listener_config_->listener_worker_routers_.end()) {
-    return;
+    return false;
   }
   udp_listener_config_->listener_worker_routers_.emplace(
       address.asString(), std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency));
+  return true;
 }
 
 void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
@@ -1004,8 +1005,11 @@ Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
   buildConnectionBalancer(*socket_factory->localAddress());
-  buildUdpListenerWorkerRouter(*socket_factory->localAddress(),
-                               parent_.server_.options().concurrency());
+  if (buildUdpListenerWorkerRouter(*socket_factory->localAddress(),
+                                   parent_.server_.options().concurrency())) {
+    parent_.server_.hotRestart().registerUdpForwardingListener(socket_factory->localAddress(),
+                                                               udp_listener_config_);
+  }
   socket_factories_.emplace_back(std::move(socket_factory));
 }
 

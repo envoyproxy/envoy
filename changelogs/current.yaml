@@ -36,6 +36,13 @@ behavior_changes:
     To revert the entire change, set the runtime flag ``envoy.reloadable_features.locality_routing_use_new_routing_logic``
     to false to get the old behavior and well-tested codepaths, undoing both changes.
 
+- area: UHV
+  change: |
+    Introduced runtime flag ``envoy.reloadable_features.enable_universal_header_validator`` for toggling Universal Header Validator
+    (UHV) on and off.
+    The default value is off. This option is currently functional only when the ``ENVOY_ENABLE_UHV`` build flag is enabled.
+    See https://github.com/envoyproxy/envoy/issues/10646 for more information about UHV.
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: ext_authz
@@ -128,6 +135,9 @@ bug_fixes:
 - area: router check tool
   change: |
     Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
+- area: unix domain sockets
+  change: |
+    Fixed a crash on some versions of macOS when using a listener on a unix-domain socket.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

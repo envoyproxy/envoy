@@ -34,6 +34,8 @@ using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
 class GrpcServiceConfigWithHashKey {
 public:
+  GrpcServiceConfigWithHashKey() = default;
+
   explicit GrpcServiceConfigWithHashKey(const envoy::config::core::v3::GrpcService& config)
       : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)){};
 
@@ -53,9 +55,14 @@ public:
 
   const envoy::config::core::v3::GrpcService& config() const { return config_; }
 
+  void setConfig(const envoy::config::core::v3::GrpcService g) {
+    config_ = g;
+    pre_computed_hash_ = Envoy::MessageUtil::hash(g);
+  }
+
 private:
-  const envoy::config::core::v3::GrpcService config_;
-  const std::size_t pre_computed_hash_;
+  envoy::config::core::v3::GrpcService config_;
+  std::size_t pre_computed_hash_;
 };
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
