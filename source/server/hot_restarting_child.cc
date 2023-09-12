@@ -100,7 +100,7 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
   main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(Blocking::Yes);
+      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
   if (!main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
                                             HotRestartMessage::Reply::kPassListenSocket)) {
     return -1;
@@ -118,7 +118,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
   main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(Blocking::Yes);
+      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
   RELEASE_ASSERT(
       main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
       "Hot restart parent did not respond as expected to get stats request.");
@@ -153,7 +153,7 @@ HotRestartingChild::sendParentAdminShutdownRequest() {
   main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(Blocking::Yes);
+      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
   RELEASE_ASSERT(main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
                                                       HotRestartMessage::Reply::kShutdownAdmin),
                  "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
