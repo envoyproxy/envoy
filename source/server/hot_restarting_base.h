@@ -91,13 +91,15 @@ private:
  */
 class HotRestartingBase : public Logger::Loggable<Logger::Id::main> {
 protected:
-  HotRestartingBase(uint64_t base_id) : main_rpc_stream_(base_id) {}
+  HotRestartingBase(uint64_t base_id)
+      : main_rpc_stream_(base_id), udp_forwarding_rpc_stream_(base_id) {}
 
   // Returns a Gauge that tracks hot-restart generation, where every successive
   // child increments this number.
   static Stats::Gauge& hotRestartGeneration(Stats::Scope& scope);
 
   RpcStream main_rpc_stream_;
+  RpcStream udp_forwarding_rpc_stream_;
 };
 
 } // namespace Server

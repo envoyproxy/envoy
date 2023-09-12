@@ -20,11 +20,16 @@ namespace {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+class MockHotRestartMessageSender : public HotRestartMessageSender {
+public:
+  MOCK_METHOD(void, sendHotRestartMessage, (envoy::HotRestartMessage && msg));
+};
+
 class HotRestartingParentTest : public testing::Test {
 public:
   NiceMock<MockInstance> server_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  HotRestartingParent::Internal hot_restarting_parent_{&server_, dispatcher_};
+  MockHotRestartMessageSender message_sender_;
+  HotRestartingParent::Internal hot_restarting_parent_{&server_, message_sender_};
 };
 
 TEST_F(HotRestartingParentTest, ShutdownAdmin) {
@@ -311,6 +316,13 @@ MATCHER_P(UdpPacketHandlerPtrIs, expected_handler, "") {
 TEST_F(HotRestartingParentTest, DrainListeners) {
   EXPECT_CALL(server_, drainListeners(UdpPacketHandlerPtrIs(&hot_restarting_parent_)));
   hot_restarting_parent_.drainListeners();
+}
+
+TEST_F(HotRestartingParentTest, UdpPacketIsForwarded) {
+  uint32_t worker_index = 12; // arbitrary index
+
+  EXPECT_CALL(message_sender_, sendHotRestartMessage(_));
+  hot_restarting_parent_.handle(worker_index, packet);
 }
 
 } // namespace
