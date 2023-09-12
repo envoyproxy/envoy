@@ -263,6 +263,7 @@ envoy_cc_library(
     deps = [
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/config:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",

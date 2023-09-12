@@ -232,7 +232,7 @@ public:
   using SubsetFallbackPolicy = envoy::config::cluster::v3::Cluster::LbSubsetConfig::
       LbSubsetSelector::LbSubsetSelectorFallbackPolicy;
 
-  ProdLoadBalancerSubsetInfoImpl(const SubsetLoadbalancingPolicyProto& subset_config)
+  ProdLoadBalancerSubsetInfoImpl(const LegacySubsetLoadbalancingPolicyProto& subset_config)
       : default_subset_(subset_config.default_subset()),
         fallback_policy_(static_cast<FallbackPolicy>(subset_config.fallback_policy())),
         metadata_fallback_policy_(
@@ -250,7 +250,7 @@ public:
     }
   }
 
-  ProdLoadBalancerSubsetInfoImpl(const LegacySubsetLoadbalancingPolicyProto& subset_config)
+  ProdLoadBalancerSubsetInfoImpl(const SubsetLoadbalancingPolicyProto& subset_config)
       : default_subset_(subset_config.default_subset()),
         fallback_policy_(static_cast<FallbackPolicy>(subset_config.fallback_policy())),
         metadata_fallback_policy_(
