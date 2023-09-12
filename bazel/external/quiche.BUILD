@@ -3169,6 +3169,7 @@ envoy_cc_library(
     hdrs = ["quiche/common/capsule.h"],
     copts = quiche_copts,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_data_lib",
         ":quic_core_http_http_frames_lib",

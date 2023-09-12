@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
-    tags = ["nofips"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
@@ -36,7 +35,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    tags = ["nofips"],
     deps = [
         "//source/extensions/upstreams/http/udp:config",
         "//source/extensions/upstreams/http/udp:upstream_request_lib",
