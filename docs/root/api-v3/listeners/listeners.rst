@@ -6,7 +6,7 @@ Listeners
   :maxdepth: 2
 
   ../config/listener/v3/api_listener.proto
-  ../extensions/network/connection_balance/dlb/v3alpha/dlb.proto
+  ../extensions/dlb/v3alpha/dlb.proto
   ../config/listener/v3/listener_components.proto
   ../config/listener/v3/listener.proto
   ../config/listener/v3/quic_config.proto
