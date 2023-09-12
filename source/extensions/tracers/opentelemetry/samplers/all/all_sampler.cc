@@ -11,9 +11,10 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-bool AllSampler::sample(Tracing::TraceContext& trace_context) {
+bool AllSampler::sample(SpanPtr& span) {
     (void)context_;
-    (void)trace_context;
+    (void)span;
+    span->setTracestate("asdf");
     return true;
 }
 

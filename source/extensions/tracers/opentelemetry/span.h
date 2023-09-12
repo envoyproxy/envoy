@@ -1,8 +1,5 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
-
 #include "envoy/api/api.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/runtime/runtime.h"
@@ -11,13 +8,17 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/common/factory_base.h"
-#include "source/extensions/tracers/opentelemetry/tracer.h"
+#include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+
+#include "absl/strings/escaping.h"
+#include "span_context.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+class Tracer;
 
 /**
  * OpenTelemetry tracing implementation of the Envoy Span object.
