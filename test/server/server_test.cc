@@ -1,4 +1,6 @@
 #include <memory>
+#include <algorithm>
+#include <vector>
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -136,10 +138,19 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
     EXPECT_EQ(snapshot.counters()[0].delta_, 1);
 
     ASSERT_EQ(snapshot.gauges().size(), 2);
-    EXPECT_EQ(snapshot.gauges()[0].get().name(), "world");
-    EXPECT_EQ(snapshot.gauges()[0].get().value(), 5);
-    EXPECT_EQ(snapshot.gauges()[1].get().name(), "again");
-    EXPECT_EQ(snapshot.gauges()[1].get().value(), 10);
+    auto world_it = std::find_if(snapshot.gauges().begin(), snapshot.gauges().end(),
+                                 [](const std::reference_wrapper<const Stats::Gauge>& gauge) {
+                                   return gauge.get().name().compare("world") == 0;
+                                 });
+    ASSERT_TRUE(world_it != snapshot.gauges().end());
+    EXPECT_EQ(world_it->get().value(), 5);
+
+    auto again_it = std::find_if(snapshot.gauges().begin(), snapshot.gauges().end(),
+                                 [](const std::reference_wrapper<const Stats::Gauge>& gauge) {
+                                   return gauge.get().name().compare("again") == 0;
+                                 });
+    ASSERT_TRUE(again_it != snapshot.gauges().end());
+    EXPECT_EQ(again_it->get().value(), 10);
 
     ASSERT_EQ(snapshot.textReadouts().size(), 0);
   }));
