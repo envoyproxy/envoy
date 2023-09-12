@@ -17,6 +17,7 @@ envoy_cc_extension(
         ":resource_detector_environment_lib",
         "//envoy/registry",
         "//source/common/config:utility_lib",
+        "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
     ],
 )
 
@@ -27,5 +28,6 @@ envoy_cc_library(
     deps = [
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
+        "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
     ],
 )

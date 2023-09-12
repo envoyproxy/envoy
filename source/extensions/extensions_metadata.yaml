@@ -1646,3 +1646,5 @@ envoy.tracers.opentelemetry.resource_detectors.environment:
   - envoy.tracers.opentelemetry.resource_detectors
   security_posture: unknown
   status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig

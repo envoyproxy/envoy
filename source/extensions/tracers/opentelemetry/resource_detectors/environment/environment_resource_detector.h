@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/logger.h"
@@ -19,11 +20,15 @@ namespace OpenTelemetry {
  */
 class EnvironmentResourceDetector : public ResourceDetector, Logger::Loggable<Logger::Id::tracing> {
 public:
-  EnvironmentResourceDetector(Server::Configuration::TracerFactoryContext& context)
-      : context_(context) {}
+  EnvironmentResourceDetector(const envoy::extensions::tracers::opentelemetry::resource_detectors::
+                                  v3::EnvironmentResourceDetectorConfig& config,
+                              Server::Configuration::TracerFactoryContext& context)
+      : config_(config), context_(context) {}
   Resource detect() override;
 
 private:
+  const envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+      EnvironmentResourceDetectorConfig config_;
   Server::Configuration::TracerFactoryContext&
       context_; // TODO, is keeping a reference ok (ownership)?
 };

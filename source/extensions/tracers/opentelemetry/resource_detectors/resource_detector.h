@@ -41,11 +41,11 @@ public:
 using ResourceDetectorPtr = std::shared_ptr<ResourceDetector>;
 
 /*
- * A factory for creating resource detectors that have configuration.
+ * A factory for creating resource detectors.
  */
-class ResourceDetectorTypedFactory : public Envoy::Config::TypedFactory {
+class ResourceDetectorFactory : public Envoy::Config::TypedFactory {
 public:
-  ~ResourceDetectorTypedFactory() override = default;
+  ~ResourceDetectorFactory() override = default;
 
   /**
    * @brief Creates a resource detector based on the configuration type provided.
@@ -55,34 +55,13 @@ public:
    * @return ResourceDetectorPtr A resource detector based on the configuration type provided.
    */
   virtual ResourceDetectorPtr
-  createTypedResourceDetector(const Protobuf::Message& message,
-                              Server::Configuration::TracerFactoryContext& context) PURE;
+  createResourceDetector(const Protobuf::Message& message,
+                         Server::Configuration::TracerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tracers.opentelemetry.resource_detectors"; }
 };
 
-using ResourceDetectorTypedFactoryPtr = std::unique_ptr<ResourceDetectorTypedFactory>;
-
-/*
- * A factory for creating resource detectors without configuration.
- */
-class ResourceDetectorFactory : public Envoy::Config::UntypedFactory {
-public:
-  ~ResourceDetectorFactory() override = default;
-
-  /**
-   * @brief Creates a resource detector that does not have a configuration.
-   *
-   * @param context The tracer factory context.
-   * @return ResourceDetectorPtr A resource detector based on the provided name.
-   */
-  virtual ResourceDetectorPtr
-  createResourceDetector(Server::Configuration::TracerFactoryContext& context) PURE;
-
-  std::string category() const override { return "envoy.tracers.opentelemetry.resource_detectors"; }
-};
-
-using ResourceDetectorFactoryPtr = std::unique_ptr<ResourceDetectorFactory>;
+using ResourceDetectorTypedFactoryPtr = std::unique_ptr<ResourceDetectorFactory>;
 
 } // namespace OpenTelemetry
 } // namespace Tracers

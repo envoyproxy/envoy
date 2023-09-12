@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
+
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
 
 namespace Envoy {
@@ -18,11 +20,18 @@ public:
    * @brief Create a Resource Detector that reads from the OTEL_RESOURCE_ATTRIBUTES
    * environment variable.
    *
-   * @param context
+   * @param message The resource detector configuration.
+   * @param context The tracer factory context.
    * @return ResourceDetectorPtr
    */
   ResourceDetectorPtr
-  createResourceDetector(Server::Configuration::TracerFactoryContext& context) override;
+  createResourceDetector(const Protobuf::Message& message,
+                         Server::Configuration::TracerFactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+                                EnvironmentResourceDetectorConfig>();
+  }
 
   std::string name() const override {
     return "envoy.tracers.opentelemetry.resource_detectors.environment";

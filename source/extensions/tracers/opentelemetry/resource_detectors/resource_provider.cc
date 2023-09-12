@@ -80,29 +80,17 @@ const Resource ResourceProviderImpl::getResource(
   Resource resource = createInitialResource(opentelemetry_config.service_name());
 
   auto detectors_configs = opentelemetry_config.resource_detectors();
+
   for (const auto& detector_config : detectors_configs) {
     ResourceDetectorPtr detector;
-    if (detector_config.has_typed_config()) {
-      auto* factory =
-          Envoy::Config::Utility::getFactory<ResourceDetectorTypedFactory>(detector_config);
+    auto* factory = Envoy::Config::Utility::getFactory<ResourceDetectorFactory>(detector_config);
 
-      if (!factory) {
-        throw EnvoyException(
-            fmt::format("Resource detector factory not found: '{}'", detector_config.name()));
-      }
-
-      detector = factory->createTypedResourceDetector(detector_config.typed_config(), context);
-    } else {
-      auto* factory =
-          Envoy::Config::Utility::getFactoryByName<ResourceDetectorFactory>(detector_config.name());
-
-      if (!factory) {
-        throw EnvoyException(
-            fmt::format("Resource detector factory not found: '{}'", detector_config.name()));
-      }
-
-      detector = factory->createResourceDetector(context);
+    if (!factory) {
+      throw EnvoyException(
+          fmt::format("Resource detector factory not found: '{}'", detector_config.name()));
     }
+
+    detector = factory->createResourceDetector(detector_config.typed_config(), context);
 
     if (!detector) {
       throw EnvoyException(
