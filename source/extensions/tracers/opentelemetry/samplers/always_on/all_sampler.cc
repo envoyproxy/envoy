@@ -11,10 +11,15 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-bool AllSampler::sample(Tracing::TraceContext& trace_context) {
+SamplingResult AlwaysOnSampler::shouldSample() {
     (void)context_;
-    (void)trace_context;
-    return true;
+    SamplingResult result;
+    result.decision = Decision::RECORD_AND_SAMPLE;
+    return {};
+}
+
+std::string AlwaysOnSampler::getDescription() const {
+    return "AlwaysOnSampler";
 }
 
 } // namespace OpenTelemetry

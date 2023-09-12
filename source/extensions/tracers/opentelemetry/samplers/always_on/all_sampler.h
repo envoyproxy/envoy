@@ -16,15 +16,15 @@ namespace OpenTelemetry {
  * variable.
  *
  */
-class AllSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
+class AlwaysOnSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
 public:
-  AllSampler(Server::Configuration::TracerFactoryContext& context)
+  AlwaysOnSampler(Server::Configuration::TracerFactoryContext& context)
       : context_(context) {}
-  bool sample(Tracing::TraceContext& trace_context) override;
+  SamplingResult shouldSample() override;
+  std::string getDescription() const override;
 
 private:
-  Server::Configuration::TracerFactoryContext&
-      context_;
+  Server::Configuration::TracerFactoryContext& context_;
 };
 
 } // namespace OpenTelemetry

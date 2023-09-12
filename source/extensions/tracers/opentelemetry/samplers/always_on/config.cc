@@ -9,16 +9,16 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-SamplerPtr AllSamplerFactory::createSampler(
+SamplerPtr AlwaysOnSamplerFactory::createSampler(
     Server::Configuration::TracerFactoryContext& context) {
 
-  return std::make_shared<AllSampler>(context);
+  return std::make_shared<AlwaysOnSampler>(context);
 }
 
 /**
  * Static registration for the Env sampler factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(AllSamplerFactory, SamplerFactory);
+REGISTER_FACTORY(AlwaysOnSamplerFactory, SamplerFactory);
 
 } // namespace OpenTelemetry
 } // namespace Tracers

@@ -70,7 +70,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   SpanContextExtractor extractor(trace_context);
   if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
-    if (sampler_ && !sampler_->sample(trace_context)) {
+    if (sampler_ && !sampler_->shouldSample().isRecording()) {
       // we should start a span which has "sampled == false"
       // we should pass the started span to the sampler. So, the sampler can call setTag() and add sampling related content
       return std::make_unique<Tracing::NullSpan>();
