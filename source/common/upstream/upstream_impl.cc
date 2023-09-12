@@ -56,9 +56,6 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/load_balancer_factory_base.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
-#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
-#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
-#include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"

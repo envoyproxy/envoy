@@ -16,14 +16,6 @@
 namespace Envoy {
 namespace Upstream {
 
-LegacyTypedRingHashLbConfig::LegacyTypedRingHashLbConfig(
-    const envoy::config::cluster::v3::Cluster::RingHashLbConfig& config)
-    : lb_config_(config) {}
-
-TypedRingHashLbConfig::TypedRingHashLbConfig(
-    const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& config)
-    : lb_config_(config) {}
-
 RingHashLoadBalancer::RingHashLoadBalancer(
     const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
