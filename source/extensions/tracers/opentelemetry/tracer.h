@@ -16,6 +16,8 @@
 #include "absl/strings/escaping.h"
 #include "span_context.h"
 
+#include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -36,7 +38,7 @@ class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
   Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-         OpenTelemetryTracerStats tracing_stats, const std::string& service_name);
+         OpenTelemetryTracerStats tracing_stats, const std::string& service_name, SamplerPtr sampler);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -64,6 +66,7 @@ private:
   Event::TimerPtr flush_timer_;
   OpenTelemetryTracerStats tracing_stats_;
   std::string service_name_;
+  SamplerPtr sampler_;
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
