@@ -374,12 +374,13 @@ public:
 
     const uint64_t inline_keys_num = descriptor_.inlineKeysNum();
     const auto& inline_keys = descriptor_.inlineKeys();
+    const Value* inline_entries = inlineEntries();
     for (uint64_t i = 0; i < inline_keys_num; ++i) {
       if (!inlineEntryValid(i)) {
         continue;
       }
 
-      if (!callback(inline_keys[i], inlineEntries()[i])) {
+      if (!callback(inline_keys[i], inline_entries[i])) {
         return;
       }
     }
@@ -459,7 +460,9 @@ private:
 
   template <class SetValue> void resetInlineMapEntry(uint64_t inline_entry_id, SetValue&& value) {
     ASSERT(inline_entry_id < descriptor_.inlineKeysNum());
-    // Only allocate the memory for inline entries when the first inline entry is added.
+    // Only allocate the memory for inline entries when the first inline entry is added. The avoid
+    // the unnecessary memory allocation and deallocation for the map instances that never add any
+    // inline entries.
     lazyInitializeInlineEntriesMemory();
 
     clearInlineMapEntry(inline_entry_id);
