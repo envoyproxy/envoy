@@ -74,7 +74,7 @@ do
     _CHANGES=$(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1 | tr '\n' ' ')
     IFS=' ' read -ra CHANGES <<< "$_CHANGES"
 
-    echo -ne "  Checking format for $i - "
+    echo -ne "  Checking format for ${CHANGES[*]} - "
     bazel run //tools/code_format:check_format -- check "${CHANGES[@]}" || exit 1
     # TODO(phlax): It seems this is not running in CI anymore and is now finding issues
     # in merged PRs. Unify this hook and format checks in CI when the new format tool is rolled
