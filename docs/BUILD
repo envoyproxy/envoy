@@ -196,6 +196,13 @@ pkg_files(
 )
 
 pkg_files(
+    name = "repo_configs",
+    srcs = ["//configs"],
+    prefix = "_configs/repo",
+    strip_prefix = "/configs",
+)
+
+pkg_files(
     name = "examples_rst",
     srcs = ["//examples:files"],
     prefix = "start/sandboxes/_include",
@@ -206,6 +213,7 @@ pkg_filegroup(
     name = "rst_files",
     srcs = [
         ":examples_rst",
+        ":repo_configs",
         ":sphinx_base",
         ":sphinx_inventories",
         ":sphinx_root",
