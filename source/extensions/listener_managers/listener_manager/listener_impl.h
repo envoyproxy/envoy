@@ -454,7 +454,7 @@ private:
   void buildAccessLog();
   void buildInternalListener();
   void validateConfig();
-  void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+  bool buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
   void buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<

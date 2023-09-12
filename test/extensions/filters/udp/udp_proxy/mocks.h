@@ -22,6 +22,7 @@ public:
   MOCK_METHOD(uint64_t, sessionId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(void, continueFilterChain, ());
+  MOCK_METHOD(void, injectDatagramToFilterChain, (Network::UdpRecvData & data));
 
   uint64_t session_id_{1};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -34,6 +35,7 @@ public:
 
   MOCK_METHOD(uint64_t, sessionId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(void, injectDatagramToFilterChain, (Network::UdpRecvData & data));
 
   uint64_t session_id_{1};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
