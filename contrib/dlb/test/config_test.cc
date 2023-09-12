@@ -6,7 +6,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 
-#include "contrib/envoy/extensions/dlb/v3alpha/dlb.pb.h"
+#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
 #include "contrib/dlb/source/connection_balancer_impl.h"
 #include "gtest/gtest.h"
 

@@ -12,8 +12,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/listener_managers/listener_manager/active_tcp_listener.h"
 
-#include "contrib/envoy/extensions/dlb/v3alpha/dlb.pb.h"
-#include "contrib/envoy/extensions/dlb/v3alpha/dlb.pb.validate.h"
+#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
+#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.validate.h"
 
 #ifndef DLB_DISABLED
 #include "dlb.h"

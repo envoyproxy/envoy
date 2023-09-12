@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <memory>
 
-#include "contrib/envoy/extensions/dlb/v3alpha/dlb.pb.h"
+#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
 
 #ifndef DLB_DISABLED
 #include "dlb.h"
