@@ -175,6 +175,35 @@ TEST_F(HttpCapsuleFilterTest, DecapsulateSplitPayload) {
   EXPECT_EQ(0, payload2.buffer_->length());
 }
 
+TEST_F(HttpCapsuleFilterTest, DecapsulateMultipleDatagrams) {
+  setup();
+
+  const std::string capsule = absl::HexStringToBytes("00" // DATAGRAM Capsule Type
+                                                     "09" // Capsule Length = length(payload1) + 1
+                                                     "00" // Context ID
+                                                     ) +
+                              "payload1" +
+                              absl::HexStringToBytes("00" // DATAGRAM Capsule Type
+                                                     "09" // Capsule Length = length(payload2) + 1
+                                                     "00" // Context ID
+                                                     ) +
+                              "payload2";
+
+  Network::UdpRecvData datagram;
+  datagram.buffer_ = std::make_unique<Buffer::OwnedImpl>();
+  datagram.buffer_->add(capsule);
+  EXPECT_CALL(write_callbacks_, injectDatagramToFilterChain(_))
+      .WillOnce(Invoke([](Network::UdpRecvData& data) -> void {
+        EXPECT_EQ("payload1", data.buffer_->toString());
+      }))
+      .WillOnce(Invoke([](Network::UdpRecvData& data) -> void {
+        EXPECT_EQ("payload2", data.buffer_->toString());
+      }));
+
+  EXPECT_EQ(WriteFilterStatus::StopIteration, filter_->onWrite(datagram));
+  EXPECT_EQ(0, datagram.buffer_->length());
+}
+
 } // namespace
 } // namespace HttpCapsule
 } // namespace SessionFilters
