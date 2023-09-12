@@ -22,11 +22,13 @@ py_binary(
     srcs = ["check_format.py"],
     args = [
         "--path=%s" % PATH,
+        "--clang_format_path=$(location //tools/clang-format)",
         "--buildifier_path=$(location @com_github_bazelbuild_buildtools//buildifier)",
         "--buildozer_path=$(location @com_github_bazelbuild_buildtools//buildozer)",
     ],
     data = [
         ":config.yaml",
+        "//tools/clang-format",
         "@com_github_bazelbuild_buildtools//buildifier",
         "@com_github_bazelbuild_buildtools//buildozer",
     ],
