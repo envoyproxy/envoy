@@ -51,9 +51,6 @@ public:
   explicit PerFilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context,
                                             Init::Manager& init_manager);
 
-  ~PerFilterChainFactoryContextImpl() {
-    std::cout << "Destructing PerFilterChainFactoryContextImpl >>>>>>>>>>>>>>>>>>>>" << std::endl;
-  }
   // DrainDecision
   bool drainClose() const override;
   Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {

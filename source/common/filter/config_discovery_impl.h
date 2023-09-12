@@ -542,7 +542,9 @@ public:
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
-    subscription_stat_prefix = provider_stat_prefix = subscription_stat_prefix;
+    subscription_stat_prefix =
+        absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
+    provider_stat_prefix = subscription_stat_prefix;
 
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
                                         server_context, cluster_manager, subscription_stat_prefix);
