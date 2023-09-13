@@ -33,8 +33,8 @@ TEST(EnvironmentResourceDetectorTest, Detection) {
     auto detector = std::make_shared<EnvironmentResourceDetector>(config, context);
     Resource resource = detector->detect();
 
-    EXPECT_EQ(resource.schemaUrl, "");
-    EXPECT_TRUE(resource.attributes.empty());
+    EXPECT_EQ(resource.schemaUrl_, "");
+    EXPECT_TRUE(resource.attributes_.empty());
   }
   // OTEL_RESOURCE_ATTRIBUTES env variable present but empty
   {
@@ -47,8 +47,8 @@ TEST(EnvironmentResourceDetectorTest, Detection) {
     auto detector = std::make_shared<EnvironmentResourceDetector>(config, context);
     Resource resource = detector->detect();
 
-    EXPECT_EQ(resource.schemaUrl, "");
-    EXPECT_TRUE(resource.attributes.empty());
+    EXPECT_EQ(resource.schemaUrl_, "");
+    EXPECT_TRUE(resource.attributes_.empty());
     TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
   }
   // // OTEL_RESOURCE_ATTRIBUTES env variable present and with attributes
@@ -66,10 +66,10 @@ TEST(EnvironmentResourceDetectorTest, Detection) {
     auto detector = std::make_shared<EnvironmentResourceDetector>(config, context);
     Resource resource = detector->detect();
 
-    EXPECT_EQ(resource.schemaUrl, "");
-    EXPECT_EQ(2, resource.attributes.size());
+    EXPECT_EQ(resource.schemaUrl_, "");
+    EXPECT_EQ(2, resource.attributes_.size());
 
-    for (auto& actual : resource.attributes) {
+    for (auto& actual : resource.attributes_) {
       auto expected = expected_attributes.find(actual.first);
 
       EXPECT_TRUE(expected != expected_attributes.end());

@@ -14,10 +14,9 @@ namespace OpenTelemetry {
 
 using ResourceAttributes = std::map<std::string, std::string>;
 
-class Resource {
-public:
-  std::string schemaUrl{""};
-  ResourceAttributes attributes{};
+struct Resource {
+  std::string schemaUrl_{""};
+  ResourceAttributes attributes_{};
 
   virtual ~Resource() = default;
 };
@@ -35,7 +34,7 @@ public:
    * populated with them and a possible SchemaUrl.
    * @return Resource
    */
-  virtual Resource detect() = 0;
+  virtual Resource detect() PURE;
 };
 
 using ResourceDetectorPtr = std::shared_ptr<ResourceDetector>;

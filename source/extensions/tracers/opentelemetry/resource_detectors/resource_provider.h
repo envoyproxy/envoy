@@ -27,14 +27,14 @@ public:
    * @param context The tracer factory context.
    * @return Resource const The merged resource.
    */
-  virtual Resource const
+  virtual Resource
   getResource(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-              Server::Configuration::TracerFactoryContext& context) const = 0;
+              Server::Configuration::TracerFactoryContext& context) const PURE;
 };
 
 class ResourceProviderImpl : public ResourceProvider {
 public:
-  Resource const
+  Resource
   getResource(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
               Server::Configuration::TracerFactoryContext& context) const override;
 };

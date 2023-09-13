@@ -13,7 +13,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 namespace {
-bool isEmptyResource(const Resource& resource) { return resource.attributes.empty(); }
+bool isEmptyResource(const Resource& resource) { return resource.attributes_.empty(); }
 
 Resource createInitialResource(std::string service_name) {
   Resource resource{};
@@ -22,12 +22,12 @@ Resource createInitialResource(std::string service_name) {
   if (service_name.empty()) {
     service_name = std::string{kDefaultServiceName};
   }
-  resource.attributes[std::string(kServiceNameKey.data(), kServiceNameKey.size())] = service_name;
+  resource.attributes_[std::string(kServiceNameKey.data(), kServiceNameKey.size())] = service_name;
   return resource;
 }
 
 /**
- * @brief Calculates the new schema url when merging two resources.
+ * @brief Resolves the new schema url when merging two resources.
  * This function implements the algorightm as defined in the OpenTelemetry Resource SDK
  * specification. @see
  * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.24.0/specification/resource/sdk.md#merge
@@ -36,7 +36,7 @@ Resource createInitialResource(std::string service_name) {
  * @param updating_schema_url The updating resource's schema URL.
  * @return std::string The calculated schema URL.
  */
-std::string mergeSchemaUrl(const std::string& old_schema_url,
+std::string resolveSchemaUrl(const std::string& old_schema_url,
                            const std::string& updating_schema_url) {
   if (old_schema_url.empty()) {
     return updating_schema_url;
@@ -66,20 +66,20 @@ void mergeResource(Resource& old_resource, const Resource& updating_resource) {
   if (isEmptyResource(updating_resource)) {
     return;
   }
-  for (auto const& attr : updating_resource.attributes) {
-    old_resource.attributes.insert_or_assign(attr.first, attr.second);
+  for (auto const& attr : updating_resource.attributes_) {
+    old_resource.attributes_.insert_or_assign(attr.first, attr.second);
   }
-  old_resource.schemaUrl = mergeSchemaUrl(old_resource.schemaUrl, updating_resource.schemaUrl);
+  old_resource.schemaUrl_ = resolveSchemaUrl(old_resource.schemaUrl_, updating_resource.schemaUrl_);
 }
 } // namespace
 
-const Resource ResourceProviderImpl::getResource(
+Resource ResourceProviderImpl::getResource(
     const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
     Server::Configuration::TracerFactoryContext& context) const {
 
   Resource resource = createInitialResource(opentelemetry_config.service_name());
 
-  auto detectors_configs = opentelemetry_config.resource_detectors();
+  const auto& detectors_configs = opentelemetry_config.resource_detectors();
 
   for (const auto& detector_config : detectors_configs) {
     ResourceDetectorPtr detector;

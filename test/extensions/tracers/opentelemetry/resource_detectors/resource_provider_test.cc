@@ -56,8 +56,8 @@ const std::string kOtelResourceAttributesEnv = "OTEL_RESOURCE_ATTRIBUTES";
 class ResourceProviderTest : public testing::Test {
 public:
   ResourceProviderTest() {
-    resource_a_.attributes.insert(std::pair<std::string, std::string>("key1", "val1"));
-    resource_b_.attributes.insert(std::pair<std::string, std::string>("key2", "val2"));
+    resource_a_.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
+    resource_b_.attributes_.insert(std::pair<std::string, std::string>("key2", "val2"));
   }
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
   Resource resource_a_;
@@ -78,10 +78,10 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   ResourceProviderImpl resource_provider;
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-  EXPECT_EQ(resource.schemaUrl, "");
+  EXPECT_EQ(resource.schemaUrl_, "");
 
   // Only the service name was added to the resource
-  EXPECT_EQ(1, resource.attributes.size());
+  EXPECT_EQ(1, resource.attributes_.size());
 }
 
 TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
@@ -97,11 +97,11 @@ TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
   ResourceProviderImpl resource_provider;
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-  EXPECT_EQ(resource.schemaUrl, "");
+  EXPECT_EQ(resource.schemaUrl_, "");
 
   // service.name receives the unknown value when not configured
-  EXPECT_EQ(1, resource.attributes.size());
-  auto service_name = resource.attributes.find("service.name");
+  EXPECT_EQ(1, resource.attributes_.size());
+  auto service_name = resource.attributes_.find("service.name");
   EXPECT_EQ("unknown_service:envoy", service_name->second);
 }
 
@@ -145,13 +145,13 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   ResourceProviderImpl resource_provider;
   Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-  EXPECT_EQ(resource.schemaUrl, "");
+  EXPECT_EQ(resource.schemaUrl_, "");
 
   // The resource should contain all 3 merged attributes
   // service.name + 1 for each detector
-  EXPECT_EQ(3, resource.attributes.size());
+  EXPECT_EQ(3, resource.attributes_.size());
 
-  for (auto& actual : resource.attributes) {
+  for (auto& actual : resource.attributes_) {
     auto expected = expected_attributes.find(actual.first);
 
     EXPECT_TRUE(expected != expected_attributes.end());
@@ -217,7 +217,7 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
     Resource old_resource = resource_a_;
 
     Resource updating_resource = resource_b_;
-    updating_resource.schemaUrl = expected_schema_url;
+    updating_resource.schemaUrl_ = expected_schema_url;
 
     auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
     EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
@@ -254,16 +254,16 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
     ResourceProviderImpl resource_provider;
     Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-    EXPECT_EQ(expected_schema_url, resource.schemaUrl);
+    EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
   }
   // old resource schema is not empty and updating one is. should keep old schema
   {
     std::string expected_schema_url = "my.schema/v1";
     Resource old_resource = resource_a_;
-    old_resource.schemaUrl = expected_schema_url;
+    old_resource.schemaUrl_ = expected_schema_url;
 
     Resource updating_resource = resource_b_;
-    updating_resource.schemaUrl = "";
+    updating_resource.schemaUrl_ = "";
 
     auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
     EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
@@ -300,16 +300,16 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
     ResourceProviderImpl resource_provider;
     Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-    EXPECT_EQ(expected_schema_url, resource.schemaUrl);
+    EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
   }
   // old and updating resource schema are the same. should keep old schema
   {
     std::string expected_schema_url = "my.schema/v1";
     Resource old_resource = resource_a_;
-    old_resource.schemaUrl = expected_schema_url;
+    old_resource.schemaUrl_ = expected_schema_url;
 
     Resource updating_resource = resource_b_;
-    updating_resource.schemaUrl = expected_schema_url;
+    updating_resource.schemaUrl_ = expected_schema_url;
 
     auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
     EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
@@ -346,16 +346,16 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
     ResourceProviderImpl resource_provider;
     Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-    EXPECT_EQ(expected_schema_url, resource.schemaUrl);
+    EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
   }
   // old and updating resource schema are not empty and are different. should keep old schema
   {
     std::string expected_schema_url = "my.schema/v1";
     Resource old_resource = resource_a_;
-    old_resource.schemaUrl = expected_schema_url;
+    old_resource.schemaUrl_ = expected_schema_url;
 
     Resource updating_resource = resource_b_;
-    updating_resource.schemaUrl = "my.schema/v2";
+    updating_resource.schemaUrl_ = "my.schema/v2";
 
     auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
     EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
@@ -392,7 +392,7 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
     ResourceProviderImpl resource_provider;
     Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-    EXPECT_EQ(expected_schema_url, resource.schemaUrl);
+    EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
   }
 }
 

@@ -26,27 +26,21 @@ Resource EnvironmentResourceDetector::detect() {
   ds.set_environment_variable(kOtelResourceAttributesEnv);
 
   Resource resource;
-  resource.schemaUrl = "";
+  resource.schemaUrl_ = "";
 
-  TRY_NEEDS_AUDIT {
-    auto attributes_str = Config::DataSource::read(ds, true, context_.serverFactoryContext().api());
-    if (attributes_str.empty()) {
-      return resource;
-    }
-
-    std::istringstream iss(attributes_str);
-    std::string token;
-    while (std::getline(iss, token, ',')) {
-      size_t pos = token.find('=');
-      std::string key = token.substr(0, pos);
-      std::string value = token.substr(pos + 1);
-      resource.attributes[key] = value;
-    }
-  }
-  END_TRY catch (const EnvoyException& e) {
-    ENVOY_LOG(error, "Failed to read resource attributes: {}.", e.what());
+  auto attributes_str = Config::DataSource::read(ds, true, context_.serverFactoryContext().api());
+  if (attributes_str.empty()) {
+    return resource;
   }
 
+  std::istringstream iss(attributes_str);
+  std::string token;
+  while (std::getline(iss, token, ',')) {
+    size_t pos = token.find('=');
+    std::string key = token.substr(0, pos);
+    std::string value = token.substr(pos + 1);
+    resource.attributes_[key] = value;
+  }
   return resource;
 }
 

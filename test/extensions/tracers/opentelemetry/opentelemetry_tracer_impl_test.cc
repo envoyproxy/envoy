@@ -29,7 +29,7 @@ using testing::ReturnRef;
 
 class MockResourceProvider : public ResourceProvider {
 public:
-  MOCK_METHOD(const Resource, getResource,
+  MOCK_METHOD(Resource, getResource,
               (const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
                Server::Configuration::TracerFactoryContext& context),
               (const));
@@ -53,7 +53,7 @@ public:
     ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
     Resource resource;
-    resource.attributes.insert(std::pair<std::string, std::string>("key1", "val1"));
+    resource.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
 
     auto mock_resource_provider = NiceMock<MockResourceProvider>();
     EXPECT_CALL(mock_resource_provider, getResource(_, _)).WillRepeatedly(Return(resource));
