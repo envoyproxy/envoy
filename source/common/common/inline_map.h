@@ -452,7 +452,7 @@ private:
       const uint64_t memory_size = value_memory_size + valid_memory_size;
 
       inline_entries_.reset(new uint8_t[memory_size]);
-      memset(inline_entries_.get(), 0, memory_size);
+      memset(inline_entries_.get() + value_memory_size, 0, valid_memory_size);
 
       inline_entries_valid_ = reinterpret_cast<bool*>(inline_entries_.get() + value_memory_size);
     }
