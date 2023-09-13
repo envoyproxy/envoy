@@ -15,22 +15,22 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
 
   // Set entries.
   for (size_t i = 0; i < 100; ++i) {
-    map.set("key_" + std::to_string(i), "value_" + std::to_string(i));
+    map.set(absl::StrCat("key_", i), absl::StrCat("value_", i));
   }
 
   // Set entries by duplicate keys will fail.
   for (size_t i = 0; i < 100; ++i) {
-    EXPECT_FALSE(map.set("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
+    EXPECT_FALSE(map.set(absl::StrCat("key_", i), absl::StrCat("value_", i)).second);
   }
 
   // Use operator[] to set entries could overwrite existing entries.
   for (size_t i = 0; i < 100; ++i) {
-    map["key_" + std::to_string(i)] = "value_" + std::to_string(i) + "_new";
+    map[absl::StrCat("key_", i)] = absl::StrCat("value_", i, "_new");
   }
 
   // Get entries.
   for (size_t i = 0; i < 100; ++i) {
-    EXPECT_EQ(*map.get("key_" + std::to_string(i)), "value_" + std::to_string(i) + "_new");
+    EXPECT_EQ(*map.get(absl::StrCat("key_", i)), absl::StrCat("value_", i, "_new"));
   }
 
   // Get entries by non-existing keys.
@@ -38,7 +38,7 @@ TEST(InlineMapWithZeroInlineKey, InlineMapWithZeroInlineKeyTest) {
 
   // Erase entries.
   for (size_t i = 0; i < 100; ++i) {
-    map.erase("key_" + std::to_string(i));
+    map.erase(absl::StrCat("key_", i));
   }
 }
 
@@ -49,12 +49,12 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Create 20 inline keys.
   for (size_t i = 0; i < 20; ++i) {
-    handles.push_back(descriptor.addInlineKey("key_" + std::to_string(i)));
+    handles.push_back(descriptor.addInlineKey(absl::StrCat("key_", i)));
   }
 
   // Add repeated inline keys will make no effect and return the same handle.
   for (size_t i = 0; i < 20; ++i) {
-    EXPECT_EQ(handles[i], descriptor.addInlineKey("key_" + std::to_string(i)));
+    EXPECT_EQ(handles[i], descriptor.addInlineKey(absl::StrCat("key_", i)));
   }
 
   descriptor.finalize();
@@ -63,27 +63,27 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Set entries by normal keys. But these keys are registered as inline keys.
   for (size_t i = 0; i < 10; ++i) {
-    EXPECT_TRUE(map.set("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
+    EXPECT_TRUE(map.set(absl::StrCat("key_", i), absl::StrCat("value_", i)).second);
     EXPECT_EQ(map.size(), i + 1);
   }
 
   // Set entries by duplicate keys will fail.
   for (size_t i = 0; i < 10; ++i) {
-    EXPECT_FALSE(map.set("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
+    EXPECT_FALSE(map.set(absl::StrCat("key_", i), absl::StrCat("value_", i)).second);
     EXPECT_EQ(map.size(), 10);
   }
 
   // Set entries by typed inline handle.
   for (size_t i = 10; i < 20; ++i) {
     auto handle = handles[i];
-    EXPECT_TRUE(map.set(handle, "value_" + std::to_string(i)).second);
+    EXPECT_TRUE(map.set(handle, absl::StrCat("value_", i)).second);
     EXPECT_EQ(map.size(), i + 1);
   }
 
   // Set entries by duplicate keys will fail.
   for (size_t i = 0; i < 20; ++i) {
     auto handle = handles[i];
-    EXPECT_FALSE(map.set(handle, "value_" + std::to_string(i)).second);
+    EXPECT_FALSE(map.set(handle, absl::StrCat("value_", i)).second);
 
     // The size will not change.
     EXPECT_EQ(map.size(), 20);
@@ -91,19 +91,19 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Set entries by normal keys.
   for (size_t i = 20; i < 100; ++i) {
-    EXPECT_TRUE(map.set("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
+    EXPECT_TRUE(map.set(absl::StrCat("key_", i), absl::StrCat("value_", i)).second);
     EXPECT_EQ(map.size(), i + 1);
   }
 
   // Set entries by duplicate keys will fail.
   for (size_t i = 20; i < 100; ++i) {
-    EXPECT_FALSE(map.set("key_" + std::to_string(i), "value_" + std::to_string(i)).second);
+    EXPECT_FALSE(map.set(absl::StrCat("key_", i), absl::StrCat("value_", i)).second);
     EXPECT_EQ(map.size(), 100);
   }
 
   // Use operator[] to set entries with typed inline handle could overwrite existing keys.
   for (size_t i = 0; i < 10; ++i) {
-    map[handles[i]] = "value_" + std::to_string(i) + "_new";
+    map[handles[i]] = absl::StrCat("value_", i, "_new");
 
     // The size will not change.
     EXPECT_EQ(map.size(), 100);
@@ -112,7 +112,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   // Use operator[] to set entries could overwrite existing keys (10-20 will be the keys that
   // registered as inline keys).
   for (size_t i = 10; i < 100; ++i) {
-    map["key_" + std::to_string(i)] = "value_" + std::to_string(i) + "_new";
+    map[absl::StrCat("key_", i)] = absl::StrCat("value_", i, "_new");
 
     // The size will not change.
     EXPECT_EQ(map.size(), 100);
@@ -120,7 +120,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Get entries.
   for (size_t i = 0; i < 100; ++i) {
-    EXPECT_EQ(*map.get("key_" + std::to_string(i)), "value_" + std::to_string(i) + "_new");
+    EXPECT_EQ(*map.get(absl::StrCat("key_", i)), absl::StrCat("value_", i, "_new"));
 
     // The size will not change.
     EXPECT_EQ(map.size(), 100);
@@ -128,9 +128,9 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Get entries by typed inline handle.
   for (size_t i = 0; i < handles.size(); ++i) {
-    const std::string key = "key_" + std::to_string(i);
+    const std::string key = absl::StrCat("key_", i);
     auto handle = handles[i];
-    EXPECT_EQ(*map.get(handle), "value_" + std::to_string(i) + "_new");
+    EXPECT_EQ(*map.get(handle), absl::StrCat("value_", i, "_new"));
 
     // The size will not change.
     EXPECT_EQ(map.size(), 100);
@@ -141,7 +141,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Erase entries by typed inline handle.
   for (size_t i = 0; i < 10; ++i) {
-    const std::string key = "key_" + std::to_string(i);
+    const std::string key = absl::StrCat("key_", i);
     auto handle = handles[i];
     map.erase(handle);
 
@@ -150,7 +150,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Erase entries.
   for (size_t i = 10; i < 100; ++i) {
-    map.erase("key_" + std::to_string(i));
+    map.erase(absl::StrCat("key_", i));
 
     EXPECT_EQ(map.size(), 100 - i - 1);
   }
@@ -159,7 +159,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
 
   // Get entries from empty map by normal key will return nothing.
   for (size_t i = 0; i < 100; ++i) {
-    EXPECT_EQ(map.get("key_" + std::to_string(i)), OptRef<std::string>{});
+    EXPECT_EQ(map.get(absl::StrCat("key_", i)), OptRef<std::string>{});
   }
 
   // Get entries from empty map by typed inline handle will return nothing.
@@ -175,7 +175,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTest) {
   }
 
   for (size_t i = 10; i < 100; ++i) {
-    EXPECT_EQ(map["key_" + std::to_string(i)], "");
+    EXPECT_EQ(map[absl::StrCat("key_", i)], "");
 
     EXPECT_EQ(map.size(), i + 1);
   }
@@ -190,12 +190,12 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTestDestructWithEntries) 
 
   // Create 20 inline keys.
   for (size_t i = 0; i < 20; ++i) {
-    handles.push_back(descriptor.addInlineKey("key_" + std::to_string(i)));
+    handles.push_back(descriptor.addInlineKey(absl::StrCat("key_", i)));
   }
 
   // Add repeated inline keys will make no effect and return the same handle.
   for (size_t i = 0; i < 20; ++i) {
-    EXPECT_EQ(handles[i], descriptor.addInlineKey("key_" + std::to_string(i)));
+    EXPECT_EQ(handles[i], descriptor.addInlineKey(absl::StrCat("key_", i)));
   }
 
   descriptor.finalize();
@@ -205,12 +205,12 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTestDestructWithEntries) 
 
     // Set inline entries.
     for (size_t i = 0; i < 20; ++i) {
-      map.set(handles[i], "value_" + std::to_string(i));
+      map.set(handles[i], absl::StrCat("value_", i));
     }
 
     // Set dynamic entries.
     for (size_t i = 20; i < 100; ++i) {
-      map.set("key_" + std::to_string(i), "value_" + std::to_string(i));
+      map.set(absl::StrCat("key_", i), absl::StrCat("value_", i));
     }
   }
 }
@@ -222,12 +222,12 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTestWithUniquePtrAsValue)
 
   // Create 20 inline keys.
   for (size_t i = 0; i < 20; ++i) {
-    handles.push_back(descriptor.addInlineKey("key_" + std::to_string(i)));
+    handles.push_back(descriptor.addInlineKey(absl::StrCat("key_", i)));
   }
 
   // Add repeated inline keys will make no effect and return the same handle.
   for (size_t i = 0; i < 20; ++i) {
-    EXPECT_EQ(handles[i], descriptor.addInlineKey("key_" + std::to_string(i)));
+    EXPECT_EQ(handles[i], descriptor.addInlineKey(absl::StrCat("key_", i)));
   }
 
   descriptor.finalize();
@@ -236,13 +236,12 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTestWithUniquePtrAsValue)
 
   // Set inline entries.
   for (size_t i = 0; i < 20; ++i) {
-    map.set(handles[i], std::make_unique<std::string>("value_" + std::to_string(i)));
+    map.set(handles[i], std::make_unique<std::string>(absl::StrCat("value_", i)));
   }
 
   // Set dynamic entries.
   for (size_t i = 20; i < 100; ++i) {
-    map.set("key_" + std::to_string(i),
-            std::make_unique<std::string>("value_" + std::to_string(i)));
+    map.set(absl::StrCat("key_", i), std::make_unique<std::string>(absl::StrCat("value_", i)));
   }
 
   // Erase entries by typed inline handle.
@@ -252,18 +251,17 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTestWithUniquePtrAsValue)
 
   // Overwrite entries by typed inline handle.
   for (size_t i = 5; i < 10; ++i) {
-    map[handles[i]] = std::make_unique<std::string>("value_" + std::to_string(i) + "_new");
+    map[handles[i]] = std::make_unique<std::string>(absl::StrCat("value_", i, "_new"));
   }
 
   // Erase entries by dynamic key.
   for (size_t i = 20; i < 25; ++i) {
-    map.erase("key_" + std::to_string(i));
+    map.erase(absl::StrCat("key_", i));
   }
 
   // Overwrite entries by dynamic key.
   for (size_t i = 25; i < 30; ++i) {
-    map["key_" + std::to_string(i)] =
-        std::make_unique<std::string>("value_" + std::to_string(i) + "_new");
+    map[absl::StrCat("key_", i)] = std::make_unique<std::string>(absl::StrCat("value_", i, "_new"));
   }
 
   // Clear the map.
@@ -273,8 +271,7 @@ TEST(InlineMapWith20InlineKey, InlineMapWith20InlineKeyTestWithUniquePtrAsValue)
 
   // Reset the entries.
   for (size_t i = 0; i < 100; ++i) {
-    map.set("key_" + std::to_string(i),
-            std::make_unique<std::string>("value_" + std::to_string(i)));
+    map.set(absl::StrCat("key_", i), std::make_unique<std::string>(absl::StrCat("value_", i)));
   }
 
   EXPECT_EQ(map.size(), 100);
@@ -284,7 +281,7 @@ TEST(InlineMapWith3InlineKey, TestInlineKeysAsString) {
   InlineMapDescriptor<std::string> descriptor;
   // Create 3 inline keys.
   for (size_t i = 0; i < 3; ++i) {
-    descriptor.addInlineKey("key_" + std::to_string(i));
+    descriptor.addInlineKey(absl::StrCat("key_", i));
   }
 
   descriptor.finalize();
@@ -299,20 +296,19 @@ TEST(InlineMapWith3InlineKey, TestInlineMapMoveConstructor) {
   InlineMapDescriptor<std::string> descriptor;
   // Create 3 inline keys.
   for (size_t i = 0; i < 3; ++i) {
-    descriptor.addInlineKey("key_" + std::to_string(i));
+    descriptor.addInlineKey(absl::StrCat("key_", i));
   }
 
   descriptor.finalize();
 
   InlineMap<std::string, std::unique_ptr<std::string>> map(descriptor);
   for (size_t i = 0; i < 10; ++i) {
-    map.set("key_" + std::to_string(i),
-            std::make_unique<std::string>("value_" + std::to_string(i)));
+    map.set(absl::StrCat("key_", i), std::make_unique<std::string>(absl::StrCat("value_", i)));
   }
 
   // Check values by the keys.
   for (size_t i = 0; i < 10; ++i) {
-    EXPECT_EQ(*map.get("key_" + std::to_string(i)).ref(), "value_" + std::to_string(i));
+    EXPECT_EQ(*map.get(absl::StrCat("key_", i)).ref(), absl::StrCat("value_", i));
   }
 
   InlineMap<std::string, std::unique_ptr<std::string>> map2(std::move(map));
@@ -323,7 +319,7 @@ TEST(InlineMapWith3InlineKey, TestInlineMapMoveConstructor) {
 
   // Check values by the keys.
   for (size_t i = 0; i < 10; ++i) {
-    EXPECT_EQ(*map2.get("key_" + std::to_string(i)).ref(), "value_" + std::to_string(i));
+    EXPECT_EQ(*map2.get(absl::StrCat("key_", i)).ref(), absl::StrCat("value_", i));
   }
 }
 

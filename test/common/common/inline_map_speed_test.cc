@@ -14,8 +14,7 @@ static void BM_InlineMapConstructAndDestruct(benchmark::State& state) {
   InlineMapDescriptor<std::string> descriptor_200;
   // Create 200 inline keys.
   for (size_t i = 0; i < 200; ++i) {
-    const std::string key = "key_" + std::to_string(i);
-    descriptor_200.addInlineKey(key);
+    descriptor_200.addInlineKey(absl::StrCat("key_", i));
   }
   InlineMapDescriptor<std::string> descriptor_0;
 
@@ -64,8 +63,7 @@ static void BM_InlineMapConstructAndDestructWithSingleEntry(benchmark::State& st
   InlineMapDescriptor<std::string> descriptor_200;
   // Create 200 inline keys.
   for (size_t i = 0; i < 200; ++i) {
-    const std::string key = "key_" + std::to_string(i);
-    descriptor_200.addInlineKey(key);
+    descriptor_200.addInlineKey(absl::StrCat("key_", i));
   }
   InlineMapDescriptor<std::string> descriptor_0;
 
@@ -122,10 +120,10 @@ static void BM_InlineMapSet(benchmark::State& state) {
   // Create 200 inline keys.
   std::vector<InlineMapDescriptor<std::string>::Handle> inline_handles_200;
   for (size_t i = 0; i < 200; ++i) {
-    const std::string key = "key_" + std::to_string(i);
+    const std::string key = absl::StrCat("key_", i);
     inline_handles_200.push_back(descriptor_200.addInlineKey(key));
     normal_keys.push_back(key);
-    normal_values.push_back("value_" + std::to_string(i));
+    normal_values.push_back(absl::StrCat("value_", i));
   }
   InlineMapDescriptor<std::string> descriptor_0;
 
@@ -185,7 +183,7 @@ static void BM_InlineMapGet(benchmark::State& state) {
   // Create 200 inline keys.
   std::vector<InlineMapDescriptor<std::string>::Handle> inline_handles_200;
   for (size_t i = 0; i < 200; ++i) {
-    const std::string key = "key_" + std::to_string(i);
+    const std::string key = absl::StrCat("key_", i);
     inline_handles_200.push_back(descriptor_200.addInlineKey(key));
     normal_keys.push_back(key);
   }
@@ -199,9 +197,10 @@ static void BM_InlineMapGet(benchmark::State& state) {
   InlineMap<std::string, std::string> inline_map_0(descriptor_0);
 
   for (size_t i = 0; i < 200; ++i) {
-    normal_map[normal_keys[i]] = "value_" + std::to_string(i);
-    inline_map_200.set(normal_keys[i], "value_" + std::to_string(i));
-    inline_map_0.set(normal_keys[i], "value_" + std::to_string(i));
+    const std::string value = absl::StrCat("value_", i);
+    normal_map[normal_keys[i]] = value;
+    inline_map_200.set(normal_keys[i], value);
+    inline_map_0.set(normal_keys[i], value);
   }
 
   if (map_type == 0) {
