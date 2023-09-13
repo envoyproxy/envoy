@@ -836,6 +836,10 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   EXPECT_EQ(
       subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
       "Unexpected SDS secrets length: 2");
+  Protobuf::RepeatedPtrField<std::string> unused;
+  EXPECT_EQ(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, unused, "")
+                .message(),
+            "Unexpected SDS secrets length: 2");
 }
 
 // Validate that SdsApi throws exception if secret name passed to onConfigUpdate()
