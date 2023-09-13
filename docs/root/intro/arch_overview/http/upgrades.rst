@@ -62,7 +62,7 @@ a deployment of the form:
 In this case, if a client is for example using WebSocket, we want the Websocket to arrive at the
 upstream server functionally intact, which means it needs to traverse the HTTP/2+ hop.
 
-This is accomplished for HTTP/2 via `Extended CONNECT (RFC 8441) <https://tools.ietf.org/html/rfc8441>`_ support,
+This is accomplished for HTTP/2 via `Extended CONNECT (RFC 8441) <https://www.rfc-editor.org/rfc/rfc8441>`_ support,
 turned on by setting :ref:`allow_connect <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.allow_connect>`
 to ``true`` at the second layer Envoy.
 
@@ -143,23 +143,44 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
    ``CONNECT-UDP`` is in an alpha status and may not be stable enough for use in production.
    We recommend to use this feature with caution.
 
-``CONNECT-UDP`` (`RFC 9298 <https://datatracker.ietf.org/doc/html/rfc9298>`_) allows HTTP clients
+``CONNECT-UDP`` (`RFC 9298 <https://www.rfc-editor.org/rfc/rfc9298>`_) allows HTTP clients
 to create UDP tunnels through an HTTP proxy server. Unlike ``CONNECT``, which is limited to
 tunneling TCP, ``CONNECT-UDP`` can be used to proxy UDP-based protocols such as HTTP/3.
 
 ``CONNECT-UDP`` support is disabled by default in Envoy. Similar to ``CONNECT``, it can be enabled
 through the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
-by setting the value to the special keyword ``CONNECT-UDP``. Like ``CONNECT``, CONNECT-UDP requests
+by setting the value to the special keyword ``CONNECT-UDP``. Like ``CONNECT``, ``CONNECT-UDP`` requests
 are forwarded to the upstream by default.
 :ref:`connect_config <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>`
-must be set to terminate the requests and forward the payload as UDP datagrams to the upstream.
+must be set to terminate the requests and forward the payload as UDP datagrams to the target.
 
-.. tip::
-   For an example of forwarding ``CONNECT-UDP``, please see
-   :repo:`configs/proxy_connect_udp.yaml <configs/proxy_connect_udp.yaml>`
+Example Configuration
+---------------------
 
-   For an example of terminating ``CONNECT-UDP``, please see
-   :repo:`configs/terminate_http3_connect_udp.yaml <configs/terminate_http3_connect_udp.yaml>`
+The following example configuration makes Envoy forward ``CONNECT-UDP`` requests to the upstream. Note
+that the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
+is set to ``CONNECT-UDP``.
+
+.. literalinclude:: /_configs/repo/proxy_connect_udp.yaml
+   :language: yaml
+   :linenos:
+   :lines: 33-60
+   :lineno-start: 33
+   :emphasize-lines: 47-48, 57-58
+   :caption: :download:`proxy_connect_udp.yaml </_configs/repo/proxy_connect_udp.yaml>`
+
+The following example configuration makes Envoy terminate ``CONNECT-UDP`` requests and send UDP payloads
+to the target. As in this example, the
+:ref:`connect_config <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>`
+must be set to terminate ``CONNECT-UDP`` requests.
+
+.. literalinclude:: /_configs/repo/terminate_http3_connect_udp.yaml
+   :language: yaml
+   :linenos:
+   :lines: 32-63
+   :lineno-start: 32
+   :emphasize-lines: 46-47, 50-53, 60-61
+   :caption: :download:`terminate_http3_connect_udp.yaml </_configs/repo/terminate_http3_connect_udp.yaml>`
 
 .. _tunneling-tcp-over-http:
 

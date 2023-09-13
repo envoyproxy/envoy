@@ -1,5 +1,5 @@
-# This will proxy CONNECT-UDP requests from a downstream connecting on 127.0.0.1:10001 to an
-# upstream listening on 127.0.0.1:10002. Note that the downstream client uses TCP in this example.
+# This will forward CONNECT-UDP requests from a downstream connecting on 127.0.0.1:10001 to an
+# upstream listening on 127.0.0.1:10002.
 admin:
   address:
     socket_address:
@@ -11,14 +11,30 @@ static_resources:
   - name: listener_0
     address:
       socket_address:
-        protocol: TCP
+        protocol: UDP
         address: 127.0.0.1
         port_value: 10001
+    udp_listener_config:
+      quic_options: {}
+      downstream_socket_config:
+        prefer_gro: true
     filter_chains:
-    - filters:
+    - transport_socket:
+        name: envoy.transport_sockets.quic
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+          downstream_tls_context:
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: certs/servercert.pem
+                private_key:
+                  filename: certs/serverkey.pem
+      filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          codec_type: HTTP3
           stat_prefix: ingress_http
           route_config:
             name: local_route

@@ -1,4 +1,4 @@
-# This configuration terminates a CONNECT-UDP request and sends the CONNECT-UDP payload upstream.
+# This configuration terminates a CONNECT-UDP request and sends UDP payloads directly over UDP to the target.
 admin:
   address:
     socket_address:
