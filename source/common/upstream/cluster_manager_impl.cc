@@ -1278,8 +1278,8 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
   // This method may be called multiple times to create mutiple ClusterInitializationObject
   // instances for the same cluster. And before the thread local clusters are acutally initialized,
   // the new instances will override the old instances in the work threads. But part of data is only
-  // be created once in the first time, such as the load balancer factory. So we need to merge
-  // the new instance with the old one to keep the data.
+  // be created only once, such as the load balancer factory. So we need to merge the new instance
+  // with the old one to keep the latest instance always have all necessary data.
   //
   // More specifically, this will happend in the following scenarios for now:
   // 1. EDS clusters: the ClusterLoadAssignment of EDS cluster may be updated multiples before
@@ -1360,9 +1360,6 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
       load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map) {
 
-  ASSERT(cluster_info_->type() == envoy::config::cluster::v3::Cluster::EDS,
-         fmt::format("Using merge constructor on possible non-mergable cluster of type {}",
-                     cluster_info_->type()));
   // Because EDS Clusters receive the entire ClusterLoadAssignment but only
   // provides the delta we must process the hosts_added and hosts_removed and
   // not simply overwrite with hosts added.
