@@ -55,7 +55,9 @@ public:
    *
    * @return a SamplingResult
    */
-  virtual SamplingResult shouldSample(absl::StatusOr<SpanContext> &parent_context, std::string trace_id, std::string name, ::opentelemetry::proto::trace::v1::Span::SpanKind spankind) = 0;
+  virtual SamplingResult
+  shouldSample(absl::StatusOr<SpanContext>& parent_context, const std::string& trace_id, const std::string& name,
+               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, const std::map<std::string, std::string>& attributes) = 0;
 
   virtual std::string getDescription() const = 0;
 };
