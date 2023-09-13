@@ -5,7 +5,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-
 envoy_cc_test(
     name = "send_headers_test",
     srcs = envoy_select_enable_yaml(
