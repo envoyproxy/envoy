@@ -255,6 +255,8 @@ private:
   bool doTrailer(ProcessorState& state, Http::HeaderMap& trailers);
   bool doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers);
 
+  void initRequest(ProcessorState& state);
+
   uint64_t getMergedConfigId(ProcessorState& state);
 
   void continueEncodeLocalReply(ProcessorState& state);

@@ -257,6 +257,25 @@ const (
 	Terminate DestroyReason = 1
 )
 
+// For each AccessLogType's meaning, see
+// https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage
+// Currently, only some downstream access log types are supported
+type AccessLogType int
+
+const (
+	AccessLogNotSet                                  AccessLogType = 0
+	AccessLogTcpUpstreamConnected                    AccessLogType = 1
+	AccessLogTcpPeriodic                             AccessLogType = 2
+	AccessLogTcpConnectionEnd                        AccessLogType = 3
+	AccessLogDownstreamStart                         AccessLogType = 4
+	AccessLogDownstreamPeriodic                      AccessLogType = 5
+	AccessLogDownstreamEnd                           AccessLogType = 6
+	AccessLogUpstreamPoolReady                       AccessLogType = 7
+	AccessLogUpstreamPeriodic                        AccessLogType = 8
+	AccessLogUpstreamEnd                             AccessLogType = 9
+	AccessLogDownstreamTunnelSuccessfullyEstablished AccessLogType = 10
+)
+
 const (
 	NormalFinalize int = 0 // normal, finalize on destroy
 	GCFinalize     int = 1 // finalize in GC sweep
