@@ -18,34 +18,44 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
 
-FETCH_TARGETS=(
-    //contrib/...
-    //distribution/...
-    //docs/...
-    //source/...
-    //test/...
-    //tools/...
-    @nodejs//...
-    @envoy_api//...
-    @envoy_build_tools//...)
-
+# Its better to fetch too little rather than too much, as whatever is
+# actually used is what will be cached.
+# Fetching is mostly for robustness rather than optimization.
 FETCH_TARGETS=(
     @bazel_tools//tools/jdk:remote_jdk11
-    @com_github_bufbuild_buf//:bin/buf
     @envoy_build_tools//...
-    //docs/...
-    //tools/proto_format/...
-    //tools/zstd
     //tools/gsutil
-    //tools/code_format/...)
-
+    //tools/zstd)
 FETCH_BUILD_TARGETS=(
-    @com_github_google_quiche//:ci_tests
     //contrib/exe/...
     //distribution/...
-    //source/exe/...
-    //test/tools/schema_validator/...
+    //source/exe/...)
+FETCH_GCC_TARGETS=(
+    //source/exe/...)
+# TODO(phlax): add this as a general cache
+#  this fetches a bit too much for some of the targets
+#  but its not really possible to filter their needs so move
+#  to a shared precache
+FETCH_TEST_TARGETS=(
+    @nodejs//...
     //test/...)
+FETCH_ALL_TEST_TARGETS=(
+    @com_github_google_quiche//:ci_tests
+    "${FETCH_TEST_TARGETS[@]}")
+FETCH_API_TARGETS=(
+    @envoy_api//...
+    //tools/api_proto_plugin/...
+    //tools/protoprint/...
+    //tools/protoxform/...
+    //tools/type_whisperer/...
+    //tools/testdata/protoxform/...)
+FETCH_DOCS_TARGETS+=(
+    //docs/...)
+FETCH_FORMAT_TARGETS+=(
+    //tools/code_format/...)
+FETCH_PROTO_TARGETS=(
+    @com_github_bufbuild_buf//:bin/buf
+    //tools/proto_format/...)
 
 retry () {
     local n wait iterations
@@ -611,8 +621,31 @@ case $CI_TARGET in
             fetch)
                 targets=("${FETCH_TARGETS[@]}")
                 ;;
+            fetch-check_and_fix_proto_format)
+                targets=("${FETCH_PROTO_TARGETS[@]}")
+                ;;
+            fetch-docs)
+                targets=("${FETCH_DOCS_TARGETS[@]}")
+                ;;
+            fetch-format)
+                targets=("${FETCH_FORMAT_TARGETS[@]}")
+                ;;
+            fetch-gcc)
+                targets=("${FETCH_GCC_TARGETS[@]}")
+                ;;
             fetch-release)
-                targets=("${FETCH_BUILD_TARGETS[@]}")
+                targets=(
+                    "${FETCH_BUILD_TARGETS[@]}"
+                    "${FETCH_ALL_TEST_TARGETS[@]}")
+                ;;
+            fetch-*coverage)
+                targets=("${FETCH_TEST_TARGETS[@]}")
+                ;;
+            fetch-*san|fetch-compile_time_options)
+                targets=("${FETCH_ALL_TEST_TARGETS[@]}")
+                ;;
+            fetch-api)
+                targets=("${FETCH_API_TARGETS[@]}")
                 ;;
             *)
                 exit 0
@@ -629,8 +662,6 @@ case $CI_TARGET in
               "${FETCH_ARGS[@]}" \
               "${targets[@]}"
         ;;
-
-
 
     fix_proto_format)
         # proto_format.sh needs to build protobuf.
@@ -670,7 +701,7 @@ case $CI_TARGET in
 
     info)
         setup_clang_toolchain
-        bazel info "${BAZEL_GLOBAL_OPTIONS[@]}"
+        bazel info "${BAZEL_BUILD_OPTIONS[@]}"
         ;;
 
     msan)
