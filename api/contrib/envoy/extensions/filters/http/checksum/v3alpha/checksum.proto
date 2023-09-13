@@ -24,9 +24,11 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 message ChecksumConfig {
   message Checksum {
-    // A matcher for a path that is expected to have a specific checksum, as specified
-    // in the ``sha256`` field.
-    type.matcher.v3.StringMatcher path_matcher = 1 [(validate.rules).message = {required: true}];
+    oneof matcher {
+      // A matcher for a path that is expected to have a specific checksum, as specified
+      // in the ``sha256`` field.
+      type.matcher.v3.StringMatcher path_matcher = 1 [(validate.rules).message = {required: true}];
+    }
 
     // A hex-encoded sha256 string required to match the sha256sum of the response body
     // of the path specified in the ``path_matcher`` field.
