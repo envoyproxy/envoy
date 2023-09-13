@@ -85,7 +85,9 @@ do
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
     "$SCRIPT_DIR"/proto_format/proto_format.sh check || exit 1
 
-    "$SCRIPT_DIR"/code_format/format_python_tools.sh check || exit 1
+    bazel run //tools/code:check -- \
+          -s main \
+          -v warn || exit 1
 
     # Check correctness of repositories definitions.
     echo "  Checking repositories definitions"
