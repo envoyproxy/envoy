@@ -26,6 +26,8 @@ using NetworkFilterFactoriesList = std::vector<FilterConfigProviderPtr<Network::
 // Listener filter config provider aliases
 using ListenerFilterFactoriesList =
     std::vector<FilterConfigProviderPtr<Network::ListenerFilterFactoryCb>>;
+using QuicListenerFilterFactoriesList =
+    std::vector<FilterConfigProviderPtr<Network::QuicListenerFilterFactoryCb>>;
 
 /**
  * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider

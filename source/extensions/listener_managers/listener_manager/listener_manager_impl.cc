@@ -158,7 +158,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
           config_discovery, name, context.getServerFactoryContext(), context,
-          context.clusterManager(), false, "listener", createListenerFilterMatcher(proto_config));
+          context.clusterManager(), false, "tcp-listener",
+          createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",
@@ -207,6 +208,61 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
+  }
+  return ret;
+}
+
+Filter::QuicListenerFilterFactoriesList
+ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
+    const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+    Configuration::ListenerFactoryContext& context,
+    Filter::QuicListenerFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::QuicListenerFilterFactoriesList ret;
+
+  ret.reserve(filters.size());
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const auto& proto_config = filters[i];
+    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
+    // dynamic listener filter configuration
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      const envoy::config::core::v3::ExtensionConfigSource& config_discovery =
+          proto_config.config_discovery();
+      const std::string& name = proto_config.name();
+      if (config_discovery.apply_default_config_without_warming() &&
+          !config_discovery.has_default_config()) {
+        throw EnvoyException(fmt::format(
+            "Error: listener filter config {} applied without warming but has no default config.",
+            name));
+      }
+      for (absl::string_view type_url : config_discovery.type_urls()) {
+        absl::string_view factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+        if (Registry::FactoryRegistry<Server::Configuration::NamedQuicListenerFilterConfigFactory>::
+                getFactoryByType(factory_type_url) == nullptr) {
+          throw EnvoyException(fmt::format(
+              "Error: no listener factory found for a required type URL {}.", factory_type_url));
+        }
+      }
+      ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
+          config_discovery, name, context.getServerFactoryContext(), context,
+          context.clusterManager(), false, "quic-listener",
+          createListenerFilterMatcher(proto_config)));
+    } else {
+      ENVOY_LOG(debug, "  config: {}",
+                MessageUtil::getJsonStringFromMessageOrError(
+                    static_cast<const Protobuf::Message&>(proto_config.typed_config())));
+      // For static configuration, now see if there is a factory that will accept the config.
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::NamedQuicListenerFilterConfigFactory>(
+              proto_config);
+      const auto message = Config::Utility::translateToFactoryConfig(
+          proto_config, context.messageValidationVisitor(), factory);
+      const auto callback = factory.createListenerFilterFactoryFromProto(
+          *message, createListenerFilterMatcher(proto_config), context);
+      ret.push_back(
+          config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name()));
+    }
   }
   return ret;
 }

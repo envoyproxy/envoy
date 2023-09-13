@@ -227,6 +227,37 @@ public:
               (const Network::ListenerFilterMatcherSharedPtr&, Network::ListenerFilterPtr&));
 };
 
+#ifdef ENVOY_ENABLE_QUIC
+
+} // namespace Network
+} // namespace Envoy
+
+#include "quiche/quic/platform/api/quic_socket_address.h"
+
+namespace Envoy {
+namespace Network {
+
+class MockQuicListenerFilter : public QuicListenerFilter {
+public:
+  MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
+  MOCK_METHOD(bool, shouldAdvertiseServerPreferredAddress, (const quic::QuicSocketAddress&),
+              (const));
+  MOCK_METHOD(Network::FilterStatus, onPeerAddressChanged,
+              (const quic::QuicSocketAddress&, Network::Connection&));
+};
+
+class MockQuicListenerFilterManager : public QuicListenerFilterManager {
+public:
+  MOCK_METHOD(void, addFilter,
+              (const Network::ListenerFilterMatcherSharedPtr&, QuicListenerFilterPtr&&));
+  MOCK_METHOD(bool, shouldAdvertiseServerPreferredAddress, (const quic::QuicSocketAddress&),
+              (const));
+
+  MOCK_METHOD(void, onPeerAddressChanged, (const quic::QuicSocketAddress&, Connection&));
+};
+
+#endif
+
 class MockFilterChain : public DrainableFilterChain {
 public:
   MockFilterChain();
@@ -270,6 +301,7 @@ public:
   MOCK_METHOD(bool, createListenerFilterChain, (ListenerFilterManager & listener));
   MOCK_METHOD(void, createUdpListenerFilterChain,
               (UdpListenerFilterManager & listener, UdpReadFilterCallbacks& callbacks));
+  MOCK_METHOD(bool, createQuicListenerFilterChain, (QuicListenerFilterManager & listener));
 };
 
 class MockListenSocket : public Socket {

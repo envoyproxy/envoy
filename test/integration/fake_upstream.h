@@ -750,6 +750,7 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager& listener) override;
 
   void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
   void setDisableAllAndDoNotEnable(bool value) { disable_and_do_not_enable_ = value; }

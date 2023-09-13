@@ -736,6 +736,10 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
   udp_listener.addReadFilter(std::make_unique<FakeUdpFilter>(*this, callbacks));
 }
 
+bool FakeUpstream::createQuicListenerFilterChain(Network::QuicListenerFilterManager&) {
+  return true;
+}
+
 void FakeUpstream::threadRoutine() {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
