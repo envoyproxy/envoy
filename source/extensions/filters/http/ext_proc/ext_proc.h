@@ -310,12 +310,14 @@ public:
          const envoy::config::core::v3::GrpcService& grpc_service)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
         grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
-        decoding_state_(*this, config->processingMode(), config->untypedMetadataNamespaces(),
-                        config->typedMetadataNamespaces(), config->enableReturnedMetadata(),
-                        config->bifurcateReturnedMetadataNamespace()),
-        encoding_state_(*this, config->processingMode(), config->untypedMetadataNamespaces(),
-                        config->typedMetadataNamespaces(), config->enableReturnedMetadata(),
-                        config->bifurcateReturnedMetadataNamespace()) {}
+        decoding_state_(*this, config->processingMode(),
+                        config->untypedForwardingMetadataNamespaces(),
+                        config->typedForwardingMetadataNamespaces(),
+                        config->untypedReceivingMetadataNamespaces()),
+        encoding_state_(*this, config->processingMode(),
+                        config->untypedForwardingMetadataNamespaces(),
+                        config->typedForwardingMetadataNamespaces(),
+                        config->untypedReceivingMetadataNamespaces()) {}
 
   const FilterConfig& config() const { return *config_; }
 
