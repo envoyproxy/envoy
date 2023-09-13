@@ -4,7 +4,7 @@ HTTP Capsule filter
 ==================================
 
 Tunneling UDP datagrams over HTTP (see `Proxying UDP in HTTP <https://www.rfc-editor.org/rfc/rfc9298.html>`_) requires an encapsulation mechanism to preserve the boundaries of the original datagram.
-This filter applied the `HTTP Datagrams and the Capsule Protocol <https://www.rfc-editor.org/rfc/rfc9297.html>`_ to downstream and upstream datagrams, so they are complient with the Capsule Protocol.
+This filter applies the `HTTP Datagrams and the Capsule Protocol <https://www.rfc-editor.org/rfc/rfc9297.html>`_ to downstream and upstream datagrams, so they are compliant with the Capsule Protocol.
 
 .. note::
   This filter must be used last in the UDP session filter chain, and should only be used when tunneling UDP over HTTP streams.

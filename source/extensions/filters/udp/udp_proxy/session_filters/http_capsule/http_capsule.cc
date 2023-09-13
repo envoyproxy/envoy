@@ -31,9 +31,9 @@ WriteFilterStatus HttpCapsuleFilter::onWrite(Network::UdpRecvData& data) {
   peer_address_ = data.addresses_.peer_;
 
   for (const Buffer::RawSlice& slice : data.buffer_->getRawSlices()) {
-    absl::string_view mem_slice(static_cast<const char*>(slice.mem_), slice.len_);
+    absl::string_view mem_slice(reinterpret_cast<const char*>(slice.mem_), slice.len_);
     if (!capsule_parser_.IngestCapsuleFragment(mem_slice)) {
-      ENVOY_LOG(error, "Capsule ingestion error occured: slice = {}", mem_slice);
+      ENVOY_LOG(error, "Capsule ingestion error occured: slice length = {}", slice.len_);
       break;
     }
   }
@@ -55,6 +55,7 @@ bool HttpCapsuleFilter::OnCapsule(const quiche::Capsule& capsule) {
       quiche::ConnectUdpDatagramPayload::Parse(capsule.datagram_capsule().http_datagram_payload);
   if (!connect_udp_datagram_payload) {
     // Indicates parsing failure to reset the data stream.
+    ENVOY_LOG(debug, "capsule parsing error");
     return false;
   }
 

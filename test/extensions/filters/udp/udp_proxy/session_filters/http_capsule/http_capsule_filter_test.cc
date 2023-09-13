@@ -45,7 +45,7 @@ TEST_F(HttpCapsuleFilterTest, EncapsulateEmptyDatagram) {
   EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(datagram));
 
   const std::string expected_data = absl::HexStringToBytes("00" // DATAGRAM Capsule Type
-                                                           "01" // Context ID length
+                                                           "01" // Capsule length
                                                            "00" // Context ID
   );
 
@@ -99,7 +99,7 @@ TEST_F(HttpCapsuleFilterTest, IncompatibleCapsule) {
 
   Network::UdpRecvData datagram;
   datagram.buffer_ = std::make_unique<Buffer::OwnedImpl>();
-  datagram.buffer_->add(invalid_context_id_fragment);
+  datagram.buffer_->add(unexpected_capsule_fragment);
   EXPECT_CALL(write_callbacks_, injectDatagramToFilterChain(_)).Times(0);
   EXPECT_EQ(WriteFilterStatus::StopIteration, filter_->onWrite(datagram));
   EXPECT_EQ(0, datagram.buffer_->length());
@@ -109,9 +109,9 @@ TEST_F(HttpCapsuleFilterTest, UnknownContextId) {
   setup();
 
   const std::string invalid_context_id_fragment =
-      absl::HexStringToBytes("00" // Capsule Type is not DATAGRAM
+      absl::HexStringToBytes("00" // DATAGRAM Capsule Type
                              "01" // Capsule Length
-                             "01" // Context ID (Invalid VarInt62)
+                             "01" // Unknown Context ID
       );
 
   Network::UdpRecvData datagram;
