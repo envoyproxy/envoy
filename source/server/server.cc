@@ -184,9 +184,11 @@ const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
   return *config_.clusterManager();
 }
 
-void InstanceImpl::drainListeners() {
+void InstanceImpl::drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) {
   ENVOY_LOG(info, "closing and draining listeners");
-  listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
+  listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
+                                   options.has_value() ? *options
+                                                       : Network::ExtraShutdownListenerOptions{});
   drain_manager_->startDrainSequence([] {});
 }
 
@@ -423,8 +425,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   if (bootstrap_.has_application_log_config()) {
-    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
-    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+    THROW_IF_NOT_OK(
+        Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
+    THROW_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
   }
 
 #ifdef ENVOY_PERFETTO
@@ -676,12 +679,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
-  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.remove_runtime_singleton", true)) {
-    runtime_ = std::move(runtime_ptr);
-  } else {
-    runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
-  }
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+
   initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
 
@@ -994,12 +993,7 @@ void InstanceImpl::terminate() {
   FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
-Runtime::Loader& InstanceImpl::runtime() {
-  if (runtime_singleton_) {
-    return runtime_singleton_->instance();
-  }
-  return *runtime_;
-}
+Runtime::Loader& InstanceImpl::runtime() { return *runtime_; }
 
 void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");

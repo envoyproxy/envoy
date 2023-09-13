@@ -194,9 +194,6 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
 
-export BUILDIFIER_BIN="${BUILDIFIER_BIN:-/usr/local/bin/buildifier}"
-export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
-
 if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]]; then
   # shellcheck source=ci/filter_example_setup.sh
   . "$(dirname "$0")"/filter_example_setup.sh

@@ -240,6 +240,16 @@ public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
+class MockFilterChainInfo : public FilterChainInfo {
+public:
+  MockFilterChainInfo();
+
+  // Network::FilterChainInfo
+  MOCK_METHOD(absl::string_view, name, (), (const));
+
+  std::string filter_chain_name_{"mock"};
+};
+
 class MockFilterChainManager : public FilterChainManager {
 public:
   MockFilterChainManager();
@@ -492,7 +502,8 @@ public:
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
-  MOCK_METHOD(void, stopListeners, (uint64_t listener_tag));
+  MOCK_METHOD(void, stopListeners,
+              (uint64_t listener_tag, const Network::ExtraShutdownListenerOptions& options));
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());

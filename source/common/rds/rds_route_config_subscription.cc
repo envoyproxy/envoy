@@ -50,11 +50,11 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
   route_config_provider_manager_.eraseDynamicProvider(manager_identifier_);
 }
 
-void RdsRouteConfigSubscription::onConfigUpdate(
+absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   if (!validateUpdateSize(resources.size())) {
-    return;
+    return absl::OkStatus();
   }
   const auto& route_config = resources[0].get().resource();
   Protobuf::ReflectableMessage reflectable_config = createReflectableMessage(route_config);
@@ -83,16 +83,17 @@ void RdsRouteConfigSubscription::onConfigUpdate(
               config_update_info_->configHash());
 
     if (route_config_provider_ != nullptr) {
-      route_config_provider_->onConfigUpdate();
+      THROW_IF_NOT_OK(route_config_provider_->onConfigUpdate());
     }
 
     afterProviderUpdate();
   }
 
   local_init_target_.ready();
+  return absl::OkStatus();
 }
 
-void RdsRouteConfigSubscription::onConfigUpdate(
+absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
@@ -103,8 +104,9 @@ void RdsRouteConfigSubscription::onConfigUpdate(
               rds_type_, removed_resources[0]);
   }
   if (!added_resources.empty()) {
-    onConfigUpdate(added_resources, added_resources[0].get().version());
+    return onConfigUpdate(added_resources, added_resources[0].get().version());
   }
+  return absl::OkStatus();
 }
 
 void RdsRouteConfigSubscription::onConfigUpdateFailed(

@@ -84,7 +84,8 @@ quic::QuicTimeWaitListManager* EnvoyQuicDispatcher::CreateQuicTimeWaitListManage
 std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
     const quic::QuicSocketAddress& peer_address, absl::string_view /*alpn*/,
-    const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) {
+    const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo,
+    quic::ConnectionIdGeneratorInterface& connection_id_generator) {
   quic::QuicConfig quic_config = config();
   // TODO(danzh) use passed-in ALPN instead of hard-coded h3 after proof source interfaces takes in
   // ALPN.
@@ -98,7 +99,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
       /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, std::move(connection_socket),
-      connection_id_generator());
+      connection_id_generator);
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
@@ -124,6 +125,24 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   per_worker_stats_.downstream_cx_active_.inc();
   per_worker_stats_.downstream_cx_total_.inc();
   return quic_session;
+}
+
+bool EnvoyQuicDispatcher::processPacket(const quic::QuicSocketAddress& self_address,
+                                        const quic::QuicSocketAddress& peer_address,
+                                        const quic::QuicReceivedPacket& packet) {
+  // Assume a packet was dispatched successfully, if OnFailedToDispatchPacket is not called.
+  current_packet_dispatch_success_ = true;
+  ProcessPacket(self_address, peer_address, packet);
+  return current_packet_dispatch_success_;
+}
+
+bool EnvoyQuicDispatcher::OnFailedToDispatchPacket(
+    const quic::ReceivedPacketInfo& received_packet_info) {
+  if (!accept_new_connections()) {
+    current_packet_dispatch_success_ = false;
+    return true;
+  }
+  return quic::QuicDispatcher::OnFailedToDispatchPacket(received_packet_info);
 }
 
 void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(

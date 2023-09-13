@@ -16,47 +16,58 @@ using HotRestartMessage = envoy::HotRestartMessage;
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
                                          const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
-  child_address_ = createDomainSocketAddress(restart_epoch_ + 1, "child", socket_path, socket_mode);
-  bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
+  child_address_ = main_rpc_stream_.createDomainSocketAddress(restart_epoch_ + 1, "child",
+                                                              socket_path, socket_mode);
+  main_rpc_stream_.bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
+}
+
+// Network::NonDispatchedUdpPacketHandler
+void HotRestartingParent::Internal::handle(uint32_t /*worker_index*/,
+                                           const Network::UdpRecvData& /*packet*/) {
+  dispatcher_.post([]() {
+    // TODO(ravenblack): encapsulate the packet, dispatch it to the hot restarter thread, and
+    // forward the message over a domain socket to HotRestartingChild.
+    // (Pending PR #29328)
+  });
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   socket_event_ = dispatcher.createFileEvent(
-      myDomainSocket(),
+      main_rpc_stream_.domain_socket_,
       [this](uint32_t events) -> void {
         ASSERT(events == Event::FileReadyType::Read);
         onSocketEvent();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
-  internal_ = std::make_unique<Internal>(&server);
+  internal_ = std::make_unique<Internal>(&server, dispatcher);
 }
 
 void HotRestartingParent::onSocketEvent() {
   std::unique_ptr<HotRestartMessage> wrapped_request;
-  while ((wrapped_request = receiveHotRestartMessage(Blocking::No))) {
+  while ((wrapped_request = main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::No))) {
     if (wrapped_request->requestreply_case() == HotRestartMessage::kReply) {
       ENVOY_LOG(error, "child sent us a HotRestartMessage reply (we want requests); ignoring.");
       HotRestartMessage wrapped_reply;
       wrapped_reply.set_didnt_recognize_your_last_message(true);
-      sendHotRestartMessage(child_address_, wrapped_reply);
+      main_rpc_stream_.sendHotRestartMessage(child_address_, wrapped_reply);
       continue;
     }
     switch (wrapped_request->request().request_case()) {
     case HotRestartMessage::Request::kShutdownAdmin: {
-      sendHotRestartMessage(child_address_, internal_->shutdownAdmin());
+      main_rpc_stream_.sendHotRestartMessage(child_address_, internal_->shutdownAdmin());
       break;
     }
 
     case HotRestartMessage::Request::kPassListenSocket: {
-      sendHotRestartMessage(child_address_,
-                            internal_->getListenSocketsForChild(wrapped_request->request()));
+      main_rpc_stream_.sendHotRestartMessage(
+          child_address_, internal_->getListenSocketsForChild(wrapped_request->request()));
       break;
     }
 
     case HotRestartMessage::Request::kStats: {
       HotRestartMessage wrapped_reply;
       internal_->exportStatsToChild(wrapped_reply.mutable_reply()->mutable_stats());
-      sendHotRestartMessage(child_address_, wrapped_reply);
+      main_rpc_stream_.sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
 
@@ -75,7 +86,7 @@ void HotRestartingParent::onSocketEvent() {
       ENVOY_LOG(error, "child sent us an unfamiliar type of HotRestartMessage; ignoring.");
       HotRestartMessage wrapped_reply;
       wrapped_reply.set_didnt_recognize_your_last_message(true);
-      sendHotRestartMessage(child_address_, wrapped_reply);
+      main_rpc_stream_.sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
     }
@@ -84,7 +95,8 @@ void HotRestartingParent::onSocketEvent() {
 
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
-HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(server) {
+HotRestartingParent::Internal::Internal(Server::Instance* server, Event::Dispatcher& dispatcher)
+    : server_(server), dispatcher_(dispatcher) {
   Stats::Gauge& hot_restart_generation = hotRestartGeneration(*server->stats().rootScope());
   hot_restart_generation.inc();
 }
@@ -184,7 +196,11 @@ void HotRestartingParent::Internal::recordDynamics(HotRestartMessage::Reply::Sta
   }
 }
 
-void HotRestartingParent::Internal::drainListeners() { server_->drainListeners(); }
+void HotRestartingParent::Internal::drainListeners() {
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = *this;
+  server_->drainListeners(options);
+}
 
 } // namespace Server
 } // namespace Envoy

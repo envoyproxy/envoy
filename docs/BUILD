@@ -1,9 +1,9 @@
+load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
-load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
 
@@ -196,6 +196,13 @@ pkg_files(
 )
 
 pkg_files(
+    name = "repo_configs",
+    srcs = ["//configs"],
+    prefix = "_configs/repo",
+    strip_prefix = "/configs",
+)
+
+pkg_files(
     name = "examples_rst",
     srcs = ["//examples:files"],
     prefix = "start/sandboxes/_include",
@@ -206,6 +213,7 @@ pkg_filegroup(
     name = "rst_files",
     srcs = [
         ":examples_rst",
+        ":repo_configs",
         ":sphinx_base",
         ":sphinx_inventories",
         ":sphinx_root",

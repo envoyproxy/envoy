@@ -147,6 +147,49 @@ settings:
   cb(connection);
 }
 
+// Validates that a value of connection_rate_limit above 0 isn't rejected.
+TEST(RedisProxyFilterConfigFactoryTest, ValidConnectionRateLimit) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  connection_rate_limit:
+   connection_rate_limit_per_sec: 1
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context.getServerFactoryContext()));
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+// Validates that a value of connection_rate_limit 0 is rejected.
+TEST(RedisProxyFilterConfigFactoryTest, InvalidConnectionRateLimit) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  connection_rate_limit:
+   connection_rate_limit_per_sec: 0
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
+                          ProtoValidationException,
+                          "ConnectionRateLimitPerSec: value must be greater than 0");
+}
+
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

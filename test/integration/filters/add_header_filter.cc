@@ -68,9 +68,9 @@ public:
     return std::make_unique<test::integration::filters::AddHeaderFilterConfig>();
   }
 
-  Http::FilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message& config, const std::string&,
-      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string&,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
 
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const test::integration::filters::AddHeaderFilterConfig&>(

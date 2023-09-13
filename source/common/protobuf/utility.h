@@ -170,7 +170,7 @@ public:
   template <class ProtoType>
   static std::size_t hash(const Protobuf::RepeatedPtrField<ProtoType>& source) {
     std::string text;
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     {
       Protobuf::TextFormat::Printer printer;
       printer.SetExpandAny(true);

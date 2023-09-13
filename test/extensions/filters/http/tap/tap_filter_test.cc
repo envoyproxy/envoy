@@ -23,9 +23,13 @@ class MockFilterConfig : public FilterConfig {
 public:
   MOCK_METHOD(HttpTapConfigSharedPtr, currentConfig, ());
   FilterStats& stats() override { return stats_; }
+  const envoy::extensions::filters::http::tap::v3::Tap& getTapConfig() const override {
+    return tap_config_;
+  }
 
   Stats::IsolatedStoreImpl stats_store_;
   FilterStats stats_{Filter::generateStats("foo", *stats_store_.rootScope())};
+  const envoy::extensions::filters::http::tap::v3::Tap tap_config_;
 };
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
@@ -52,7 +56,7 @@ public:
     if (has_config) {
       EXPECT_CALL(callbacks_, streamId());
       http_per_request_tapper_ = new MockHttpPerRequestTapper();
-      EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_))
+      EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_, _))
           .WillOnce(Return(http_per_request_tapper_));
     }
 
