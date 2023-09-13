@@ -36,8 +36,10 @@ HttpTapConfigImpl::HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& pr
       time_source_(context.mainThreadDispatcher().timeSource()) {}
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(
-    const envoy::extensions::filters::http::tap::v3::Tap& tap_config, uint64_t stream_id) {
-  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), tap_config, stream_id);
+    const envoy::extensions::filters::http::tap::v3::Tap& tap_config, uint64_t stream_id,
+    OptRef<const Network::Connection> connection) {
+  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), tap_config, stream_id,
+                                                    connection);
 }
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {
@@ -189,11 +191,20 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
     response_trailers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_trailers()));
   }
 
-  if (should_record_downstream_connection_) {
+  if (should_record_downstream_connection_ && connection_.has_value()) {
+
+    envoy::config::core::v3::Address downstream_local_address;
+    envoy::config::core::v3::Address downstream_remote_address;
+
+    Envoy::Network::Utility::addressToProtobufAddress(
+        *connection_->connectionInfoProvider().localAddress(), downstream_local_address);
+    Envoy::Network::Utility::addressToProtobufAddress(
+        *connection_->connectionInfoProvider().remoteAddress(), downstream_remote_address);
+
     http_trace.mutable_downstream_connection()->mutable_local_address()->MergeFrom(
-        downstream_local_address_);
+        downstream_local_address);
     http_trace.mutable_downstream_connection()->mutable_remote_address()->MergeFrom(
-        downstream_remote_address_);
+        downstream_remote_address);
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");
@@ -242,21 +253,6 @@ void HttpPerRequestTapperImpl::onBody(
                                               data, 0, data.length());
   }
 }
-
-void HttpPerRequestTapperImpl::setDownstreamConnectionAddress(
-    const Envoy::Network::ConnectionInfoProvider& connection_info_provider) {
-  if (connection_info_provider.localAddress() != nullptr &&
-      connection_info_provider.localAddress()->type() == Network::Address::Type::Ip) {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection_info_provider.localAddress(),
-                                                      downstream_local_address_);
-  }
-  if (connection_info_provider.remoteAddress() != nullptr &&
-      connection_info_provider.remoteAddress()->type() == Network::Address::Type::Ip) {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection_info_provider.remoteAddress(),
-                                                      downstream_remote_address_);
-  }
-}
-
 } // namespace TapFilter
 } // namespace HttpFilters
 } // namespace Extensions

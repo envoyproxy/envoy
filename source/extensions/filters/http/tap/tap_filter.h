@@ -99,7 +99,8 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     HttpTapConfigSharedPtr config = config_->currentConfig();
-    tapper_ = config ? config->createPerRequestTapper(config_->getTapConfig(), callbacks.streamId())
+    tapper_ = config ? config->createPerRequestTapper(config_->getTapConfig(), callbacks.streamId(),
+                                                      callbacks.connection())
                      : nullptr;
   }
 
@@ -115,8 +116,6 @@ public:
     return Http::FilterMetadataStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
-  void setDownstreamConnectionAddress(
-      const Envoy::Network::ConnectionInfoProvider& connection_info_provider) override;
 
   // AccessLog::Instance
   void log(const Http::RequestHeaderMap* request_headers,

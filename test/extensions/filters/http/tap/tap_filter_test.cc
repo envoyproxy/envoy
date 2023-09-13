@@ -40,8 +40,6 @@ public:
   MOCK_METHOD(void, onResponseHeaders, (const Http::ResponseHeaderMap& headers));
   MOCK_METHOD(void, onResponseBody, (const Buffer::Instance& data));
   MOCK_METHOD(void, onResponseTrailers, (const Http::ResponseTrailerMap& headers));
-  MOCK_METHOD(void, setDownstreamConnectionAddress,
-              (const Envoy::Network::ConnectionInfoProvider& connection_info_provider));
   MOCK_METHOD(bool, onDestroyLog, ());
 };
 
@@ -57,8 +55,9 @@ public:
 
     if (has_config) {
       EXPECT_CALL(callbacks_, streamId());
+      EXPECT_CALL(callbacks_, connection());
       http_per_request_tapper_ = new MockHttpPerRequestTapper();
-      EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_, _))
+      EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_, _, _))
           .WillOnce(Return(http_per_request_tapper_));
     }
 

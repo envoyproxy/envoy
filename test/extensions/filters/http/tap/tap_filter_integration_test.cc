@@ -1,5 +1,3 @@
-#include <memory>
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 

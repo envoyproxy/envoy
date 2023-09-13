@@ -881,12 +881,6 @@ public:
    * Called at the end of the stream, when all data has been decoded.
    */
   virtual void decodeComplete() {}
-
-  /**
-   * Pass downstream connection info into filter
-   */
-  virtual void setDownstreamConnectionAddress(
-      [[maybe_unused]] const Envoy::Network::ConnectionInfoProvider& connection_info_provider) {}
 };
 
 using StreamDecoderFilterSharedPtr = std::shared_ptr<StreamDecoderFilter>;

@@ -565,10 +565,6 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     (*entry)->processed_headers_ = true;
 
-    if (connection_.has_value()) {
-      (*entry)->setDownstreamConnectionAddress(connection_->connectionInfoProvider());
-    }
-
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
     ENVOY_BUG(!continue_iteration || !state_.local_complete_,
               "Filter did not return StopAll or StopIteration after sending a local reply.");

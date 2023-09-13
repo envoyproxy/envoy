@@ -26,7 +26,7 @@ public:
   // TapFilter::HttpTapConfig
   HttpPerRequestTapperPtr
   createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
-                         uint64_t stream_id) override;
+                         uint64_t stream_id, OptRef<const Network::Connection> connection) override;
 
   TimeSource& timeSource() const override { return time_source_; }
 
@@ -38,12 +38,13 @@ class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<L
 public:
   HttpPerRequestTapperImpl(HttpTapConfigSharedPtr config,
                            const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
-                           uint64_t stream_id)
+                           uint64_t stream_id, OptRef<const Network::Connection> connection)
       : config_(std::move(config)),
         should_record_headers_received_time_(tap_config.record_headers_received_time()),
         should_record_downstream_connection_(tap_config.record_downstream_connection()),
         stream_id_(stream_id), sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
-        statuses_(config_->createMatchStatusVector()) {
+        statuses_(config_->createMatchStatusVector()),
+	connection_(connection) {
     config_->rootMatcher().onNewStream(statuses_);
   }
 
@@ -54,8 +55,6 @@ public:
   void onResponseHeaders(const Http::ResponseHeaderMap& headers) override;
   void onResponseBody(const Buffer::Instance& data) override;
   void onResponseTrailers(const Http::ResponseTrailerMap& headers) override;
-  void setDownstreamConnectionAddress(
-      const Envoy::Network::ConnectionInfoProvider& connection_info_provider) override;
   bool onDestroyLog() override;
 
 private:
@@ -100,11 +99,10 @@ private:
   const uint64_t stream_id_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;
+  OptRef<const Network::Connection> connection_;
   bool started_streaming_trace_{};
   long request_headers_received_time_;
   long response_headers_received_time_;
-  envoy::config::core::v3::Address downstream_local_address_;
-  envoy::config::core::v3::Address downstream_remote_address_;
   const Http::RequestHeaderMap* request_headers_{};
   const Http::HeaderMap* request_trailers_{};
   const Http::ResponseHeaderMap* response_headers_{};
