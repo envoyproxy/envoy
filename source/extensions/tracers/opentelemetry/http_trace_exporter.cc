@@ -13,10 +13,10 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 OpenTelemetryHttpTraceExporter::OpenTelemetryHttpTraceExporter(
-    Upstream::ClusterManager& cluster_manager,
-    envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config,
+    Upstream::ClusterManager& cluster_manager, envoy::config::core::v3::HttpService http_service,
     OpenTelemetryTracerStats& tracing_stats)
-    : cluster_manager_(cluster_manager), http_config_(http_config), tracing_stats_(tracing_stats) {}
+    : cluster_manager_(cluster_manager), http_service_(http_service),
+      tracing_stats_(tracing_stats) {}
 
 bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& request) {
 
@@ -33,30 +33,31 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
   // If traces_path is omitted, send to /v1/traces by default
-  if (http_config_.traces_path().empty()) {
+  if (http_service_.path().empty()) {
     message->headers().setPath(TRACES_PATH);
   } else {
-    message->headers().setPath(http_config_.traces_path());
+    message->headers().setPath(http_service_.path());
   }
 
-  message->headers().setHost(http_config_.hostname());
+  message->headers().setHost(http_service_.hostname());
 
   // add all custom headers to the request
-  for (const envoy::config::core::v3::HeaderValue& header : http_config_.headers()) {
-    message->headers().setCopy(Http::LowerCaseString(header.key()), header.value());
+  for (const auto& header_value_option : http_service_.request_headers_to_add()) {
+    message->headers().setCopy(Http::LowerCaseString(header_value_option.header().key()),
+                               header_value_option.header().value());
   }
 
   message->body().add(request_body);
 
   const auto thread_local_cluster =
-      cluster_manager_.getThreadLocalCluster(http_config_.cluster_name());
+      cluster_manager_.getThreadLocalCluster(http_service_.cluster_name());
   if (thread_local_cluster == nullptr) {
     ENVOY_LOG(warn, "Thread local cluster not found for collector.");
     return false;
   }
 
   std::chrono::milliseconds timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::nanoseconds(http_config_.timeout().nanos()));
+      std::chrono::nanoseconds(http_service_.timeout().nanos()));
   Http::AsyncClient::Request* http_request = thread_local_cluster->httpAsyncClient().send(
       std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
   tracing_stats_.http_reports_sent_.inc();

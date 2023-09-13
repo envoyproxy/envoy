@@ -64,10 +64,11 @@ public:
     const std::string yaml_string = R"EOF(
     http_service:
       cluster_name: "my_o11y_backend"
-      traces_path: "/otlp/v1/traces"
+      path: "/otlp/v1/traces"
       hostname: "some-o11y.com"
-      headers:
-        - key: "Authorization"
+      request_headers_to_add:
+      - header: 
+          key: "Authorization"
           value: "auth-token"
       timeout: 0.250s
     )EOF";

@@ -1,8 +1,7 @@
 
 #pragma once
 
-#include "envoy/config/core/v3/http_uri.pb.h"
-#include "envoy/config/trace/v3/opentelemetry.pb.h"
+#include "envoy/config/core/v3/http_service.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
@@ -27,10 +26,9 @@ namespace OpenTelemetry {
 class OpenTelemetryHttpTraceExporter : public OpenTelemetryTraceExporter,
                                        public Http::AsyncClient::Callbacks {
 public:
-  OpenTelemetryHttpTraceExporter(
-      Upstream::ClusterManager& cluster_manager,
-      envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config,
-      OpenTelemetryTracerStats& tracing_stats);
+  OpenTelemetryHttpTraceExporter(Upstream::ClusterManager& cluster_manager,
+                                 envoy::config::core::v3::HttpService http_service,
+                                 OpenTelemetryTracerStats& tracing_stats);
 
   // The default path to use when OpenTelemetryConfig::HttpConfig::traces_path is empty
   const Http::LowerCaseString TRACES_PATH{"/v1/traces"};
@@ -44,7 +42,7 @@ public:
 
 private:
   Upstream::ClusterManager& cluster_manager_;
-  envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config_;
+  envoy::config::core::v3::HttpService http_service_;
   OpenTelemetryTracerStats& tracing_stats_;
 };
 

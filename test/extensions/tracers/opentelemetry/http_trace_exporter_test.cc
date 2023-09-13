@@ -27,7 +27,7 @@ class OpenTelemetryHttpTraceExporterTest : public testing::Test {
 public:
   OpenTelemetryHttpTraceExporterTest() = default;
 
-  void setup(envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config) {
+  void setup(envoy::config::core::v3::HttpService http_service) {
     cluster_manager_.thread_local_cluster_.cluster_.info_->name_ = "my_o11y_backend";
     cluster_manager_.initializeThreadLocalClusters({"my_o11y_backend"});
     ON_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
@@ -36,7 +36,7 @@ public:
     cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
 
     trace_exporter_ =
-        std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_config, stats_);
+        std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_service, stats_);
   }
 
 protected:
@@ -51,19 +51,21 @@ protected:
 TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   std::string yaml_string = fmt::format(R"EOF(
   cluster_name: "my_o11y_backend"
-  traces_path: "/otlp/v1/traces"
+  path: "/otlp/v1/traces"
   hostname: "some-o11y.com"
-  headers:
-    - key: "Authorization"
+  request_headers_to_add:
+  - header:
+      key: "Authorization"
       value: "auth-token"
-    - key: "x-custom-header"
+  - header: 
+      key: "x-custom-header"
       value: "custom-value"
   timeout: 0.250s
   )EOF");
 
-  envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config;
-  TestUtility::loadFromYaml(yaml_string, http_config);
-  setup(http_config);
+  envoy::config::core::v3::HttpService http_service;
+  TestUtility::loadFromYaml(yaml_string, http_service);
+  setup(http_service);
 
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
@@ -122,14 +124,14 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
 TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalCluster) {
   std::string yaml_string = fmt::format(R"EOF(
   cluster_name: "my_o11y_backend"
-  traces_path: "/otlp/v1/traces"
+  path: "/otlp/v1/traces"
   hostname: "some-o11y.com"
   timeout: 0.250s
   )EOF");
 
-  envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config;
-  TestUtility::loadFromYaml(yaml_string, http_config);
-  setup(http_config);
+  envoy::config::core::v3::HttpService http_service;
+  TestUtility::loadFromYaml(yaml_string, http_service);
+  setup(http_service);
 
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
 
@@ -151,9 +153,9 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpanWithDefaul
   timeout: 0.250s
   )EOF");
 
-  envoy::config::trace::v3::OpenTelemetryConfig::HttpConfig http_config;
-  TestUtility::loadFromYaml(yaml_string, http_config);
-  setup(http_config);
+  envoy::config::core::v3::HttpService http_service;
+  TestUtility::loadFromYaml(yaml_string, http_service);
+  setup(http_service);
 
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
