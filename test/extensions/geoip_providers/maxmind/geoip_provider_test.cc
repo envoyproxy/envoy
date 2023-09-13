@@ -89,6 +89,26 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   EXPECT_EQ("15169", asn_it->second);
 }
 
+TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/MaxMind-DB-test-ipv4-24.mmdb"
+  )EOF";
+  initializeProvider(config_yaml);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("2345:0425:2CA1:0:0:0567:5673:23b5");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  expectStats("city_db", 1, 0, 1);
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(0, captured_lookup_response_.size());
+}
+
 // Tests for anonymous database replicate expectations from corresponding Maxmind tests:
 // https://github.com/maxmind/GeoIP2-perl/blob/main/t/GeoIP2/Database/Reader-Anonymous-IP.t
 TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {

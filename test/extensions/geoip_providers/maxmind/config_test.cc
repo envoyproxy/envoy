@@ -7,6 +7,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 
+#include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -180,6 +181,11 @@ MATCHER_P(HasAnonHostingHeader, expected_header, "") {
 std::string genGeoDbFilePath(std::string db_name) {
   return TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/" + db_name);
+}
+
+TEST(MaxmindProviderConfigTest, EmptyProto) {
+  MaxmindProviderFactory factory;
+  EXPECT_TRUE(factory.createEmptyConfigProto() != nullptr);
 }
 
 TEST(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
