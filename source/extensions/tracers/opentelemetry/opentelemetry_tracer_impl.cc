@@ -32,12 +32,12 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   // TODO: init sampler
   if (opentelemetry_config.has_sampler()) {
     auto sampler_config = opentelemetry_config.sampler();
-    auto* factory = Envoy::Config::Utility::getFactoryByName<SamplerFactory>(sampler_config.name());
+    auto* factory = Envoy::Config::Utility::getFactory<SamplerFactory>(sampler_config);
     if (!factory) {
       throw EnvoyException(
-          fmt::format(" factory not found: '{}'", sampler_config.name()));
+          fmt::format("Sampler factory not found: '{}'", sampler_config.name()));
     }
-    sampler_ = factory->createSampler(context);
+    sampler_ = factory->createSampler(sampler_config.typed_config(), context);
   }
 
   tls_slot_ptr_->set([opentelemetry_config, &factory_context, this](Event::Dispatcher& dispatcher) {

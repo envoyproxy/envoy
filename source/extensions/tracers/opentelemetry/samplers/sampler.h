@@ -59,43 +59,20 @@ public:
 using SamplerPtr = std::shared_ptr<Sampler>;
 
 /*
- * A factory for creating resource detectors that have configuration.
- */
-class SamplerTypedFactory : public Envoy::Config::TypedFactory {
-public:
-  ~SamplerTypedFactory() override = default;
-
-  /**
-   * @brief Creates a sampler based on the configuration type provided.
-   *
-   * @param message The sampler configuration.
-   * @param context The tracer factory context.
-   * @return A sampler based on the configuration type provided.
-   */
-  virtual SamplerPtr
-  createTypedSampler(const Protobuf::Message& message,
-                              Server::Configuration::TracerFactoryContext& context) PURE;
-
-  std::string category() const override { return "envoy.tracers.opentelemetry.samplers"; }
-};
-
-using SamplerTypedFactoryFactoryPtr = std::unique_ptr<SamplerTypedFactory>;
-
-/*
  * A factory for creating sampler without configuration.
  */
-class SamplerFactory : public Envoy::Config::UntypedFactory {
+class SamplerFactory : public Envoy::Config::TypedFactory {
 public:
   ~SamplerFactory() override = default;
 
   /**
-   * @brief Creates a sampler that does not have a configuration.
-   *
+   * @brief Creates a sampler
+   * @param message The sampler config
    * @param context The tracer factory context.
    * @return SamplerPtr
    */
   virtual SamplerPtr
-  createSampler(Server::Configuration::TracerFactoryContext& context) PURE;
+  createSampler(const Protobuf::Message& message, Server::Configuration::TracerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tracers.opentelemetry.samplers"; }
 };

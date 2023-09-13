@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 
 import "google/protobuf/any.proto";
@@ -42,5 +43,5 @@ message OpenTelemetryConfig {
 
   // optional sampler which is used in the opentelemetry tracer
   // [#extension-category: envoy.tracers.opentelemetry.samplers]
-  Sampler sampler = 3;
+  optional core.v3.TypedExtensionConfig sampler = 3;
 }

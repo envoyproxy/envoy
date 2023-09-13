@@ -17,6 +17,7 @@ envoy_cc_extension(
         ":always_on_sampler_lib",
         "//envoy/registry",
         "//source/common/config:utility_lib",
+        "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
     ],
 )
 
@@ -27,5 +28,6 @@ envoy_cc_library(
     deps = [
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
+        "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
     ],
 )
