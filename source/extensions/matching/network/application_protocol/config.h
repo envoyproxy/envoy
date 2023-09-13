@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.validate.h"
 #include "envoy/matcher/matcher.h"

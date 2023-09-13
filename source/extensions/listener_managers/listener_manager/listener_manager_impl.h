@@ -208,7 +208,8 @@ public:
   uint64_t numConnections() const override;
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog, std::function<void()> callback) override;
-  void stopListeners(StopListenersType stop_listeners_type) override;
+  void stopListeners(StopListenersType stop_listeners_type,
+                     const Network::ExtraShutdownListenerOptions& options) override;
   void stopWorkers() override;
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
@@ -291,10 +292,13 @@ private:
    * Stop a listener. The listener will stop accepting new connections and its socket will be
    * closed.
    * @param listener supplies the listener to stop.
+   * @param options additional options to be passed through to shutdownListener.
    * @param completion supplies the completion to be called when all workers are stopped accepting
    * new connections. This completion is called on the main thread.
    */
-  void stopListener(Network::ListenerConfig& listener, std::function<void()> completion);
+  void stopListener(Network::ListenerConfig& listener,
+                    const Network::ExtraShutdownListenerOptions& options,
+                    std::function<void()> completion);
 
   /**
    * Get a listener by name. This routine is used because listeners have inherent order in static

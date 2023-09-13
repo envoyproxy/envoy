@@ -74,6 +74,14 @@ remaining datagrams to different clusters according to their source ports.
    :lines: 14-53
    :caption: :download:`udp-proxy-router.yaml <_include/udp-proxy-router.yaml>`
 
+Session filters
+---------------
+
+The UDP proxy is able to apply :ref:`session filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>`.
+These kinds of filters run seprately on each upstream UDP session and support a more granular API that allows running operations only
+at the start of an upstream UDP session, when a UDP datagram is received from the downstream and when a UDP datagram is received from the
+upstream, similar to network filters.
+
 Example configuration
 ---------------------
 

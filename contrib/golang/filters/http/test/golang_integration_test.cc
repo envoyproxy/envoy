@@ -234,6 +234,46 @@ typed_config:
     initializeBasicFilter(so_id, "test.com");
   }
 
+  void initializePropertyConfig(const std::string& lib_id, const std::string& lib_path,
+                                const std::string& plugin_name) {
+    const auto yaml_fmt = R"EOF(
+name: golang
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+  library_id: %s
+  library_path: %s
+  plugin_name: %s
+  plugin_config:
+    "@type": type.googleapis.com/xds.type.v3.TypedStruct
+)EOF";
+
+    auto yaml_string = absl::StrFormat(yaml_fmt, lib_id, lib_path, plugin_name);
+    config_helper_.prependFilter(yaml_string);
+    config_helper_.skipPortUsageValidation();
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_match()
+              ->set_prefix("/property");
+
+          // setting route name for testing
+          hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
+              "test-route-name");
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("cluster_0");
+        });
+
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  }
+
   void testBasic(std::string path) {
     initializeBasicFilter(BASIC, "test.com");
 
@@ -626,6 +666,7 @@ typed_config:
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
   const std::string ROUTECONFIG{"routeconfig"};
+  const std::string PROPERTY{"property"};
   const std::string ACCESSLOG{"access_log"};
   const std::string METRIC{"metric"};
 };
@@ -697,6 +738,51 @@ TEST_P(GolangIntegrationTest, Passthrough) {
   cleanup();
 }
 
+TEST_P(GolangIntegrationTest, PluginNotFound) {
+  initializeConfig(ECHO, genSoPath(ECHO), PASSTHROUGH);
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, Property) {
+  initializePropertyConfig(PROPERTY, genSoPath(PROPERTY), PROPERTY);
+  initialize();
+  registerTestServerPorts({"http"});
+
+  auto path = "/property?a=1";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},  {":path", path},  {":scheme", "http"},     {":authority", "test.com"},
+      {"User-Agent", "ua"}, {"Referer", "r"}, {"X-Request-Id", "xri"},
+  };
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(request_encoder, "helloworld", true);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data("goodbye");
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanup();
+}
+
 TEST_P(GolangIntegrationTest, AccessLog) {
   initializeBasicFilter(ACCESSLOG, "test.com");
 
@@ -735,7 +821,72 @@ TEST_P(GolangIntegrationTest, AccessLog) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("206", getHeader(upstream_request_->headers(), "respCode"));
+  EXPECT_EQ("7", getHeader(upstream_request_->headers(), "respSize"));
   EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsyncly"));
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, AccessLogDownstreamStart) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_access_log_options()->set_flush_access_log_on_new_request(true);
+      });
+  initializeBasicFilter(ACCESSLOG, "test.com");
+
+  auto path = "/test";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},        {":path", path},  {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r"},
+  };
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_TRUE(response->complete());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers2{
+      {":method", "POST"},        {":path", path},   {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r2"},
+  };
+
+  response = sendRequestAndWaitForResponse(request_headers2, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("r;r2", getHeader(upstream_request_->headers(), "referers"));
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, AccessLogDownstreamPeriodic) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_access_log_options()->mutable_access_log_flush_interval()->set_nanos(
+            100000000); // 0.1 seconds
+      });
+  initializeBasicFilter(ACCESSLOG, "test.com");
+
+  auto path = "/test?periodic=1";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},        {":path", path},  {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r"},
+  };
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_TRUE(response->complete());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("r", getHeader(upstream_request_->headers(), "referers"));
 
   cleanup();
 }

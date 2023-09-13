@@ -49,7 +49,10 @@ namespace Protobuf = google::protobuf;
 // Forward declarations
 namespace google::protobuf {
 class FileDescriptorSet;
-}
+} // namespace google::protobuf
+namespace cc_proto_descriptor_library::internal {
+struct FileDescriptorInfo;
+} // namespace cc_proto_descriptor_library::internal
 
 namespace Envoy {
 class MessageLiteDifferencer;
@@ -139,6 +142,9 @@ public:
 };
 
 using ConstMessagePtrVector = std::vector<std::unique_ptr<const Protobuf::Message>>;
+
+using FileDescriptorInfo = ::cc_proto_descriptor_library::internal::FileDescriptorInfo;
+void loadFileDescriptors(const FileDescriptorInfo& file_descriptor_info);
 
 } // namespace Envoy
 

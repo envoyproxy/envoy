@@ -153,7 +153,7 @@ public:
       EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, _, 0));
     }
     EXPECT_CALL(*worker_, addListener(_, _, _, _));
-    EXPECT_CALL(*worker_, stopListener(_, _));
+    EXPECT_CALL(*worker_, stopListener(_, _, _));
     EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
 
     EXPECT_TRUE(addOrUpdateListener(new_listener_proto));
@@ -169,7 +169,7 @@ public:
   void expectRemove(const envoy::config::listener::v3::Listener& listener_proto,
                     ListenerHandle* listener_handle, Network::MockListenSocket& socket) {
 
-    EXPECT_CALL(*worker_, stopListener(_, _));
+    EXPECT_CALL(*worker_, stopListener(_, _, _));
     EXPECT_CALL(socket, close());
     EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
@@ -1733,7 +1733,7 @@ dynamic_listeners:
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*duplicated_socket, duplicate());
   EXPECT_CALL(*worker_, addListener(_, _, _, _));
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion();
@@ -2554,12 +2554,13 @@ filter_chains:
 
   // Remove foo into draining.
   std::function<void()> stop_completion;
-  EXPECT_CALL(*worker_, stopListener(_, _))
-      .WillOnce(Invoke(
-          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
-            ASSERT_TRUE(completion != nullptr);
-            stop_completion = std::move(completion);
-          }));
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
+                                          const Network::ExtraShutdownListenerOptions&,
+                                          std::function<void()> completion) -> void {
+        ASSERT_TRUE(completion != nullptr);
+        stop_completion = std::move(completion);
+      }));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -2615,12 +2616,13 @@ filter_chains:
 
   // Remove foo into draining.
   std::function<void()> stop_completion;
-  EXPECT_CALL(*worker_, stopListener(_, _))
-      .WillOnce(Invoke(
-          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
-            ASSERT_TRUE(completion != nullptr);
-            stop_completion = std::move(completion);
-          }));
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
+                                          const Network::ExtraShutdownListenerOptions&,
+                                          std::function<void()> completion) -> void {
+        ASSERT_TRUE(completion != nullptr);
+        stop_completion = std::move(completion);
+      }));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -2674,7 +2676,7 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
   // Remove foo into draining.
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -2728,7 +2730,7 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
   // Remove foo into draining.
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(2);
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -2835,7 +2837,7 @@ filter_chains:
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
 
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -3097,7 +3099,7 @@ filter_chains:
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -3186,7 +3188,7 @@ filter_chains:
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -3254,9 +3256,9 @@ filter_chains:
   EXPECT_EQ(2UL, manager_->listeners().size());
 
   // Validate that stop listener is only called once - for inbound listeners.
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
   // Validate that listener creation in outbound direction is allowed.
@@ -3333,10 +3335,10 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->stopListeners(ListenerManager::StopListenersType::All);
+  manager_->stopListeners(ListenerManager::StopListenersType::All, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
   // Validate that adding a listener is not allowed after all listeners are stopped.
@@ -3403,10 +3405,10 @@ filter_chains:
 
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 }
 
@@ -5260,7 +5262,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
-  // TLS client with exact SNI match but without ALPN - no match (SNI blackholed by configuration).
+  // TLS client with exact SNI match but without ALPN - no match (SNI blackholed by
+  // configuration).
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls", {}, "127.0.0.1", 111);
   EXPECT_EQ(filter_chain, nullptr);
@@ -7118,7 +7121,7 @@ per_connection_buffer_limit_bytes: 10
   // removal.
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*worker_, addListener(_, _, _, _));
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion();
@@ -7334,10 +7337,10 @@ filter_chains:
 
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 }
 
@@ -7396,7 +7399,7 @@ filter_chains:
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -7691,12 +7694,13 @@ filter_chains:
 
   // Stop the active listener listener_foo_update1.
   std::function<void()> stop_completion;
-  EXPECT_CALL(*worker_, stopListener(_, _))
-      .WillOnce(Invoke(
-          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
-            ASSERT_TRUE(completion != nullptr);
-            stop_completion = std::move(completion);
-          }));
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
+                                          const Network::ExtraShutdownListenerOptions&,
+                                          std::function<void()> completion) -> void {
+        ASSERT_TRUE(completion != nullptr);
+        stop_completion = std::move(completion);
+      }));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
 
@@ -7795,12 +7799,13 @@ filter_chains:
 
   // Stop the active listener listener_foo_update1.
   std::function<void()> stop_completion;
-  EXPECT_CALL(*worker_, stopListener(_, _))
-      .WillOnce(Invoke(
-          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
-            ASSERT_TRUE(completion != nullptr);
-            stop_completion = std::move(completion);
-          }));
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
+                                          const Network::ExtraShutdownListenerOptions&,
+                                          std::function<void()> completion) -> void {
+        ASSERT_TRUE(completion != nullptr);
+        stop_completion = std::move(completion);
+      }));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
 

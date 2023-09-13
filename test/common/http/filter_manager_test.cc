@@ -17,6 +17,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_reply/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -396,6 +397,64 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
                            std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
         cb(*route_config);
       }));
+  decoder_filter->callbacks_->traversePerFilterConfig(
+      [&](const Router::RouteSpecificFilterConfig& config) {
+        EXPECT_EQ(route_config.get(), &config);
+      });
+
+  filter_manager_->destroyFilters();
+};
+
+TEST_F(FilterManagerTest, GetRouteLevelFilterConfigButDisabledDowngrade) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.no_downgrade_to_canonical_name", "true"}});
+
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
+        manager.applyFilterFactoryCb({"custom-name", "filter-name"}, decoder_factory);
+        return true;
+      }));
+  filter_manager_->createFilterChain();
+
+  std::shared_ptr<Router::MockRoute> route(new NiceMock<Router::MockRoute>());
+  auto route_config = std::make_shared<Router::RouteSpecificFilterConfig>();
+
+  NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
+  ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
+      .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
+  ON_CALL(downstream_callbacks, route(_)).WillByDefault(Return(route));
+
+  // Get a valid config by the custom filter name.
+  EXPECT_CALL(*route, mostSpecificPerFilterConfig(testing::Eq("custom-name")))
+      .WillOnce(Return(route_config.get()));
+  EXPECT_EQ(route_config.get(), decoder_filter->callbacks_->mostSpecificPerFilterConfig());
+
+  // Get nothing by the custom filter name.
+  EXPECT_CALL(*route, mostSpecificPerFilterConfig(testing::Eq("custom-name")))
+      .WillOnce(Return(nullptr));
+  EXPECT_EQ(nullptr, decoder_filter->callbacks_->mostSpecificPerFilterConfig());
+
+  // Get a valid config by the custom filter name.
+  EXPECT_CALL(*route, traversePerFilterConfig(testing::Eq("custom-name"), _))
+      .WillOnce(Invoke([&](const std::string&,
+                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+        cb(*route_config);
+      }));
+  decoder_filter->callbacks_->traversePerFilterConfig(
+      [&](const Router::RouteSpecificFilterConfig& config) {
+        EXPECT_EQ(route_config.get(), &config);
+      });
+
+  // Get nothing by the custom filter name.
+  EXPECT_CALL(*route, traversePerFilterConfig(testing::Eq("custom-name"), _))
+      .WillOnce(Invoke([&](const std::string&,
+                           std::function<void(const Router::RouteSpecificFilterConfig&)>) {}));
   decoder_filter->callbacks_->traversePerFilterConfig(
       [&](const Router::RouteSpecificFilterConfig& config) {
         EXPECT_EQ(route_config.get(), &config);

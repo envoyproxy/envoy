@@ -1,3 +1,4 @@
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "make")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
@@ -7,7 +8,6 @@ load(
     "//contrib:all_contrib_extensions.bzl",
     "envoy_contrib_linux_x86_64_constraints",
 )
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "make")
 
 licenses(["notice"])  # Apache 2
 
@@ -37,8 +37,8 @@ envoy_cc_contrib_extension(
         ],
     }),
     deps = [
-        "//envoy/registry",
         "//envoy/api:api_interface",
+        "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",

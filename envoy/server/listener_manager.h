@@ -221,8 +221,10 @@ public:
    * is used for server draining and /drain_listeners admin endpoint. This method directly stops the
    * listeners on workers. Once a listener is stopped, any listener modifications are not allowed.
    * @param stop_listeners_type indicates listeners to stop.
+   * @param options additional options passed through to shutdownListener.
    */
-  virtual void stopListeners(StopListenersType stop_listeners_type) PURE;
+  virtual void stopListeners(StopListenersType stop_listeners_type,
+                             const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will

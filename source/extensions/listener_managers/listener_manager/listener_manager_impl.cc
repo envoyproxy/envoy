@@ -593,7 +593,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
   const uint64_t listener_tag = draining_it->listener_->listenerTag();
-  stopListener(*draining_it->listener_, [this, listener_tag]() {
+  stopListener(*draining_it->listener_, {}, [this, listener_tag]() {
     for (auto& listener : draining_listeners_) {
       if (listener.listener_->listenerTag() == listener_tag) {
         maybeCloseSocketsForListener(*listener.listener_);
@@ -922,10 +922,11 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
 }
 
 void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
+                                       const Network::ExtraShutdownListenerOptions& options,
                                        std::function<void()> callback) {
   const auto workers_pending_stop = std::make_shared<std::atomic<uint64_t>>(workers_.size());
   for (const auto& worker : workers_) {
-    worker->stopListener(listener, [this, callback, workers_pending_stop]() {
+    worker->stopListener(listener, options, [this, callback, workers_pending_stop]() {
       if (--(*workers_pending_stop) == 0) {
         server_.dispatcher().post(callback);
       }
@@ -933,7 +934,8 @@ void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
   }
 }
 
-void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
+void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
+                                        const Network::ExtraShutdownListenerOptions& options) {
   stop_listeners_type_ = stop_listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     if (stop_listeners_type != StopListenersType::InboundOnly ||
@@ -948,7 +950,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
       // Close the socket once all workers stopped accepting its connections.
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
-      stopListener(listener, [this, listener_tag]() {
+      stopListener(listener, options, [this, listener_tag]() {
         stats_.listener_stopped_.inc();
         for (auto& listener : active_listeners_) {
           if (listener->listenerTag() == listener_tag) {

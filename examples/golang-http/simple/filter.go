@@ -74,6 +74,18 @@ func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 	return api.Continue
 }
 
+func (f *filter) OnLog() {
+	// Collect request info when it is ended
+}
+
+func (f *filter) OnLogDownstreamStart() {
+	// Collect request info when the request is started (required corresponding Envoy configuration)
+}
+
+func (f *filter) OnLogDownstreamPeriodic() {
+	// Collect request info periodically (required corresponding Envoy configuration)
+}
+
 func (f *filter) OnDestroy(reason api.DestroyReason) {
 }
 */
