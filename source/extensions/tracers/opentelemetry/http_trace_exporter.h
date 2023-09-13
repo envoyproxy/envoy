@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "envoy/config/core/v3/http_service.pb.h"
