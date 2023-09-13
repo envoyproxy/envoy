@@ -43,12 +43,7 @@ class ExtAuthzGrpcIntegrationTest
       public TestWithParam<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>,
       public HttpIntegrationTest {
 public:
-  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    if (!usingDownstreamFilter()) {
-      // TODO(pianiststickman): fix stats when using as upstream filter.
-      skip_tag_extraction_rule_check_ = true;
-    }
-  }
+  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   static std::string protocolTestParamsToString(
       const TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>&
