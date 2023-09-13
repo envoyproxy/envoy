@@ -3383,6 +3383,7 @@ envoy_cc_library(
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
         ":quic_core_web_transport_interface_lib",
+        ":quic_core_web_transport_stats_lib",
         ":quic_platform_base",
         ":quiche_common_capsule_lib",
         ":quiche_common_mem_slice_storage",
@@ -4655,6 +4656,21 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_platform_base",
         ":quiche_common_text_utils_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_web_transport_stats_lib",
+    srcs = ["quiche/quic/core/web_transport_stats.cc"],
+    hdrs = ["quiche/quic/core/web_transport_stats.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_session_lib",
+        ":quic_core_congestion_control_rtt_stats_lib",
+        ":quiche_web_transport_web_transport_lib",
     ],
 )
 
