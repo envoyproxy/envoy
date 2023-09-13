@@ -1274,15 +1274,20 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
   auto entry = cluster_initialization_map_.find(cluster_name);
   // TODO(kbaichoo): if EDS can be configured via cluster_type() then modify the
   // merging logic below.
-  // We should only merge if the cluster type is the same as before and this is
-  // an EDS cluster. This is due to the fact that EDS clusters get
-  // ClusterLoadAssignment from the configuration server but pass per priority
-  // deltas in updates to the ClusterManager. In the future we may decide to
-  // change how the updates propagate among those components.
+  //
+  // This method may be called multiple times to create mutiple ClusterInitializationObject
+  // instances for the same cluster. And before the thread local clusters are acutally initialized,
+  // the new instances will override the old instances in the work threads. But part of data is only
+  // be created once in the first time, such as the load balancer factory. So we need to merge
+  // the new instance with the old one to keep the data.
+  //
+  // More specifically, this will happend in the following scenarios for now:
+  // 1. EDS clusters: the ClusterLoadAssignment of EDS cluster may be updated multiples before
+  //   the thread local cluster is initialized.
+  // 2. Clusters in the unit tests: the cluster in the unit test may be updated multiples before
+  //   the thread local cluster is initialized by calling `updateHosts` directly.
   const bool should_merge_with_prior_cluster =
-      entry != cluster_initialization_map_.end() &&
-      entry->second->cluster_info_->type() == cluster_info->type() &&
-      cluster_info->type() == envoy::config::cluster::v3::Cluster::EDS;
+      entry != cluster_initialization_map_.end() && entry->second->cluster_info_ == cluster_info;
 
   if (should_merge_with_prior_cluster) {
     // We need to copy from an existing Cluster Initialization Object. In
