@@ -240,6 +240,10 @@ new_features:
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: tcp
+  change: |
+    added the support to detect and send TCP RST for raw buffer socket based connections. This is currently supported on Linux only.
+    It can be disabled by the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
 
 - area: upstream
   change: |

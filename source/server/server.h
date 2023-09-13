@@ -253,7 +253,7 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
-  void drainListeners() override;
+  void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) override;
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool fail) override;
