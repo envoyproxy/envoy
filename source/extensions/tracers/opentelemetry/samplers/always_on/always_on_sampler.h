@@ -20,7 +20,7 @@ class AlwaysOnSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
 public:
   AlwaysOnSampler(Server::Configuration::TracerFactoryContext& context)
       : context_(context) {}
-  SamplingResult shouldSample() override;
+  SamplingResult shouldSample(absl::StatusOr<SpanContext> &parent_context, std::string trace_id, std::string name, ::opentelemetry::proto::trace::v1::Span::SpanKind spankind) override;
   std::string getDescription() const override;
 
 private:

@@ -128,6 +128,8 @@ public:
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
+  ::opentelemetry::proto::trace::v1::Span::SpanKind spankind() { return span_.kind(); }
+
   std::string tracestate() { return span_.trace_state(); }
 
   /**

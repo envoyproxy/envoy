@@ -15,6 +15,8 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+class SpanContext;
+
 enum class Decision {
   // IsRecording() == false, span will not be recorded and all events and attributes will be
   // dropped.
@@ -29,7 +31,7 @@ struct SamplingResult
 {
   Decision decision;
   // A set of span Attributes that will also be added to the Span. Can be nullptr.
-  std::unique_ptr<const std::set<opentelemetry::proto::common::v1::KeyValue>> attributes;
+  std::unique_ptr<const std::map<std::string, std::string>> attributes;
   // The tracestate used by the span.
   std::string trace_state;
 
@@ -53,7 +55,7 @@ public:
    *
    * @return a SamplingResult
    */
-  virtual SamplingResult shouldSample() = 0;
+  virtual SamplingResult shouldSample(absl::StatusOr<SpanContext> &parent_context, std::string trace_id, std::string name, ::opentelemetry::proto::trace::v1::Span::SpanKind spankind) = 0;
 
   virtual std::string getDescription() const = 0;
 };
