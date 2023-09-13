@@ -580,11 +580,11 @@ envoy_cmake(
         "BUILD_SHARED_LIBS": "no",
         "BUILD_TESTING": "no",
     },
+    defines = ["MAXMIND_STATICLIB"],
     env = select({
         "//bazel:windows_x86_64": {"WIN32": "yes"},
         "//conditions:default": {},
     }),
-    defines = ["MAXMIND_STATICLIB"],
     lib_source = "@com_github_maxmind_libmaxminddb//:all",
     out_static_libs = select({
         "//bazel:windows_x86_64": ["libmaxminddb.lib"],
