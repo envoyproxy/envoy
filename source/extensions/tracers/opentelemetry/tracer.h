@@ -12,6 +12,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 
 #include "absl/strings/escaping.h"
 #include "span_context.h"
@@ -36,7 +37,7 @@ class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
   Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-         OpenTelemetryTracerStats tracing_stats, const std::string& service_name);
+         OpenTelemetryTracerStats tracing_stats, const std::string& service_name, SamplerPtr sampler);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -64,6 +65,7 @@ private:
   Event::TimerPtr flush_timer_;
   OpenTelemetryTracerStats tracing_stats_;
   std::string service_name_;
+  SamplerPtr sampler_;
 };
 
 /**

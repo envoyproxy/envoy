@@ -94,9 +94,9 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
 Tracer::Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
-               const std::string& service_name)
+               const std::string& service_name, SamplerPtr sampler)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
-      tracing_stats_(tracing_stats), service_name_(service_name) {
+      tracing_stats_(tracing_stats), service_name_(service_name), sampler_(sampler) {
   if (service_name.empty()) {
     service_name_ = std::string{kDefaultServiceName};
   }
