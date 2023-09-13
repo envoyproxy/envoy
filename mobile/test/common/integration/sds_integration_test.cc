@@ -20,7 +20,7 @@ constexpr absl::string_view SECRET_NAME = "client_cert";
 class SdsIntegrationTest : public XdsIntegrationTest {
 public:
   void initialize() override {
-    create_xds_upstream_ = false;
+    create_xds_upstream_ = true;
     use_lds_ = false;
     skip_tag_extraction_rule_check_ = true;
     ExtensionRegistry::registerFactories();
@@ -38,33 +38,20 @@ public:
     XdsIntegrationTest::createEnvoy();
   }
 
-  void createUpstreams() override { addFakeUpstream(Http::CodecType::HTTP2); }
-
 protected:
   void sendCdsResponse() {
     auto cds_cluster = createSingleEndpointClusterConfig(std::string(XDS_CLUSTER_NAME));
     // Update the cluster to use SSL.
-    auto* transport_socket = cds_cluster.mutable_transport_socket();
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
     tls_context.set_sni("lyft.com");
     auto* secret_config =
         tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
     setUpSdsConfig(secret_config, SECRET_NAME);
+    auto* transport_socket = cds_cluster.mutable_transport_socket();
     transport_socket->set_name("envoy.transport_sockets.tls");
     transport_socket->mutable_typed_config()->PackFrom(tls_context);
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
         Config::TypeUrl::get().Cluster, {cds_cluster}, {cds_cluster}, {}, "55");
-  }
-
-  void initializeXdsStream() override {
-    AssertionResult result = fake_upstreams_.back()->waitForHttpConnection(
-        *BaseIntegrationTest::dispatcher_, BaseIntegrationTest::xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-
-    result = BaseIntegrationTest::xds_connection_->waitForNewStream(
-        *BaseIntegrationTest::dispatcher_, xds_stream_);
-    RELEASE_ASSERT(result, result.message());
-    xds_stream_->startGrpcStream();
   }
 
   void sendSdsResponse(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
@@ -76,7 +63,7 @@ protected:
   }
 
   void setUpSdsConfig(envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig* secret_config,
-                      const absl::string_view secret_name) {
+                      absl::string_view secret_name) {
     secret_config->set_name(secret_name);
     auto* config_source = secret_config->mutable_sds_config();
     config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
