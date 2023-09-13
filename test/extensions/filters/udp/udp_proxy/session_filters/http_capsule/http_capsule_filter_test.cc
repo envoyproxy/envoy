@@ -91,10 +91,10 @@ TEST_F(HttpCapsuleFilterTest, InvalidCapsule) {
 TEST_F(HttpCapsuleFilterTest, IncompatibleCapsule) {
   setup();
 
-  const std::string invalid_context_id_fragment =
-      absl::HexStringToBytes("01" // Capsule Type is not DATAGRAM
+  const std::string unexpected_capsule_fragment =
+      absl::HexStringToBytes("17" // Capsule Type is not DATAGRAM
                              "01" // Capsule Length
-                             "00" // Context ID (Invalid VarInt62)
+                             "00" // Unknown capsule payload
       );
 
   Network::UdpRecvData datagram;
