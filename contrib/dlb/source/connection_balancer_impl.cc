@@ -1,4 +1,4 @@
-#include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
+#include "contrib/dlb/source/connection_balancer_impl.h"
 
 #include <sys/eventfd.h>
 #include <unistd.h>

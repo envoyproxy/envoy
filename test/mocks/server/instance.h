@@ -24,7 +24,7 @@ public:
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Network::DnsResolverSharedPtr, dnsResolver, ());
-  MOCK_METHOD(void, drainListeners, ());
+  MOCK_METHOD(void, drainListeners, (OptRef<const Network::ExtraShutdownListenerOptions> options));
   MOCK_METHOD(DrainManager&, drainManager, ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(void, failHealthcheck, (bool fail));
