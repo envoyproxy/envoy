@@ -33,12 +33,13 @@ FilterConfig::FilterConfig(
       tokens_per_fill_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1)),
       descriptors_(config.descriptors()),
       rate_limit_per_connection_(config.local_rate_limit_per_downstream_connection()),
-      consume_default_token_bucket_(config.has_consume_default_token_bucket()
-                                        ? config.consume_default_token_bucket().value()
-                                        : true),
+      always_consume_default_token_bucket_(
+          config.has_always_consume_default_token_bucket()
+              ? config.always_consume_default_token_bucket().value()
+              : true),
       rate_limiter_(new Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
           fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_,
-          consume_default_token_bucket_)),
+          always_consume_default_token_bucket_)),
       local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()

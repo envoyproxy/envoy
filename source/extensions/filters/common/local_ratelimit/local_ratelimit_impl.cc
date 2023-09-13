@@ -18,12 +18,12 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-    bool consume_default_token_bucket)
+    bool always_consume_default_token_bucket)
     : fill_timer_(fill_interval > std::chrono::milliseconds(0)
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
       time_source_(dispatcher.timeSource()),
-      consume_default_token_bucket_(consume_default_token_bucket) {
+      always_consume_default_token_bucket_(always_consume_default_token_bucket) {
   if (fill_timer_ && fill_interval < std::chrono::milliseconds(50)) {
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
   }
@@ -193,7 +193,7 @@ bool LocalRateLimiterImpl::requestAllowed(
     }
   }
   // Since global tokens are not sorted, it should be larger than other descriptors.
-  if (matched_descriptor || consume_default_token_bucket_) {
+  if (!matched_descriptor || always_consume_default_token_bucket_) {
     return requestAllowedHelper(tokens_);
   }
   return true;

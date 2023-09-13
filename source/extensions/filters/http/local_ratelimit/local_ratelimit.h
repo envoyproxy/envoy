@@ -54,9 +54,9 @@ public:
       Envoy::Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptor,
-      bool consume_default_token_bucket)
+      bool always_consume_default_token_bucket)
       : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor,
-                      consume_default_token_bucket) {}
+                      always_consume_default_token_bucket) {}
   static const std::string& key();
   const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() const {
     return rate_limiter_;
@@ -110,7 +110,7 @@ public:
   envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
-  bool consumeDefaultTokenBucket() const { return consume_default_token_bucket_; }
+  bool consumeDefaultTokenBucket() const { return always_consume_default_token_bucket_; }
 
 private:
   friend class FilterTest;
@@ -135,7 +135,7 @@ private:
       envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>
       descriptors_;
   const bool rate_limit_per_connection_;
-  const bool consume_default_token_bucket_{};
+  const bool always_consume_default_token_bucket_{};
   std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;

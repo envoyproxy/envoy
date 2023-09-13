@@ -120,9 +120,9 @@ message LocalRateLimit {
   common.ratelimit.v3.VhRateLimitsOptions vh_rate_limits = 13
       [(validate.rules).enum = {defined_only: true}];
 
-  // Whether consume default token bucket when there is no matching descriptor.
-  // If set to false, default token bucket will not be consumed when there is
-  // no matching descriptor. If set to true, default token bucket will be consumed
-  // when there is no matching descriptor. Default is true.
-  google.protobuf.BoolValue consume_default_token_bucket = 14;
+  // Specifies if default token bucket should be always consumed.
+  // If set to false, default token bucket will only be consumed when there is
+  // no matching descriptor. If set to true, default token bucket will always
+  // be consumed. Default is true.
+  google.protobuf.BoolValue always_consume_default_token_bucket = 14;
 }
