@@ -81,7 +81,7 @@ protected:
 
   // Called by the "start" method on the stream by the filter
   virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                             const envoy::config::core::v3::GrpcService&,
+                                             const Grpc::GrpcServiceConfigWithHashKey&,
                                              const StreamInfo::StreamInfo&) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
@@ -218,7 +218,7 @@ protected:
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const envoy::config::core::v3::GrpcService&,
+                                     const Grpc::GrpcServiceConfigWithHashKey&,
                                      const StreamInfo::StreamInfo&) override {
     callbacks.onGrpcError(Grpc::Status::Internal);
     // Returns nullptr on start stream failure.

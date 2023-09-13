@@ -160,7 +160,7 @@ Filter::StreamOpenState Filter::openStream() {
   }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
+    stream_ = client_->start(*this, config_with_hash_key_, decoder_callbacks_->streamInfo());
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       // Asserts that `stream_` is nullptr since it is not valid to be used any further
@@ -874,6 +874,7 @@ void Filter::mergePerRouteConfig() {
   if (merged_config->grpcService()) {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *merged_config->grpcService();
+    config_with_hash_key_.setConfig(*merged_config->grpcService());
   }
 }
 
