@@ -1280,9 +1280,7 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
   // deltas in updates to the ClusterManager. In the future we may decide to
   // change how the updates propagate among those components.
   const bool should_merge_with_prior_cluster =
-      entry != cluster_initialization_map_.end() &&
-      entry->second->cluster_info_->type() == cluster_info->type() &&
-      cluster_info->type() == envoy::config::cluster::v3::Cluster::EDS;
+      entry != cluster_initialization_map_.end() && entry->second->cluster_info_ == cluster_info;
 
   if (should_merge_with_prior_cluster) {
     // We need to copy from an existing Cluster Initialization Object. In

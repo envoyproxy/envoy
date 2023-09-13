@@ -954,7 +954,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
-getTypedLbConfigFromLegacy(const envoy::config::cluster::v3::Cluster& config) {
+getTypedLbConfigFromLegacyProto(const envoy::config::cluster::v3::Cluster& config) {
 
   LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
@@ -1161,13 +1161,17 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
-  if (config.has_load_balancing_policy()) {
+  if (config.has_load_balancing_policy() ||
+      config.lb_policy() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
     configureLbPolicies(config, server_context);
   } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.convert_legacy_lb_config")) {
-    auto lb_pair = getTypedLbConfigFromLegacy(config);
+    auto lb_pair = getTypedLbConfigFromLegacyProto(config);
     load_balancer_config_ = std::move(lb_pair.first);
     load_balancer_factory_ = lb_pair.second;
     lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
+
+    RELEASE_ASSERT(load_balancer_factory_,
+                   "No load balancer factory found from legacy LB configuration.");
 
     // Clear unnecessary legacy config because all legacy config is wrapped in load_balancer_config_
     // except the original_dst_lb_config.

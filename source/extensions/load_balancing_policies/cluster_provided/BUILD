@@ -12,6 +12,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        # previously considered core code.
+        "//test:__subpackages__",
+    ],
     deps = [
         "//source/common/upstream:load_balancer_factory_base_lib",
         "@envoy_api//envoy/extensions/load_balancing_policies/cluster_provided/v3:pkg_cc_proto",
