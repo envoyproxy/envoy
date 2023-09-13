@@ -107,15 +107,12 @@ func getRequest(r *C.httpRequest) *httpRequest {
 func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
 	var req *httpRequest
 	phase := api.EnvoyRequestPhase(r.phase)
-	if phase == api.DecodeHeaderPhase {
+	// early SendLocalReply or OnLogDownstreamStart may run before the header handling
+	req = getRequest(r)
+	if req == nil {
 		req = createRequest(r)
-	} else {
-		req = getRequest(r)
-		// early sendLocalReply may skip the whole decode phase
-		if req == nil {
-			req = createRequest(r)
-		}
 	}
+
 	if req.pInfo.paniced {
 		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
 		// to prevent error from spreading.
@@ -205,16 +202,30 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 }
 
 //export envoyGoFilterOnHttpLog
-func envoyGoFilterOnHttpLog(r *C.httpRequest) {
+func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
 	req := getRequest(r)
-	// do nothing as the request is finished
+	if req == nil {
+		req = createRequest(r)
+	}
+
 	defer req.RecoverPanic()
 	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
 		req.sema.Done()
 	}
 
+	v := api.AccessLogType(logType)
+
 	f := req.httpFilter
-	f.OnLog()
+	switch v {
+	case api.AccessLogDownstreamStart:
+		f.OnLogDownstreamStart()
+	case api.AccessLogDownstreamPeriodic:
+		f.OnLogDownstreamPeriodic()
+	case api.AccessLogDownstreamEnd:
+		f.OnLog()
+	default:
+		api.LogErrorf("access log type %d is not supported yet", logType)
+	}
 }
 
 //export envoyGoFilterOnHttpDestroy

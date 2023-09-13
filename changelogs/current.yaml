@@ -201,6 +201,10 @@ new_features:
 - area: extension_discovery_service
   change: |
     added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
+- area: quic
+  change: |
+    added support for QUIC listener filters with ECDS support reusing the same config API
+    :ref:`listener_filters <envoy_v3_api_field_config.listener.v3.Listener.listener_filters>` as TCP does.
 - area: redis
   change: |
     added support for time command (returns a local response).

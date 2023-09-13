@@ -705,10 +705,17 @@ void ListenerImpl::buildListenSocketOptions(
 void ListenerImpl::createListenerFilterFactories() {
   if (!config_.listener_filters().empty()) {
     switch (socket_type_) {
-    case Network::Socket::Type::Datagram:
-      udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
-          config_.listener_filters(), *listener_factory_context_);
+    case Network::Socket::Type::Datagram: {
+      if (udp_listener_config_->listener_factory_->isTransportConnectionless()) {
+        udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
+            config_.listener_filters(), *listener_factory_context_);
+      } else {
+        // This is a QUIC listener.
+        quic_listener_filter_factories_ = parent_.factory_->createQuicListenerFilterFactoryList(
+            config_.listener_filters(), *listener_factory_context_);
+      }
       break;
+    }
     case Network::Socket::Type::Stream:
       listener_filter_factories_ = parent_.factory_->createListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
@@ -972,6 +979,17 @@ void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManage
                                                 Network::UdpReadFilterCallbacks& callbacks) {
   Configuration::FilterChainUtility::buildUdpFilterChain(manager, callbacks,
                                                          udp_listener_filter_factories_);
+}
+
+bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterManager& manager) {
+  if (Configuration::FilterChainUtility::buildQuicFilterChain(manager,
+                                                              quic_listener_filter_factories_)) {
+    return true;
+  }
+  ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                   "Close socket and stop the iteration onAccept.");
+  missing_listener_config_stats_.extension_config_missing_.inc();
+  return false;
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

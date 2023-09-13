@@ -200,8 +200,12 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
   if (quicConnection() == nullptr) {
     return;
   }
-  quicConnection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  quicConnection()->CloseConnection(
+      quic::QUIC_NO_ERROR,
+      (localCloseReason().empty()
+           ? "Closed by application"
+           : absl::StrCat("Closed by application with reason: ", localCloseReason())),
+      quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {

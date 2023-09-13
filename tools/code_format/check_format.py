@@ -1048,7 +1048,9 @@ class FormatChecker:
 
         if self.check_error_messages():
             if self.args.operation_type == "check":
-                print("ERROR: check format failed. run '//tools/code_format:check_format -- fix'")
+                print(
+                    "ERROR: check format failed. run 'bazel run //tools/code_format:check_format -- fix'"
+                )
             else:
                 print("ERROR: check format failed. diff has been applied'")
             sys.exit(1)
