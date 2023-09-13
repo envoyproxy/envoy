@@ -148,6 +148,7 @@ public:
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
+  DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:
   // A convenience function which returns true if
@@ -213,6 +214,9 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
+  // Set the detected close type for this connection.
+  void setDetectedCloseType(DetectedCloseType close_type);
+
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
@@ -225,6 +229,7 @@ private:
   uint64_t last_write_buffer_size_{};
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
+  DetectedCloseType detected_close_type_{DetectedCloseType::Normal};
   bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;
@@ -239,6 +244,7 @@ private:
   // read_disable_count_ == 0 to ensure that read resumption happens when remaining bytes are held
   // in transport socket internal buffers.
   bool transport_wants_read_ : 1;
+  bool enable_rst_detect_send_ : 1;
 };
 
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {

@@ -405,6 +405,7 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager& manager) override;
 
   SystemTime last_updated_;
 
@@ -454,7 +455,7 @@ private:
   void buildAccessLog();
   void buildInternalListener();
   void validateConfig();
-  void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+  bool buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
   void buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
@@ -502,6 +503,7 @@ private:
 
   Filter::ListenerFilterFactoriesList listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
+  Filter::QuicListenerFilterFactoriesList quic_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;

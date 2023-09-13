@@ -47,8 +47,6 @@ public:
     TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
 
-  ~FilterTest() override { filter_->onDestroy(); }
-
   void addMatcherConfig(MatcherConfigType config_type) {
 
     // Add the matcher configuration.
@@ -138,18 +136,17 @@ public:
                 testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
   }
 
+  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockFactoryContext> context_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 
-  std::unique_ptr<RateLimitQuotaFilter> filter_;
+  ThreadLocalClient thread_local_client_;
   FilterConfigConstSharedPtr filter_config_;
   FilterConfig config_;
+  BucketsCache bucket_cache_;
+  std::unique_ptr<RateLimitQuotaFilter> filter_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-
-  BucketsCache bucket_cache_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  ThreadLocalClient thread_local_client_;
 };
 
 TEST_F(FilterTest, EmptyMatcherConfig) {
@@ -374,7 +371,6 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
   Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
   inner_matcher->mutable_on_match()->MergeFrom(on_match);
   config_.mutable_bucket_matchers()->MergeFrom(matcher);
-  std::cout << config_.DebugString() << std::endl;
   createFilter();
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.

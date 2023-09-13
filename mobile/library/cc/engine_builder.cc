@@ -23,7 +23,6 @@
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 #endif
 
-#include "source/common/common/assert.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
@@ -149,6 +148,9 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap* bootstrap) const
         bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
     list->add_patterns()->set_exact("cluster_manager.active_clusters");
     list->add_patterns()->set_exact("cluster_manager.cluster_added");
+    // Allow SDS related stats.
+    list->add_patterns()->mutable_safe_regex()->set_regex("sds\\..*");
+    list->add_patterns()->mutable_safe_regex()->set_regex(".*\\.ssl_context_update_by_sds");
   }
 }
 #endif

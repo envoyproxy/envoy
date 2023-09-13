@@ -37,6 +37,7 @@ RUNTIME_GUARD(envoy_reloadable_features_check_mep_on_first_eject);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_copy_response_code_to_downstream_stream_info);
 RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
+RUNTIME_GUARD(envoy_reloadable_features_detect_and_raise_rst_tcp_connection);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_enable_aws_credentials_file);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
@@ -120,6 +121,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // TODO(adisuissa): enable by default once this is tested in prod.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
+// TODO(#10646) change to true when UHV is sufficiently tested
+// For more information about Universal Header Validation, please see
+// https://github.com/envoyproxy/envoy/issues/10646
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
 // TODO(wbpcode): enable by default after a complete deprecation period.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 

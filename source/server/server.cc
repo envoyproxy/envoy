@@ -184,9 +184,11 @@ const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
   return *config_.clusterManager();
 }
 
-void InstanceImpl::drainListeners() {
+void InstanceImpl::drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) {
   ENVOY_LOG(info, "closing and draining listeners");
-  listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
+  listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
+                                   options.has_value() ? *options
+                                                       : Network::ExtraShutdownListenerOptions{});
   drain_manager_->startDrainSequence([] {});
 }
 
@@ -423,8 +425,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   if (bootstrap_.has_application_log_config()) {
-    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
-    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+    THROW_IF_NOT_OK(
+        Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
+    THROW_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
   }
 
 #ifdef ENVOY_PERFETTO

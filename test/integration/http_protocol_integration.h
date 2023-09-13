@@ -14,6 +14,7 @@ struct HttpProtocolTestParams {
   Http1ParserImpl http1_implementation;
   Http2Impl http2_implementation;
   bool defer_processing_backedup_streams;
+  bool use_universal_header_validator;
 };
 
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
@@ -70,12 +71,15 @@ public:
       : HttpIntegrationTest(
             GetParam().downstream_protocol, GetParam().version,
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
-                                          Http::CodecType::HTTP3)) {
+                                          Http::CodecType::HTTP3)),
+        use_universal_header_validator_(GetParam().use_universal_header_validator) {
     setupHttp1ImplOverrides(GetParam().http1_implementation);
     setupHttp2ImplOverrides(GetParam().http2_implementation);
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       GetParam().defer_processing_backedup_streams ? "true"
                                                                                    : "false");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                      GetParam().use_universal_header_validator ? "true" : "false");
   }
 
   void SetUp() override {
@@ -85,6 +89,9 @@ public:
 
   void setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
   void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
+
+protected:
+  const bool use_universal_header_validator_{false};
 };
 
 class UpstreamDownstreamIntegrationTest
@@ -101,6 +108,9 @@ public:
     config_helper_.addRuntimeOverride(
         Runtime::defer_processing_backedup_streams,
         std::get<0>(GetParam()).defer_processing_backedup_streams ? "true" : "false");
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.enable_universal_header_validator",
+        std::get<0>(GetParam()).use_universal_header_validator ? "true" : "false");
   }
   static std::string testParamsToString(
       const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {

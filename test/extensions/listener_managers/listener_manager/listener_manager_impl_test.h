@@ -96,6 +96,8 @@ protected:
             }));
     ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
         .WillByDefault(Return(&tcp_listener_config_provider_manager_));
+    ON_CALL(listener_factory_, getQuicListenerConfigProviderManager())
+        .WillByDefault(Return(&quic_listener_config_provider_manager_));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -113,6 +115,15 @@ protected:
                        -> std::vector<Network::UdpListenerFilterFactoryCb> {
               return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters,
                                                                                           context);
+            }));
+    ON_CALL(listener_factory_, createQuicListenerFilterFactoryList(_, _))
+        .WillByDefault(Invoke(
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                       filters,
+                   Configuration::ListenerFactoryContext& context)
+                -> Filter::QuicListenerFilterFactoriesList {
+              return ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
+                  filters, context, *listener_factory_.getQuicListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
       return listener_tag_++;
@@ -520,6 +531,7 @@ protected:
   bool use_matcher_;
   Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
 };
 } // namespace Server
 } // namespace Envoy
