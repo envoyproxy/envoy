@@ -165,7 +165,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   
   if (sampler_) {
     absl::StatusOr<SpanContext> span_context = absl::InvalidArgumentError("no parent span");
-    auto sampling_result = sampler_->shouldSample(span_context, operation_name, new_span->getTraceIdAsHex(), new_span->spankind(), {});
+    auto sampling_result = sampler_->shouldSample(span_context, operation_name, new_span->getTraceIdAsHex(), new_span->spankind(), {}, {});
     new_span->setSampled(sampling_result.isSampled());
     if (sampling_result.attributes) {
       for (auto const &attribute: *sampling_result.attributes) {
@@ -198,7 +198,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   
   if (sampler_) {
     absl::StatusOr<SpanContext> span_context = previous_span_context;
-    auto sampling_result = sampler_->shouldSample(span_context, operation_name, new_span->getTraceIdAsHex(), new_span->spankind(), {});
+    auto sampling_result = sampler_->shouldSample(span_context, operation_name, new_span->getTraceIdAsHex(), new_span->spankind(), {}, {});
     for (auto const &attribute: *sampling_result.attributes) {
       new_span->setTag(attribute.first, attribute.second);
       new_span->setTracestate(sampling_result.trace_state);

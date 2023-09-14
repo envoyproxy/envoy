@@ -22,7 +22,7 @@ public:
   SamplingResult shouldSample(absl::StatusOr<SpanContext>& parent_context,
                               const std::string& trace_id, const std::string& name,
                               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind,
-                              const std::map<std::string, std::string>& attributes) override;
+                              const std::map<std::string, std::string>& attributes, const std::set<SpanContext> links) override;
   std::string getDescription() const override;
 
 private:

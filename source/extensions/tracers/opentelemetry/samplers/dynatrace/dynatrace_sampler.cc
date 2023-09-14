@@ -15,13 +15,10 @@ namespace OpenTelemetry {
 
 SamplingResult
 DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
-                              const std::string& trace_id, const std::string& name,
-                              ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, 
-                              const std::map<std::string, std::string>& attributes) {
-  (void)trace_id;
-  (void)name;
-  (void)spankind;
-  (void)attributes;
+                              const std::string& /*trace_id*/, const std::string& /*name*/,
+                              ::opentelemetry::proto::trace::v1::Span::SpanKind /*spankind*/,
+                              const std::map<std::string, std::string>& /*attributes*/,
+                              const std::set<SpanContext> /*links*/) {  
   SamplingResult result;
 
   if (counter_ %2 == 0) {

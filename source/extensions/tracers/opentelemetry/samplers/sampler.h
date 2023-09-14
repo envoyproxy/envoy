@@ -1,7 +1,9 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
+#include <set>
 
 #include "envoy/config/typed_config.h"
 #include "envoy/server/tracer_config.h"
@@ -57,7 +59,8 @@ public:
    */
   virtual SamplingResult
   shouldSample(absl::StatusOr<SpanContext>& parent_context, const std::string& trace_id, const std::string& name,
-               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, const std::map<std::string, std::string>& attributes) PURE;
+               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, 
+               const std::map<std::string, std::string>& attributes, const std::set<SpanContext> links) PURE;
 
   virtual std::string getDescription() const PURE;
 };
