@@ -688,6 +688,23 @@ request_headers_to_add:
   EXPECT_EQ("dGVzdF92YWx1ZQo=", header_map.get_("x-per-request"));
 }
 
+TEST(HeaderParserTest, EvaluatePlainAndRawHeader) {
+  // The encoded value is: %FILTER_STATE(test_key:PLAIN)%
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+request_headers_to_add:
+  - header:
+      key: "x-per-request"
+      value: "test"
+      raw_value: JUZJTFRFUl9TVEFURSh0ZXN0X2tleTpQTEFJTiklCg==
+  )EOF";
+  const auto route = parseRouteFromV3Yaml(yaml);
+  EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(route.request_headers_to_add()), EnvoyException,
+                            "cannot specify both value and raw_value");
+}
+
 TEST(HeaderParserTest, EvaluateResponseHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
