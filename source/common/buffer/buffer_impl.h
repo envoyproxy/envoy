@@ -314,7 +314,9 @@ public:
   void transferDrainTrackersTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
-    destination.releasor_.swap(releasor_);
+    // The releasor needn't to be transferred, and actually if there is releasor, this
+    // slice can't coalesce. Then there won't be a chance to calling this method.
+    ASSERT(releasor_ == nullptr);
   }
 
   /**
