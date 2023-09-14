@@ -21,36 +21,30 @@ static void BM_InlineMapConstructAndDestruct(benchmark::State& state) {
   descriptor_200.finalize();
   descriptor_0.finalize();
 
-  const auto create_normal_map = []() {
-    absl::flat_hash_map<std::string, std::string> normal_map;
-    return normal_map.size();
-  };
-
-  const auto create_inline_map_200 = [&descriptor_200]() {
-    InlineMap<std::string, std::string> inline_map(descriptor_200);
-    return inline_map.size();
-  };
-
-  const auto create_inline_map_0 = [&descriptor_0]() {
-    InlineMap<std::string, std::string> inline_map(descriptor_0);
-    return inline_map.size();
-  };
-
   if (map_type == 0) {
     // Normal map.
+    size_t total_size = 0;
     for (auto _ : state) { // NOLINT
-      benchmark::DoNotOptimize(create_normal_map());
+      absl::flat_hash_map<std::string, std::string> normal_map;
+      total_size += normal_map.size();
     }
+    benchmark::DoNotOptimize(total_size);
   } else if (map_type == 1) {
     // Inline map without any inline keys.
+    size_t total_size = 0;
     for (auto _ : state) { // NOLINT
-      benchmark::DoNotOptimize(create_inline_map_0());
+      InlineMap<std::string, std::string> inline_map(descriptor_0);
+      total_size += inline_map.size();
     }
+    benchmark::DoNotOptimize(total_size);
   } else {
     // Inline map with 200 inline keys.
+    size_t total_size = 0;
     for (auto _ : state) { // NOLINT
-      benchmark::DoNotOptimize(create_inline_map_200());
+      InlineMap<std::string, std::string> inline_map(descriptor_200);
+      total_size += inline_map.size();
     }
+    benchmark::DoNotOptimize(total_size);
   }
 }
 
@@ -70,39 +64,33 @@ static void BM_InlineMapConstructAndDestructWithSingleEntry(benchmark::State& st
   descriptor_200.finalize();
   descriptor_0.finalize();
 
-  const auto create_normal_map = []() {
-    absl::flat_hash_map<std::string, std::string> normal_map;
-    normal_map.insert({"key_1", "value_1"});
-    return normal_map.size();
-  };
-
-  const auto create_inline_map_200 = [&descriptor_200]() {
-    InlineMap<std::string, std::string> inline_map(descriptor_200);
-    inline_map.set("key_1", "value_1");
-    return inline_map.size();
-  };
-
-  const auto create_inline_map_0 = [&descriptor_0]() {
-    InlineMap<std::string, std::string> inline_map(descriptor_0);
-    inline_map.set("key_1", "value_1");
-    return inline_map.size();
-  };
-
   if (map_type == 0) {
     // Normal map.
+    size_t total_size = 0;
     for (auto _ : state) { // NOLINT
-      benchmark::DoNotOptimize(create_normal_map());
+      absl::flat_hash_map<std::string, std::string> normal_map;
+      normal_map.insert({"key_1", "value_1"});
+      total_size += normal_map.size();
     }
+    benchmark::DoNotOptimize(total_size);
   } else if (map_type == 1) {
     // Inline map without any inline keys.
+    size_t total_size = 0;
     for (auto _ : state) { // NOLINT
-      benchmark::DoNotOptimize(create_inline_map_0());
+      InlineMap<std::string, std::string> inline_map(descriptor_0);
+      inline_map.set("key_1", "value_1");
+      total_size += inline_map.size();
     }
+    benchmark::DoNotOptimize(total_size);
   } else {
     // Inline map with 200 inline keys.
+    size_t total_size = 0;
     for (auto _ : state) { // NOLINT
-      benchmark::DoNotOptimize(create_inline_map_200());
+      InlineMap<std::string, std::string> inline_map(descriptor_200);
+      inline_map.set("key_1", "value_1");
+      total_size += inline_map.size();
     }
+    benchmark::DoNotOptimize(total_size);
   }
 }
 
