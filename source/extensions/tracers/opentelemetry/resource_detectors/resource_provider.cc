@@ -37,7 +37,7 @@ Resource createInitialResource(std::string service_name) {
  * @return std::string The calculated schema URL.
  */
 std::string resolveSchemaUrl(const std::string& old_schema_url,
-                           const std::string& updating_schema_url) {
+                             const std::string& updating_schema_url) {
   if (old_schema_url.empty()) {
     return updating_schema_url;
   }

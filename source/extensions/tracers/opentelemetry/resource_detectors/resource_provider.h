@@ -34,9 +34,8 @@ public:
 
 class ResourceProviderImpl : public ResourceProvider {
 public:
-  Resource
-  getResource(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-              Server::Configuration::TracerFactoryContext& context) const override;
+  Resource getResource(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
+                       Server::Configuration::TracerFactoryContext& context) const override;
 };
 
 } // namespace OpenTelemetry
