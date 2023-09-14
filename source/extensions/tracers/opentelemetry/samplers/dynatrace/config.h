@@ -23,7 +23,7 @@ public:
    * @return SamplerPtr
    */
   SamplerPtr
-  createSampler(const Protobuf::Message& message) override;
+  createSampler(const Protobuf::Message& config) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::tracers::opentelemetry::samplers::v3::

@@ -10,9 +10,8 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 SamplerPtr AlwaysOnSamplerFactory::createSampler(
-    const Protobuf::Message& message) {
-  (void)message;
-  return std::make_shared<AlwaysOnSampler>();
+    const Protobuf::Message& config) {
+  return std::make_shared<AlwaysOnSampler>(config);
 }
 
 /**

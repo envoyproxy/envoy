@@ -18,7 +18,7 @@ namespace OpenTelemetry {
  */
 class DynatraceSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
 public:
-  DynatraceSampler() : counter_(0) {}
+  DynatraceSampler(const Protobuf::Message& /*config*/) : counter_(0) {}
   SamplingResult shouldSample(absl::StatusOr<SpanContext>& parent_context,
                               const std::string& trace_id, const std::string& name,
                               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind,
