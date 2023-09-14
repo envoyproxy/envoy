@@ -10,9 +10,9 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 SamplerPtr DynatraceSamplerFactory::createSampler(
-    const Protobuf::Message& message, Server::Configuration::TracerFactoryContext& context) {
+    const Protobuf::Message& message) {
   (void)message;
-  return std::make_shared<DynatraceSampler>(context);
+  return std::make_shared<DynatraceSampler>();
 }
 
 /**

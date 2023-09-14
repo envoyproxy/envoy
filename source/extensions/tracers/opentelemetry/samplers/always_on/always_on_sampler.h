@@ -18,7 +18,7 @@ namespace OpenTelemetry {
  */
 class AlwaysOnSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
 public:
-  AlwaysOnSampler(Server::Configuration::TracerFactoryContext& context) : context_(context) {}
+  AlwaysOnSampler() {}
   SamplingResult shouldSample(absl::StatusOr<SpanContext>& parent_context,
                               const std::string& trace_id, const std::string& name,
                               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind,
@@ -26,7 +26,6 @@ public:
   std::string getDescription() const override;
 
 private:
-  Server::Configuration::TracerFactoryContext& context_;
 };
 
 } // namespace OpenTelemetry

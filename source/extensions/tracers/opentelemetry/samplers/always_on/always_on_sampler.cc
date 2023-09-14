@@ -18,7 +18,6 @@ AlwaysOnSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
                               const std::string& trace_id, const std::string& name,
                               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, 
                               const std::map<std::string, std::string>& attributes) {
-  (void)context_;
   (void)trace_id;
   (void)name;
   (void)spankind;

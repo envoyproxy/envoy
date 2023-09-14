@@ -74,11 +74,10 @@ public:
   /**
    * @brief Creates a sampler
    * @param message The sampler config
-   * @param context The tracer factory context.
    * @return SamplerPtr
    */
   virtual SamplerPtr
-  createSampler(const Protobuf::Message& message, Server::Configuration::TracerFactoryContext& context) PURE;
+  createSampler(const Protobuf::Message& message) PURE;
 
   std::string category() const override { return "envoy.tracers.opentelemetry.samplers"; }
 };
