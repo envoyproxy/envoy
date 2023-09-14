@@ -31,8 +31,7 @@ FORMAT_ARGS=(
     ./bazel/envoy_mobile_swift_bazel_support.bzl
     ./bazel/envoy_mobile_repositories.bzl
     ./examples/swift/swiftpm/Packages/Envoy.xcframework
-    --skip_envoy_build_rule_check
-    "$ENVOY_FORMAT_ACTION")
+    --skip_envoy_build_rule_check)
 if [[ -n "$TARGET_PATH" ]]; then
     FORMAT_ARGS+=("$TARGET_PATH")
 fi
@@ -47,4 +46,4 @@ FORMAT_ARGS+=(
     ./library/common/extensions ./test/java ./test/kotlin ./test/objective-c
     ./test/swift ./experimental/swift)
 
-export ENVOY_BAZEL_PREFIX="@envoy" && ./bazelw run @envoy//tools/code_format:check_format -- --path "$PWD" "${FORMAT_ARGS[@]}"
+export ENVOY_BAZEL_PREFIX="@envoy" && ./bazelw run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"

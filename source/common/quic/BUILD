@@ -348,6 +348,7 @@ envoy_cc_library(
     deps = [
         ":quic_io_handle_wrapper_lib",
         ":quic_network_connection_lib",
+        "//source/common/network:generic_listener_filter_impl_base_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
     ],

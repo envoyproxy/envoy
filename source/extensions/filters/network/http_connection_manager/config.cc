@@ -640,7 +640,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.getServerFactoryContext(),
              context_.clusterManager(), context_, stats_prefix_);
-  helper.processFilters(config.http_filters(), "http", "http", filter_factories_);
+  THROW_IF_NOT_OK(helper.processFilters(config.http_filters(), "http", "http", filter_factories_));
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
@@ -653,7 +653,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
       Http::DependencyManager upgrade_dependency_manager;
-      helper.processFilters(upgrade_config.filters(), name, "http upgrade", *factories);
+      THROW_IF_NOT_OK(
+          helper.processFilters(upgrade_config.filters(), name, "http upgrade", *factories));
       // TODO(auni53): Validate encode dependencies too.
       auto status = upgrade_dependency_manager.validDecodeDependencies();
       if (!status.ok()) {
