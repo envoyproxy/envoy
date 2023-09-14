@@ -238,6 +238,11 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: tls
+  change: |
+    added :ref:`disable_stateful_session_resumption
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` config option to
+    disable stateful TLS session resumption.
 - area: udp_proxy
   change: |
     added :ref:`session_filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>` config to
