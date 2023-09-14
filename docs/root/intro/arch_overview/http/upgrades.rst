@@ -166,7 +166,7 @@ is set to ``CONNECT-UDP``.
    :linenos:
    :lines: 33-60
    :lineno-start: 33
-   :emphasize-lines: 47-48, 57-58
+   :emphasize-lines: 15-16, 25-26
    :caption: :download:`proxy_connect_udp.yaml </_configs/repo/proxy_connect_udp.yaml>`
 
 The following example configuration makes Envoy terminate ``CONNECT-UDP`` requests and send UDP payloads
@@ -179,7 +179,7 @@ must be set to terminate ``CONNECT-UDP`` requests.
    :linenos:
    :lines: 32-63
    :lineno-start: 32
-   :emphasize-lines: 46-47, 50-53, 60-61
+   :emphasize-lines: 15-16, 19-22, 29-30
    :caption: :download:`terminate_http3_connect_udp.yaml </_configs/repo/terminate_http3_connect_udp.yaml>`
 
 .. _tunneling-tcp-over-http:
