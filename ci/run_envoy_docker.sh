@@ -152,6 +152,7 @@ docker run --rm \
        -e ENVOY_REPO \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
+       -e GITHUB_REF_NAME \
        -e GITHUB_TOKEN \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \
