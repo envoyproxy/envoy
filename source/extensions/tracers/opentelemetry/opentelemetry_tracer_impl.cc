@@ -29,11 +29,13 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
       tracing_stats_{OPENTELEMETRY_TRACER_STATS(
           POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))} {
   auto& factory_context = context.serverFactoryContext();
+
   Resource resource = resource_provider.getResource(opentelemetry_config, context);
+  ResourcePtr resource_ptr = std::make_shared<Resource>(std::move(resource));
 
   // Create the tracer in Thread Local Storage.
   tls_slot_ptr_->set([opentelemetry_config, &factory_context, this,
-                      resource](Event::Dispatcher& dispatcher) {
+                      resource_ptr](Event::Dispatcher& dispatcher) {
     OpenTelemetryGrpcTraceExporterPtr exporter;
     if (opentelemetry_config.has_grpc_service()) {
       Grpc::AsyncClientFactoryPtr&& factory =
@@ -45,7 +47,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     }
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
-        factory_context.runtime(), dispatcher, tracing_stats_, resource);
+        factory_context.runtime(), dispatcher, tracing_stats_, resource_ptr);
 
     return std::make_shared<TlsTracer>(std::move(tracer));
   });

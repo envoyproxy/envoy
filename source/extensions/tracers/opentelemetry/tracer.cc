@@ -92,7 +92,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
 Tracer::Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
-               const Resource& resource)
+               const ResourcePtr resource)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
@@ -113,10 +113,10 @@ void Tracer::flushSpans() {
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
-  resource_span->set_schema_url(resource_.schemaUrl_);
+  resource_span->set_schema_url(resource_->schemaUrl_);
 
   // add resource attributes
-  for (auto const& att : resource_.attributes_) {
+  for (auto const& att : resource_->attributes_) {
     opentelemetry::proto::common::v1::KeyValue key_value =
         opentelemetry::proto::common::v1::KeyValue();
     opentelemetry::proto::common::v1::AnyValue value_proto =
