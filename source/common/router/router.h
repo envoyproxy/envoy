@@ -232,46 +232,7 @@ public:
 
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
-               const envoy::extensions::filters::http::router::v3::Router& config)
-      : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                     context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-                     PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span(), config.suppress_envoy_headers(),
-                     config.respect_expected_rq_timeout(),
-                     config.suppress_grpc_request_failure_code_stats(),
-                     config.has_upstream_log_options()
-                         ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
-                         : false,
-                     config.strict_check_headers(), context.api().timeSource(),
-                     context.httpContext(), context.routerContext()) {
-    for (const auto& upstream_log : config.upstream_log()) {
-      upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
-    }
-
-    if (config.has_upstream_log_options() &&
-        config.upstream_log_options().has_upstream_log_flush_interval()) {
-      upstream_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-          config.upstream_log_options().upstream_log_flush_interval()));
-    }
-
-    if (config.upstream_http_filters_size() > 0) {
-      auto& server_factory_ctx = context.getServerFactoryContext();
-      const Http::FilterChainUtility::FiltersList& upstream_http_filters =
-          config.upstream_http_filters();
-      std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
-          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-              server_factory_ctx);
-      std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
-      upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
-          server_factory_ctx, context.initManager(), context.scope());
-      Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
-                              Server::Configuration::UpstreamHttpFilterConfigFactory>
-          helper(*filter_config_provider_manager, server_factory_ctx, context.clusterManager(),
-                 *upstream_ctx_, prefix);
-      helper.processFilters(upstream_http_filters, "router upstream http", "router upstream http",
-                            upstream_http_filter_factories_);
-    }
-  }
+               const envoy::extensions::filters::http::router::v3::Router& config);
 
   bool createFilterChain(
       Http::FilterChainManager& manager, bool only_create_if_configured = false,
