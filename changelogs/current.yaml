@@ -138,9 +138,15 @@ bug_fixes:
 - area: unix domain sockets
   change: |
     Fixed a crash on some versions of macOS when using a listener on a unix-domain socket.
+- area: redis
+  change: |
+    Fixed a bug where redis key with % in the key is failing with a validation error.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: listener
+  change: |
+    Removed ``envoy.reloadable_features.enable_update_listener_socket_options`` runtime flag and legacy code paths.
 - area: tcp
   change: |
     Removed runtime key ``envoy.reloadable_features.tcp_pool_idle_timeout``.
@@ -201,6 +207,10 @@ new_features:
 - area: extension_discovery_service
   change: |
     added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
+- area: quic
+  change: |
+    added support for QUIC listener filters with ECDS support reusing the same config API
+    :ref:`listener_filters <envoy_v3_api_field_config.listener.v3.Listener.listener_filters>` as TCP does.
 - area: redis
   change: |
     added support for time command (returns a local response).

@@ -575,3 +575,11 @@ envoy_cc_library(
         "//source/common/common:macros",
     ],
 )
+
+envoy_cc_library(
+    name = "generic_listener_filter_impl_base_lib",
+    hdrs = ["generic_listener_filter_impl_base.h"],
+    deps = [
+        "//envoy/network:filter_interface",
+    ],
+)

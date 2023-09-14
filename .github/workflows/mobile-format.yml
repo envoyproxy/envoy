@@ -32,8 +32,6 @@ jobs:
     timeout-minutes: 45
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
-      env:
-        CLANG_FORMAT: /opt/llvm/bin/clang-format
     steps:
     - uses: actions/checkout@v4
     - name: Add safe directory

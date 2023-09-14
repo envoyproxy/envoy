@@ -110,6 +110,16 @@ public:
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
+   * Creates a list of QUIC listener filter factories.
+   * @param filters supplies the JSON configuration.
+   * @param context supplies the factory creation context.
+   * @return Filter::ListenerFilterFactoriesList the list of filter factories.
+   */
+  virtual Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) PURE;
+
+  /**
    * @return DrainManagerPtr a new drain manager.
    * @param drain_type supplies the type of draining to do for the owning listener.
    */

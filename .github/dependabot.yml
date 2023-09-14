@@ -40,12 +40,6 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "pip"
-  directory: "/mobile/docs"
-  schedule:
-    interval: "daily"
-    time: "06:00"
-
-- package-ecosystem: "pip"
   directory: "/tools/base"
   schedule:
     interval: "daily"

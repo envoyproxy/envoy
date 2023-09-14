@@ -347,6 +347,22 @@ private:
   }
 };
 
+class QuicListenerDynamicFilterConfigProviderImpl
+    : public ListenerDynamicFilterConfigProviderImpl<Network::QuicListenerFilterFactoryCb> {
+public:
+  using ListenerDynamicFilterConfigProviderImpl::ListenerDynamicFilterConfigProviderImpl;
+
+private:
+  Network::QuicListenerFilterFactoryCb
+  instantiateFilterFactory(const Protobuf::Message& message) const override {
+    auto* factory =
+        Registry::FactoryRegistry<Server::Configuration::NamedQuicListenerFilterConfigFactory>::
+            getFactoryByType(message.GetTypeName());
+    return factory->createListenerFilterFactoryFromProto(message, listener_filter_matcher_,
+                                                         factory_context_);
+  }
+};
+
 /**
  * All extension config discovery stats. @see stats_macros.h
  */
@@ -754,6 +770,19 @@ public:
 
 protected:
   const std::string getConfigDumpType() const override { return "ecds_filter_udp_listener"; }
+};
+
+// QUIC listener filter
+class QuicListenerFilterConfigProviderManagerImpl
+    : public FilterConfigProviderManagerImpl<
+          Server::Configuration::NamedQuicListenerFilterConfigFactory,
+          Network::QuicListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
+          QuicListenerDynamicFilterConfigProviderImpl> {
+public:
+  absl::string_view statPrefix() const override { return "quic_listener_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_quic_listener"; }
 };
 
 } // namespace Filter

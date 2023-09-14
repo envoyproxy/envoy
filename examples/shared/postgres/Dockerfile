@@ -1,3 +1,3 @@
-FROM postgres:latest@sha256:a5e89e5f2679863bedef929c4a7ec5d1a2cb3c045f13b47680d86f8701144ed7
+FROM postgres:latest@sha256:f2d194fecc644f4d71fb52ff191f17e3550247e2511affbecc2514269f84639a
 COPY docker-healthcheck.sh /usr/local/bin/
 HEALTHCHECK CMD ["docker-healthcheck.sh"]
