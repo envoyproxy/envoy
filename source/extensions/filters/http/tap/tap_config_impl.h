@@ -43,8 +43,7 @@ public:
         should_record_headers_received_time_(tap_config.record_headers_received_time()),
         should_record_downstream_connection_(tap_config.record_downstream_connection()),
         stream_id_(stream_id), sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
-        statuses_(config_->createMatchStatusVector()),
-	connection_(connection) {
+        statuses_(config_->createMatchStatusVector()), connection_(connection) {
     config_->rootMatcher().onNewStream(statuses_);
   }
 
