@@ -39,6 +39,9 @@ public:
       downstream_bytes_to_drain_++;
       return ReadFilterStatus::StopIteration;
     } else {
+      // Make sure that we are able to call continueFilterChain() here without
+      // impacting the filter chain iteration.
+      read_callbacks_->continueFilterChain();
       return ReadFilterStatus::Continue;
     }
   }
