@@ -70,7 +70,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   SpanContextExtractor extractor(trace_context);
   if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
-    std::unique_ptr<Tracing::Span> new_open_telemetry_span =
+    Tracing::SpanPtr new_open_telemetry_span =
         tracer.startSpan(config, operation_name, stream_info.startTime(), tracing_decision);
     return new_open_telemetry_span;
   } else {

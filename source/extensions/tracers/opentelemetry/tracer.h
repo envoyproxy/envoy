@@ -146,7 +146,6 @@ private:
   bool sampled_;
 };
 
-using SpanPtr = std::unique_ptr<Span>;
 using TracerPtr = std::unique_ptr<Tracer>;
 
 } // namespace OpenTelemetry
