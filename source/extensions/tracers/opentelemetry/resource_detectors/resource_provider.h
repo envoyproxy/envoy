@@ -22,7 +22,7 @@ public:
    * resource SDK specification. @see
    * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.24.0/specification/resource/sdk.md#merge.
    *
-   * @param opentelemetry_config The opentelemetry configuration, which contains the configured
+   * @param opentelemetry_config The OpenTelemetry configuration, which contains the configured
    * resource detectors.
    * @param context The tracer factory context.
    * @return Resource const The merged resource.

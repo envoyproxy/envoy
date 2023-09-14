@@ -28,7 +28,7 @@ Resource createInitialResource(std::string service_name) {
 
 /**
  * @brief Resolves the new schema url when merging two resources.
- * This function implements the algorightm as defined in the OpenTelemetry Resource SDK
+ * This function implements the algorithm as defined in the OpenTelemetry Resource SDK
  * specification. @see
  * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.24.0/specification/resource/sdk.md#merge
  *

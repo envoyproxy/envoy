@@ -51,7 +51,7 @@ TEST(EnvironmentResourceDetectorTest, Detection) {
     EXPECT_TRUE(resource.attributes_.empty());
     TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
   }
-  // // OTEL_RESOURCE_ATTRIBUTES env variable present and with attributes
+  // OTEL_RESOURCE_ATTRIBUTES env variable present and with attributes
   {
     NiceMock<Server::Configuration::MockTracerFactoryContext> context;
     TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "key1=val1,key2=val2", 1);
