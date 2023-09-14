@@ -204,7 +204,7 @@ Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::
     // We defer the socket creation when the session includes filters, so the filters can be
     // iterated before choosing the host, to allow dynamically choosing upstream host. Due to this,
     // we can't perform health checks during a session.
-    // TODO(ohadvano): add similar funcionality that is performed after session filter chain
+    // TODO(ohadvano): add similar functionality that is performed after session filter chain
     // iteration to signal filters about the unhealthy host, or replace the host during the session.
     if (!defer_socket &&
         active_session->host().value().get().coarseHealth() == Upstream::Host::Health::Unhealthy) {
