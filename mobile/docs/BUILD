@@ -69,7 +69,7 @@ genrule(
          -b html \
          build \
          output \
-    && tar czf $@ -C build .
+    && tar czf $@ -C output .
     """,
     tools = [
         ":rst",
