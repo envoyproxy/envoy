@@ -240,12 +240,12 @@ public:
     client_ = std::make_unique<TestClientConnectionImpl>(
         client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
         client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
-        ProdNghttp2SessionFactory::get(), uhvEnabled());
+        ProdNghttp2SessionFactory::get());
     client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
         server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
-        headers_with_underscores_action_, uhvEnabled());
+        headers_with_underscores_action_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     createHeaderValidator();
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -400,25 +400,16 @@ public:
   }
 
   void createHeaderValidator() {
-    if (uhvEnabled()) {
-      header_validator_config_.set_headers_with_underscores_action(
-          static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
-                          HeaderValidatorConfig::HeadersWithUnderscoresAction>(
-              headers_with_underscores_action_));
-      header_validator_ = std::make_unique<
-          Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator>(
-          header_validator_config_, Protocol::Http2, server_->http2CodecStats(),
-          header_validator_config_overrides_);
-      request_decoder_.setHeaderValidator(header_validator_.get());
-    }
-  }
-
-  bool uhvEnabled() const {
 #ifdef ENVOY_ENABLE_UHV
-    // TODO(#28841) parameterize test suite to run with and without UHV
-    return true;
-#else
-    return false;
+    header_validator_config_.set_headers_with_underscores_action(
+        static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
+                        HeaderValidatorConfig::HeadersWithUnderscoresAction>(
+            headers_with_underscores_action_));
+    header_validator_ = std::make_unique<
+        Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator>(
+        header_validator_config_, Protocol::Http2, server_->http2CodecStats(),
+        header_validator_config_overrides_);
+    request_decoder_.setHeaderValidator(header_validator_.get());
 #endif
   }
 
@@ -2508,12 +2499,12 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   client_ = std::make_unique<TestClientConnectionImpl>(
       client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
       client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
-      ProdNghttp2SessionFactory::get(), uhvEnabled());
+      ProdNghttp2SessionFactory::get());
   client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
   server_ = std::make_unique<TestServerConnectionImpl>(
       server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
       server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
-      headers_with_underscores_action_, uhvEnabled());
+      headers_with_underscores_action_);
   server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
   setupDefaultConnectionMocks();
   driveToCompletion();
@@ -4579,7 +4570,7 @@ public:
       uint32_t max_request_headers_count, Http2SessionFactory& http2_session_factory)
       : TestClientConnectionImpl(connection, callbacks, scope, http2_options, random,
                                  max_request_headers_kb, max_request_headers_count,
-                                 http2_session_factory, false) {}
+                                 http2_session_factory) {}
 
   // Overrides TestClientConnectionImpl::submitMetadata().
   bool submitMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id) override {
@@ -4679,7 +4670,7 @@ protected:
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
         server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
-        headers_with_underscores_action_, false);
+        headers_with_underscores_action_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     setupDefaultConnectionMocks();
     driveToCompletion();
@@ -4729,7 +4720,7 @@ TEST(CodecChoiceTest, ProtocolOptionExplicitlySet) {
 
   auto client = std::make_unique<TestClientConnectionImpl>(
       client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
-      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get(), false);
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
   // The protocol option takes precedence over the runtime feature.
   EXPECT_TRUE(client->useOghttp2Library());
@@ -4738,7 +4729,7 @@ TEST(CodecChoiceTest, ProtocolOptionExplicitlySet) {
 
   auto client2 = std::make_unique<TestClientConnectionImpl>(
       client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
-      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get(), false);
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
   EXPECT_FALSE(client2->useOghttp2Library());
 }
@@ -4766,7 +4757,7 @@ TEST(CodecChoiceTest, ProtocolOptionNotSpecified) {
 
   auto client = std::make_unique<TestClientConnectionImpl>(
       client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
-      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get(), false);
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
   // Since no protocol option is specified, the runtime feature is used.
   EXPECT_TRUE(client->useOghttp2Library());
@@ -4775,7 +4766,7 @@ TEST(CodecChoiceTest, ProtocolOptionNotSpecified) {
 
   auto client2 = std::make_unique<TestClientConnectionImpl>(
       client_connection, client_callbacks, *client_stats_store.rootScope(), http2_options, random,
-      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get(), false);
+      max_request_headers_kb, max_response_headers_count, ProdNghttp2SessionFactory::get());
 
   EXPECT_FALSE(client2->useOghttp2Library());
 }

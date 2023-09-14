@@ -19,8 +19,7 @@ public:
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                            headers_with_underscores_action,
-                        bool uhv_enabled);
+                            headers_with_underscores_action);
 
   void setRequestDecoder(Http::RequestDecoder& decoder) override {
     request_decoder_ = &decoder;
@@ -108,17 +107,6 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
-  // Indicates that header validation is performed by UHV in HTTP Connection Manager
-  bool uhvEnabled() const {
-#ifdef ENVOY_ENABLE_UHV
-    return uhv_enabled_;
-#else
-    // Workaround for gcc not understanding [[maybe_unused]] for class members.
-    (void)uhv_enabled_;
-    return false;
-#endif
-  }
-
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
   // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
@@ -137,8 +125,6 @@ private:
 #endif
   // True if a :path header has been seen before.
   bool saw_path_{false};
-  // Indicates that header validation is performed by UHV in HTTP Connection Manager
-  const bool uhv_enabled_{false};
 };
 
 } // namespace Quic

@@ -684,7 +684,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager, uhvEnabled());
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP3:
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
@@ -692,7 +692,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
             connection, callbacks,
             Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
             http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-            headersWithUnderscoresAction(), uhvEnabled());
+            headersWithUnderscoresAction());
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
@@ -766,7 +766,6 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   return nullptr;
 }
 
-#ifdef ENVOY_ENABLE_UHV
 ::Envoy::Http::HeaderValidatorStats&
 HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) {
   switch (protocol) {
@@ -780,7 +779,6 @@ HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Prot
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
-#endif
 
 std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(

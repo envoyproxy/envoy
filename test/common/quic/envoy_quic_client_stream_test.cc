@@ -32,7 +32,6 @@ public:
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
 };
 
-// TODO(#28841) parameterize test suite to run with and without UHV
 class EnvoyQuicClientStreamTest : public testing::Test {
 public:
   EnvoyQuicClientStreamTest()
@@ -55,7 +54,7 @@ public:
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
                                       POOL_GAUGE_PREFIX(scope_, "http3."))}),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL,
-                                               stats_, http3_options_, false)),
+                                               stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
         request_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setResponseDecoder(stream_decoder_);

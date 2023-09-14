@@ -20,15 +20,14 @@ namespace Quic {
 EnvoyQuicClientStream::EnvoyQuicClientStream(
     quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session, quic::StreamType type,
     Http::Http3::CodecStats& stats,
-    const envoy::config::core::v3::Http3ProtocolOptions& http3_options, bool uhv_enabled)
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
           // Flow control receive window should be larger than 8k so that the send buffer can fully
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
-          stats, http3_options),
-      uhv_enabled_(uhv_enabled) {
+          stats, http3_options) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
 }
@@ -36,16 +35,16 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
-  if (!uhvEnabled()) {
-    // Headers are now validated by UHV before encoding by the codec. Two checks below are not
-    // needed when UHV is enabled.
-    //
-    // Required headers must be present. This can only happen by some erroneous processing after the
-    // downstream codecs decode.
-    RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
-    // Verify that a filter hasn't added an invalid header key or value.
-    RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
-  }
+#ifndef ENVOY_ENABLE_UHV
+  // Headers are now validated by UHV before encoding by the codec. Two checks below are not needed
+  // when UHV is enabled.
+  //
+  // Required headers must be present. This can only happen by some erroneous processing after the
+  // downstream codecs decode.
+  RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
+  // Verify that a filter hasn't added an invalid header key or value.
+  RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
+#endif
 
   if (write_side_closed()) {
     return absl::CancelledError("encodeHeaders is called on write-closed stream.");
@@ -54,43 +53,41 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   spdy::Http2HeaderBlock spdy_headers;
-  if (!uhvEnabled()) {
-    // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_http3_header_normalisation") &&
-        Http::Utility::isUpgrade(headers)) {
-      // In Envoy, both upgrade requests and extended CONNECT requests are
-      // represented as their HTTP/1 forms, regardless of the HTTP version used.
-      // Therefore, these need to be transformed into their HTTP/3 form, before
-      // sending them.
-      upgrade_protocol_ = std::string(headers.getUpgradeValue());
+#ifndef ENVOY_ENABLE_UHV
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
+      Http::Utility::isUpgrade(headers)) {
+    // In Envoy, both upgrade requests and extended CONNECT requests are
+    // represented as their HTTP/1 forms, regardless of the HTTP version used.
+    // Therefore, these need to be transformed into their HTTP/3 form, before
+    // sending them.
+    upgrade_protocol_ = std::string(headers.getUpgradeValue());
+    Http::RequestHeaderMapPtr modified_headers =
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+    Http::Utility::transformUpgradeRequestFromH1toH3(*modified_headers);
+    spdy_headers = envoyHeadersToHttp2HeaderBlock(*modified_headers);
+  } else if (headers.Method()) {
+    spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
+    if (headers.Method()->value() == "CONNECT") {
       Http::RequestHeaderMapPtr modified_headers =
           Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
-      Http::Utility::transformUpgradeRequestFromH1toH3(*modified_headers);
+      modified_headers->remove(Http::Headers::get().Scheme);
+      modified_headers->remove(Http::Headers::get().Path);
+      modified_headers->remove(Http::Headers::get().Protocol);
       spdy_headers = envoyHeadersToHttp2HeaderBlock(*modified_headers);
-    } else if (headers.Method()) {
-      spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-      if (headers.Method()->value() == "CONNECT") {
-        Http::RequestHeaderMapPtr modified_headers =
-            Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
-        modified_headers->remove(Http::Headers::get().Scheme);
-        modified_headers->remove(Http::Headers::get().Path);
-        modified_headers->remove(Http::Headers::get().Protocol);
-        spdy_headers = envoyHeadersToHttp2HeaderBlock(*modified_headers);
-      } else if (headers.Method()->value() == "HEAD") {
-        sent_head_request_ = true;
-      }
-    }
-    if (spdy_headers.empty()) {
-      spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-    }
-  } else {
-    spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-    if (headers.Method()->value() == "HEAD") {
+    } else if (headers.Method()->value() == "HEAD") {
       sent_head_request_ = true;
     }
   }
-
+  if (spdy_headers.empty()) {
+    spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
+  }
+#else
+  spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
+  if (headers.Method()->value() == "HEAD") {
+    sent_head_request_ = true;
+  }
+#endif
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
       (Http::HeaderUtility::isCapsuleProtocol(headers) ||
@@ -258,36 +255,35 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
   const absl::optional<uint64_t> optional_status =
       Http::Utility::getResponseStatusOrNullopt(*headers);
-  if (!uhvEnabled()) {
-    if (!optional_status.has_value()) {
-      details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-      onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
-                    quic::QUIC_BAD_APPLICATION_PAYLOAD);
-      return;
-    }
-
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_http3_header_normalisation") &&
-        !upgrade_protocol_.empty()) {
-      Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
-    }
-  } else {
-    // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-    // In Envoy, both upgrade requests and extended CONNECT requests are
-    // represented as their HTTP/1 forms, regardless of the HTTP version used.
-    // Therefore, these need to be transformed into their HTTP/1 form.
-
-    // In UHV mode the :status header at this point can be malformed, as it is validated
-    // later on in the response_decoder_.decodeHeaders() call.
-    // Account for this here.
-    if (!optional_status.has_value()) {
-      // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail
-      // the request
-      response_decoder_->decodeHeaders(std::move(headers), fin);
-      ConsumeHeaderList();
-      return;
-    }
+#ifndef ENVOY_ENABLE_UHV
+  if (!optional_status.has_value()) {
+    details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
+                  quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    return;
   }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
+      !upgrade_protocol_.empty()) {
+    Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
+  }
+#else
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
+  // In Envoy, both upgrade requests and extended CONNECT requests are
+  // represented as their HTTP/1 forms, regardless of the HTTP version used.
+  // Therefore, these need to be transformed into their HTTP/1 form.
+
+  // In UHV mode the :status header at this point can be malformed, as it is validated
+  // later on in the response_decoder_.decodeHeaders() call.
+  // Account for this here.
+  if (!optional_status.has_value()) {
+    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
+    // request
+    response_decoder_->decodeHeaders(std::move(headers), fin);
+    ConsumeHeaderList();
+    return;
+  }
+#endif
 
   const uint64_t status = optional_status.value();
   // TODO(#29071) determine how to handle 101, since it is not supported by HTTP/2

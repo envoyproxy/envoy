@@ -129,7 +129,7 @@ public:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                  Random::RandomGenerator& random_generator,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                 const uint32_t max_headers_kb, const uint32_t max_headers_count, bool uhv_enabled);
+                 const uint32_t max_headers_kb, const uint32_t max_headers_count);
 
   ~ConnectionImpl() override;
 
@@ -156,17 +156,6 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  // Indicates that header validation is performed by UHV in HTTP Connection Manager
-  bool uhvEnabled() const {
-#ifdef ENVOY_ENABLE_UHV
-    return uhv_enabled_;
-#else
-    // Workaround for gcc not understanding [[maybe_unused]] for class members.
-    (void)uhv_enabled_;
-    return false;
-#endif
-  }
-
 protected:
   friend class ProdNghttp2SessionFactory;
 
@@ -190,7 +179,7 @@ protected:
   class Http2Options {
   public:
     Http2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                 uint32_t max_headers_kb, bool uhv_enabled);
+                 uint32_t max_headers_kb);
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
@@ -204,7 +193,7 @@ protected:
   class ClientHttp2Options : public Http2Options {
   public:
     ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                       uint32_t max_headers_kb, bool uhv_enabled);
+                       uint32_t max_headers_kb);
   };
 
   /**
@@ -735,8 +724,6 @@ private:
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
-  // Indicates that header validation is performed by UHV in HTTP Connection Manager
-  const bool uhv_enabled_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   MonotonicTime last_received_data_time_{};
@@ -758,7 +745,7 @@ public:
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
-                       SessionFactory& http2_session_factory, bool uhv_enabled);
+                       SessionFactory& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
@@ -788,7 +775,7 @@ public:
                        const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action,
-                       Server::OverloadManager& overload_manager, bool uhv_enabled);
+                       Server::OverloadManager& overload_manager);
 
 private:
   // ConnectionImpl

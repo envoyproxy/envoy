@@ -253,15 +253,11 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::ServerHeaderValidatorPtr
-  makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
-#ifdef ENVOY_ENABLE_UHV
+  Http::ServerHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) override {
+    // header_validator_factory_ is always nullptr when ENVOY_ENABLE_UHV is not defined
     return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
                                            protocol, getHeaderValidatorStats(protocol))
                                      : nullptr;
-#else
-    return nullptr;
-#endif
   }
   bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
   bool addProxyProtocolConnectionState() const override {
@@ -282,11 +278,8 @@ private:
           filter_config);
 
   bool uhvEnabled() const {
-#ifdef ENVOY_ENABLE_UHV
+    // header_validator_factory_ is always nullptr when ENVOY_ENABLE_UHV is not defined
     return header_validator_factory_ != nullptr;
-#else
-    return false;
-#endif
   }
 
   Http::RequestIDExtensionSharedPtr request_id_extension_;

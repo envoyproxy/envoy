@@ -18,7 +18,7 @@ public:
                                Http::ConnectionCallbacks& callbacks, Http::Http3::CodecStats& stats,
                                const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                                const uint32_t max_request_headers_kb,
-                               const uint32_t max_response_headers_count, bool uhv_enabled);
+                               const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
   Http::RequestEncoder& newStream(Http::ResponseDecoder& response_decoder) override;

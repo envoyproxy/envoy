@@ -192,7 +192,7 @@ public:
         mock_server_connection_, mock_server_callbacks_,
         Http2::CodecStats::atomicGet(http2_stats_, scope), random_, server_settings_,
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-        envoy::config::core::v3::HttpProtocolOptions::ALLOW, overload_manager_, false);
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW, overload_manager_);
 
     Buffer::OwnedImpl payload;
     payload.add(Http2Frame::Preamble, 24);
@@ -224,7 +224,6 @@ static void resetHarness() { harness = nullptr; }
 // HTTP/2 fuzzer
 //
 // Uses a mix of structured HTTP/2 frames and junk frames for coverage
-// TODO(#28841) parameterize test suite to run with and without UHV
 
 DEFINE_PROTO_FUZZER(const test::common::http::http2::Http2ConnectionFuzzCase& input) {
   if (harness == nullptr) {

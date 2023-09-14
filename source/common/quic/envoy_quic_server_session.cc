@@ -61,8 +61,7 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
     return nullptr;
   }
   auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL, codec_stats_.value(),
-                                          http3_options_.value(), headers_with_underscores_action_,
-                                          uhv_enabled_);
+                                          http3_options_.value(), headers_with_underscores_action_);
   ActivateStream(absl::WrapUnique(stream));
   if (aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();

@@ -18,8 +18,7 @@ class EnvoyQuicClientStream : public quic::QuicSpdyClientStream,
 public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
-                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
-                        bool uhv_enabled);
+                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
   void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
@@ -52,17 +51,6 @@ public:
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
-
-  // Indicates that header validation is performed by UHV in HTTP Connection Manager
-  bool uhvEnabled() const {
-#ifdef ENVOY_ENABLE_UHV
-    return uhv_enabled_;
-#else
-    // Workaround for gcc not understanding [[maybe_unused]] for class members.
-    (void)uhv_enabled_;
-    return false;
-#endif
-  }
 
 protected:
   // EnvoyQuicStream
@@ -107,9 +95,6 @@ private:
   // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".
   // It will be empty, when no such request is active.
   std::string upgrade_protocol_;
-
-  // Indicates that header validation is performed by UHV in HTTP Connection Manager
-  const bool uhv_enabled_{false};
 };
 
 } // namespace Quic
