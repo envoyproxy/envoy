@@ -144,6 +144,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: listener
+  change: |
+    Removed ``envoy.reloadable_features.enable_update_listener_socket_options`` runtime flag and legacy code paths.
 - area: tcp
   change: |
     Removed runtime key ``envoy.reloadable_features.tcp_pool_idle_timeout``.
