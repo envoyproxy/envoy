@@ -889,9 +889,11 @@ class FormatChecker:
             return []
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
-                return [f"ERROR: something went wrong while executing: {e.cmd}"]
+                return [
+                    f"ERROR: something went wrong while executing: {e.cmd}\n{e.output.decode()}"
+                ]
             # In case we can't find any line numbers, record an error message first.
-            error_messages = [f"{error_message} for file: {file_path}\n{e}"]
+            error_messages = [f"{error_message} for file: {file_path}\n{e.output.decode()}"]
             for line in e.output.decode('utf-8').splitlines():
                 for num in regex.findall(line):
                     error_messages.append("  %s:%s" % (file_path, num))
