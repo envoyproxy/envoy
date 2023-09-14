@@ -932,7 +932,7 @@ TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 
 Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
 
-Once this is set up, you can run clang-format without docker:
+You can run clang-format directly, without docker:
 
 ```shell
 bazel run //tools/code_format:check_format -- check
