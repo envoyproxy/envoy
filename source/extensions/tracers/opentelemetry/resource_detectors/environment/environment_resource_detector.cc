@@ -27,8 +27,15 @@ Resource EnvironmentResourceDetector::detect() {
 
   Resource resource;
   resource.schemaUrl_ = "";
+  std::string attributes_str = "";
 
-  auto attributes_str = Config::DataSource::read(ds, true, context_.serverFactoryContext().api());
+  TRY_NEEDS_AUDIT {
+    attributes_str = Config::DataSource::read(ds, true, context_.serverFactoryContext().api());
+  }
+  END_TRY catch (const EnvoyException& e) {
+    ENVOY_LOG(warn, "Failed to detect resource attributes from the environment: {}.", e.what());
+  }
+
   if (attributes_str.empty()) {
     return resource;
   }
