@@ -25,6 +25,11 @@ behavior_changes:
     Switch from http_parser to BalsaParser for handling HTTP/1.1 traffic. See https://github.com/envoyproxy/envoy/issues/21245 for
     details. This behavioral change can be reverted by setting runtime flag ``envoy.reloadable_features.http1_use_balsa_parser`` to
     false.
+- area: udp_proxy
+  change: |
+    When the UDP proxy has session filters, choosing the upstream host and creating a socket only happens after iterating all
+    ``onNewSession()`` calls for all the filters in the chain. Upstream host health check for each downstream datagram does
+    not apply when there are session filters, and per-packet load balancing can't be used when there are session filters.
 - area: zone-aware routing
   change: |
     Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
@@ -138,9 +143,15 @@ bug_fixes:
 - area: unix domain sockets
   change: |
     Fixed a crash on some versions of macOS when using a listener on a unix-domain socket.
+- area: redis
+  change: |
+    Fixed a bug where redis key with % in the key is failing with a validation error.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: listener
+  change: |
+    Removed ``envoy.reloadable_features.enable_update_listener_socket_options`` runtime flag and legacy code paths.
 - area: tcp
   change: |
     Removed runtime key ``envoy.reloadable_features.tcp_pool_idle_timeout``.

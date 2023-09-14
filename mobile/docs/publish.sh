@@ -10,7 +10,7 @@
 set -e
 
 DOCS_DIR=generated/docs
-CHECKOUT_DIR=../envoy-mobile-docs
+CHECKOUT_DIR=../../envoy-mobile-docs
 BUILD_SHA="$(git rev-parse HEAD)"
 
 if [ "$GITHUB_REF_TYPE" == "tag" ]

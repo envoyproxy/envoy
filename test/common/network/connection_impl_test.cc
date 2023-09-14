@@ -2794,6 +2794,45 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
             connection_->readDisable(false));
 }
 
+// Test the connection correctly handle the transport socket read (data + RST) case.
+TEST_F(MockTransportConnectionImplTest, ServerLargeReadResetClose) {
+  InSequence s;
+
+  std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
+  connection_->addReadFilter(read_filter);
+
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> IoResult {
+        buffer.add("01234");
+        return {PostIoAction::KeepOpen, 5, false};
+      }));
+
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter, onData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+        EXPECT_EQ(5, data.length());
+        data.drain(data.length());
+        return FilterStatus::Continue;
+      }));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  // This simulates the socket do {...} while read when there is processed data
+  // with the last rest flag.
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> IoResult {
+        buffer.add("5678");
+        return {PostIoAction::Close, 4, false, Api::IoError::IoErrorCode::ConnectionReset};
+      }));
+
+  EXPECT_CALL(*read_filter, onData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+        EXPECT_EQ(4, data.length());
+        data.drain(data.length());
+        return FilterStatus::Continue;
+      }));
+  file_ready_cb_(Event::FileReadyType::Read);
+}
+
 // Test that BytesSentCb is invoked at the correct times
 TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
   uint64_t bytes_sent = 0;

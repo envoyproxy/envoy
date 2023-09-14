@@ -404,7 +404,7 @@ ClusterManagerImpl::ClusterManagerImpl(
         Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads");
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-      Config::Utility::checkTransportVersion(dyn_resources.ads_config());
+      THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(dyn_resources.ads_config()));
       std::string name;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         name = "envoy.config_mux.delta_grpc_mux_factory";
@@ -423,7 +423,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           local_info, std::move(custom_config_validators), std::move(backoff_strategy),
           makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
-      Config::Utility::checkTransportVersion(dyn_resources.ads_config());
+      THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(dyn_resources.ads_config()));
       auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
       std::string name;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
@@ -515,7 +515,7 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
 
-    Config::Utility::checkTransportVersion(load_stats_config);
+    THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(load_stats_config));
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,

@@ -10,6 +10,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/config/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/http/checksum/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/language/v3alpha:pkg",

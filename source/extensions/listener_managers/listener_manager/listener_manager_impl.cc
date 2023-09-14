@@ -505,18 +505,16 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
 void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                                                         const ListenerImpl& existing_listener) {
   bool same_socket_options = true;
-  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG)) {
-    if (new_listener.reusePort() != existing_listener.reusePort()) {
-      throw EnvoyException(fmt::format("Listener {}: reuse port cannot be changed during an update",
-                                       new_listener.name()));
-    }
+  if (new_listener.reusePort() != existing_listener.reusePort()) {
+    throw EnvoyException(fmt::format("Listener {}: reuse port cannot be changed during an update",
+                                     new_listener.name()));
+  }
 
-    same_socket_options = existing_listener.socketOptionsEqual(new_listener);
-    if (!same_socket_options && new_listener.reusePort() == false) {
-      throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
-                                       "when the reuse port isn't enabled",
-                                       new_listener.name()));
-    }
+  same_socket_options = existing_listener.socketOptionsEqual(new_listener);
+  if (!same_socket_options && new_listener.reusePort() == false) {
+    throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
+                                     "when the reuse port isn't enabled",
+                                     new_listener.name()));
   }
 
   if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {

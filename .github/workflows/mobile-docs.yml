@@ -29,14 +29,12 @@ jobs:
       packages: read
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 20
-    container:
-      image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
     - uses: actions/checkout@v4
     - name: Add safe directory
       run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
     - name: Generate docs
-      run: mobile/docs/build.sh
+      run: ./ci/run_envoy_docker.sh 'cd mobile && docs/build.sh'
     - name: Set up deploy key
       if: github.ref == 'refs/heads/main'
       uses: shimataro/ssh-key-action@v2.5.1
@@ -45,7 +43,7 @@ jobs:
         known_hosts: unnecessary
     - name: Publish docs
       if: github.ref == 'refs/heads/main'
-      run: mobile/docs/publish.sh
+      run: ./ci/run_envoy_docker.sh 'cd mobile && docs/publish.sh'
     - uses: actions/upload-artifact@v3
       with:
         name: docs

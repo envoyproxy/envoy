@@ -446,6 +446,7 @@ docutils==0.19 \
     # via
     #   envoy-docs-sphinx-runner
     #   sphinx
+    #   sphinx-rtd-theme
 envoy-base-utils==0.4.11 \
     --hash=sha256:5ced696c470b4c3090e6fc3f74e7e33f5fe217e775b1fc1fb56dfc756b781fbe \
     --hash=sha256:97c79177bb89360b7772e58fb20c671c67bf0b6cdee74c0b9f8a80433f0370cc
@@ -487,9 +488,9 @@ envoy-distribution-verify==0.0.11 \
 envoy-docker-utils==0.0.2 \
     --hash=sha256:a12cb57f0b6e204d646cbf94f927b3a8f5a27ed15f60d0576176584ec16a4b76
     # via envoy-distribution-distrotest
-envoy-docs-sphinx-runner==0.2.6 \
-    --hash=sha256:045b23f182d9760df693e0c01f6bd0654d0c5690107945e262ce720a976920b7 \
-    --hash=sha256:8166ff4b1b265efaf73db397d7ad0a1a743d71281ec233885c692c24f9349bd1
+envoy-docs-sphinx-runner==0.2.7 \
+    --hash=sha256:093a53b20c4818354e156c459beb81ef9da607e8aa7fb87d0118ccd7332ff87c \
+    --hash=sha256:da659d446be6433da909e91ed6a2feca9c2cb9a97b10a1f01b67cca8678df63e
     # via -r requirements.in
 envoy-github-abstract==0.0.22 \
     --hash=sha256:2dd65e2f247a4947d0198b295c82716c13162e30c433b7625c27d59eee7bcf78 \
@@ -1234,11 +1235,18 @@ sphinx==7.2.2 \
     #   -r requirements.in
     #   envoy-docs-sphinx-runner
     #   sphinx-copybutton
+    #   sphinx-rtd-theme
+    #   sphinxcontrib-googleanalytics
     #   sphinxcontrib-httpdomain
+    #   sphinxcontrib-jquery
     #   sphinxext-rediraffe
 sphinx-copybutton==0.5.2 \
     --hash=sha256:4cf17c82fb9646d1bc9ca92ac280813a3b605d8c421225fd9913154103ee1fbd \
     --hash=sha256:fb543fd386d917746c9a2c50360c7905b605726b9355cd26e9974857afeae06e
+    # via envoy-docs-sphinx-runner
+sphinx-rtd-theme==2.0.0rc2 \
+    --hash=sha256:d1270effe620df9164b1cd2d617909472a63531e21a716fd22d0fbcedf9d24ff \
+    --hash=sha256:f04df9213acf421c3b42f4f39005c8bc68fc4696c5b4ed4ef13d1678369713f7
     # via envoy-docs-sphinx-runner
 sphinxcontrib-applehelp==1.0.4 \
     --hash=sha256:29d341f67fb0f6f586b23ad80e072c8e6ad0b48417db2bde114a4c9746feb228 \
@@ -1248,6 +1256,10 @@ sphinxcontrib-devhelp==1.0.2 \
     --hash=sha256:8165223f9a335cc1af7ffe1ed31d2871f325254c0423bc0c4c7cd1c1e4734a2e \
     --hash=sha256:ff7f1afa7b9642e7060379360a67e9c41e8f3121f2ce9164266f61b9f4b338e4
     # via sphinx
+sphinxcontrib-googleanalytics==0.4 \
+    --hash=sha256:4b19c1f0fce5df6c7da5633201b64a9e5b0cb3210a14fdb4134942ceee8c5d12 \
+    --hash=sha256:a6574983f9a58e5864ec10d34dc99914c4d647108b22c9249c8f0038b0cb18b3
+    # via -r requirements.in
 sphinxcontrib-htmlhelp==2.0.1 \
     --hash=sha256:0cbdd302815330058422b98a113195c9249825d681e18f11e8b1f78a2f11efff \
     --hash=sha256:c38cb46dccf316c79de6e5515e1770414b797162b23cd3d06e67020e1d2a6903
@@ -1256,11 +1268,12 @@ sphinxcontrib-httpdomain==1.8.1 \
     --hash=sha256:21eefe1270e4d9de8d717cc89ee92cc4871b8736774393bafc5e38a6bb77b1d5 \
     --hash=sha256:6c2dfe6ca282d75f66df333869bb0ce7331c01b475db6809ff9d107b7cdfe04b
     # via envoy-docs-sphinx-runner
-sphinxcontrib-jquery @ https://github.com/sphinx-contrib/jquery/archive/refs/tags/v3.0.0.zip \
-    --hash=sha256:562ad9ac0ac3d8f04a363eb3507ae4b2b856aa04aabab6df7543530fafb849ca
+sphinxcontrib-jquery==4.1 \
+    --hash=sha256:1620739f04e36a2c779f1a131a2dfd49b2fd07351bf1968ced074365933abc7a \
+    --hash=sha256:f936030d7d0147dd026a4f2b5a57343d233f1fc7b363f68b3d4f1cb0993878ae
     # via
-    #   -r requirements.in
     #   envoy-docs-sphinx-runner
+    #   sphinx-rtd-theme
 sphinxcontrib-jsmath==1.0.1 \
     --hash=sha256:2ec2eaebfb78f3f2078e73666b1415417a116cc848b72e5172e596c871103178 \
     --hash=sha256:a9925e4a4587247ed2191a22df5f6970656cb8ca2bd6284309578f2153e0c4b8
@@ -1564,9 +1577,7 @@ zstandard==0.21.0 \
     # via envoy-base-utils
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==68.2.0 \
-    --hash=sha256:00478ca80aeebeecb2f288d3206b0de568df5cd2b8fada1209843cc9a8d88a48 \
-    --hash=sha256:af3d5949030c3f493f550876b2fd1dd5ec66689c4ee5d5344f009746f71fd5a8
-    # via
-    #   -r requirements.in
-    #   sphinxcontrib-jquery
+setuptools==68.2.2 \
+    --hash=sha256:4ac1475276d2f1c48684874089fefcd83bd7162ddaafb81fac866ba0db282a87 \
+    --hash=sha256:b454a35605876da60632df1a60f736524eb73cc47bbc9f3f1ef1b644de74fd2a
+    # via -r requirements.in
