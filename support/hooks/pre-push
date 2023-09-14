@@ -65,12 +65,6 @@ do
     # our `relpath` helper.
     SCRIPT_DIR="$(dirname "$(realpath "$0")")/../../tools"
 
-    # TODO(hausdorff): We should have a more graceful failure story when the
-    # user does not have all the tools set up correctly. This script assumes
-    # `$CLANG_FORMAT` and `$BUILDIFY` are defined, or that the default values it
-    # assumes for these variables correspond to real binaries on the system. If
-    # either of these things aren't true, the check fails.
-
     _CHANGES=$(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1 | tr '\n' ' ')
     IFS=' ' read -ra CHANGES <<< "$_CHANGES"
 

@@ -56,7 +56,7 @@ affected files manually or run the provided formatting script.
 To run the format fix script directly:
 
 ```console
-bazel run //tools/code_format:check_format -- fix && ./tools/code_format/format_python_tools.sh fix
+bazel run //tools/code_format:check_format -- fix && bazel run //tools/code:check -- fix -s main -v warn
 ```
 
 To run the format fix script under Docker:

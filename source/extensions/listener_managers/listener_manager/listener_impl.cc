@@ -1166,8 +1166,7 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   // Skip the duplicate address check if this is the case of a listener update with new socket
   // options.
-  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG) &&
-      (name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
+  if ((name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
     return false;
   }
 
