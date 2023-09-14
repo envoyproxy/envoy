@@ -1275,13 +1275,13 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
   // TODO(kbaichoo): if EDS can be configured via cluster_type() then modify the
   // merging logic below.
   //
-  // This method may be called multiple times to create mutiple ClusterInitializationObject
-  // instances for the same cluster. And before the thread local clusters are acutally initialized,
+  // This method may be called multiple times to create multiple ClusterInitializationObject
+  // instances for the same cluster. And before the thread local clusters are actually initialized,
   // the new instances will override the old instances in the work threads. But part of data is only
   // be created only once, such as the load balancer factory. So we need to merge the new instance
   // with the old one to keep the latest instance always have all necessary data.
   //
-  // More specifically, this will happend in the following scenarios for now:
+  // More specifically, this will happen in the following scenarios for now:
   // 1. EDS clusters: the ClusterLoadAssignment of EDS cluster may be updated multiples before
   //   the thread local cluster is initialized.
   // 2. Clusters in the unit tests: the cluster in the unit test may be updated multiples before
