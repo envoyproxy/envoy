@@ -283,7 +283,7 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
 
 absl::StatusOr<std::string> InstanceImplWin32::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    return absl::InvalidArgumentException(absl::StrCat("Invalid path: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
   }
 
   // In integration tests (and potentially in production) we rename config files and this creates
@@ -295,9 +295,9 @@ absl::StatusOr<std::string> InstanceImplWin32::fileReadToEnd(const std::string& 
   if (fd == INVALID_HANDLE) {
     auto last_error = ::GetLastError();
     if (last_error == ERROR_FILE_NOT_FOUND) {
-      return absl::InvalidArgumentException(absl::StrCat("Invalid path: ", path));
+      return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
     }
-    return absl::InvalidArgumentException(absl::StrCat("unable to read file: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("unable to read file: ", path));
   }
   DWORD buffer_size = 100;
   DWORD bytes_read = 0;
@@ -308,10 +308,10 @@ absl::StatusOr<std::string> InstanceImplWin32::fileReadToEnd(const std::string& 
       auto last_error = ::GetLastError();
       if (last_error == ERROR_FILE_NOT_FOUND) {
         CloseHandle(fd);
-        return absl::InvalidArgumentException(absl::StrCat("Invalid path: ", path));
+        return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
       }
       CloseHandle(fd);
-      return absl::InvalidArgumentException(absl::StrCat("unable to read file: ", path));
+      return absl::InvalidArgumentError(absl::StrCat("unable to read file: ", path));
     }
     complete_buffer.insert(complete_buffer.end(), buffer.begin(), buffer.begin() + bytes_read);
   } while (bytes_read == buffer_size);

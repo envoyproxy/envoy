@@ -108,7 +108,9 @@ void WatcherImpl::onKqueueEvent() {
     ASSERT(file != nullptr);
     ASSERT(watch_fd == file->fd_);
 
-    auto pathname = file_system_.splitPathFromFilename(file->file_);
+    absl::StatusOr<PathSplitResult> pathname_or_error = file_system_.splitPathFromFilename(file->file_);
+    THROW_IF_STATUS_NOT_OK(pathname_or_error);
+    PathSplitResult& pathname = pathname_or_error.value();
 
     if (file->watching_dir_) {
       if (event.fflags & NOTE_DELETE) {
