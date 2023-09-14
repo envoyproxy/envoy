@@ -39,7 +39,7 @@ routing PRs, questions, etc. to the right place.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
   * Data plane, overload management, flow control.
 * Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
-  * Performance, Dubbo.
+  * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
   * Bazel, CI, compilers, linkers, general build issues, etc.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)

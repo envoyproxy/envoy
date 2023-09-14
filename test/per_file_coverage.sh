@@ -45,8 +45,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/http/cache/simple_http_cache:95.9"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"
-"source/extensions/stat_sinks/graphite_statsd:82.1"
-"source/extensions/stat_sinks/statsd:84.6"
+"source/extensions/stat_sinks/graphite_statsd:78.6" # Death tests don't report LCOV
+"source/extensions/stat_sinks/statsd:80.8" # Death tests don't report LCOV
 "source/extensions/tracers:95.8"
 "source/extensions/tracers/common:73.8"
 "source/extensions/tracers/common/ot:71.8"
@@ -62,7 +62,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/listener_managers/validation_listener_manager:70.0"
 "source/extensions/watchdog/profile_action:83.3"
-"source/server:90.8" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
+"source/server:90.7" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/config_validation:88.4"
 "source/extensions/health_checkers:96.0"
 "source/extensions/health_checkers/http:93.9"

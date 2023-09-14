@@ -211,18 +211,33 @@ void Filter::onDestroy() {
 }
 
 // access_log is executed before the log of the stream filter
-void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo& stream_info,
-                 Envoy::AccessLog::AccessLogType) {
+void Filter::log(const Http::RequestHeaderMap* headers, const Http::ResponseHeaderMap*,
+                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
+                 Envoy::AccessLog::AccessLogType type) {
   // `log` may be called multiple times with different log type
-  if (!stream_info.requestComplete().has_value()) {
-    return;
-  }
+  switch (type) {
+  case Envoy::AccessLog::AccessLogType::DownstreamStart:
+  case Envoy::AccessLog::AccessLogType::DownstreamPeriodic:
+  case Envoy::AccessLog::AccessLogType::DownstreamEnd: {
+    auto& state = getProcessorState();
 
-  // TODO: support mid-request logging
-  auto& state = getProcessorState();
-  state.log();
-  dynamic_lib_->envoyGoFilterOnHttpLog(req_);
+    if (req_ == nullptr) {
+      // log called by AccessLogDownstreamStart will happen before doHeaders
+      initRequest(state);
+
+      request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
+          const_cast<Http::RequestHeaderMap*>(headers));
+    }
+
+    state.enterLog();
+    req_->phase = static_cast<int>(state.phase());
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(type));
+    state.leaveLog();
+  } break;
+  default:
+    // skip calling with unsupported log types
+    break;
+  }
 }
 
 /*** common APIs for filter, both decode and encode ***/
@@ -233,12 +248,7 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
             state.stateStr(), state.phaseStr(), end_stream);
 
   if (req_ == nullptr) {
-    // req is used by go, so need to use raw memory and then it is safe to release at the gc
-    // finalize phase of the go object.
-    req_ = new httpRequestInternal(weak_from_this());
-    req_->configId = getMergedConfigId(state);
-    req_->plugin_name.data = config_->pluginName().data();
-    req_->plugin_name.len = config_->pluginName().length();
+    initRequest(state);
   }
 
   req_->phase = static_cast<int>(state.phase());
@@ -1417,6 +1427,15 @@ CAPIStatus Filter::serializeStringValue(Filters::Common::Expr::CelValue value,
   default:
     return CAPIStatus::CAPISerializationFailure;
   }
+}
+
+void Filter::initRequest(ProcessorState& state) {
+  // req is used by go, so need to use raw memory and then it is safe to release at the gc
+  // finalize phase of the go object.
+  req_ = new httpRequestInternal(weak_from_this());
+  req_->configId = getMergedConfigId(state);
+  req_->plugin_name.data = config_->pluginName().data();
+  req_->plugin_name.len = config_->pluginName().length();
 }
 
 /* ConfigId */

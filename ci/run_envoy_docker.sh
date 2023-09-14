@@ -161,6 +161,5 @@ docker run --rm \
        -e ENVOY_BUILD_ARCH \
        -e SYSTEM_STAGEDISPLAYNAME \
        -e SYSTEM_JOBDISPLAYNAME \
-       -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        "${ENVOY_BUILD_IMAGE}" \
        "${START_COMMAND[@]}"

@@ -151,7 +151,7 @@ class FormatChecker:
             self.config.paths["excluded"] + tuple(self.args.add_excluded_prefixes)
             if self.args.add_excluded_prefixes else self.config.paths["excluded"])
 
-    @property
+    @cached_property
     def error_messages(self):
         return []
 
@@ -889,9 +889,11 @@ class FormatChecker:
             return []
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
-                return [f"ERROR: something went wrong while executing: {e.cmd}"]
+                return [
+                    f"ERROR: something went wrong while executing: {e.cmd}\n{e.output.decode()}"
+                ]
             # In case we can't find any line numbers, record an error message first.
-            error_messages = [f"{error_message} for file: {file_path}\n{e}"]
+            error_messages = [f"{error_message} for file: {file_path}\n{e.output.decode()}"]
             for line in e.output.decode('utf-8').splitlines():
                 for num in regex.findall(line):
                     error_messages.append("  %s:%s" % (file_path, num))
@@ -1048,7 +1050,9 @@ class FormatChecker:
 
         if self.check_error_messages():
             if self.args.operation_type == "check":
-                print("ERROR: check format failed. run '//tools/code_format:check_format -- fix'")
+                print(
+                    "ERROR: check format failed. run 'bazel run //tools/code_format:check_format -- fix'"
+                )
             else:
                 print("ERROR: check format failed. diff has been applied'")
             sys.exit(1)
