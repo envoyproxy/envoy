@@ -178,11 +178,6 @@ public:
                  const absl::optional<std::chrono::milliseconds>& timeout);
 
   /**
-   * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.
-   */
-  static void validateResponse(Http::ResponseMessage& http_response);
-
-  /**
    * @return const std::string& type URL prefix.
    */
   static const std::string& typeUrlPrefix();
@@ -223,8 +218,6 @@ public:
   static absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path);
 
 private:
-  static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);
-
   static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;
 };
 
