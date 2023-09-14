@@ -615,6 +615,9 @@ is empty string. For example, the following configuration uses ``%RESPONSE_CODE%
 modify request headers using code from the response.  The output is an empty string, because request
 headers are modified before the request is sent upstream and the response is not received yet.
 
+Raw header values accept dynamic values as well and require escaping the
+literal percent symbols. Raw header values are encoded as Base64 when appended.
+
 .. literalinclude:: _include/header_formatters.yaml
     :language: yaml
     :linenos:

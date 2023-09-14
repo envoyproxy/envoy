@@ -437,6 +437,7 @@ envoy_cc_library(
         "//envoy/router:string_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:base64_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",

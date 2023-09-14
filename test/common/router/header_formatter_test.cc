@@ -655,6 +655,39 @@ request_headers_to_add:
   EXPECT_EQ(1, counts["x-request-start"]);
 }
 
+TEST(HeaderParserTest, EvaluateRawHeader) {
+  // The encoded value is: %FILTER_STATE(test_key:PLAIN)%
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+request_headers_to_add:
+  - header:
+      key: "x-per-request"
+      raw_value: JUZJTFRFUl9TVEFURSh0ZXN0X2tleTpQTEFJTiklCg==
+  )EOF";
+
+  const auto route = parseRouteFromV3Yaml(yaml);
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("test_key", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
+
+  req_header_parser->evaluateHeaders(header_map, stream_info);
+
+  EXPECT_TRUE(header_map.has("x-per-request"));
+  EXPECT_EQ("dGVzdF92YWx1ZQo=", header_map.get_("x-per-request"));
+}
+
 TEST(HeaderParserTest, EvaluateResponseHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
