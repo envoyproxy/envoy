@@ -684,9 +684,7 @@ void ConnectionImpl::onReadReady() {
   // The socket is closed immediately when receiving RST.
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
-    ENVOY_CONN_LOG(trace, "boteng: read: rst close from peer", *this);
-    ENVOY_CONN_LOG(trace, "boteng: read: rst close processed data {}", *this,
-                   result.bytes_processed_);
+    ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
     if (result.bytes_processed_ != 0) {
       onRead(new_buffer_size);
     }
