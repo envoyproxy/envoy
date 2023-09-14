@@ -18,7 +18,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
