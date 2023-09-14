@@ -54,8 +54,8 @@ public:
     filter_ = std::make_unique<Filter>(filter_config_);
 
     if (has_config) {
-      EXPECT_CALL(callbacks_, streamId());
       EXPECT_CALL(callbacks_, connection());
+      EXPECT_CALL(callbacks_, streamId());
       http_per_request_tapper_ = new MockHttpPerRequestTapper();
       EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_, _, _))
           .WillOnce(Return(http_per_request_tapper_));
