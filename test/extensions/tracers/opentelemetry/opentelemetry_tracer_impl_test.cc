@@ -67,7 +67,7 @@ public:
       path: "/otlp/v1/traces"
       hostname: "some-o11y.com"
       request_headers_to_add:
-      - header: 
+      - header:
           key: "Authorization"
           value: "auth-token"
       timeout: 0.250s

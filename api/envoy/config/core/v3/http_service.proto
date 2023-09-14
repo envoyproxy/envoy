@@ -4,15 +4,9 @@ package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
 
-import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
-import "google/protobuf/empty.proto";
-import "google/protobuf/struct.proto";
-import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";

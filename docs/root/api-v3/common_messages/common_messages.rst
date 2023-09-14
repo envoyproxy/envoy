@@ -23,6 +23,7 @@ Common messages
   ../extensions/filters/common/dependency/v3/dependency.proto
   ../extensions/regex_engines/v3/google_re2.proto
   ../config/core/v3/grpc_method_list.proto
+  ../config/core/v3/http_service.proto
   ../config/core/v3/grpc_service.proto
   ../extensions/key_value/file_based/v3/config.proto
   ../config/common/key_value/v3/config.proto

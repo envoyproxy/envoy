@@ -57,7 +57,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   - header:
       key: "Authorization"
       value: "auth-token"
-  - header: 
+  - header:
       key: "x-custom-header"
       value: "custom-value"
   timeout: 0.250s
