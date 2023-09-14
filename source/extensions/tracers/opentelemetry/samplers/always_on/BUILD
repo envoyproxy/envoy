@@ -28,6 +28,7 @@ envoy_cc_library(
     deps = [
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
     ],
 )

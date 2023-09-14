@@ -57,9 +57,9 @@ public:
    */
   virtual SamplingResult
   shouldSample(absl::StatusOr<SpanContext>& parent_context, const std::string& trace_id, const std::string& name,
-               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, const std::map<std::string, std::string>& attributes) = 0;
+               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, const std::map<std::string, std::string>& attributes) PURE;
 
-  virtual std::string getDescription() const = 0;
+  virtual std::string getDescription() const PURE;
 };
 
 using SamplerPtr = std::shared_ptr<Sampler>;

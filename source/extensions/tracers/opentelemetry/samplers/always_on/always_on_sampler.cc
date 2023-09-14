@@ -6,6 +6,7 @@
 
 #include "source/common/config/datasource.h"
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +18,6 @@ AlwaysOnSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
                               const std::string& trace_id, const std::string& name,
                               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, 
                               const std::map<std::string, std::string>& attributes) {
-  (void)parent_context;
   (void)context_;
   (void)trace_id;
   (void)name;
@@ -25,12 +25,9 @@ AlwaysOnSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
   (void)attributes;
   SamplingResult result;
   result.decision = Decision::RECORD_AND_SAMPLE;
-  // ----
-  result.trace_state = "FW_FW_FW";
-  std::map<std::string, std::string> att;
-  att["this_is_my_key"] = "this_is_my_value";
-  result.attributes = std::make_unique<const std::map<std::string, std::string>>(std::move(att));
-  // ----
+  if (parent_context.ok()) {
+    result.trace_state = parent_context.value().tracestate();
+  }
   return result;
 }
 
