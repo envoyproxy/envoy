@@ -161,13 +161,13 @@ The following example configuration makes Envoy forward ``CONNECT-UDP`` requests
 that the :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
 is set to ``CONNECT-UDP``.
 
-.. literalinclude:: /_configs/repo/proxy_connect_udp.yaml
+.. literalinclude:: /_configs/repo/proxy_connect_udp_http3_downstream.yaml
    :language: yaml
    :linenos:
    :lines: 33-60
    :lineno-start: 33
    :emphasize-lines: 15-16, 25-26
-   :caption: :download:`proxy_connect_udp.yaml </_configs/repo/proxy_connect_udp.yaml>`
+   :caption: :download:`proxy_connect_udp_http3_downstream.yaml </_configs/repo/proxy_connect_udp_http3_downstream.yaml>`
 
 The following example configuration makes Envoy terminate ``CONNECT-UDP`` requests and send UDP payloads
 to the target. As in this example, the
