@@ -11,8 +11,10 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tra
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Environment Resource Detector config]
-// [#extension: envoy.tracers.opentelemetry.resource_detectors.environment]
 
 // Configuration for the Environment Resource detector extension.
+// The resource detector reads from the `OTEL_RESOURCE_ATTRIBUTES`
+// environment variable, as per the OpenTelemetry specification.
+// [#extension: envoy.tracers.opentelemetry.resource_detectors.environment]
 message EnvironmentResourceDetectorConfig {
 }
