@@ -72,7 +72,6 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     // No propagation header, so we can create a fresh span with the given decision.
     std::unique_ptr<Tracing::Span> new_open_telemetry_span =
         tracer.startSpan(config, operation_name, stream_info.startTime(), tracing_decision);
-    new_open_telemetry_span->setSampled(tracing_decision.traced);
     return new_open_telemetry_span;
   } else {
     // Try to extract the span context. If we can't, just return a null span.
