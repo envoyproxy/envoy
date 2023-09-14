@@ -122,7 +122,12 @@ if __name__ == "__main__":
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
     parser.add_argument('--exclude_contrib', action='store_true')
-    parser.add_argument('--system-clang', action='store_true', help='Use `clang++` instead of the bazel wrapper for commands. This may help if `clangd` cannot find/run the tools.')
+    parser.add_argument(
+        '--system-clang',
+        action='store_true',
+        help=
+        'Use `clang++` instead of the bazel wrapper for commands. This may help if `clangd` cannot find/run the tools.'
+    )
     parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
         'bazel_targets', nargs='*', default=[
