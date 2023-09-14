@@ -6,7 +6,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
-#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,8 +19,7 @@ Tracing::DriverSharedPtr OpenTelemetryTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::OpenTelemetryConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
 
-  ResourceProviderImpl resource_provider;
-  return std::make_shared<Driver>(proto_config, context, resource_provider);
+  return std::make_shared<Driver>(proto_config, context);
 }
 
 /**

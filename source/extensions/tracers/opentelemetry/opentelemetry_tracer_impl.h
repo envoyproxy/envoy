@@ -31,6 +31,9 @@ using OpenTelemetryConstants = ConstSingleton<OpenTelemetryConstantValues>;
 class Driver : Logger::Loggable<Logger::Id::tracing>, public Tracing::Driver {
 public:
   Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
+         Server::Configuration::TracerFactoryContext& context);
+
+  Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
          Server::Configuration::TracerFactoryContext& context,
          const ResourceProvider& resource_provider);
 

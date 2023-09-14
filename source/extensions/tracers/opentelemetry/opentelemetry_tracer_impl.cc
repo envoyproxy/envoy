@@ -1,3 +1,4 @@
+#include "opentelemetry_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
 #include <string>
@@ -21,6 +22,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
+
+Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
+               Server::Configuration::TracerFactoryContext& context)
+    : Driver(opentelemetry_config, context, ResourceProviderImpl{}) {}
 
 Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
                Server::Configuration::TracerFactoryContext& context,
