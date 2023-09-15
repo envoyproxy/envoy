@@ -2,11 +2,11 @@
 
 #include "test/integration/integration.h"
 
+#include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
 #include "library/common/types/c_types.h"
-#include "test_engine_builder.h"
 
 namespace Envoy {
 
@@ -77,10 +77,9 @@ protected:
   bool explicit_flow_control_ = false;
   uint64_t min_delivery_size_ = 10;
   bool expect_dns_ = true;
-  bool override_builder_config_ = false;
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;
-  TestEngineBuilder builder_;
+  Platform::EngineBuilder builder_;
   envoy_final_stream_intel last_stream_final_intel_;
 };
 

@@ -365,6 +365,11 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
 
 } // namespace
 
+// Allow disabling ALPN checks for transport sockets. See
+// https://github.com/envoyproxy/envoy/issues/22876
+const absl::string_view ClusterImplBase::DoNotValidateAlpnRuntimeKey =
+    "config.do_not_validate_alpn_support";
+
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
 // stat name into every host that receives a copy of that metric. This can be improved by putting
 // a single copy of the stat name into a thread-local key->index map so that the lock can be avoided
@@ -1243,7 +1248,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);
-    helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
+    THROW_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
+                                          http_filter_factories_));
   }
 }
 
@@ -1431,7 +1437,8 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
     }
-    if (!matcher_supports_alpn) {
+    if (!matcher_supports_alpn &&
+        !runtime_.snapshot().featureEnabled(ClusterImplBase::DoNotValidateAlpnRuntimeKey, 0)) {
       throw EnvoyException(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));

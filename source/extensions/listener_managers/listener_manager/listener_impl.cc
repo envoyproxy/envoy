@@ -705,10 +705,17 @@ void ListenerImpl::buildListenSocketOptions(
 void ListenerImpl::createListenerFilterFactories() {
   if (!config_.listener_filters().empty()) {
     switch (socket_type_) {
-    case Network::Socket::Type::Datagram:
-      udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
-          config_.listener_filters(), *listener_factory_context_);
+    case Network::Socket::Type::Datagram: {
+      if (udp_listener_config_->listener_factory_->isTransportConnectionless()) {
+        udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
+            config_.listener_filters(), *listener_factory_context_);
+      } else {
+        // This is a QUIC listener.
+        quic_listener_filter_factories_ = parent_.factory_->createQuicListenerFilterFactoryList(
+            config_.listener_filters(), *listener_factory_context_);
+      }
       break;
+    }
     case Network::Socket::Type::Stream:
       listener_filter_factories_ = parent_.factory_->createListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
@@ -974,6 +981,17 @@ void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManage
                                                          udp_listener_filter_factories_);
 }
 
+bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterManager& manager) {
+  if (Configuration::FilterChainUtility::buildQuicFilterChain(manager,
+                                                              quic_listener_filter_factories_)) {
+    return true;
+  }
+  ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                   "Close socket and stop the iteration onAccept.");
+  missing_listener_config_stats_.extension_config_missing_.inc();
+  return false;
+}
+
 void ListenerImpl::debugLog(const std::string& message) {
   UNREFERENCED_PARAMETER(message);
   ENVOY_LOG(debug, "{}: name={}, hash={}, tag={}, address={}", message, name_, hash_, listener_tag_,
@@ -1148,8 +1166,7 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   // Skip the duplicate address check if this is the case of a listener update with new socket
   // options.
-  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG) &&
-      (name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
+  if ((name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
     return false;
   }
 

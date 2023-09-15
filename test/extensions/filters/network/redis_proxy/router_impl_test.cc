@@ -161,6 +161,43 @@ TEST(PrefixRoutesTest, TestFormatterWithPrefixRoute) {
   EXPECT_EQ("{abc:bar}-test-subjectCN-{abc:bar}", key);
 }
 
+TEST(PrefixRoutesTest, TestFormatterWithPercentInKey) {
+  auto upstream_c = std::make_shared<ConnPool::MockInstance>();
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
+  const std::string format =
+      "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
+
+  stream_info.filterState()->setData(
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
+  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterC", upstream_c);
+
+  Runtime::MockLoader runtime_;
+  auto prefix_routes = createPrefixRoutes();
+  {
+    auto* route = prefix_routes.mutable_routes()->Add();
+    route->set_prefix("");
+    route->set_cluster("fake_clusterC");
+    route->set_key_formatter(format);
+  }
+  PrefixRoutes router(prefix_routes, std::move(upstreams), runtime_);
+  std::string key("%abc:bar%");
+  EXPECT_EQ(upstream_c,
+            router.upstreamPool(key, filter_callbacks.connection().streamInfo())->upstream());
+  EXPECT_EQ("{%abc:bar%}-test-subjectCN-{%abc:bar%}", key);
+}
+
 TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
   auto upstream_c = std::make_shared<ConnPool::MockInstance>();
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;

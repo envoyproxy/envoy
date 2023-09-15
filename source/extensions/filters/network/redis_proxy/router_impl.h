@@ -89,6 +89,7 @@ private:
   Upstreams upstreams_;
   PrefixSharedPtr catch_all_route_;
   const std::string redis_key_formatter_command_ = "%KEY%";
+  const std::string redis_key_to_be_replaced_ = "~REPLACED_KEY~";
 };
 
 } // namespace RedisProxy
