@@ -560,7 +560,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
         fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
-  if (ss_len >= (offsetof(sockaddr_storage, ss_family) + sizeof(ss.ss_family)) &&
+  if (static_cast<unsigned int>(ss_len) >=
+          (offsetof(sockaddr_storage, ss_family) + sizeof(ss.ss_family)) &&
       ss.ss_family == AF_UNIX) {
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other
