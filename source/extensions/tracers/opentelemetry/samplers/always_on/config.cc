@@ -11,7 +11,8 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-SamplerPtr AlwaysOnSamplerFactory::createSampler(const Protobuf::Message& config) {
+SamplerPtr AlwaysOnSamplerFactory::createSampler(const Protobuf::Message& config, Server::Configuration::TracerFactoryContext& context) {
+  (void)context;
   return std::make_shared<AlwaysOnSampler>(config);
 }
 

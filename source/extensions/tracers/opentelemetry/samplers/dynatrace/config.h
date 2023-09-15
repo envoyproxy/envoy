@@ -23,7 +23,7 @@ public:
    * @param context
    * @return SamplerPtr
    */
-  SamplerPtr createSampler(const Protobuf::Message& config) override;
+  SamplerPtr createSampler(const Protobuf::Message& config, Server::Configuration::TracerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<

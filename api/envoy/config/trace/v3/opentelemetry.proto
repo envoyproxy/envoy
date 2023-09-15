@@ -19,16 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: OpenTelemetry tracer]
 
-message Sampler {
-  // The name of the sampler to instantiate.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Sampler specific configuration which depends on the sampler being
-  // instantiated. See the supported sampler for further documentation.
-  // Not required for sampler that don't need a config.
-  google.protobuf.Any typed_config = 2;
-}
-
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
 message OpenTelemetryConfig {

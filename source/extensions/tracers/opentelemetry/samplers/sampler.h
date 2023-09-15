@@ -9,6 +9,7 @@
 
 #include "envoy/config/typed_config.h"
 
+#include "envoy/server/tracer_config.h"
 #include "envoy/tracing/trace_context.h"
 
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
@@ -79,7 +80,7 @@ public:
    * @param config The sampler config
    * @return SamplerPtr
    */
-  virtual SamplerPtr createSampler(const Protobuf::Message& config) PURE;
+  virtual SamplerPtr createSampler(const Protobuf::Message& config, Server::Configuration::TracerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tracers.opentelemetry.samplers"; }
 };
