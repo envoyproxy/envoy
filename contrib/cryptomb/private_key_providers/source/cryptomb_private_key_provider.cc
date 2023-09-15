@@ -36,8 +36,7 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
 
   const EC_GROUP* group = EC_KEY_get0_group(ec_key_.get());
   priv_key_ = EC_KEY_get0_private_key(ec_key_.get());
-  const EC_POINT* pub_key = EC_KEY_get0_public_key(ec_key_.get());
-  if (group == nullptr || priv_key_ == nullptr || pub_key == nullptr) {
+  if (group == nullptr || priv_key_ == nullptr) {
     return false;
   }
 
@@ -519,10 +518,10 @@ void CryptoMbQueue::processRsaRequests() {
 void CryptoMbQueue::processEcdsaRequests() {
   uint8_t sig_r[MULTIBUFF_BATCH][32];
   uint8_t sig_s[MULTIBUFF_BATCH][32];
-  uint8_t* sign_r[MULTIBUFF_BATCH] = {sig_r[0], sig_r[1], sig_r[2], sig_r[3],
-                                      sig_r[4], sig_r[5], sig_r[6], sig_r[7]};
-  uint8_t* sign_s[MULTIBUFF_BATCH] = {sig_s[0], sig_s[1], sig_s[2], sig_s[3],
-                                      sig_s[4], sig_s[5], sig_s[6], sig_s[7]};
+  uint8_t* pa_sig_r[MULTIBUFF_BATCH] = {sig_r[0], sig_r[1], sig_r[2], sig_r[3],
+                                        sig_r[4], sig_r[5], sig_r[6], sig_r[7]};
+  uint8_t* pa_sig_s[MULTIBUFF_BATCH] = {sig_s[0], sig_s[1], sig_s[2], sig_s[3],
+                                        sig_s[4], sig_s[5], sig_s[6], sig_s[7]};
   const unsigned char* digest[MULTIBUFF_BATCH] = {nullptr};
   const BIGNUM* eph_key[MULTIBUFF_BATCH] = {nullptr};
   const BIGNUM* priv_key[MULTIBUFF_BATCH] = {nullptr};
@@ -539,7 +538,7 @@ void CryptoMbQueue::processEcdsaRequests() {
   ENVOY_LOG(debug, "Multibuffer ECDSA process {} requests", request_queue_.size());
 
   uint32_t ecdsa_sts =
-      ipp_->mbxNistp256EcdsaSignSslMb8(sign_r, sign_s, digest, eph_key, priv_key, nullptr);
+      ipp_->mbxNistp256EcdsaSignSslMb8(pa_sig_r, pa_sig_s, digest, eph_key, priv_key);
 
   enum RequestStatus status[MULTIBUFF_BATCH] = {RequestStatus::Retry};
 
@@ -549,7 +548,7 @@ void CryptoMbQueue::processEcdsaRequests() {
     enum RequestStatus ctx_status;
     if (ipp_->mbxGetSts(ecdsa_sts, req_num)) {
       ENVOY_LOG(debug, "Multibuffer ECDSA request {} success", req_num);
-      if (postprocessEcdsaRequest(mb_ctx, sign_r[req_num], sign_s[req_num])) {
+      if (postprocessEcdsaRequest(mb_ctx, pa_sig_r[req_num], pa_sig_s[req_num])) {
         status[req_num] = RequestStatus::Success;
       } else {
         status[req_num] = RequestStatus::Error;
@@ -568,31 +567,25 @@ void CryptoMbQueue::processEcdsaRequests() {
 }
 
 bool CryptoMbQueue::postprocessEcdsaRequest(CryptoMbEcdsaContextSharedPtr mb_ctx,
-                                            const uint8_t* sign_r, const uint8_t* sign_s) {
-  ECDSA_SIG* s = ECDSA_SIG_new();
-  if (s == nullptr) {
+                                            const uint8_t* pa_sig_r, const uint8_t* pa_sig_s) {
+  ECDSA_SIG* sig = ECDSA_SIG_new();
+  if (sig == nullptr) {
     return false;
   }
-  BIGNUM* sig_r = BN_new();
-  BIGNUM* sig_s = BN_new();
-  if (ECDSA_SIG_set0(s, sig_r, sig_s) == 0) {
-    ECDSA_SIG_free(s);
-    return false;
-  }
-
-  BN_bin2bn(sign_r, 32, sig_r);
-  BN_bin2bn(sign_s, 32, sig_s);
+  BIGNUM* sig_r = BN_bin2bn(pa_sig_r, 32, nullptr);
+  BIGNUM* sig_s = BN_bin2bn(pa_sig_s, 32, nullptr);
+  ECDSA_SIG_set0(sig, sig_r, sig_s);
 
   // Marshal signature into out_buf_.
   CBB cbb;
-  if (!CBB_init_fixed(&cbb, mb_ctx->out_buf_, mb_ctx->sig_len_) || !ECDSA_SIG_marshal(&cbb, s) ||
+  if (!CBB_init_fixed(&cbb, mb_ctx->out_buf_, mb_ctx->sig_len_) || !ECDSA_SIG_marshal(&cbb, sig) ||
       !CBB_finish(&cbb, nullptr, &mb_ctx->out_len_)) {
     CBB_cleanup(&cbb);
-    ECDSA_SIG_free(s);
+    ECDSA_SIG_free(sig);
     return false;
   }
 
-  ECDSA_SIG_free(s);
+  ECDSA_SIG_free(sig);
   return true;
 }
 
