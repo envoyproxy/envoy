@@ -7574,14 +7574,24 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
       ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
 }
 
-TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithWellKnownEnv) {
+TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithEnv) {
   constexpr uint64_t MaxResponseBodySizeBytes = 4096;
   envoy::config::route::v3::Route route;
 
-  route.mutable_direct_response()->mutable_body()->set_environment_variable("PATH");
+  const std::string body(MaxResponseBodySizeBytes + 1, '*');
+  TestEnvironment::setEnvVar("ResponseBodyContents", body, 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ResponseBodyContents"); });
 
-  EXPECT_FALSE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes).empty());
+  route.mutable_direct_response()->mutable_body()->set_environment_variable("ResponseBodyContents");
+
+  std::string expected_message("response body size is 4097 bytes; maximum is 4096");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
+      EnvoyException, expected_message);
+  EXPECT_EQ(
+      MaxResponseBodySizeBytes + 1,
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
 }
 
 TEST_F(RouteConfigurationV2, RedirectCode) {
