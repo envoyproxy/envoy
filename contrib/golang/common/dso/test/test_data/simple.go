@@ -53,7 +53,7 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 }
 
 //export envoyGoFilterOnHttpLog
-func envoyGoFilterOnHttpLog(r *C.httpRequest) {
+func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
 }
 
 //export envoyGoFilterOnHttpDestroy

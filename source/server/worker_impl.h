@@ -63,7 +63,9 @@ public:
   void start(GuardDog& guard_dog, const std::function<void()>& cb) override;
   void initializeStats(Stats::Scope& scope) override;
   void stop() override;
-  void stopListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
+  void stopListener(Network::ListenerConfig& listener,
+                    const Network::ExtraShutdownListenerOptions& options,
+                    std::function<void()> completion) override;
 
 private:
   void threadRoutine(GuardDog& guard_dog, const std::function<void()>& cb);

@@ -37,6 +37,7 @@ envoy_cc_test_library(
         "//envoy/network:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/router:string_accessor_lib",
     ],
 )
 
