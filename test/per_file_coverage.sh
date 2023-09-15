@@ -39,6 +39,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/listener/original_dst:87.9"
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/common:96.4"
+"source/extensions/filters/network/http_connection_manager:94.4" # ifdefed UHV code is counted in coverage, will be restored once UHV is part of main build
 "source/extensions/filters/network/mongo_proxy:96.0"
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/wasm:76.9"
