@@ -36,6 +36,9 @@ minor_behavior_changes:
     Enable copying response_code from the upstream stream_info onto the downstream stream_info.
     This behavior can be reverted by setting runtime guard
     ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` to false.
+- area: router
+  change: |
+    Enable environment_variable in router direct response.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
