@@ -52,16 +52,17 @@ protected:
 TEST_F(RawAsyncClientCacheTest, CacheEviction) {
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service);
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
-  client_cache_.setCache(foo_service, foo_client);
+  client_cache_.setCache(config_with_hash_key, foo_client);
   waitForSeconds(49);
   // Cache entry hasn't been evicted because it was created 49s ago.
-  EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
+  EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), foo_client.get());
   waitForSeconds(49);
   // Cache entry hasn't been evicted because it was accessed 49s ago.
-  EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
+  EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), foo_client.get());
   waitForSeconds(51);
-  EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);
+  EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), nullptr);
 }
 
 TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
@@ -69,23 +70,27 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   for (int i = 1; i <= 50; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    client_cache_.setCache(grpc_service, foo_client);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    client_cache_.setCache(config_with_hash_key, foo_client);
   }
   waitForSeconds(20);
   for (int i = 51; i <= 100; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    client_cache_.setCache(grpc_service, foo_client);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    client_cache_.setCache(config_with_hash_key, foo_client);
   }
   waitForSeconds(30);
   // Cache entries created 50s before have expired.
   for (int i = 1; i <= 50; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    EXPECT_EQ(client_cache_.getCache(grpc_service).get(), nullptr);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), nullptr);
   }
   // Cache entries 30s before haven't expired.
   for (int i = 51; i <= 100; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    EXPECT_EQ(client_cache_.getCache(grpc_service).get(), foo_client.get());
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), foo_client.get());
   }
 }
 
@@ -95,14 +100,15 @@ TEST_F(RawAsyncClientCacheTest, GetExpiredButNotEvictedCacheEntry) {
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
-  client_cache_.setCache(foo_service, foo_client);
+  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service);
+  client_cache_.setCache(config_with_hash_key, foo_client);
   time_system_.advanceTimeAsyncImpl(std::chrono::seconds(50));
   // Cache entry hasn't been evicted because it is accessed before timer fire.
-  EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
+  EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), foo_client.get());
   time_system_.advanceTimeAndRun(std::chrono::seconds(50), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
   // Cache entry has been evicted because it is accessed after timer fire.
-  EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);
+  EXPECT_EQ(client_cache_.getCache(config_with_hash_key).get(), nullptr);
 }
 
 class AsyncClientManagerImplTest : public testing::Test {
@@ -126,6 +132,25 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return());
   async_client_manager_.factoryForGrpcService(grpc_service, scope_, false);
+}
+
+TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  envoy::config::core::v3::GrpcService grpc_service_c;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("bar");
+
+  GrpcServiceConfigWithHashKey config_with_hash_key_a = GrpcServiceConfigWithHashKey(grpc_service);
+  GrpcServiceConfigWithHashKey config_with_hash_key_b = GrpcServiceConfigWithHashKey(grpc_service);
+  GrpcServiceConfigWithHashKey config_with_hash_key_c =
+      GrpcServiceConfigWithHashKey(grpc_service_c);
+  EXPECT_TRUE(config_with_hash_key_a == config_with_hash_key_b);
+  EXPECT_FALSE(config_with_hash_key_a == config_with_hash_key_c);
+
+  EXPECT_EQ(config_with_hash_key_a.getPreComputedHash(),
+            config_with_hash_key_b.getPreComputedHash());
+  EXPECT_NE(config_with_hash_key_a.getPreComputedHash(),
+            config_with_hash_key_c.getPreComputedHash());
 }
 
 TEST_F(AsyncClientManagerImplTest, RawAsyncClientCache) {

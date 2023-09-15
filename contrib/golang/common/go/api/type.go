@@ -257,6 +257,25 @@ const (
 	Terminate DestroyReason = 1
 )
 
+// For each AccessLogType's meaning, see
+// https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage
+// Currently, only some downstream access log types are supported
+type AccessLogType int
+
+const (
+	AccessLogNotSet                                  AccessLogType = 0
+	AccessLogTcpUpstreamConnected                    AccessLogType = 1
+	AccessLogTcpPeriodic                             AccessLogType = 2
+	AccessLogTcpConnectionEnd                        AccessLogType = 3
+	AccessLogDownstreamStart                         AccessLogType = 4
+	AccessLogDownstreamPeriodic                      AccessLogType = 5
+	AccessLogDownstreamEnd                           AccessLogType = 6
+	AccessLogUpstreamPoolReady                       AccessLogType = 7
+	AccessLogUpstreamPeriodic                        AccessLogType = 8
+	AccessLogUpstreamEnd                             AccessLogType = 9
+	AccessLogDownstreamTunnelSuccessfullyEstablished AccessLogType = 10
+)
+
 const (
 	NormalFinalize int = 0 // normal, finalize on destroy
 	GCFinalize     int = 1 // finalize in GC sweep
@@ -349,6 +368,9 @@ const (
 	FlushWriteAndDelay ConnectionCloseType = 2
 	// Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
 	Abort ConnectionCloseType = 3
+	// Do not write/flush any pending data and immediately raise
+	// ConnectionEvent::LocalClose. Envoy will try to close the connection with RST flag.
+	AbortReset ConnectionCloseType = 4
 )
 
 func (t ConnectionCloseType) String() string {
@@ -361,6 +383,8 @@ func (t ConnectionCloseType) String() string {
 		return "FlushWriteAndDelay"
 	case Abort:
 		return "Abort"
+	case AbortReset:
+		return "AbortReset"
 	}
 	return "unknown"
 }

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 
 #include "envoy/ssl/context_config.h"

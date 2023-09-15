@@ -1,4 +1,3 @@
-load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -10,6 +9,7 @@ load(
     "envoy_quiche_platform_impl_cc_library",
     "envoy_quiche_platform_impl_cc_test_library",
 )
+load("@rules_proto//proto:defs.bzl", "proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -3348,6 +3348,7 @@ envoy_cc_library(
         "quiche/quic/core/http/quic_spdy_stream.cc",
         "quiche/quic/core/http/web_transport_http3.cc",
         "quiche/quic/core/http/web_transport_stream_adapter.cc",
+        "quiche/quic/core/web_transport_stats.cc",
     ],
     hdrs = [
         "quiche/quic/core/http/quic_headers_stream.h",
@@ -3357,6 +3358,7 @@ envoy_cc_library(
         "quiche/quic/core/http/quic_spdy_stream.h",
         "quiche/quic/core/http/web_transport_http3.h",
         "quiche/quic/core/http/web_transport_stream_adapter.h",
+        "quiche/quic/core/web_transport_stats.h",
     ],
     copts = quiche_copts,
     repository = "@envoy",
@@ -3553,15 +3555,15 @@ envoy_cc_library(
     srcs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
-            "quiche/quic/core/io/event_loop_socket_factory.cc",
             "quiche/quic/core/io/event_loop_connecting_client_socket.cc",
+            "quiche/quic/core/io/event_loop_socket_factory.cc",
         ],
     }),
     hdrs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
-            "quiche/quic/core/io/event_loop_socket_factory.h",
             "quiche/quic/core/io/event_loop_connecting_client_socket.h",
+            "quiche/quic/core/io/event_loop_socket_factory.h",
         ],
     }),
     copts = quiche_copts,

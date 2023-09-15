@@ -61,7 +61,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
 
   @Override
   public String dumpStats() {
-    return JniLibrary.dumpStats();
+    return JniLibrary.dumpStats(engineHandle);
   }
 
   /**

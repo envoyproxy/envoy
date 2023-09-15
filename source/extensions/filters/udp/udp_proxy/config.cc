@@ -17,6 +17,11 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       // Default prefer_gro to true for upstream client traffic.
       upstream_socket_config_(config.upstream_socket_config(), true),
       random_(context.api().randomGenerator()) {
+  if (use_per_packet_load_balancing_ && config.session_filters().size() > 0) {
+    throw EnvoyException(
+        "Only one of use_per_packet_load_balancing or session_filters can be used.");
+  }
+
   if (use_original_src_ip_ &&
       !Api::OsSysCallsSingleton::get().supportsIpTransparent(
           context.getServerFactoryContext().options().localAddressIpVersion())) {
@@ -37,6 +42,20 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
 
   if (!config.hash_policies().empty()) {
     hash_policy_ = std::make_unique<HashPolicyImpl>(config.hash_policies());
+  }
+
+  for (const auto& filter : config.session_filters()) {
+    ENVOY_LOG(debug, "    UDP session filter #{}", filter_factories_.size());
+    ENVOY_LOG(debug, "      name: {}", filter.name());
+    ENVOY_LOG(debug, "    config: {}",
+              MessageUtil::getJsonStringFromMessageOrError(
+                  static_cast<const Protobuf::Message&>(filter.typed_config()), true));
+
+    auto& factory = Config::Utility::getAndCheckFactory<NamedUdpSessionFilterConfigFactory>(filter);
+    ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
+        filter, context.messageValidationVisitor(), factory);
+    FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, context);
+    filter_factories_.push_back(callback);
   }
 }
 

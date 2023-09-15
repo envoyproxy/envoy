@@ -145,7 +145,8 @@ bool isHeaderNameValid(absl::string_view name) {
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
                          bool enable_trailers, bool allow_custom_methods)
-    : message_type_(type), connection_(connection), allow_custom_methods_(allow_custom_methods) {
+    : message_type_(type), connection_(connection), enable_trailers_(enable_trailers),
+      allow_custom_methods_(allow_custom_methods) {
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
@@ -159,9 +160,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
-  if (enable_trailers) {
-    framer_.set_balsa_trailer(&trailers_);
-  }
+  framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
   framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
@@ -274,10 +273,10 @@ void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
 void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*/) {}
 
 void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
-  processHeadersOrTrailersImpl(headers);
+  validateAndProcessHeadersOrTrailersImpl(headers, /* trailers = */ false);
 }
 void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
-  processHeadersOrTrailersImpl(trailer);
+  validateAndProcessHeadersOrTrailersImpl(trailer, /* trailers = */ true);
 }
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
@@ -392,7 +391,8 @@ void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
   }
 }
 
-void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers) {
+void BalsaParser::validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers,
+                                                          bool trailers) {
   for (const std::pair<absl::string_view, absl::string_view>& key_value : headers.lines()) {
     if (status_ == ParserStatus::Error) {
       return;
@@ -403,6 +403,10 @@ void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& heade
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_HEADER_TOKEN";
       return;
+    }
+
+    if (trailers && !enable_trailers_) {
+      continue;
     }
 
     status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));

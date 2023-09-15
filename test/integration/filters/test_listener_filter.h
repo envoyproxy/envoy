@@ -1,5 +1,10 @@
+#pragma once
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "source/common/router/string_accessor_impl.h"
 
 namespace Envoy {
 /**
@@ -74,5 +79,52 @@ public:
     return Network::FilterStatus::Continue;
   }
 };
+
+#ifdef ENVOY_ENABLE_QUIC
+/**
+ * Test QUIC listener filter which add a new filter state.
+ */
+class TestQuicListenerFilter : public Network::QuicListenerFilter {
+public:
+  class TestStringFilterState : public Router::StringAccessorImpl {
+  public:
+    TestStringFilterState(std::string value) : Router::StringAccessorImpl(value) {}
+    static const absl::string_view key() { return "test.filter_state.string"; }
+  };
+
+  explicit TestQuicListenerFilter(std::string added_value, bool allow_server_migration,
+                                  bool allow_client_migration)
+      : added_value_(added_value), allow_server_migration_(allow_server_migration),
+        allow_client_migration_(allow_client_migration) {}
+
+  // Network::QuicListenerFilter
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
+    cb.filterState().setData(TestStringFilterState::key(),
+                             std::make_unique<TestStringFilterState>(added_value_),
+                             StreamInfo::FilterState::StateType::ReadOnly,
+                             StreamInfo::FilterState::LifeSpan::Connection);
+    return Network::FilterStatus::Continue;
+  }
+  bool isCompatibleWithServerPreferredAddress(
+      const quic::QuicSocketAddress& /*server_preferred_address*/) const override {
+    return allow_server_migration_;
+  }
+  Network::FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& /*new_address*/,
+                                             Network::Connection& connection) override {
+    if (allow_client_migration_) {
+      return Network::FilterStatus::Continue;
+    }
+    connection.close(Network::ConnectionCloseType::NoFlush,
+                     "Migration to a new address which is not compatible with this filter.");
+    return Network::FilterStatus::StopIteration;
+  }
+
+private:
+  const std::string added_value_;
+  const bool allow_server_migration_;
+  const bool allow_client_migration_;
+};
+
+#endif
 
 } // namespace Envoy

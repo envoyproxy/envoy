@@ -1,3 +1,5 @@
+#pragma once
+
 #include "source/extensions/filters/http/geoip/geoip_provider_config.h"
 
 #include "test/extensions/filters/http/geoip/dummy.pb.h"

@@ -6667,6 +6667,9 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ(nullptr, config.route(headers, stream_info, 0));
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ("", config.name());
+  EXPECT_FALSE(config.usesVhds());
+  EXPECT_FALSE(config.mostSpecificHeaderMutationsWins());
+  EXPECT_EQ(0Ul, config.maxDirectResponseBodySizeBytes());
 }
 
 class BadHttpRouteConfigurationsTest : public testing::Test, public ConfigImplTestBase {};

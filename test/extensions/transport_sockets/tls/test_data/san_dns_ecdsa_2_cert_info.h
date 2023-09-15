@@ -1,3 +1,5 @@
+#pragma once
+
 // NOLINT(namespace-envoy)
 constexpr char TEST_SAN_DNS_ECDSA_2_CERT_256_HASH[] =
     "8ff1f6f38244b1912162633914c538ddf048c6e4085681514bd54fc5f1e28c4a";
