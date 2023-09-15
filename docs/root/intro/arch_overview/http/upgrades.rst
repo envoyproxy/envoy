@@ -164,8 +164,8 @@ is set to ``CONNECT-UDP``.
 .. literalinclude:: /_configs/repo/proxy_connect_udp_http3_downstream.yaml
    :language: yaml
    :linenos:
-   :lines: 33-60
-   :lineno-start: 33
+   :lines: 27-54
+   :lineno-start: 27
    :emphasize-lines: 15-16, 25-26
    :caption: :download:`proxy_connect_udp_http3_downstream.yaml </_configs/repo/proxy_connect_udp_http3_downstream.yaml>`
 
@@ -177,8 +177,8 @@ must be set to terminate ``CONNECT-UDP`` requests.
 .. literalinclude:: /_configs/repo/terminate_http3_connect_udp.yaml
    :language: yaml
    :linenos:
-   :lines: 32-63
-   :lineno-start: 32
+   :lines: 26-57
+   :lineno-start: 26
    :emphasize-lines: 15-16, 19-22, 29-30
    :caption: :download:`terminate_http3_connect_udp.yaml </_configs/repo/terminate_http3_connect_udp.yaml>`
 

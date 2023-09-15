@@ -1,11 +1,5 @@
 # This will forward CONNECT-UDP requests from a downstream connecting on 127.0.0.1:10001 to an
 # upstream listening on 127.0.0.1:10002.
-admin:
-  address:
-    socket_address:
-      protocol: TCP
-      address: 127.0.0.1
-      port_value: 9902
 static_resources:
   listeners:
   - name: listener_0
@@ -58,7 +52,6 @@ static_resources:
           - upgrade_type: CONNECT-UDP
   clusters:
   - name: cluster_0
-    connect_timeout: 5s
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
