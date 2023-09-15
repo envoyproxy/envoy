@@ -584,6 +584,6 @@ envoy_cmake(
     lib_source = "@com_github_maxmind_libmaxminddb//:all",
     out_static_libs = select({
         "//bazel:windows_x86_64": ["maxminddb.lib"],
-        "//conditions:default": ["maxminddb.a"],
+        "//conditions:default": ["libmaxminddb.a"],
     }),
 )
