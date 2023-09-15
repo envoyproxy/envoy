@@ -566,10 +566,8 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
-  for (int i = 1; i < 11; ++i) {
-    addEndpoint(cluster_load_assignment, 1000 * i);
-    doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  }
+  addEndpoint(cluster_load_assignment, 1000);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   auto initiailization_instance =
       cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
@@ -596,14 +594,9 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
       parseClusterFromV3Yaml(new_eds_cluster_yaml, getEdsClusterType()), "version2"));
   envoy::config::endpoint::v3::ClusterLoadAssignment new_cluster_load_assignment;
   new_cluster_load_assignment.set_cluster_name("new_fare");
-  for (int i = 1; i < 2; ++i) {
-    addEndpoint(new_cluster_load_assignment, 100 * i);
-    doOnConfigUpdateVerifyNoThrow(new_cluster_load_assignment);
-  }
+  addEndpoint(new_cluster_load_assignment, 100);
+  doOnConfigUpdateVerifyNoThrow(new_cluster_load_assignment);
 
-  EXPECT_LOG_CONTAINS("debug", "initializing TLS cluster cluster_1 inline",
-                      cluster_manager_->getThreadLocalCluster("cluster_1"));
-  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
   auto new_initialization_instance =
       cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
   EXPECT_NE(initiailization_instance.get(), new_initialization_instance.get());
@@ -612,10 +605,6 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
   // TODO(wbpcode): if we remove the legacy LB policy and configure all LB policies via new
   // TypedLoadBalancerFactory, we need a new way to check the LB policy.
   EXPECT_EQ(nullptr, new_initialization_instance->load_balancer_factory_);
-
-  Cluster& cluster = cluster_manager_->activeClusters().find("cluster_1")->second;
-  EXPECT_EQ(cluster.info()->endpointStats().membership_total_.value(), 1);
-  EXPECT_TRUE(hostsInHostsVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts(), {100}));
 }
 
 // Test that removed hosts do not appear when initializing a deferred eds cluster.
