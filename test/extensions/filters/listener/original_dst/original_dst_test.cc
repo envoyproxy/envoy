@@ -48,6 +48,18 @@ TEST_F(OriginalDstTest, InternalDynamicMetadata) {
   EXPECT_EQ("127.0.0.1:8080", socket_.connectionInfoProvider().localAddress()->asString());
 }
 
+TEST_F(OriginalDstTest, InternalDynamicMetadataFailure) {
+  EXPECT_CALL(socket_, addressType()).WillRepeatedly(Return(Network::Address::Type::EnvoyInternal));
+  TestUtility::loadFromYaml(R"EOF(
+    filter_metadata:
+      envoy.filters.listener.original_dst:
+        local: aaabb
+  )EOF",
+                            metadata_);
+  filter_.onAccept(cb_);
+  EXPECT_FALSE(socket_.connectionInfoProvider().localAddressRestored());
+}
+
 TEST_F(OriginalDstTest, InternalFilterState) {
   EXPECT_CALL(socket_, addressType()).WillRepeatedly(Return(Network::Address::Type::EnvoyInternal));
   const auto local = Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
