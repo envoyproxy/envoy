@@ -465,6 +465,9 @@ protected:
     proxy_buffer_factory_ = proxy_buffer_factory;
   }
 
+  void clearUpstreamMaxConcurrentStreams() {
+    upstream_config_.http2_options_.clear_max_concurrent_streams();
+  }
   void mergeOptions(envoy::config::core::v3::Http2ProtocolOptions& options) {
     upstream_config_.http2_options_.MergeFrom(options);
   }

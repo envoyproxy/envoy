@@ -439,8 +439,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamConnectionCloseWithManyStream
 
 TEST_P(MultiplexedUpstreamIntegrationTest, MoreThan100StreamsOutstanding) {
   if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    GTEST_SKIP();
     return;
   }
+
+  clearUpstreamMaxConcurrentStreams();
 
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 120;
@@ -450,6 +453,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MoreThan100StreamsOutstanding) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
+    SCOPED_TRACE(absl::StrCat("Starting request ", i));
     auto encoder_decoder =
         codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                    {":path", "/test/long/url"},
@@ -457,29 +461,26 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MoreThan100StreamsOutstanding) {
                                                                    {":authority", "sni.lyft.com"}});
     encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
+  }
 
-    // Ensure that we establish the first request (which will be reset) to avoid
-    // a race where the reset is detected before the upstream stream is
-    // established (#5316)
-    if (i == 0) {
-      ASSERT_TRUE(
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    }
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    SCOPED_TRACE(absl::StrCat("Accepting upstream request ", i));
     upstream_requests.emplace_back();
     ASSERT_TRUE(
         fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
-    upstream_requests.back()->waitForHeaders();
+    ASSERT_TRUE(upstream_requests.back()->waitForHeadersComplete());
   }
 
-  // Reset one stream to test how reset and watermarks interact.
-  codec_client_->sendReset(*encoders[0]);
-
-  for (uint32_t i = 1; i < num_requests; ++i) {
+  for (uint32_t i = 0; i < num_requests; ++i) {
     codec_client_->sendData(*encoders[i], 0, true);
   }
 
   // Now drain the upstream connection.
   for (uint32_t i = 1; i < num_requests; ++i) {
+    SCOPED_TRACE(absl::StrCat("Draining upstream request ", i));
     ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
     upstream_requests[i]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_requests[i]->encodeData(100, true);
@@ -487,6 +488,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MoreThan100StreamsOutstanding) {
   }
   // Ensure the streams all complete before test teardown.
   for (uint32_t i = 1; i < num_requests; ++i) {
+    SCOPED_TRACE(absl::StrCat("Waiting for END_STREAM on request ", i));
     ASSERT_TRUE(responses[i]->waitForEndStream());
   }
 
