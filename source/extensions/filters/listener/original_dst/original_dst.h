@@ -1,13 +1,37 @@
 #pragma once
 
+#include "envoy/common/hashable.h"
 #include "envoy/network/filter.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
+
+class FilterNameValues {
+public:
+  const std::string Name = "envoy.filters.listener.original_dst";
+  const std::string LocalField = "local";
+  const std::string LocalFilterStateKey = "envoy.filters.listener.original_dst.local_ip";
+  const std::string RemoteFilterStateKey = "envoy.filters.listener.original_dst.remote_ip";
+};
+
+using FilterNames = ConstSingleton<FilterNameValues>;
+
+class AddressObject : public StreamInfo::FilterState::Object, public Hashable {
+public:
+  AddressObject(const Network::Address::InstanceConstSharedPtr& address) : address_(address) {}
+  absl::optional<std::string> serializeAsString() const override { return address_->asString(); }
+  absl::optional<uint64_t> hash() const override;
+  const Network::Address::InstanceConstSharedPtr& address() const { return address_; }
+
+private:
+  const Network::Address::InstanceConstSharedPtr address_;
+};
 
 /**
  * Implementation of an original destination listener filter.

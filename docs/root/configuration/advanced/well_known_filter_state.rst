@@ -30,6 +30,12 @@ The following list of filter state objects are consumed by Envoy extensions:
      - | :ref:`Dynamic forward proxy <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`
        | upstream port override on a per-connection basis.
        | Accepts a port number string as a constructor.
+   * - ``envoy.filters.listener.original_dst.local_ip``
+     - | :ref:`Original destination listener filter <config_listener_filters_original_dst>`
+       | destination address selection for internal listeners.
+   * - ``envoy.filters.listener.original_dst.remote_ip``
+     - | :ref:`Original destination listener filter <config_listener_filters_original_dst>`
+       | source address selection for internal listeners.
 
 
 The filter state object fields can be used in the format strings. For example,

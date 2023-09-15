@@ -50,7 +50,7 @@ public:
     return std::make_unique<envoy::extensions::filters::listener::original_dst::v3::OriginalDst>();
   }
 
-  std::string name() const override { return "envoy.filters.listener.original_dst"; }
+  std::string name() const override { return FilterNames::get().Name; }
 };
 
 /**

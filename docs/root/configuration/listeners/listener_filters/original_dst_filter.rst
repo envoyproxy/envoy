@@ -40,5 +40,26 @@ rather than the address at which the listener is listening at. Furthermore, :ref
 destination cluster <arch_overview_service_discovery_types_original_destination>` may be used to
 forward HTTP requests or TCP connections to the restored destination address.
 
+Internal listeners
+------------------
+
+Original destination listener filter reads the dynamic metadata and the filter
+state objects on the user space sockets handled by the :ref:`internal listeners
+<config_internal_listener>`.
+
+Dynamic metadata for the destination address is expected to be placed into the
+key `envoy.filters.listener.original_dst` under the field `local` and should
+contain a string with an IP and a port address.
+
+The filter state objects consumed by this filter are:
+
+* `envoy.filters.listener.original_dst.local_ip` for the destination address
+* `envoy.filters.listener.original_dst.source_ip` for the source address
+
+:ref:`Internal upstream transport <config_internal_upstream_transport>` allows
+passing dynamic metadata from a host to the socket metadata and filter state
+objects that are shared with the upstream connection through a user space
+socket.
+
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.listener.original_dst.v3.OriginalDst>`

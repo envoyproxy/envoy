@@ -3,6 +3,8 @@
 #include "envoy/network/listen_socket.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
+#include "source/common/config/metadata.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/network/utility.h"
@@ -12,6 +14,10 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
 
+absl::optional<uint64_t> AddressObject::hash() const {
+  return Envoy::HashUtil::xxHash64(address_->asStringView());
+}
+
 Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Network::Socket& sock) {
   return Network::Utility::getOriginalDst(sock);
 }
@@ -20,7 +26,8 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
   ENVOY_LOG(trace, "original_dst: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
 
-  if (socket.addressType() == Network::Address::Type::Ip) {
+  switch (socket.addressType()) {
+  case Network::Address::Type::Ip: {
     Network::Address::InstanceConstSharedPtr original_local_address = getOriginalDst(socket);
     // A listener that has the use_original_dst flag set to true can still receive
     // connections that are NOT redirected using iptables. If a connection was not redirected,
@@ -68,6 +75,41 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
       // Restore the local address to the original one.
       socket.connectionInfoProvider().restoreLocalAddress(original_local_address);
     }
+    break;
+  }
+  case Network::Address::Type::EnvoyInternal: {
+    const auto& local_value = Config::Metadata::metadataValue(
+        &cb.dynamicMetadata(), FilterNames::get().Name, FilterNames::get().LocalField);
+    if (local_value.has_string_value()) {
+      const auto local_address = Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(
+          local_value.string_value(), /*v6only=*/false);
+      if (local_address) {
+        ENVOY_LOG_MISC(debug, "original_dst: set destination from metadata to {}",
+                       local_address->asString());
+        socket.connectionInfoProvider().restoreLocalAddress(local_address);
+      } else {
+        ENVOY_LOG_MISC(debug, "original_dst: failed to parse address: {}",
+                       local_address->asString());
+      }
+    } else {
+      const auto* local_object =
+          cb.filterState().getDataReadOnly<AddressObject>(FilterNames::get().LocalFilterStateKey);
+      if (local_object) {
+        ENVOY_LOG_MISC(debug, "original_dst: set destination from filter state to {}",
+                       local_object->address()->asString());
+        socket.connectionInfoProvider().restoreLocalAddress(local_object->address());
+      }
+    }
+    const auto* remote_object =
+        cb.filterState().getDataReadOnly<AddressObject>(FilterNames::get().RemoteFilterStateKey);
+    if (remote_object) {
+      ENVOY_LOG_MISC(debug, "original_dst: set source from filter state to {}",
+                     remote_object->address()->asString());
+      socket.connectionInfoProvider().setRemoteAddress(remote_object->address());
+    }
+  }
+  default:
+    break;
   }
 
   return Network::FilterStatus::Continue;

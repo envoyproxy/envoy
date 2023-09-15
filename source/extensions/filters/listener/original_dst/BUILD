@@ -17,12 +17,17 @@ envoy_cc_library(
     srcs = ["original_dst.cc"],
     hdrs = ["original_dst.h"],
     deps = [
+        "//envoy/common:hashable_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/network:utility_lib",
+        "//source/common/singleton:const_singleton",
     ],
 )
 
