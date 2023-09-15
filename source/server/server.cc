@@ -214,7 +214,6 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         gauges_.reserve(size);
       },
       [this](Stats::Gauge& gauge) {
-        ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
         snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
         gauges_.push_back(gauge);
       });
@@ -789,7 +788,7 @@ void InstanceImpl::onRuntimeReady() {
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
     TRY_ASSERT_MAIN_THREAD {
-      Config::Utility::checkTransportVersion(hds_config);
+      THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,

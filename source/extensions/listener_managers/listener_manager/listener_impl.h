@@ -28,9 +28,6 @@
 namespace Envoy {
 namespace Server {
 
-constexpr absl::string_view ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG{
-    "envoy.reloadable_features.enable_update_listener_socket_options"};
-
 /**
  * All missing listener config stats. @see stats_macros.h
  */

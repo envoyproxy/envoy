@@ -116,6 +116,7 @@ message UdpProxyConfig {
   // Perform per packet load balancing (upstream host selection) on each received data chunk.
   // The default if not specified is false, that means each data chunk is forwarded
   // to upstream host selected on first chunk receival for that "session" (identified by source IP/port and local IP/port).
+  // Only one of use_per_packet_load_balancing or session_filters can be used.
   bool use_per_packet_load_balancing = 7;
 
   // Configuration for session access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
@@ -125,5 +126,6 @@ message UdpProxyConfig {
   repeated config.accesslog.v3.AccessLog proxy_access_log = 10;
 
   // Optional session filters that will run for each UDP session.
+  // Only one of use_per_packet_load_balancing or session_filters can be used.
   repeated SessionFilter session_filters = 11;
 }
