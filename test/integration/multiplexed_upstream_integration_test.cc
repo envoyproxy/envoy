@@ -452,6 +452,8 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MoreThan100StreamsOutstanding) {
   std::vector<FakeStreamPtr> upstream_requests;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Starts the streams.
   for (uint32_t i = 0; i < num_requests; ++i) {
     SCOPED_TRACE(absl::StrCat("Starting request ", i));
     auto encoder_decoder =
@@ -463,9 +465,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MoreThan100StreamsOutstanding) {
     responses.push_back(std::move(encoder_decoder.second));
   }
 
+  // Accepts the upstream connection.
   ASSERT_TRUE(
       fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
 
+  // Accepts the upstream requests.
   for (uint32_t i = 0; i < num_requests; ++i) {
     SCOPED_TRACE(absl::StrCat("Accepting upstream request ", i));
     upstream_requests.emplace_back();
@@ -474,11 +478,12 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MoreThan100StreamsOutstanding) {
     ASSERT_TRUE(upstream_requests.back()->waitForHeadersComplete());
   }
 
+  // Finishes the requests from the client.
   for (uint32_t i = 0; i < num_requests; ++i) {
     codec_client_->sendData(*encoders[i], 0, true);
   }
 
-  // Now drain the upstream connection.
+  // Drains the upstream connection.
   for (uint32_t i = 1; i < num_requests; ++i) {
     SCOPED_TRACE(absl::StrCat("Draining upstream request ", i));
     ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
@@ -486,7 +491,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MoreThan100StreamsOutstanding) {
     upstream_requests[i]->encodeData(100, true);
     responses[i]->waitForHeaders();
   }
-  // Ensure the streams all complete before test teardown.
+  // Ensures all the streams complete before test teardown.
   for (uint32_t i = 1; i < num_requests; ++i) {
     SCOPED_TRACE(absl::StrCat("Waiting for END_STREAM on request ", i));
     ASSERT_TRUE(responses[i]->waitForEndStream());
