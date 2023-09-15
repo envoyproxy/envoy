@@ -45,6 +45,7 @@ public:
     return proxy_access_logs_;
   }
   const FilterChainFactory& sessionFilterFactory() const override { return *this; };
+  bool hasSessionFilters() const override { return !filter_factories_.empty(); }
 
   // FilterChainFactory
   void createFilterChain(FilterChainFactoryCallbacks& callbacks) const override {

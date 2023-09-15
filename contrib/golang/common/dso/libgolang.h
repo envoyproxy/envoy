@@ -129,7 +129,7 @@ extern GoUint64 envoyGoFilterOnHttpData(httpRequest* r,
 
 // go:linkname envoyGoFilterOnHttpLog
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpLog
-extern void envoyGoFilterOnHttpLog(httpRequest* r);
+extern void envoyGoFilterOnHttpLog(httpRequest* r, GoUint64 type);
 
 // go:linkname envoyGoFilterOnHttpDestroy
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpDestroy

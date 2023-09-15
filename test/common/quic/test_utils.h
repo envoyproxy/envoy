@@ -49,7 +49,7 @@ public:
             &writer, /*owns_writer=*/false, supported_versions,
             createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
                                          "example.com", "h3-29"),
-            generator) {}
+            generator, nullptr) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();

@@ -89,6 +89,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters:filter_config_interface",
         "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:buffer_filter_config_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:buffer_filter_proto_cc_proto",
         "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_config_lib",
         "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_proto_cc_proto",
         "//test/integration:integration_lib",

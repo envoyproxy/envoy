@@ -53,6 +53,8 @@ protected:
 
   void onWriteEventDone();
 
+  Network::Connection* networkConnection() { return envoy_connection_; }
+
 private:
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;

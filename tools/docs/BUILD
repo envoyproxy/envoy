@@ -33,11 +33,11 @@ py_binary(
 
 # The upstream lib is maintained here:
 #
-#    https://github.com/envoyproxy/pytooling/tree/main/envoy.docs.sphinx_runner
+#    https://github.com/envoyproxy/toolshed/tree/main/envoy.docs.sphinx_runner
 #
-# Please submit issues/PRs to the pytooling repo:
+# Please submit issues/PRs to the toolshed repo:
 #
-#    https://github.com/envoyproxy/pytooling
+#    https://github.com/envoyproxy/toolshed
 
 envoy_entry_point(
     name = "sphinx_runner",

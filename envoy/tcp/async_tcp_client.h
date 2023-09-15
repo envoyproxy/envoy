@@ -53,6 +53,11 @@ public:
   virtual void close(Network::ConnectionCloseType type) PURE;
 
   /**
+   * @return the detected close type from socket.
+   */
+  virtual Network::DetectedCloseType detectedCloseType() const PURE;
+
+  /**
    * Write data through the client.
    * @param data the bufferred data.
    * @param end_stream indicates if this is the end of the stream, half close

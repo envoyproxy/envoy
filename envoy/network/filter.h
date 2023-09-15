@@ -12,6 +12,10 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+namespace quic {
+class QuicSocketAddress;
+}
+
 namespace Envoy {
 
 namespace Event {
@@ -334,7 +338,7 @@ using ListenerFilterMatcherPtr = std::unique_ptr<ListenerFilterMatcher>;
 using ListenerFilterMatcherSharedPtr = std::shared_ptr<ListenerFilterMatcher>;
 
 /**
- * Listener Filter
+ * TCP Listener Filter
  */
 class ListenerFilter {
 public:
@@ -399,6 +403,88 @@ public:
  * more than one if desired.
  */
 using ListenerFilterFactoryCb = std::function<void(ListenerFilterManager& filter_manager)>;
+
+/**
+ * QUIC Listener Filter
+ */
+class QuicListenerFilter {
+public:
+  virtual ~QuicListenerFilter() = default;
+
+  /**
+   * Called when a new connection is accepted, but before a Connection is created.
+   * Filter chain iteration can be terminated if the cb shouldn't be accessed any more
+   * by returning `FilterStatus::StopIteration`, or continue the filter chain iteration
+   * by returning `FilterStatus::ContinueIteration`. Reject the connection by closing
+   * the socket and returning `FilterStatus::StopIteration`. If `FilterStatus::StopIteration` is
+   * returned, following filters' onAccept() will be skipped, but the connection creation is not
+   * going to be paused. If the connection socket is closed upon connection creation, the connection
+   * will be closed immediately.
+   * @param cb the callbacks the filter instance can use to communicate with the filter chain.
+   * @param server_preferred_addresses the server's preferred addresses to be advertised.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
+
+  /**
+   * Called before connection creation.
+   * @return false if the given preferred address is incomplatible with this filter and the listener
+   * shouldn't advertise the given preferred address. I.e. onAccept() would have behaved differently
+   * if the connection socket's destination address were the preferred address.
+   */
+  virtual bool isCompatibleWithServerPreferredAddress(
+      const quic::QuicSocketAddress& server_preferred_address) const PURE;
+
+  /**
+   * Called after the peer has migrated to a different address. Check if the connection
+   * migration is compatible with this listener filter. If not, close the connection and return
+   * `FilterStatus::StopIteration`. An alternative approach is to disable active migration on the
+   * given connection during connection creation. But peer address change is inevitable given NAT
+   * rebinding is more frequent than TCP, and such passive address change is indistinguishable from
+   * active migration. So there is no way to completely disable connection migration. disable client
+   * connection migration.
+   * @param new_address the address the peer has migrated to.
+   * @param connection the connection just migrated.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+                                            Connection& connection) PURE;
+};
+
+using QuicListenerFilterPtr = std::unique_ptr<QuicListenerFilter>;
+
+/**
+ * Interface for filter callbacks and adding listener filters to a manager.
+ */
+class QuicListenerFilterManager {
+public:
+  virtual ~QuicListenerFilterManager() = default;
+
+  /**
+   * Add a filter to the listener. Filters are invoked in FIFO order (the filter added
+   * first is called first).
+   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled.
+   * @param filter supplies the filter being added.
+   */
+  virtual void addFilter(const ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                         QuicListenerFilterPtr&& filter) PURE;
+
+  virtual bool shouldAdvertiseServerPreferredAddress(
+      const quic::QuicSocketAddress& server_preferred_address) const PURE;
+
+  virtual void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+                                    Connection& connection) PURE;
+};
+
+/**
+ * This function is used to wrap the creation of a QUIC listener filter chain for new connections.
+ * Filter factories create the lambda at configuration initialization time, and then they are used
+ * at runtime.
+ * @param filter_manager supplies the filter manager for the listener to install filters to.
+ * Typically the function will install a single filter, but it's technically possibly to install
+ * more than one if desired.
+ */
+using QuicListenerFilterFactoryCb = std::function<void(QuicListenerFilterManager& filter_manager)>;
 
 template <class FactoryCb>
 using FilterConfigProvider = Envoy::Config::ExtensionConfigProvider<FactoryCb>;
@@ -568,6 +654,13 @@ public:
    */
   virtual void createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
                                             UdpReadFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Called to create the QUIC listener filter chain.
+   * @param manager supplies the filter manager to create the chain on.
+   * @return true if filter chain was created successfully. Otherwise false.
+   */
+  virtual bool createQuicListenerFilterChain(QuicListenerFilterManager& manager) PURE;
 };
 
 /**
