@@ -27,9 +27,7 @@ AlwaysOnSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
   return result;
 }
 
-std::string AlwaysOnSampler::getDescription() const {
-    return "AlwaysOnSampler";
-}
+std::string AlwaysOnSampler::getDescription() const { return "AlwaysOnSampler"; }
 
 } // namespace OpenTelemetry
 } // namespace Tracers

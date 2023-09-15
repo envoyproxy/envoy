@@ -9,8 +9,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-SamplerPtr DynatraceSamplerFactory::createSampler(
-    const Protobuf::Message& config) {
+SamplerPtr DynatraceSamplerFactory::createSampler(const Protobuf::Message& config) {
   return std::make_shared<DynatraceSampler>(config);
 }
 

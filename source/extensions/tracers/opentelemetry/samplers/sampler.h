@@ -5,8 +5,9 @@
 #include <string>
 #include <set>
 
+#include "absl/status/statusor.h"
+
 #include "envoy/config/typed_config.h"
-#include "envoy/server/tracer_config.h"
 
 #include "envoy/tracing/trace_context.h"
 
@@ -29,16 +30,14 @@ enum class Decision {
   RECORD_AND_SAMPLE
 };
 
-struct SamplingResult
-{
+struct SamplingResult {
   Decision decision;
   // A set of span Attributes that will also be added to the Span. Can be nullptr.
   std::unique_ptr<const std::map<std::string, std::string>> attributes;
   // The tracestate used by the span.
   std::string trace_state;
 
-  inline bool isRecording()
-  {
+  inline bool isRecording() {
     return decision == Decision::RECORD_ONLY || decision == Decision::RECORD_AND_SAMPLE;
   }
   inline bool isSampled() { return decision == Decision::RECORD_AND_SAMPLE; }
@@ -57,10 +56,11 @@ public:
    *
    * @return a SamplingResult
    */
-  virtual SamplingResult
-  shouldSample(absl::StatusOr<SpanContext>& parent_context, const std::string& trace_id, const std::string& name,
-               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind, 
-               const std::map<std::string, std::string>& attributes, const std::set<SpanContext> links) PURE;
+  virtual SamplingResult shouldSample(absl::StatusOr<SpanContext>& parent_context,
+                                      const std::string& trace_id, const std::string& name,
+                                      ::opentelemetry::proto::trace::v1::Span::SpanKind spankind,
+                                      const std::map<std::string, std::string>& attributes,
+                                      const std::set<SpanContext> links) PURE;
 
   virtual std::string getDescription() const PURE;
 };
@@ -68,7 +68,7 @@ public:
 using SamplerPtr = std::shared_ptr<Sampler>;
 
 /*
- * A factory for creating sampler without configuration.
+ * A factory for creating a sampler
  */
 class SamplerFactory : public Envoy::Config::TypedFactory {
 public:
@@ -76,11 +76,10 @@ public:
 
   /**
    * @brief Creates a sampler
-   * @param message The sampler config
+   * @param config The sampler config
    * @return SamplerPtr
    */
-  virtual SamplerPtr
-  createSampler(const Protobuf::Message& message) PURE;
+  virtual SamplerPtr createSampler(const Protobuf::Message& config) PURE;
 
   std::string category() const override { return "envoy.tracers.opentelemetry.samplers"; }
 };

@@ -4,6 +4,7 @@
 
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 
+#include "envoy/registry/registry.h"
 #include "envoy/extensions/tracers/opentelemetry/samplers/v3/always_on_sampler.pb.h"
 
 namespace Envoy {
@@ -22,16 +23,13 @@ public:
    * @param context
    * @return SamplerPtr
    */
-  SamplerPtr
-  createSampler(const Protobuf::Message& config) override;
+  SamplerPtr createSampler(const Protobuf::Message& config) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::tracers::opentelemetry::samplers::v3::
-                                AlwaysOnSamplerConfig>();
+    return std::make_unique<
+        envoy::extensions::tracers::opentelemetry::samplers::v3::AlwaysOnSamplerConfig>();
   }
-  std::string name() const override {
-    return "envoy.tracers.opentelemetry.samplers.always_on";
-  }
+  std::string name() const override { return "envoy.tracers.opentelemetry.samplers.always_on"; }
 };
 
 DECLARE_FACTORY(AlwaysOnSamplerFactory);

@@ -1,5 +1,7 @@
 #include "config.h"
 
+#include "envoy/server/tracer_config.h"
+
 #include "source/common/config/utility.h"
 
 #include "always_on_sampler.h"
@@ -9,8 +11,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-SamplerPtr AlwaysOnSamplerFactory::createSampler(
-    const Protobuf::Message& config) {
+SamplerPtr AlwaysOnSamplerFactory::createSampler(const Protobuf::Message& config) {
   return std::make_shared<AlwaysOnSampler>(config);
 }
 

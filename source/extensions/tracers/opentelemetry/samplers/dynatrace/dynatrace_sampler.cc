@@ -15,13 +15,13 @@ namespace OpenTelemetry {
 
 SamplingResult
 DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
-                              const std::string& /*trace_id*/, const std::string& /*name*/,
-                              ::opentelemetry::proto::trace::v1::Span::SpanKind /*spankind*/,
-                              const std::map<std::string, std::string>& /*attributes*/,
-                              const std::set<SpanContext> /*links*/) {  
+                               const std::string& /*trace_id*/, const std::string& /*name*/,
+                               ::opentelemetry::proto::trace::v1::Span::SpanKind /*spankind*/,
+                               const std::map<std::string, std::string>& /*attributes*/,
+                               const std::set<SpanContext> /*links*/) {
   SamplingResult result;
-
-  if (counter_ %2 == 0) {
+  uint32_t current_counter = counter_++;
+  if (current_counter % 2 == 0) {
     result.decision = Decision::RECORD_AND_SAMPLE;
     result.trace_state = "tracestate_set_in_dynatrace_samplerX";
     std::map<std::string, std::string> att;
@@ -33,13 +33,11 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
       result.trace_state = parent_context.value().tracestate();
     }
   }
-  ++counter_;
+
   return result;
 }
 
-std::string DynatraceSampler::getDescription() const {
-    return "DynatraceSampler";
-}
+std::string DynatraceSampler::getDescription() const { return "DynatraceSampler"; }
 
 } // namespace OpenTelemetry
 } // namespace Tracers
