@@ -60,8 +60,7 @@ func (f *filter) EncodeData(buffer api.BufferInstance, endStream bool) api.Statu
 		if endStream {
 			buffer.SetString(UpdateUpstreamBody)
 		} else {
-			// TODO implement buffer->Drain, buffer.SetString means buffer->Drain(buffer.Len())
-			buffer.SetString("")
+			buffer.Reset()
 		}
 	}
 	return api.Continue
