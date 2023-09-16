@@ -204,12 +204,12 @@ message HttpConnectionManager {
     // in the router.
     //
     // Users should set appropriate value based on their tracing provider and actual scenario.
-    // * If Envoy is used as sidecar and users want to make the sidecar and its service as only one
+    // * If Envoy is used as sidecar and users want to make the sidecar and its application as only one
     //   hop in the trace chain, this flag should be set to false. And please also make sure the
     //   :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
     //   in the router is not set to true.
     // * If Envoy is used as gateway or independent proxy, or users want to make the sidecar and its
-    //   service as different hops in the trace chain, this flag should be set to true.
+    //   application as different hops in the trace chain, this flag should be set to true.
     // * If tracing provider that has explicit requirements on span creation (like SkyWalking),
     //   this flag should be set to true.
     //

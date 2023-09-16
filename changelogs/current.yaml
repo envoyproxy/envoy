@@ -264,6 +264,11 @@ new_features:
   change: |
     Added the ability to specify a custom upstream local address selector using
     :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
+- area: tracing
+  change: |
+    Added :ref:`spawn_upstream_span
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`
+    to control whether to create separate upstream span for upstream request.
 
 deprecated:
 - area: tracing
@@ -272,3 +277,10 @@ deprecated:
 - area: tracing
   change: |
     Opencensus is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
+- area: tracing
+  change: |
+    :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+    is deprecated by
+    :ref:`spawn_upstream_span
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
+    Please use the new field to control whether to create separate upstream span for upstream request.
