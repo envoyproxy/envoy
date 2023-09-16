@@ -39,9 +39,6 @@ initiated:
 * Randomly sampled via the :ref:`random_sampling <config_http_conn_man_runtime_random_sampling>`
   runtime setting.
 
-The router filter is also capable of creating a child span for egress calls via the
-:ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` option.
-
 .. _arch_overview_tracing_context_propagation:
 
 Trace context propagation
