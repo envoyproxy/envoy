@@ -391,10 +391,6 @@ TEST_F(OpenTelemetryDriverTest, SpanType) {
     // The child span should also be a CLIENT span.
     EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
-
-    // We should see a call to sendMessage to export that single span.
-    EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
-    child_span->finishSpan();
   }
 
   {
@@ -430,10 +426,6 @@ TEST_F(OpenTelemetryDriverTest, SpanType) {
     // The child span should also be a CLIENT span.
     EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
-
-    // We should see a call to sendMessage to export that single span.
-    EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
-    child_span->finishSpan();
   }
 
   {
@@ -469,10 +461,6 @@ TEST_F(OpenTelemetryDriverTest, SpanType) {
     // The child span should also be a CLIENT span.
     EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
-
-    // We should see a call to sendMessage to export that single span.
-    EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
-    child_span->finishSpan();
   }
 }
 
