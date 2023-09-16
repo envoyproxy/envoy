@@ -203,7 +203,8 @@ message HttpConnectionManager {
     // :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
     // in the router.
     //
-    // Users should set appropriate value based on their tracing provider and actual scenario.
+    // Users should set appropriate value based on their tracing provider and actual scenario:
+    //
     // * If Envoy is used as sidecar and users want to make the sidecar and its application as only one
     //   hop in the trace chain, this flag should be set to false. And please also make sure the
     //   :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
