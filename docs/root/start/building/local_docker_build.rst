@@ -8,7 +8,7 @@ The following steps guide you through building your own Envoy binary, and
 putting that in a clean Ubuntu container.
 
 .. tip::
-   These instructions use run commands in Docker using ``ci/run_envoy_docker.sh``.
+   These instructions run commands in Docker using ``ci/run_envoy_docker.sh``.
 
    By default this will place bazel run files and any artefacts in ``/tmp/envoy-docker-build``.
 
