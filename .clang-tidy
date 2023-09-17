@@ -57,6 +57,10 @@ CheckOptions:
 # Ignore GoogleTest function macros.
 - key: readability-identifier-naming.FunctionIgnoredRegexp
   value: '(TEST|TEST_F|TEST_P|INSTANTIATE_TEST_SUITE_P|MOCK_METHOD|TYPED_TEST)'
+## TODO(phlax): these are added for Golang filter, figure out how to only apply there
+- key: readability-identifier-naming.ParameterIgnoredRegexp
+  value: >-
+    (bufferLen|bufferPtr|childId|configId|configLen|configPtr|connID|dataPtr|dataSize|dispatcher|endOfStream|endStream|goConnID|headerNum|headerBytes|headerPtr|length|libraryIdLen|libraryIdPtr|nameLen|namePtr|parentId|pluginId|pluginNameLen|pluginNamePtr|pluginPtr|sliceNum)
 - key: readability-identifier-naming.ParameterCase
   value: 'lower_case'
 - key: readability-identifier-naming.PrivateMemberCase
