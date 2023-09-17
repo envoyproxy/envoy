@@ -50,7 +50,7 @@ For more information on building and different build targets, please refer to :r
 In this step we'll build the Envoy deployment images.
 
 .. note::
-   The `docker` CI target expects a release tarball to have been built previously using one of the steps above.
+   The ``docker`` CI target expects a release tarball to have been built previously using one of the steps above.
 
 In order to build Docker inside the Envoy build image we need to set the env var ``ENVOY_DOCKER_IN_DOCKER``
 
