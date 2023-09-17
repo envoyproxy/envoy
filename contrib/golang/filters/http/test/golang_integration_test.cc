@@ -857,6 +857,7 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamStart) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("r;r2", getHeader(upstream_request_->headers(), "referers"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsynclyForDownstreamStart"));
 
   cleanup();
 }
@@ -887,6 +888,7 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamPeriodic) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("r", getHeader(upstream_request_->headers(), "referers"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsynclyForDownstreamPeriodic"));
 
   cleanup();
 }
