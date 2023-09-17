@@ -896,11 +896,11 @@ def _com_google_protobuf():
     )
     native.bind(
         name = "protocol_compiler",
-        actual = "@com_google_protobuf//:protoc",
+        actual = "@envoy//tools/protoc",
     )
     native.bind(
         name = "protoc",
-        actual = "@com_google_protobuf//:protoc",
+        actual = "@envoy//tools/protoc",
     )
 
     # Needed for `bazel fetch` to work with @com_google_protobuf
