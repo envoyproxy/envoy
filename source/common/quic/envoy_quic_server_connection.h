@@ -78,6 +78,7 @@ public:
   }
   bool shouldAdvertiseServerPreferredAddress(
       const quic::QuicSocketAddress& server_preferred_address) const override {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto iter = accept_filters_.begin(); iter != accept_filters_.end(); iter++) {
       if (!(*iter)->isCompatibleWithServerPreferredAddress(server_preferred_address)) {
         return false;
@@ -87,6 +88,7 @@ public:
   }
   void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
                             Network::Connection& connection) override {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto iter = accept_filters_.begin(); iter != accept_filters_.end(); iter++) {
       Network::FilterStatus status = (*iter)->onPeerAddressChanged(new_address, connection);
       if (status == Network::FilterStatus::StopIteration ||
@@ -96,6 +98,7 @@ public:
     }
   }
   void startFilterChain() {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto iter = accept_filters_.begin(); iter != accept_filters_.end(); iter++) {
       Network::FilterStatus status = (*iter)->onAccept(*this);
       if (status == Network::FilterStatus::StopIteration || !socket().ioHandle().isOpen()) {

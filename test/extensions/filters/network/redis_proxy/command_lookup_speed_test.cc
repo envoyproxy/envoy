@@ -97,11 +97,11 @@ public:
 } // namespace Extensions
 } // namespace Envoy
 
-static void BM_MakeRequests(benchmark::State& state) {
+static void bmMakeRequests(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandLookUpSpeedTest context;
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     context.makeRequests();
   }
 }
-BENCHMARK(BM_MakeRequests);
+BENCHMARK(bmMakeRequests);

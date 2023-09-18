@@ -20,11 +20,10 @@ using ::quic::test::TestConnectionIdNineBytesLong;
 class EnvoyDeterministicConnectionIdGeneratorTest : public QuicTest {
 public:
   EnvoyDeterministicConnectionIdGeneratorTest()
-      : connection_id_length_(12),
-        generator_(EnvoyDeterministicConnectionIdGenerator(connection_id_length_)) {}
+      : generator_(EnvoyDeterministicConnectionIdGenerator(connection_id_length_)) {}
 
 protected:
-  int connection_id_length_ = 0;
+  int connection_id_length_{12};
   EnvoyDeterministicConnectionIdGenerator generator_;
 };
 
