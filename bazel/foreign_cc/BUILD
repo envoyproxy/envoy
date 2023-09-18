@@ -592,6 +592,6 @@ envoy_cmake(
     },
     defines = ["MAXMIND_STATICLIB"],
     lib_source = "@com_github_maxmind_libmaxminddb//:all",
-    out_static_libs = ["ibmaxminddb.a"],
+    out_static_libs = ["libmaxminddb.a"],
     tags = ["skip_on_windows"],
 )
