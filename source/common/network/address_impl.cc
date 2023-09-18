@@ -208,7 +208,8 @@ std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
       *--start = '.';
     }
   }
-  return std::string(start, str + BufferSize - start);
+  const std::string::size_type end = str + BufferSize - start;
+  return {start, end};
 }
 
 absl::Status Ipv4Instance::validateProtocolSupported() {

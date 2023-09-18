@@ -240,8 +240,8 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
 }
 
 bool HeaderUtility::isConnectUdp(const RequestHeaderMap& headers) {
-  return headers.Upgrade() &&
-         headers.Upgrade()->value() == Http::Headers::get().UpgradeValues.ConnectUdp;
+  return headers.Upgrade() && absl::EqualsIgnoreCase(headers.getUpgradeValue(),
+                                                     Http::Headers::get().UpgradeValues.ConnectUdp);
 }
 
 bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
