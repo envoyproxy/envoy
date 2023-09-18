@@ -856,9 +856,9 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-// Using a configuration with buffering set for the request body,
-// test the filter with a processor that changes the request body,
-// passing the data in a single chunk.
+// Using a configuration with buffering set for the request body and skip set for request header,
+// test the filter with a processor that changes the request body, passing the data in a single
+// chunk. and content_length headers are removed in this mode.
 TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedOnly) {
   initialize(R"EOF(
   grpc_service:
@@ -1705,6 +1705,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   processRequestHeaders(false, absl::nullopt);
+  // Test content-length header is removed in request in streamed mode.
   EXPECT_EQ(request_headers_.ContentLength(), nullptr);
 
   bool decoding_watermarked = false;
@@ -1734,6 +1735,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
+  // Test content-length header is removed in response in streamed mode.
   EXPECT_EQ(response_headers_.ContentLength(), nullptr);
 
   Buffer::OwnedImpl want_response_body;

@@ -243,15 +243,15 @@ TEST(MutationUtils, TestSetHeaderWithContentLength) {
   s->mutable_header()->set_value("10");
 
   EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
-                                                  /*is_streamed_mode=*/true)
+                                                  /*remove_content_length=*/true)
                   .ok());
-  // When `is_streamed_mode` is true, content_length headers is not added.
+  // When `remove_content_length` is true, content_length headers is not added.
   EXPECT_EQ(headers.ContentLength(), nullptr);
 
   EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
-                                                  /*is_streamed_mode=*/false)
+                                                  /*remove_content_length=*/false)
                   .ok());
-  // When `is_streamed_mode` is false, content_length headers is added.
+  // When `remove_content_length` is false, content_length headers is added.
   EXPECT_EQ(headers.getContentLengthValue(), "10");
 }
 
