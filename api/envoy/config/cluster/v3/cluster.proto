@@ -1257,4 +1257,8 @@ message TrackClusterStats {
   // <config_cluster_manager_cluster_stats_request_response_sizes>`  tracking header and body sizes
   // of requests and responses will be published.
   bool request_response_sizes = 2;
+
+  // If `per_endpoint_stats` is true, some stats will be emitted per-endpoint, similar to the stats in
+  // admin `/clusters` output.
+  bool per_endpoint_stats = 3;
 }

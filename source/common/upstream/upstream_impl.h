@@ -942,6 +942,11 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
+  bool perEndpointStats() const override {
+    // TODO: get from proto
+    return true;
+  }
+
   UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }

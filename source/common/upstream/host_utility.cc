@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -194,6 +195,50 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
     return host;
   }
   return nullptr;
+}
+
+namespace {
+template <class StatType, typename GetStatsFunc>
+void forEachMetric(const ClusterManager& cluster_manager,
+                   const std::function<void(HostUtility::PrimitiveMetric<StatType>&& metric)>& cb,
+                   GetStatsFunc get_stats_vector) {
+  for (const auto& [cluster_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
+    if (cluster_ref.get().info()->perEndpointStats()) {
+      for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
+        for (auto& host : host_set->hosts()) {
+          for (auto& [counter_name, primitive] : get_stats_vector(*host)) {
+            HostUtility::PrimitiveMetric<StatType> metric(primitive.get());
+
+            metric.name_ = absl::StrCat("cluster.", cluster_name, ".endpoint.", counter_name, ".",
+                                        host->address()->asStringView());
+            metric.tag_extracted_name_ = absl::StrCat("cluster.endpoint.", counter_name);
+            metric.tags_ = {{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name},
+                            {"envoy.endpoint_address", host->address()->asString()}};
+
+            const auto& hostname = host->hostname();
+            if (!hostname.empty()) {
+              metric.tags_.push_back({"envoy.endpoint_hostname", hostname});
+            }
+
+            cb(std::move(metric));
+          }
+        }
+      }
+    }
+  }
+}
+} // namespace
+
+void HostUtility::forEachHostCounter(
+    const ClusterManager& cluster_manager,
+    const std::function<void(PrimitiveMetric<Stats::PrimitiveCounter>&& metric)>& cb) {
+  forEachMetric(cluster_manager, cb, [](Host& host) { return host.counters(); });
+}
+
+void HostUtility::forEachHostGauge(
+    const ClusterManager& cluster_manager,
+    const std::function<void(PrimitiveMetric<Stats::PrimitiveGauge>&& metric)>& cb) {
+  forEachMetric(cluster_manager, cb, [](Host& host) { return host.gauges(); });
 }
 
 } // namespace Upstream

@@ -138,17 +138,19 @@ void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::I
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
-  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
+  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), server_.clusterManager(),
+                   params, response);
 }
 
 void StatsHandler::prometheusRender(Stats::Store& stats,
                                     const Stats::CustomStatNamespaces& custom_namespaces,
+                                    const Upstream::ClusterManager& cluster_manager,
                                     const StatsParams& params, Buffer::Instance& response) {
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              text_readouts_vec, response, params,
+                                              text_readouts_vec, cluster_manager, response, params,
                                               custom_namespaces);
 }
 

@@ -67,6 +67,7 @@ public:
    */
   static void prometheusRender(Stats::Store& stats,
                                const Stats::CustomStatNamespaces& custom_namespaces,
+                               const Upstream::ClusterManager& cluster_manager,
                                const StatsParams& params, Buffer::Instance& response);
 
   Http::Code handlerContention(Http::ResponseHeaderMap& response_headers,

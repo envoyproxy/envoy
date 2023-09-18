@@ -1169,6 +1169,8 @@ public:
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
+  virtual bool perEndpointStats() const PURE;
+
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */

@@ -207,6 +207,7 @@ envoy_cc_library(
         "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/stats:histogram_lib",
+        "//source/common/upstream:host_utility_lib",
     ],
 )
 

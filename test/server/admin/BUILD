@@ -172,6 +172,7 @@ envoy_cc_test(
         "//source/common/stats:tag_producer_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:prometheus_stats_lib",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
     ],
 )
