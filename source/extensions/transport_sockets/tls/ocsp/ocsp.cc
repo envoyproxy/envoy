@@ -278,9 +278,7 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
   skipResponderId(elem);
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
   auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(
-      elem, [](CBS& cbs) -> ParsingResult<SingleResponse> {
-        return ParsingResult<SingleResponse>(parseSingleResponse(cbs));
-      }));
+      elem, [](CBS& cbs) -> ParsingResult<SingleResponse> { return {parseSingleResponse(cbs)}; }));
   // Extensions currently ignored.
 
   return {std::move(responses)};

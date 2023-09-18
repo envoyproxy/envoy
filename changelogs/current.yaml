@@ -238,6 +238,11 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: tls
+  change: |
+    added :ref:`disable_stateful_session_resumption
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` config option to
+    disable stateful TLS session resumption.
 - area: udp_proxy
   change: |
     added :ref:`session_filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>` config to
@@ -255,6 +260,14 @@ new_features:
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: tls
+  change: |
+    added fallback :ref:`fallback
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.PrivateKeyProvider.fallback>`
+    to support private key provider to fallback to boringssl tls handshake.
+    If the private key provider isn't available (eg. the required hardware capability doesn't existed),
+    Envoy will fallback to the BoringSSL default implementation when the fallback is true.
+    The default value is false.
 - area: tcp
   change: |
     added the support to detect and send TCP RST for raw buffer socket based connections. This is currently supported on Linux only.

@@ -62,6 +62,7 @@ CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* r, void* key, void* value, hea
 CAPIStatus envoyGoFilterHttpRemoveHeader(void* r, void* key);
 
 CAPIStatus envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer, void* value);
+CAPIStatus envoyGoFilterHttpDrainBuffer(void* r, unsigned long long int buffer, uint64_t length);
 CAPIStatus envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buffer, void* data,
                                             int length, bufferAction action);
 

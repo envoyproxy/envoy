@@ -854,6 +854,10 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           });
     }
 
+    if (config.disableStatefulSessionResumption()) {
+      SSL_CTX_set_session_cache_mode(ctx.ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
+    }
+
     if (config.sessionTimeout() && !config.capabilities().handles_session_resumption) {
       auto timeout = config.sessionTimeout().value().count();
       SSL_CTX_set_timeout(ctx.ssl_ctx_.get(), uint32_t(timeout));

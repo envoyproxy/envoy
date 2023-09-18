@@ -142,6 +142,7 @@ public:
   MOCK_METHOD(OcspStaplePolicy, ocspStaplePolicy, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
   MOCK_METHOD(bool, disableStatelessSessionResumption, (), (const));
+  MOCK_METHOD(bool, disableStatefulSessionResumption, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
@@ -208,6 +209,7 @@ public:
               (SSL * ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
   MOCK_METHOD(void, unregisterPrivateKeyMethod, (SSL * ssl));
   MOCK_METHOD(bool, checkFips, ());
+  MOCK_METHOD(bool, isAvailable, ());
 
 #ifdef OPENSSL_IS_BORINGSSL
   MOCK_METHOD(BoringSslPrivateKeyMethodSharedPtr, getBoringSslPrivateKeyMethod, ());

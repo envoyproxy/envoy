@@ -29,7 +29,7 @@ jobs:
       contents: read
       packages: read
     name: android_release_artifacts
-    runs-on: ubuntu-22.04
+    runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 120
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}

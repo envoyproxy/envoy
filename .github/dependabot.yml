@@ -239,6 +239,12 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/buffer"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/routeconfig"
   schedule:
     interval: daily

@@ -662,9 +662,43 @@ typed_config:
     cleanup();
   }
 
+  void testBufferApi(std::string query) {
+    initializeBasicFilter(BUFFER, "test.com");
+
+    auto path = std::string("/test?") + query;
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},
+        {":path", path},
+        {":scheme", "http"},
+        {":authority", "test.com"},
+    };
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Http::RequestEncoder& request_encoder = encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    std::string data = "";
+    for (int i = 0; i < 10; i++) {
+      data += "12345";
+    }
+    codec_client_->sendData(request_encoder, data, true);
+
+    waitForNextUpstreamRequest();
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl response_data("goodbye");
+    upstream_request_->encodeData(response_data, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    cleanup();
+  }
+
   const std::string ECHO{"echo"};
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
+  const std::string BUFFER{"buffer"};
   const std::string ROUTECONFIG{"routeconfig"};
   const std::string PROPERTY{"property"};
   const std::string ACCESSLOG{"access_log"};
@@ -753,6 +787,12 @@ TEST_P(GolangIntegrationTest, PluginNotFound) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanup();
 }
+
+TEST_P(GolangIntegrationTest, BufferDrain) { testBufferApi("Drain"); }
+
+TEST_P(GolangIntegrationTest, BufferReset) { testBufferApi("Reset"); }
+
+TEST_P(GolangIntegrationTest, BufferResetAfterDrain) { testBufferApi("ResetAfterDrain"); }
 
 TEST_P(GolangIntegrationTest, Property) {
   initializePropertyConfig(PROPERTY, genSoPath(PROPERTY), PROPERTY);
@@ -857,6 +897,7 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamStart) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("r;r2", getHeader(upstream_request_->headers(), "referers"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsynclyForDownstreamStart"));
 
   cleanup();
 }
@@ -887,6 +928,7 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamPeriodic) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("r", getHeader(upstream_request_->headers(), "referers"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsynclyForDownstreamPeriodic"));
 
   cleanup();
 }

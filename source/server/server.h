@@ -193,6 +193,7 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   Api::Api& api() override { return server_.api(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }

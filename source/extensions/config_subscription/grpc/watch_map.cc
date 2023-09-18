@@ -77,7 +77,7 @@ WatchMap::updateWatchInterest(Watch* watch,
       eds_resources_cache_->removeResource(resource_name);
     }
   }
-  return AddedRemoved(std::move(added_resources), std::move(removed_resources));
+  return {std::move(added_resources), std::move(removed_resources)};
 }
 
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
@@ -287,8 +287,8 @@ void WatchMap::onConfigUpdate(
     for (const auto& resource : decoded_resources) {
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
           dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-              resource.get()->resource());
-      eds_resources_cache_->setResource(resource.get()->name(), cluster_load_assignment);
+              resource->resource());
+      eds_resources_cache_->setResource(resource->name(), cluster_load_assignment);
     }
     // No need to remove resources from the cache, as currently only non-collection
     // subscriptions are supported, and these resources are removed in the call
