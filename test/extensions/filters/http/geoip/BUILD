@@ -62,6 +62,8 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.http.geoip",
     ],
+    # Until Maxmind provider compilation is fixed on Windows
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/geoip:config",
         "//source/extensions/filters/http/geoip:geoip_filter_lib",
