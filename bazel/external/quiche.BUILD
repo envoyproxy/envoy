@@ -18,7 +18,7 @@ licenses(["notice"])  # Apache 2
 
 # QUICHE is Google's implementation of QUIC and related protocols. It is the
 # same code used in Chromium and Google's servers, but packaged in a form that
-# is intended to be easier to incorpo``rate into third-party projects.
+# is intended to be easier to incorporate into third-party projects.
 #
 # QUICHE code falls into three groups:
 # 1. Platform-independent code. Most QUICHE code is in this category.
@@ -2432,7 +2432,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_quic_cc_library(
+envoy_cc_library(
     name = "quiche_crypto_logging",
     srcs = [
         "quiche/common/quiche_crypto_logging.cc",
@@ -2440,6 +2440,11 @@ envoy_quic_cc_library(
     hdrs = [
         "quiche/common/quiche_crypto_logging.h",
     ],
+    copts = quiche_copts,
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_logging",
         "@com_google_absl//absl/status",
