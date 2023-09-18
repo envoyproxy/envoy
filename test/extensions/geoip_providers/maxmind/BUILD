@@ -19,7 +19,6 @@ envoy_extension_cc_test(
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
     extension_names = ["envoy.geoip_providers.maxmind"],
-    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/geoip_providers/maxmind:config",
         "//source/extensions/geoip_providers/maxmind:provider_impl",
@@ -36,7 +35,6 @@ envoy_extension_cc_test(
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
     extension_names = ["envoy.geoip_providers.maxmind"],
-    tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
         "//source/extensions/geoip_providers/maxmind:config",
