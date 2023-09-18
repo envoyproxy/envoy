@@ -942,7 +942,7 @@ std::string ParentHistogramImpl::quantileSummary() const {
     }
     return absl::StrJoin(summary, " ");
   } else {
-    return std::string("No recorded values");
+    return {"No recorded values"};
   }
 }
 
@@ -958,7 +958,7 @@ std::string ParentHistogramImpl::bucketSummary() const {
     }
     return absl::StrJoin(bucket_summary, " ");
   } else {
-    return std::string("No recorded values");
+    return {"No recorded values"};
   }
 }
 

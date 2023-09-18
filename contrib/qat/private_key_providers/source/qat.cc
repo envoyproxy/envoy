@@ -17,7 +17,8 @@ QatManager::QatManager(LibQatCryptoSharedPtr libqat) {
   libqat_ = libqat;
   CpaStatus status = libqat_->icpSalUserStart("SSL");
   if (status != CPA_STATUS_SUCCESS) {
-    throw EnvoyException("Failed to start QAT device.");
+    ENVOY_LOG(warn, "Failed to start QAT device.");
+    qat_is_supported_ = false;
   }
 }
 
@@ -63,6 +64,8 @@ int createIndex() {
 int QatManager::connectionIndex() { CONSTRUCT_ON_FIRST_USE(int, createIndex()); }
 
 int QatManager::contextIndex() { CONSTRUCT_ON_FIRST_USE(int, createIndex()); }
+
+bool QatManager::checkQatDevice() { return qat_is_supported_; }
 
 QatHandle::~QatHandle() {
   if (polling_thread_ == nullptr) {

@@ -282,7 +282,6 @@ void EdsClusterImpl::update(
 
   BatchUpdateHelper helper(*this, *used_load_assignment);
   priority_set_.batchHostUpdate(helper);
-  return;
 }
 
 absl::Status
