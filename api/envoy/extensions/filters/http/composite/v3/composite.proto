@@ -48,14 +48,13 @@ message DynamicConfig {
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
 // This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
 message ExecuteFilterAction {
-  oneof config_type {
-    // Filter specific configuration which depends on the filter being
-    // instantiated. See the supported filters for further documentation.
-    // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
-    config.core.v3.TypedExtensionConfig typed_config = 1;
+  // Filter specific configuration which depends on the filter being
+  // instantiated. See the supported filters for further documentation.
+  // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
+  config.core.v3.TypedExtensionConfig typed_config = 1
+      [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
-    // Dynamic configuration of filter obtained via extension configuration discovery
-    // service .
-    DynamicConfig dynamic_config = 2;
-  }
+  // Dynamic configuration of filter obtained via extension configuration discovery
+  // service .
+  DynamicConfig dynamic_config = 2;
 }
