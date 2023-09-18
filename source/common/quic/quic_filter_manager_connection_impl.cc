@@ -123,7 +123,7 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
-  return Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_);
+  return {quic_ssl_info_};
 }
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {

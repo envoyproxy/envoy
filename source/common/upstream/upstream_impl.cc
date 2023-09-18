@@ -848,7 +848,7 @@ ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
     Stats::Scope& scope, const ClusterRequestResponseSizeStatNames& stat_names) {
-  return ClusterRequestResponseSizeStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 ClusterLoadReportStats
