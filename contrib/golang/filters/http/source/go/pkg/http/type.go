@@ -369,10 +369,6 @@ func (b *httpBuffer) WriteUint64(p uint64) error {
 	return err
 }
 
-func (b *httpBuffer) Peek(n int) []byte {
-	panic("implement me")
-}
-
 func (b *httpBuffer) Bytes() []byte {
 	if b.length == 0 {
 		return nil
@@ -382,7 +378,18 @@ func (b *httpBuffer) Bytes() []byte {
 }
 
 func (b *httpBuffer) Drain(offset int) {
-	panic("implement me")
+	if offset <= 0 || b.length == 0 {
+		return
+	}
+
+	size := uint64(offset)
+	if size > b.length {
+		size = b.length
+	}
+
+	cAPI.HttpDrainBuffer(unsafe.Pointer(b.request.req), b.envoyBufferInstance, size)
+
+	b.length -= size
 }
 
 func (b *httpBuffer) Len() int {
@@ -390,7 +397,7 @@ func (b *httpBuffer) Len() int {
 }
 
 func (b *httpBuffer) Reset() {
-	panic("implement me")
+	b.Drain(b.Len())
 }
 
 func (b *httpBuffer) String() string {
