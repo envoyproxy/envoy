@@ -36,6 +36,7 @@ if [[ "$CACHE_BAZEL" == "true" ]]; then
     ./.azure-pipelines/docker/create_cache.sh \
         "${BAZEL_CACHE_TARBALL}" \
         "${ENVOY_DOCKER_BUILD_DIR}" \
+        .cache \
         bazel_root/install \
         bazel_root/base/external \
         repository_cache
