@@ -294,7 +294,7 @@ TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(ProtocolIntegrationTest, RouterOnlyTracing) {
+TEST_P(ProtocolIntegrationTest, DEPRECATED_FEATURE_TEST(RouterOnlyTracing)) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
