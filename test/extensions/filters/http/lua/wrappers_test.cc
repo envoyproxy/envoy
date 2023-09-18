@@ -12,7 +12,6 @@
 using testing::Expectation;
 using testing::InSequence;
 using testing::ReturnPointee;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {

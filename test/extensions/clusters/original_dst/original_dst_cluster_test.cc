@@ -68,7 +68,7 @@ public:
 
 class OriginalDstClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  OriginalDstClusterTest() {}
+  OriginalDstClusterTest() = default;
 
   void setupFromYaml(const std::string& yaml, bool expect_success = true) {
     if (expect_success) {

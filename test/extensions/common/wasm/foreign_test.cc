@@ -21,7 +21,7 @@ class TestContext : public Context {};
 
 class ForeignTest : public testing::Test {
 public:
-  ForeignTest() {}
+  ForeignTest() = default;
 
   void initializeFilterCallbacks() { ctx_.initializeReadFilterCallbacks(read_filter_callbacks_); }
 
