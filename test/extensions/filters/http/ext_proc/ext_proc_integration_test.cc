@@ -926,7 +926,7 @@ TEST_P(ExtProcIntegrationTest, GetBufferedButNoBodies) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, RemoveContentLengthInRequestHeader) {
+TEST_P(ExtProcIntegrationTest, RemoveRequestContentLengthInStreamedMode) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
@@ -955,10 +955,63 @@ TEST_P(ExtProcIntegrationTest, RemoveContentLengthInRequestHeader) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterRequestProcessing) {
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+// Test the request content length is removed in BUFFERED BodySendMode + SKIP HeaderSendMode..
+TEST_P(ExtProcIntegrationTest, RemoveRequestContentLengthInBufferedMode) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, World!");
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, RemoveRequestContentLengthInBufferedPartialMode) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::Headers::get().TransferEncoding,
+                            Http::Headers::get().TransferEncodingValues.Chunked));
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, World!");
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, RemoveRequestContentLengthAfterStreamedProcessing) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   ConfigOptions config_option = {};
   config_option.http1_codec = true;
   initializeConfig(config_option);
@@ -982,6 +1035,8 @@ TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterRequestProcessing) {
         return true;
       });
   handleUpstreamRequest();
+  // Verify that the content length header is removed and chunked encoding is enabled by http1
+  // codec.
   EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
   EXPECT_THAT(upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().TransferEncoding,
@@ -990,7 +1045,42 @@ TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterRequestProcessing) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, RemoveContentLengthInResponseHeader) {
+TEST_P(ExtProcIntegrationTest, RemoveRequestContentLengthAfterBufferedPartialProcessing) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto* content_length =
+            headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_header()->set_key("content-length");
+        content_length->mutable_header()->set_value("13");
+        return true;
+      });
+
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+  handleUpstreamRequest();
+
+  EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::Headers::get().TransferEncoding,
+                            Http::Headers::get().TransferEncodingValues.Chunked));
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, World!");
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, RemoveResponseContentLength) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
 
@@ -1019,7 +1109,7 @@ TEST_P(ExtProcIntegrationTest, RemoveContentLengthInResponseHeader) {
   EXPECT_EQ(response->body(), "Hello, World!");
 }
 
-TEST_P(ExtProcIntegrationTest, RemoveContentLengthAfterResponseProcessing) {
+TEST_P(ExtProcIntegrationTest, RemoveResponseContentLengthAfterBodyProcessing) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
 
@@ -1264,6 +1354,30 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
 
   verifyDownstreamResponse(*response, 200);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
+  // Verify that the content length header in the response is set by external processor,
+  EXPECT_EQ(response->headers().getContentLengthValue(), "13");
+  EXPECT_EQ("Hello, World!", response->body());
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnResponse) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+
+  // Should get just one message with the body
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
   EXPECT_EQ("Hello, World!", response->body());
 }
 
@@ -1276,8 +1390,15 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered)
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   handleUpstreamRequest();
-  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        auto* content_length =
+            headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_header()->set_key("content-length");
+        content_length->mutable_header()->set_value("100");
+        return true;
+      });
   // Should get just one message with the body
   processResponseBodyMessage(
       *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
@@ -1290,6 +1411,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered)
       });
 
   verifyDownstreamResponse(*response, 200);
+  // Verify that the content length header is removed in BUFFERED_PARTIAL BodySendMode.
+  EXPECT_EQ(response->headers().ContentLength(), nullptr);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
 }
 

@@ -810,6 +810,7 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   processRequestHeaders(true, absl::nullopt);
+  EXPECT_EQ(request_headers_.getContentLengthValue(), "100");
 
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
@@ -837,6 +838,7 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   EXPECT_EQ(Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(response_headers_.getContentLengthValue(), "3");
 
   Buffer::OwnedImpl resp_data;
   resp_data.add("bar");
@@ -847,6 +849,70 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a configuration with buffering set for the request body,
+// test the filter with a processor that changes the request body,
+// passing the data in a single chunk.
+TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedOnly) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "BUFFERED"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  // Create synthetic HTTP request
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
+
+  Buffer::OwnedImpl req_data;
+  TestUtility::feedBufferWithRandomCharacters(req_data, 100);
+  Buffer::OwnedImpl buffered_data;
+  setUpDecodingBuffering(buffered_data, true);
+
+  // Testing the case where we just have one chunk of data and it is buffered.
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
+  processRequestBody(
+      [&buffered_data](const HttpBody& req_body, ProcessingResponse&, BodyResponse& body_resp) {
+        EXPECT_TRUE(req_body.end_of_stream());
+        EXPECT_EQ(100, req_body.body().size());
+        EXPECT_EQ(req_body.body(), buffered_data.toString());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Replaced!");
+      });
+  // Expect that the original buffer is replaced.
+  EXPECT_EQ("Replaced!", buffered_data.toString());
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+
+  EXPECT_EQ(Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(response_headers_.getContentLengthValue(), "3");
+
+  Buffer::OwnedImpl resp_data;
+  resp_data.add("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
@@ -1635,6 +1701,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   processRequestHeaders(false, absl::nullopt);
+  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
 
   bool decoding_watermarked = false;
   setUpDecodingWatermarking(decoding_watermarked);
@@ -1663,6 +1730,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(response_headers_.ContentLength(), nullptr);
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
@@ -2658,6 +2726,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
   response_headers_.addCopy(LowerCaseString("content-length"), "200");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(response_headers_.getContentLengthValue(), "200");
 
   Buffer::OwnedImpl resp_data_1;
   TestUtility::feedBufferWithRandomCharacters(resp_data_1, 100);

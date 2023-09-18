@@ -91,7 +91,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       const auto mut_status = MutationUtils::applyHeaderMutations(
           common_response.header_mutation(), *headers_,
           common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, body_mode_ == ProcessingMode::STREAMED);
+          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, shouldRemoveContentLength());
       if (!mut_status.ok()) {
         return mut_status;
       }
@@ -104,9 +104,6 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       ENVOY_LOG(debug, "Replacing complete message");
       // Completely replace the body that may already exist.
       if (common_response.has_body_mutation()) {
-        // Always remove the content-length header if changing the body.
-        // The proxy can restore it later if it needs to.
-        headers_->removeContentLength();
         body_replaced_ = true;
         if (bufferedData() == nullptr) {
           Buffer::OwnedImpl new_body;
@@ -229,7 +226,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           const auto mut_status = MutationUtils::applyHeaderMutations(
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, body_mode_ == ProcessingMode::STREAMED);
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, shouldRemoveContentLength());
           if (!mut_status.ok()) {
             return mut_status;
           }
@@ -240,10 +237,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       if (common_response.has_body_mutation()) {
         ENVOY_LOG(debug, "Applying body response to buffered data. State = {}",
                   static_cast<int>(callback_state_));
-        if (headers_ != nullptr) {
-          // Always reset the content length here to prevent later problems.
-          headers_->removeContentLength();
-        }
         modifyBufferedData([&common_response](Buffer::Instance& data) {
           MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
         });
@@ -295,7 +288,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           const auto mut_status = MutationUtils::applyHeaderMutations(
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, body_mode_ == ProcessingMode::STREAMED);
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+              shouldRemoveContentLength());
           if (!mut_status.ok()) {
             return mut_status;
           }
@@ -304,10 +298,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         }
       }
       if (common_response.has_body_mutation()) {
-        if (headers_ != nullptr) {
-          // Always reset the content length here to prevent later problems.
-          headers_->removeContentLength();
-        }
         MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
       }
       if (chunk_data.length() > 0) {
@@ -361,7 +351,7 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
     if (response.has_header_mutation()) {
       auto mut_status = MutationUtils::applyHeaderMutations(
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
-          filter_.stats().rejected_header_mutations_, body_mode_ == ProcessingMode::STREAMED);
+          filter_.stats().rejected_header_mutations_);
       if (!mut_status.ok()) {
         return mut_status;
       }

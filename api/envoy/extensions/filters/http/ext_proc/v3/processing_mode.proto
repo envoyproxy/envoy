@@ -35,6 +35,17 @@ message ProcessingMode {
   }
 
   // Control how the request and response bodies are handled
+  // When body mutation by external processor is enabled, ext_proc filter will always remove
+  // the content length header in 3 cases below:
+  // 1) STREAMED BodySendMode
+  // 2) BUFFERED_PARTIAL BodySendMode
+  // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
+  // In these modes, ext_proc filter can not guarantee to set the content length correctly when
+  // body is mutated by external processor later. In http1 codec, removing content length will
+  // enable chunked encoding whenever feasible.
+  // In BUFFERED BodySendMode + SEND HeaderSendMode, ext_proc won't remove content length header,
+  // it is external processor's responsibility to set the content length correctly matched to
+  // the mutated body.
   enum BodySendMode {
     // Do not send the body at all. This is the default.
     NONE = 0;
