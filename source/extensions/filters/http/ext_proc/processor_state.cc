@@ -91,7 +91,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       const auto mut_status = MutationUtils::applyHeaderMutations(
           common_response.header_mutation(), *headers_,
           common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, shouldRemoveContentLength());
+          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+          shouldRemoveContentLength());
       if (!mut_status.ok()) {
         return mut_status;
       }
@@ -226,7 +227,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           const auto mut_status = MutationUtils::applyHeaderMutations(
               common_response.header_mutation(), *headers_,
               common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_, shouldRemoveContentLength());
+              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+              shouldRemoveContentLength());
           if (!mut_status.ok()) {
             return mut_status;
           }

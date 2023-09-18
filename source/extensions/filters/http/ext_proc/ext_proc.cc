@@ -241,7 +241,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   }
 
-  if (decoding_state_.shouldRemoveContentLength()){
+  if (decoding_state_.shouldRemoveContentLength()) {
     headers.removeContentLength();
   }
   return status;

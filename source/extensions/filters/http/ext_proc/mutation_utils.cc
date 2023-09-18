@@ -114,7 +114,8 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
 absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  Http::HeaderMap& headers, bool replacing_message,
                                                  const Checker& checker,
-                                                 Counter& rejected_mutations, bool remove_content_length) {
+                                                 Counter& rejected_mutations,
+                                                 bool remove_content_length) {
   // Check whether the remove_headers or set_headers size exceed the HTTP connection manager limit.
   // Reject the mutation and return error status if either one does.
   const auto result = responseHeaderSizeCheck(headers, mutation, rejected_mutations);
