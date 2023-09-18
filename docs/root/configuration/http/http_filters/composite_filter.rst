@@ -5,8 +5,7 @@ Composite Filter
 
 .. attention::
 
-   The composite filter is in alpha and is currently under active development.
-   Capabilities will be expanded over time and the configuration structures are likely to change.
+   The composite filter is in stable status. Breaking API changes are not allowed.
 
 The composite filter allows delegating filter actions to a filter specified by a
 :ref:`match result <arch_overview_matching_api>`. The purpose of this is to allow different filters
