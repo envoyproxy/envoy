@@ -1,4 +1,4 @@
-# This will proxy CONNECT requests from a downstream connecting on 127.0.0.1:10001
+# This will forward CONNECT requests from a downstream connecting on 127.0.0.1:10001
 # to an upstream listening on 127.0.0.1:10002
 admin:
   address:

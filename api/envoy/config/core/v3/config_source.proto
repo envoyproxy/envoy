@@ -152,7 +152,8 @@ message RateLimitSettings {
   google.protobuf.UInt32Value max_tokens = 1;
 
   // Rate at which tokens will be filled per second. If not set, a default fill rate of 10 tokens
-  // per second will be used.
+  // per second will be used. The minimal fill rate is once per year. Lower
+  // fill rates will be set to once per year.
   google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
 }
 

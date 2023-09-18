@@ -389,7 +389,7 @@ def _com_github_axboe_liburing():
     )
     native.bind(
         name = "uring",
-        actual = "@envoy//bazel/foreign_cc:liburing",
+        actual = "@envoy//bazel/foreign_cc:liburing_linux",
     )
 
 def _com_github_bazel_buildtools():
@@ -1290,7 +1290,7 @@ filegroup(
     srcs = glob([
         "dlb/libdlb/**",
     ]),
-    visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
+    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
 )
 """,
     )

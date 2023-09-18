@@ -26,6 +26,7 @@ filegroup(
             "root/**/envoy-dynamic-lds-demo.yaml",
             "root/**/envoy-dynamic-filesystem-demo.yaml",
             "root/operations/_include/traffic_tapping_*.yaml",
+            "root/configuration/http/http_filters/_include/checksum_filter.yaml",
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
@@ -47,6 +48,7 @@ filegroup(
 filegroup(
     name = "contrib_configs",
     srcs = [
+        "root/configuration/http/http_filters/_include/checksum_filter.yaml",
         "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
     ] + select({
         "//bazel:windows_x86_64": [],
@@ -196,6 +198,13 @@ pkg_files(
 )
 
 pkg_files(
+    name = "repo_configs",
+    srcs = ["//configs"],
+    prefix = "_configs/repo",
+    strip_prefix = "/configs",
+)
+
+pkg_files(
     name = "examples_rst",
     srcs = ["//examples:files"],
     prefix = "start/sandboxes/_include",
@@ -206,6 +215,7 @@ pkg_filegroup(
     name = "rst_files",
     srcs = [
         ":examples_rst",
+        ":repo_configs",
         ":sphinx_base",
         ":sphinx_inventories",
         ":sphinx_root",

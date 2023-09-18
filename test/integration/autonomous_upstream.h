@@ -86,6 +86,7 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager& listener) override;
   AssertionResult closeConnection(uint32_t index,
                                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 

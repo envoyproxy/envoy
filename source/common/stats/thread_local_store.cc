@@ -172,11 +172,7 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
   forEachGauge([&ret](std::size_t size) { ret.reserve(size); },
-               [&ret](Gauge& gauge) {
-                 if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
-                   ret.emplace_back(GaugeSharedPtr(&gauge));
-                 }
-               });
+               [&ret](Gauge& gauge) { ret.emplace_back(GaugeSharedPtr(&gauge)); });
   return ret;
 }
 
@@ -946,7 +942,7 @@ std::string ParentHistogramImpl::quantileSummary() const {
     }
     return absl::StrJoin(summary, " ");
   } else {
-    return std::string("No recorded values");
+    return {"No recorded values"};
   }
 }
 
@@ -962,7 +958,7 @@ std::string ParentHistogramImpl::bucketSummary() const {
     }
     return absl::StrJoin(bucket_summary, " ");
   } else {
-    return std::string("No recorded values");
+    return {"No recorded values"};
   }
 }
 

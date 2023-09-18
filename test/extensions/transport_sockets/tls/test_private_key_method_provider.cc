@@ -257,6 +257,8 @@ bool TestPrivateKeyMethodProvider::checkFips() {
   return true;
 }
 
+bool TestPrivateKeyMethodProvider::isAvailable() { return test_options_.is_available_; }
+
 TestPrivateKeyConnection::TestPrivateKeyConnection(
     Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
     bssl::UniquePtr<EVP_PKEY> pkey, TestPrivateKeyConnectionTestOptions& test_options)
@@ -333,6 +335,9 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     if (value_it.first == "method_error" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
       test_options_.method_error_ = value.bool_value();
     }
+    if (value_it.first == "is_available" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+      test_options_.is_available_ = value.bool_value();
+    }
     if (value_it.first == "async_method_error" &&
         value.kind_case() == ProtobufWkt::Value::kBoolValue) {
       test_options_.async_method_error_ = value.bool_value();
@@ -348,6 +353,10 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     if (value_it.first == "mode" && value.kind_case() == ProtobufWkt::Value::kStringValue) {
       mode_ = value.string_value();
     }
+  }
+
+  if (!test_options_.is_available_) {
+    return;
   }
 
   std::string private_key =

@@ -38,12 +38,14 @@ public:
   const OtlpOptionsSharedPtr otlpOptions(bool report_counters_as_deltas = false,
                                          bool report_histograms_as_deltas = false,
                                          bool emit_tags_as_attributes = true,
-                                         bool use_tag_extracted_name = true) {
+                                         bool use_tag_extracted_name = true,
+                                         const std::string& stat_prefix = "") {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
     sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
     sink_config.mutable_emit_tags_as_attributes()->set_value(emit_tags_as_attributes);
     sink_config.mutable_use_tag_extracted_name()->set_value(use_tag_extracted_name);
+    sink_config.set_prefix(stat_prefix);
 
     return std::make_shared<OtlpOptions>(sink_config);
   }
@@ -241,6 +243,20 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
   gauge_storage_.back()->used_ = false;
   metrics = flusher.flush(snapshot_);
   expectMetricsCount(metrics, 2);
+}
+
+TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix"));
+
+  addCounterToSnapshot("test_counter", 1, 1);
+  addGaugeToSnapshot("test_gauge", 1);
+  addHistogramToSnapshot("test_histogram");
+
+  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
+  expectMetricsCount(metrics, 3);
+  expectGauge(metricAt(0, metrics), getTagExtractedName("prefix.test_gauge"), 1);
+  expectSum(metricAt(1, metrics), getTagExtractedName("prefix.test_counter"), 1, false);
+  expectHistogram(metricAt(2, metrics), getTagExtractedName("prefix.test_histogram"), false);
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithNoTaggedName) {

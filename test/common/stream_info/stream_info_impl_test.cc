@@ -37,10 +37,11 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
-    ASSERT_TRUE(sizeof(stream_info) == 840 || sizeof(stream_info) == 856 ||
-                sizeof(stream_info) == 888 || sizeof(stream_info) == 776 ||
-                sizeof(stream_info) == 728 || sizeof(stream_info) == 744 ||
-                sizeof(stream_info) == 680 || sizeof(stream_info) == 696)
+    ASSERT_TRUE(
+        sizeof(stream_info) == 840 || sizeof(stream_info) == 856 || sizeof(stream_info) == 888 ||
+        sizeof(stream_info) == 776 || sizeof(stream_info) == 728 || sizeof(stream_info) == 744 ||
+        sizeof(stream_info) == 680 || sizeof(stream_info) == 696 || sizeof(stream_info) == 688 ||
+        sizeof(stream_info) == 720 || sizeof(stream_info) == 704)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);

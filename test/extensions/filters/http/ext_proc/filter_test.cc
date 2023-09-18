@@ -163,10 +163,13 @@ protected:
   }
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const envoy::config::core::v3::GrpcService& grpc_service,
+                                     const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                      testing::Unused) {
     if (final_expected_grpc_service_.has_value()) {
-      EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(), grpc_service));
+      EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(),
+                                          config_with_hash_key.config()));
+      std::cout << final_expected_grpc_service_.value().DebugString();
+      std::cout << config_with_hash_key.config().DebugString();
     }
 
     stream_callbacks_ = &callbacks;
@@ -463,6 +466,7 @@ protected:
   }
 
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
@@ -2462,6 +2466,7 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
             cb(route_config);
           }));
   final_expected_grpc_service_.emplace(route_proto.overrides().grpc_service());
+  config_with_hash_key_.setConfig(route_proto.overrides().grpc_service());
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");

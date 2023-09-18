@@ -84,11 +84,13 @@ public:
   /**
    * Stop a listener from accepting new connections. This is used for server draining.
    * @param listener supplies the listener to stop.
+   * @param options additional options to be passed through to shutdownListener.
    * @param completion supplies the completion to be called when the listener has stopped
    * accepting new connections. This completion is called on the worker thread. No locking is
    * performed by the worker.
    */
   virtual void stopListener(Network::ListenerConfig& listener,
+                            const Network::ExtraShutdownListenerOptions& options,
                             std::function<void()> completion) PURE;
 };
 

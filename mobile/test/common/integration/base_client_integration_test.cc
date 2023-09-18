@@ -203,16 +203,6 @@ void BaseClientIntegrationTest::createEnvoy() {
     }
   }
 
-  if (override_builder_config_) {
-    finalizeConfigWithPorts(config_helper_, ports, use_lds_);
-    ASSERT_FALSE(config_helper_.bootstrap().has_admin())
-        << "Bootstrap config should not have `admin` configured in Envoy Mobile";
-    builder_.setOverrideConfig(
-        std::make_unique<envoy::config::bootstrap::v3::Bootstrap>(config_helper_.bootstrap()));
-  } else {
-    ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
-  }
-
   absl::Notification engine_running;
   envoy_thread_ = api_->threadFactory().createThread(
       [this, &engine_running]() -> void { threadRoutine(engine_running); });

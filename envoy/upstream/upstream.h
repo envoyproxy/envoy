@@ -50,7 +50,7 @@ public:
 };
 
 /**
- * Used to select upstream local address based on the endpoint address.
+ * Interface to select upstream local address based on the endpoint address.
  */
 class UpstreamLocalAddressSelector {
 public:
@@ -63,9 +63,47 @@ public:
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
    * options.
    */
-  virtual UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address,
-      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const PURE;
+  UpstreamLocalAddress
+  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr& endpoint_address,
+                          const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
+    UpstreamLocalAddress local_address = getUpstreamLocalAddressImpl(endpoint_address);
+    Network::ConnectionSocket::OptionsSharedPtr connection_options =
+        std::make_shared<Network::ConnectionSocket::Options>(
+            socket_options ? *socket_options
+                           : std::vector<Network::ConnectionSocket::OptionConstSharedPtr>{});
+    return {local_address.address_,
+            local_address.socket_options_ != nullptr
+                ? Network::Socket::appendOptions(connection_options, local_address.socket_options_)
+                : connection_options};
+  }
+
+private:
+  /*
+   * The implementation is responsible for picking the ``UpstreamLocalAddress``
+   * based on the ``endpoint_address``. However adding the connection socket
+   * options is the responsibility of the base class.
+   */
+  virtual UpstreamLocalAddress getUpstreamLocalAddressImpl(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
+};
+
+using UpstreamLocalAddressSelectorConstSharedPtr =
+    std::shared_ptr<const UpstreamLocalAddressSelector>;
+
+class UpstreamLocalAddressSelectorFactory : public Config::TypedFactory {
+public:
+  ~UpstreamLocalAddressSelectorFactory() override = default;
+
+  /**
+   * @param cluster_name is set to the name of the cluster if ``bind_config`` is
+   *   from cluster config. If the bind config from the cluster manager, the param
+   *   is empty.
+   */
+  virtual UpstreamLocalAddressSelectorConstSharedPtr
+  createLocalAddressSelector(std::vector<UpstreamLocalAddress> upstream_local_addresses,
+                             absl::optional<std::string> cluster_name) const PURE;
+
+  std::string category() const override { return "envoy.upstream.local_address_selector"; }
 };
 
 /**
@@ -1134,8 +1172,7 @@ public:
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
-  virtual std::shared_ptr<UpstreamLocalAddressSelector>
-  getUpstreamLocalAddressSelector() const PURE;
+  virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 
   /**
    * @return the configuration for load balancer subsets.
