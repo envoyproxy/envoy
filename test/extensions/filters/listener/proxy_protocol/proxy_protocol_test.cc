@@ -858,6 +858,13 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1069,6 +1076,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
   connect(false);
   write(buffer, 17);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1171,6 +1185,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
       }));
   connect(false);
   write(buffer, 10);
@@ -1921,6 +1942,13 @@ TEST_P(ProxyProtocolTest, DrainError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
       }));
 
   connect(false);

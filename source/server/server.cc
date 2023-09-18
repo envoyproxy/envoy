@@ -184,9 +184,11 @@ const Upstream::ClusterManager& InstanceImpl::clusterManager() const {
   return *config_.clusterManager();
 }
 
-void InstanceImpl::drainListeners() {
+void InstanceImpl::drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options) {
   ENVOY_LOG(info, "closing and draining listeners");
-  listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
+  listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
+                                   options.has_value() ? *options
+                                                       : Network::ExtraShutdownListenerOptions{});
   drain_manager_->startDrainSequence([] {});
 }
 
@@ -212,7 +214,6 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         gauges_.reserve(size);
       },
       [this](Stats::Gauge& gauge) {
-        ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
         snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
         gauges_.push_back(gauge);
       });
@@ -423,8 +424,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   if (bootstrap_.has_application_log_config()) {
-    Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config());
-    Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config());
+    THROW_IF_NOT_OK(
+        Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
+    THROW_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
   }
 
 #ifdef ENVOY_PERFETTO
@@ -786,7 +788,7 @@ void InstanceImpl::onRuntimeReady() {
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
     TRY_ASSERT_MAIN_THREAD {
-      Config::Utility::checkTransportVersion(hds_config);
+      THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
