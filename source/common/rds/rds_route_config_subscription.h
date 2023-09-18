@@ -98,7 +98,7 @@ protected:
   RdsStats stats_;
   RouteConfigProviderManager& route_config_provider_manager_;
   const uint64_t manager_identifier_;
-  RouteConfigProvider* route_config_provider_;
+  RouteConfigProvider* route_config_provider_{nullptr};
   RouteConfigUpdatePtr config_update_info_;
   Envoy::Config::OpaqueResourceDecoderSharedPtr resource_decoder_;
 };

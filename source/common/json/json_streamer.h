@@ -141,7 +141,7 @@ public:
     void addEntries(const Entries& entries);
 
   protected:
-    virtual void nextField() override;
+    void nextField() override;
 
   private:
     bool expecting_value_{false};

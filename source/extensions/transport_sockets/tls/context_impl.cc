@@ -781,7 +781,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
-      ocsp_staple_policy_(config.ocspStaplePolicy()), has_rsa_(false),
+      ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
