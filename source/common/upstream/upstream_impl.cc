@@ -934,7 +934,7 @@ private:
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
               std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options,
-              ProtobufMessage::ValidationVisitor& validation_visitor) {
+              Server::Configuration::ServerFactoryContext& server_context) {
   if (options) {
     return std::move(options);
   }
@@ -955,7 +955,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
                  config.upstream_http_protocol_options())
            : absl::nullopt),
       config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-      config.has_http2_protocol_options(), validation_visitor);
+      config.has_http2_protocol_options(), server_context);
 }
 
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
@@ -1007,7 +1007,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
-                        factory_context.messageValidationVisitor())),
+                        factory_context.serverFactoryContext())),
       tcp_protocol_options_(extensionProtocolOptionsTyped<TcpProtocolOptionsConfigImpl>(
           "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions")),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -1764,14 +1764,6 @@ ClusterInfoImpl::makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) c
              : nullptr;
 #else
   return nullptr;
-#endif
-}
-
-bool ClusterInfoImpl::universalHeaderValidatorEnabled() const {
-#ifdef ENVOY_ENABLE_UHV
-  return http_protocol_options_->header_validator_factory_ != nullptr;
-#else
-  return false;
 #endif
 }
 

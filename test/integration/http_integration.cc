@@ -77,15 +77,16 @@ typeToCodecType(Http::CodecType type) {
 IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
-    Http::CodecType type)
-    : IntegrationCodecClient(dispatcher, random, std::move(conn), std::move(host_description), type,
-                             true) {}
+    bool enable_uhv, Http::CodecType type)
+    : IntegrationCodecClient(dispatcher, random, std::move(conn), std::move(host_description),
+                             enable_uhv, type, true) {}
 
 IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
-    Http::CodecType type, bool wait_till_connected)
-    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random, nullptr),
+    bool enable_uhv, Http::CodecType type, bool wait_till_connected)
+    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random, nullptr,
+                      enable_uhv),
       dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this),
       codec_client_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
@@ -284,18 +285,23 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
 
-  if (!disable_client_header_validation_) {
+#ifdef ENVOY_ENABLE_UHV
+  bool enable_uhv = !disable_client_header_validation_;
+  if (enable_uhv) {
     cluster->header_validator_factory_ = IntegrationUtil::makeHeaderValidationFactory(
         ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig());
   }
+#else
+  bool enable_uhv = false;
+#endif
 
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
       timeSystem())};
   // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
   // in-connection version negotiation.
-  auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
-                                                        host_description, downstream_protocol_);
+  auto codec = std::make_unique<IntegrationCodecClient>(
+      *dispatcher_, random_, std::move(conn), host_description, enable_uhv, downstream_protocol_);
   if (downstream_protocol_ == Http::CodecType::HTTP3 && codec->disconnected()) {
     // Connection may get closed during version negotiation or handshake.
     // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate

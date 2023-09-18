@@ -23,6 +23,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -313,6 +314,9 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 
 #ifdef ENVOY_ENABLE_UHV
 TEST_F(CodecClientTest, RequestHeaderValidationFails) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   initialize();
   EXPECT_CALL(*header_validator_, validateRequestHeaders(_))
       .WillOnce(Return(HeaderValidator::ValidationResult{
@@ -340,6 +344,9 @@ TEST_F(CodecClientTest, RequestHeaderValidationFails) {
 }
 
 TEST_F(CodecClientTest, RequestHeaderTransformationFails) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   initialize();
   EXPECT_CALL(*header_validator_, transformRequestHeaders(_))
       .WillOnce(Return(ByMove(ClientHeaderValidator::RequestHeadersTransformationResult{
@@ -367,6 +374,9 @@ TEST_F(CodecClientTest, RequestHeaderTransformationFails) {
 }
 
 TEST_F(CodecClientTest, RequestHeaderTransformationUpdatesHeaders) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   initialize();
   TestRequestHeaderMapImpl expected_new_headers{
       {":authority", "new_hosthost"}, {":path", "/new_path"}, {":method", "PUT"}};
@@ -399,6 +409,9 @@ TEST_F(CodecClientTest, RequestHeaderTransformationUpdatesHeaders) {
 }
 
 TEST_F(CodecClientTest, ResponseHeaderValidationFails) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   initialize();
 
   ResponseDecoder* inner_decoder;
@@ -426,6 +439,9 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFails) {
 }
 
 TEST_F(CodecClientTest, ResponseHeaderTransformationFails) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   initialize();
 
   ResponseDecoder* inner_decoder;
@@ -453,6 +469,9 @@ TEST_F(CodecClientTest, ResponseHeaderTransformationFails) {
 }
 
 TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   initialize();
   EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http2));
 
@@ -481,6 +500,33 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
   // Connection closure will cause stream to be reset
   inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,
                                                           "some error");
+}
+
+TEST_F(CodecClientTest, HeaderValidatorNotInvokedWithoutRuntimeOverride) {
+  // By default envoy.reloadable_features.enable_universal_header_validator is false
+  initialize();
+  EXPECT_CALL(*header_validator_, validateRequestHeaders(_)).Times(0);
+  EXPECT_CALL(*header_validator_, validateResponseHeaders(_)).Times(0);
+  EXPECT_CALL(*header_validator_, transformRequestHeaders(_)).Times(0);
+  EXPECT_CALL(*header_validator_, transformResponseHeaders(_)).Times(0);
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
 }
 #endif // ENVOY_ENABLE_UHV
 

@@ -1262,12 +1262,6 @@ public:
    */
   virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
-  /**
-   * @return true if header validator was enabled in cluster configuration. Always returns false if
-   * ENVOY_ENABLE_UHV is undefined.
-   */
-  virtual bool universalHeaderValidatorEnabled() const PURE;
-
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

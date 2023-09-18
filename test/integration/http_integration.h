@@ -33,11 +33,11 @@ class IntegrationCodecClient : public Http::CodecClientProd {
 public:
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                          Network::ClientConnectionPtr&& conn,
-                         Upstream::HostDescriptionConstSharedPtr host_description,
+                         Upstream::HostDescriptionConstSharedPtr host_description, bool enable_uhv,
                          Http::CodecType type);
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                          Network::ClientConnectionPtr&& conn,
-                         Upstream::HostDescriptionConstSharedPtr host_description,
+                         Upstream::HostDescriptionConstSharedPtr host_description, bool enable_uhv,
                          Http::CodecType type, bool wait_till_connected);
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);

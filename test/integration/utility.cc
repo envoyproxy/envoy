@@ -230,7 +230,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                  dispatcher->createClientConnection(
                                      addr, Network::Address::InstanceConstSharedPtr(),
                                      Network::Test::createRawBufferSocket(), nullptr, nullptr),
-                                 host_description, *dispatcher, random, options);
+                                 host_description, *dispatcher, random, options, false);
     return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type,
                                          client);
   }
@@ -261,7 +261,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       nullptr, generator);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
-                               options);
+                               options, false);
   // Quic connection needs to finish handshake.
   dispatcher->run(Event::Dispatcher::RunType::Block);
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);

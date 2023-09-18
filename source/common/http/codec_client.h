@@ -153,6 +153,11 @@ protected:
   CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 
+  // Test only constructor for toggling UHV on/off in test clients
+  CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
+              Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+              bool enable_uhv);
+
   // Http::ConnectionCallbacks
   void onGoAway(GoAwayErrorCode error_code) override {
     if (codec_callbacks_) {
@@ -187,6 +192,8 @@ protected:
     }
   }
 
+  ClientHeaderValidatorPtr makeHeaderValidator();
+
   const CodecType type_;
   // The order of host_, connection_, and codec_ matter as during destruction each can refer to
   // the previous, at least in tests.
@@ -195,6 +202,8 @@ protected:
   ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
+  // Codec client latches the flag to enable UHV at its creation
+  const bool universal_header_validator_enabled_{false};
 
 private:
   /**
@@ -231,8 +240,7 @@ private:
                          public RequestEncoderWrapper {
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
         : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent),
-          header_validator_(
-              parent.host_->cluster().makeHeaderValidator(parent.codec_->protocol())) {
+          header_validator_(parent.makeHeaderValidator()) {
       switch (parent.protocol()) {
       case Protocol::Http10:
       case Protocol::Http11:
@@ -326,6 +334,14 @@ public:
                            Upstream::HostDescriptionConstSharedPtr host,
                            Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                            const Network::TransportSocketOptionsConstSharedPtr& options);
+
+protected:
+  // Test only constructor for toggling UHV on/off in test clients
+  NoConnectCodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
+                           Upstream::HostDescriptionConstSharedPtr host,
+                           Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                           const Network::TransportSocketOptionsConstSharedPtr& options,
+                           bool enable_uhv);
 };
 
 /**
@@ -337,6 +353,12 @@ public:
                   Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
                   Random::RandomGenerator& random_generator,
                   const Network::TransportSocketOptionsConstSharedPtr& options);
+
+  // Test only constructor for toggling UHV on/off in test clients
+  CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+                  Random::RandomGenerator& random_generator,
+                  const Network::TransportSocketOptionsConstSharedPtr& options, bool enable_uhv);
 };
 
 } // namespace Http

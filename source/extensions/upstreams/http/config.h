@@ -36,7 +36,7 @@ public:
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
       const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
       bool use_downstream_protocol, bool use_http2,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      Server::Configuration::ServerFactoryContext& server_context);
 
   // Given the supplied cluster config, and protocol options configuration,
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.

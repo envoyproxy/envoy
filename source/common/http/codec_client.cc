@@ -20,11 +20,30 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+bool isUniversalHeaderValidatorRuntimeEnabled() {
+#ifdef ENVOY_ENABLE_UHV
+  return Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.enable_universal_header_validator");
+#else
+  // To make it safer always return false in non UHV mode.
+  return false;
+#endif
+}
+} // namespace
+
 CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
+    : CodecClient(type, std::move(connection), host, dispatcher,
+                  isUniversalHeaderValidatorRuntimeEnabled()) {}
+
+CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
+                         Upstream::HostDescriptionConstSharedPtr host,
+                         Event::Dispatcher& dispatcher, bool enable_uhv)
     : type_(type), host_(host), connection_(std::move(connection)),
-      idle_timeout_(host_->cluster().idleTimeout()) {
+      idle_timeout_(host_->cluster().idleTimeout()),
+      universal_header_validator_enabled_(enable_uhv) {
   if (type_ != CodecType::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing
     // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
@@ -259,6 +278,18 @@ void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, b
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
+ClientHeaderValidatorPtr CodecClient::makeHeaderValidator() {
+  // universal_header_validator_enabled_ can only be true when ENVOY_ENABLE_UHV is defined
+  if (universal_header_validator_enabled_) {
+    // When ENVOY_ENABLE_UHV is defined cluster config always creates UHV factory, which
+    // should always produce a UHV object
+    ClientHeaderValidatorPtr uhv = host_->cluster().makeHeaderValidator(codec_->protocol());
+    ENVOY_BUG(uhv != nullptr, "UHV factory did not produce UHV");
+    return uhv;
+  }
+  return nullptr;
+}
+
 CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
@@ -269,12 +300,23 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
   connect();
 }
 
-NoConnectCodecClientProd::NoConnectCodecClientProd(
-    CodecType type, Network::ClientConnectionPtr&& connection,
-    Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
-    Random::RandomGenerator& random_generator,
-    const Network::TransportSocketOptionsConstSharedPtr& options)
-    : CodecClient(type, std::move(connection), host, dispatcher) {
+CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
+                                 Upstream::HostDescriptionConstSharedPtr host,
+                                 Event::Dispatcher& dispatcher,
+                                 Random::RandomGenerator& random_generator,
+                                 const Network::TransportSocketOptionsConstSharedPtr& options,
+                                 bool enable_uhv)
+    : NoConnectCodecClientProd(type, std::move(connection), host, dispatcher, random_generator,
+                               options, enable_uhv) {
+  connect();
+}
+
+namespace {
+ClientConnectionPtr
+makeCodec(CodecType type, Network::ClientConnection& connection, ConnectionCallbacks& callbacks,
+          Upstream::HostDescriptionConstSharedPtr host, Random::RandomGenerator& random_generator,
+          const Network::TransportSocketOptionsConstSharedPtr& options, bool enable_uhv) {
+  ClientConnectionPtr codec;
   switch (type) {
   case CodecType::HTTP1: {
     // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It will
@@ -283,23 +325,22 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(
     if (options && options->http11ProxyInfo().has_value()) {
       proxied = true;
     }
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount(), proxied,
-        host->cluster().universalHeaderValidatorEnabled());
+    codec = std::make_unique<Http1::ClientConnectionImpl>(
+        connection, host->cluster().http1CodecStats(), callbacks, host->cluster().http1Settings(),
+        host->cluster().maxResponseHeadersCount(), proxied, enable_uhv);
     break;
   }
   case CodecType::HTTP2:
-    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-        *connection_, *this, host->cluster().http2CodecStats(), random_generator,
+    codec = std::make_unique<Http2::ClientConnectionImpl>(
+        connection, callbacks, host->cluster().http2CodecStats(), random_generator,
         host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
         host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   case CodecType::HTTP3: {
 #ifdef ENVOY_ENABLE_QUIC
-    auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
-    codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-        quic_session, *this, host->cluster().http3CodecStats(), host->cluster().http3Options(),
+    auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(connection);
+    codec = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
+        quic_session, callbacks, host->cluster().http3CodecStats(), host->cluster().http3Options(),
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
     // Initialize the session after max request header size is changed in above http client
     // connection creation.
@@ -311,6 +352,27 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(
 #endif
   }
   }
+  return codec;
+}
+} // namespace
+
+NoConnectCodecClientProd::NoConnectCodecClientProd(
+    CodecType type, Network::ClientConnectionPtr&& connection,
+    Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+    Random::RandomGenerator& random_generator,
+    const Network::TransportSocketOptionsConstSharedPtr& options)
+    : CodecClient(type, std::move(connection), host, dispatcher) {
+  codec_ = makeCodec(type, *connection_, *this, host, random_generator, options,
+                     universal_header_validator_enabled_);
+}
+
+NoConnectCodecClientProd::NoConnectCodecClientProd(
+    CodecType type, Network::ClientConnectionPtr&& connection,
+    Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+    Random::RandomGenerator& random_generator,
+    const Network::TransportSocketOptionsConstSharedPtr& options, bool enable_uhv)
+    : CodecClient(type, std::move(connection), host, dispatcher, enable_uhv) {
+  codec_ = makeCodec(type, *connection_, *this, host, random_generator, options, enable_uhv);
 }
 
 } // namespace Http
