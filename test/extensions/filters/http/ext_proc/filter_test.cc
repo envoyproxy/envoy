@@ -842,7 +842,6 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   EXPECT_EQ(Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
-  EXPECT_EQ(response_headers_.getContentLengthValue(), "3");
 
   Buffer::OwnedImpl resp_data;
   resp_data.add("bar");

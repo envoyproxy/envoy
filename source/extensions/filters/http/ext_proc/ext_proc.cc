@@ -239,6 +239,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   if (decoding_state_.sendHeaders()) {
     status = onHeaders(decoding_state_, headers, end_stream);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
   }
 
   if (decoding_state_.shouldRemoveContentLength()) {
@@ -527,6 +529,8 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
     status = onHeaders(encoding_state_, headers, end_stream);
     ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
   }
 
   if (encoding_state_.shouldRemoveContentLength()) {

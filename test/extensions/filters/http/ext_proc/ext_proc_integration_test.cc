@@ -202,11 +202,12 @@ protected:
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
     Http::TestResponseHeaderMapImpl response_headers =
         Http::TestResponseHeaderMapImpl{{":status", "200"}};
+    uint64_t content_length = 100;
     if (add_content_length) {
-      response_headers.setContentLength(100);
+      response_headers.setContentLength(content_length);
     }
     upstream_request_->encodeHeaders(response_headers, false);
-    upstream_request_->encodeData(100, true);
+    upstream_request_->encodeData(content_length, true);
   }
 
   void handleUpstreamRequestWithTrailer() {

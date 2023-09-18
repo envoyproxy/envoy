@@ -43,7 +43,7 @@ message ProcessingMode {
   // In these modes, ext_proc filter can not guarantee to set the content length correctly when
   // body is mutated by external processor later. In http1 codec, removing content length will
   // enable chunked encoding whenever feasible.
-  // In BUFFERED BodySendMode + SEND HeaderSendMode, ext_proc won't remove content length header,
+  // In BUFFERED BodySendMode + SEND HeaderSendMode, ext_proc filter won't remove content length header,
   // it is external processor's responsibility to set the content length correctly matched to
   // the mutated body.
   enum BodySendMode {
