@@ -155,7 +155,7 @@ public:
   const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
-  bool shouldRemoveContentLength() {
+  bool shouldRemoveContentLength() const {
     // Always remove the content length in 3 cases below:
     // 1) STREAMED BodySendMode
     // 2) BUFFERED_PARTIAL BodySendMode
