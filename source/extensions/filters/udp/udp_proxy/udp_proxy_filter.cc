@@ -277,7 +277,8 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
           [this] { onIdleTimer(); })),
       udp_session_info_(
           StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(),
-                                     std::make_shared<Network::ConnectionInfoSetterImpl>(addresses_.local_, addresses_.peer_))),
+                                     std::make_shared<Network::ConnectionInfoSetterImpl>(
+                                         addresses_.local_, addresses_.peer_))),
       session_id_(next_global_session_id_++) {
   ASSERT((defer_socket_creation && !host) || (!defer_socket_creation && host));
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
