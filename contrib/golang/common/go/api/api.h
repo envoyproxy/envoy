@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#include <cstdint>
+#include <stdint.h> // NOLINT(modernize-deprecated-headers)
 
 typedef struct { // NOLINT(modernize-use-using)
   const char* data;
@@ -93,16 +93,23 @@ CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value);
 CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value);
 
 // downstream
-CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int closeType); // NOLINT(readability-identifier-naming)
-CAPIStatus envoyGoFilterDownstreamWrite(void* wrapper, void* buffers, int buffersNum, // NOLINT(readability-identifier-naming)
+CAPIStatus envoyGoFilterDownstreamClose(void* wrapper,
+                                        int closeType); // NOLINT(readability-identifier-naming)
+CAPIStatus envoyGoFilterDownstreamWrite(void* wrapper, void* buffers,
+                                        int buffersNum, // NOLINT(readability-identifier-naming)
                                         int endStream); // NOLINT(readability-identifier-naming)
 void envoyGoFilterDownstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterDownstreamInfo(void* wrapper, int t, void* ret);
 
 // upstream
-void* envoyGoFilterUpstreamConnect(void* libraryID, void* addr, unsigned long long int connID); // NOLINT(readability-identifier-naming)
-CAPIStatus envoyGoFilterUpstreamWrite(void* wrapper, void* buffers, int buffersNum, int endStream); // NOLINT(readability-identifier-naming)
-CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int closeType); // NOLINT(readability-identifier-naming)
+void* envoyGoFilterUpstreamConnect(
+    void* libraryID, void* addr,    // NOLINT(readability-identifier-naming)
+    unsigned long long int connID); // NOLINT(readability-identifier-naming)
+CAPIStatus envoyGoFilterUpstreamWrite(void* wrapper, void* buffers,
+                                      int buffersNum, // NOLINT(readability-identifier-naming)
+                                      int endStream); // NOLINT(readability-identifier-naming)
+CAPIStatus envoyGoFilterUpstreamClose(void* wrapper,
+                                      int closeType); // NOLINT(readability-identifier-naming)
 void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterUpstreamInfo(void* wrapper, int t, void* ret);
 
