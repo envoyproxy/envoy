@@ -22,7 +22,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-class CancelStreamTest {
+private const val TEST_RESPONSE_FILTER_TYPE = "type.googleapis.com/" +
+  "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+
+class StreamIdleTimeoutTest {
 
   init {
     JniLibrary.loadTestLibrary()
@@ -64,17 +67,18 @@ class CancelStreamTest {
     override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
     override fun onCancel(finalStreamIntel: FinalStreamIntel) {
-      fail<CancelStreamTest>("Unexpected call to onCancel filter callback")
+      fail<StreamIdleTimeoutTest>("Unexpected call to onCancel filter callback")
     }
   }
 
   @Test
   fun `stream idle timeout triggers onError callbacks`() {
-    val engine = EngineBuilder(Standard()).build()
+    val engine = EngineBuilder(Standard())
       .addPlatformFilter(
         name = "idle_timeout_validation_filter",
         factory = { IdleTimeoutValidationFilter(filterExpectation) }
       )
+      .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
       .addStreamIdleTimeoutSeconds(1)
       .setOnEngineRunning {}
       .build()
@@ -95,7 +99,7 @@ class CancelStreamTest {
         callbackExpectation.countDown()
       }
       .start(Executors.newSingleThreadExecutor())
-      .sendHeaders(requestHeaders, true)
+      .sendHeaders(requestHeaders, false)
 
     filterExpectation.await(10, TimeUnit.SECONDS)
     callbackExpectation.await(10, TimeUnit.SECONDS)
