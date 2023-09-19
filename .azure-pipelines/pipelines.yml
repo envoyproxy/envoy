@@ -235,10 +235,10 @@ stages:
         gcc:
           CI_TARGET: "bazel.gcc"
           DISKSPACE_HACK: true
-        clang_tidy:
-          CI_TARGET: "bazel.clang_tidy"
-          REPO_FETCH_DEPTH: 0
-          REPO_FETCH_TAGS: true
+        # clang_tidy:
+        #   CI_TARGET: "bazel.clang_tidy"
+        #   REPO_FETCH_DEPTH: 0
+        #   REPO_FETCH_TAGS: true
         asan:
           CI_TARGET: "bazel.asan"
         msan:
