@@ -64,7 +64,7 @@ CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
   return absl::OkStatus();

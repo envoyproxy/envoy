@@ -72,8 +72,6 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
 
-  bool validateUpdateSize(int num_resources);
-
   virtual void beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
                                     std::unique_ptr<Cleanup>&) {}
   virtual void afterProviderUpdate() {}

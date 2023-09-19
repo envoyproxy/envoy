@@ -430,8 +430,8 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   if (!status_or_applied.status().ok()) {
     return status_or_applied.status();
   }
-  bool any_applied = status_or_applied.value();
-  auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
+  const bool any_applied = status_or_applied.value();
+  const auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
   if (!status.ok()) {
     return status;
   }
