@@ -124,6 +124,7 @@ jobs:
       - bash: |
           set -e
           mkdir -p $(Build.StagingDirectory)/envoy
+          rm -rf $(Build.StagingDirectory)/envoy/*
           mv $(Build.StagingDirectory)/release/* $(Build.StagingDirectory)/envoy
           ./ci/run_envoy_docker.sh 'ci/do_ci.sh docker'
         displayName: Build Docker images
