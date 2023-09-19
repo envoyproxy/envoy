@@ -109,13 +109,17 @@ def make_envoy_config_yaml(upstream_port, file_path):
             f"""
 admin:
   address:
-    socket_address: {{ address: {ENVOY_HOST}, port_value: {ENVOY_ADMIN_PORT} }}
+    socket_address:
+      address: {ENVOY_HOST}
+      port_value: {ENVOY_ADMIN_PORT}
 
 static_resources:
   listeners:
   - name: listener_0
     address:
-      socket_address: {{ address: {ENVOY_HOST}, port_value: {ENVOY_PORT} }}
+      socket_address:
+        address: {ENVOY_HOST}
+        port_value: {ENVOY_PORT}
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -129,8 +133,10 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: {{ prefix: "/" }}
-                route: {{ cluster: some_service }}
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: some_service
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
