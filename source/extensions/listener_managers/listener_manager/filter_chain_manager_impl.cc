@@ -163,6 +163,10 @@ OverloadManager& PerFilterChainFactoryContextImpl::overloadManager() {
   return parent_context_.overloadManager();
 }
 
+bool PerFilterChainFactoryContextImpl::bypassOverloadManager() {
+  return parent_context_.bypassOverloadManager();
+}
+
 OptRef<Admin> PerFilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
 
 TimeSource& PerFilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }

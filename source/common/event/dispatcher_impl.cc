@@ -199,6 +199,7 @@ DispatcherImpl::createListener(Network::SocketSharedPtr&& socket, Network::TcpLi
   return std::make_unique<Network::TcpListenerImpl>(
       *this, random_generator_, runtime, std::move(socket), cb, listener_config.bindToPort(),
       listener_config.ignoreGlobalConnLimit(),
+      listener_config.bypassOverloadManager(),
       listener_config.maxConnectionsToAcceptPerSocketEvent());
 }
 

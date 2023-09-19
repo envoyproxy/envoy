@@ -33,6 +33,7 @@ public:
   void enable() override;
   void setRejectFraction(UnitFloat) override {}
   void configureLoadShedPoints(Server::LoadShedPointProvider&) override {}
+  bool getBypassOverloadManager() override { return false; }
 
   // Network::UdpListener
   Event::Dispatcher& dispatcher() override;

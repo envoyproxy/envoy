@@ -258,7 +258,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.api().randomGenerator(), server_.httpContext(),
       server_.runtime(), server_.localInfo(), server_.clusterManager(), null_overload_manager_,
-      server_.timeSource())});
+      server_.timeSource(), true)});
   return true;
 }
 

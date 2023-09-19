@@ -259,6 +259,12 @@ public:
   virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
 
   /**
+   * @return const bool if this listener is configured with bypass_overload_manager
+   *
+   */
+  virtual bool bypassOverloadManager() PURE;
+
+  /**
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;

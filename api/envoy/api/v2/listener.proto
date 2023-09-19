@@ -27,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message Listener {
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
@@ -246,4 +246,9 @@ message Listener {
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by this listener.
   repeated config.filter.accesslog.v2.AccessLog access_log = 22;
+
+  // Specifies if traffic accepted by this listener should be allowed in
+  // overload scenarios (e.g. listener handles health probes or otherwise
+  // critical traffic).  Default: false
+  bool bypass_overload_manager = 23;
 }

@@ -51,6 +51,7 @@ public:
     }
 
     void setRejectFraction(UnitFloat) override {}
+    bool getBypassOverloadManager() override { return false; }
     void configureLoadShedPoints(Server::LoadShedPointProvider&) override {}
   };
 

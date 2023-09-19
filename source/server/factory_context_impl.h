@@ -31,6 +31,7 @@ public:
   Stats::Scope& serverScope() override { return *server_.stats().rootScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
+  bool bypassOverloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
   OptRef<Admin> admin() override;
   TimeSource& timeSource() override;

@@ -235,7 +235,7 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
       listener_scope_(
           server_.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config)))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
-      is_quic_(config.udp_listener_config().has_quic_options()) {}
+      is_quic_(config.udp_listener_config().has_quic_options()), bypass_overload_manager_(config.bypass_overload_manager()) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -271,6 +271,9 @@ const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listene
 };
 const Envoy::Config::TypedMetadata& ListenerFactoryContextBaseImpl::listenerTypedMetadata() const {
   return typed_metadata_;
+}
+bool ListenerFactoryContextBaseImpl::bypassOverloadManager() {
+  return bypass_overload_manager_;
 }
 envoy::config::core::v3::TrafficDirection ListenerFactoryContextBaseImpl::direction() const {
   return direction_;
@@ -339,6 +342,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.server_, validation_visitor_, config, this, *this,
           parent_.factory_->createDrainManager(config.drain_type()))),
       reuse_port_(getReusePortOrDefault(parent_.server_, config_, socket_type_)),
+      bypass_overload_manager_(config.bypass_overload_manager()),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
@@ -473,6 +477,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           addresses_, origin.listener_factory_context_->parentFactoryContext(), initManager(),
           *origin.filter_chain_manager_)),
       reuse_port_(origin.reuse_port_),
+      bypass_overload_manager_(origin.bypass_overload_manager_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
                           [this] {
                             ASSERT(workers_started_);
@@ -915,6 +920,9 @@ const envoy::config::core::v3::Metadata& PerListenerFactoryContextImpl::listener
 };
 const Envoy::Config::TypedMetadata& PerListenerFactoryContextImpl::listenerTypedMetadata() const {
   return listener_factory_context_base_->listenerTypedMetadata();
+}
+bool PerListenerFactoryContextImpl::bypassOverloadManager() {
+  return listener_factory_context_base_->bypassOverloadManager();
 }
 envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
   return listener_factory_context_base_->direction();

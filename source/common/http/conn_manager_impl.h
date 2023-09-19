@@ -67,7 +67,8 @@ public:
                         Random::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager& overload_manager, TimeSource& time_system);
+                        Server::OverloadManager& overload_manager, TimeSource& time_system,
+                        bool bypass_overload_manager);
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -596,6 +597,7 @@ private:
   Event::Dispatcher* dispatcher_{};
   ConnectionManagerListenerStats& listener_stats_;
   Server::OverloadManager& overload_manager_;
+  const bool bypass_overload_manager_;
   Server::ThreadLocalOverloadState& overload_state_;
   Server::LoadShedPoint* accept_new_http_stream_{nullptr};
   // References into the overload manager thread local state map. Using these lets us avoid a

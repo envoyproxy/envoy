@@ -145,6 +145,7 @@ public:
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
+  bool bypassOverloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
@@ -182,6 +183,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
   bool is_quic_;
+  bool bypass_overload_manager_;
 };
 
 class ListenerImpl;
@@ -222,6 +224,7 @@ public:
   Stats::Scope& serverScope() override { return listener_factory_context_base_->serverScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
+  bool bypassOverloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
@@ -323,6 +326,7 @@ public:
   }
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
+  bool bypassOverloadManager() const override { return bypass_overload_manager_; }
   static bool getReusePortOrDefault(Server::Instance& server,
                                     const envoy::config::listener::v3::Listener& config,
                                     Network::Socket::Type socket_type);
@@ -516,6 +520,7 @@ private:
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
   const bool reuse_port_;
+  const bool bypass_overload_manager_;
 
   // Per-listener connection limits are only specified via runtime.
   //

@@ -258,6 +258,11 @@ public:
    * limit.
    */
   virtual bool ignoreGlobalConnLimit() const PURE;
+
+  /**
+   * @return bool whether the listener should bypass overload manager actions
+   */
+  virtual bool bypassOverloadManager() const PURE;
 };
 
 /**
@@ -428,6 +433,11 @@ public:
    * after being opened.
    */
   virtual void setRejectFraction(UnitFloat reject_fraction) PURE;
+
+  /**
+   * Check whether the listener should bypass overload manager actions
+   */
+  virtual bool getBypassOverloadManager() PURE;
 
   /**
    * Configures the LoadShedPoints for this listener.

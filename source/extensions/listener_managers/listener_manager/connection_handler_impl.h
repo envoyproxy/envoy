@@ -125,7 +125,7 @@ private:
       }
       if (auto* listener = per_address_details->listener_->listener(); listener != nullptr) {
         listener->setRejectFraction(listener_reject_fraction);
-        if (overload_manager) {
+        if (overload_manager && !config.bypassOverloadManager()) {
           listener->configureLoadShedPoints(overload_manager.value());
         }
       }

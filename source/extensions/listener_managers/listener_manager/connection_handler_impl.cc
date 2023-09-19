@@ -267,7 +267,7 @@ void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& iter : listener_map_by_tag_) {
     iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
+      if (listener.listener() != nullptr && !listener.listener()->getBypassOverloadManager()) {
         listener.pauseListening();
       }
     });
@@ -278,7 +278,7 @@ void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& iter : listener_map_by_tag_) {
     iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
+      if (listener.listener() != nullptr && !listener.listener()->getBypassOverloadManager()) {
         listener.resumeListening();
       }
     });
@@ -290,7 +290,7 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   for (auto& iter : listener_map_by_tag_) {
     iter.second->invokeListenerMethod(
         [&reject_fraction](Network::ConnectionHandler::ActiveListener& listener) {
-          if (listener.listener() != nullptr) {
+          if (listener.listener() != nullptr && !listener.listener()->getBypassOverloadManager()) {
             listener.listener()->setRejectFraction(reject_fraction);
           }
         });

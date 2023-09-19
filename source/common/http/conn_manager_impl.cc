@@ -91,7 +91,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
                                              Server::OverloadManager& overload_manager,
-                                             TimeSource& time_source)
+                                             TimeSource& time_source,
+                                             const bool bypass_overload_manager)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
@@ -99,6 +100,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       random_generator_(random_generator), runtime_(runtime), local_info_(local_info),
       cluster_manager_(cluster_manager), listener_stats_(config_.listenerStats()),
       overload_manager_(overload_manager),
+      bypass_overload_manager_(bypass_overload_manager),
       overload_state_(overload_manager.getThreadLocalOverloadState()),
       accept_new_http_stream_(overload_manager.getLoadShedPoint(
           "envoy.load_shed_points.http_connection_manager_decode_headers")),
@@ -1163,10 +1165,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
   const bool drop_request_due_to_overload =
-      (connection_manager_.accept_new_http_stream_ != nullptr &&
+      !connection_manager_.bypass_overload_manager_ &&
+      ((connection_manager_.accept_new_http_stream_ != nullptr &&
        connection_manager_.accept_new_http_stream_->shouldShedLoad()) ||
       connection_manager_.random_generator_.bernoulli(
-          connection_manager_.overload_stop_accepting_requests_ref_.value());
+          connection_manager_.overload_stop_accepting_requests_ref_.value()));
 
   if (drop_request_due_to_overload) {
     // In this one special case, do not create the filter chain. If there is a risk of memory
@@ -1661,7 +1664,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       connection_manager_.proxy_name_, connection_manager_.clear_hop_by_hop_response_headers_);
 
   bool drain_connection_due_to_overload = false;
-  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+  if (!connection_manager_.bypass_overload_manager_ &&
+      connection_manager_.drain_state_ == DrainState::NotDraining &&
       connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_disable_keepalive_ref_.value())) {
     ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
