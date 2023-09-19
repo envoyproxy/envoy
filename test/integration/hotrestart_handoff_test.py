@@ -103,6 +103,14 @@ async def http_request(url):
                     log.debug(f"retrying request ({retries} remain)\n")
 
 
+async def full_http_request(url: str) -> str:
+    """Uses http_request so as to share the retry behavior."""
+    response_lines = []
+    async for line in http_request(url):
+        response_lines.append(line.decode())
+    return "".join(response_lines)
+
+
 def make_envoy_config_yaml(upstream_port, file_path):
     with open(file_path, "w") as file:
         file.write(
@@ -158,14 +166,7 @@ static_resources:
 """)
 
 
-async def full_http_request(path):
-    response_lines = []
-    async for line in http_request(path):
-        response_lines.append(line.decode())
-    return "".join(response_lines)
-
-
-async def wait_for_envoy_epoch(i):
+async def wait_for_envoy_epoch(i: int):
     """Load the admin/server_info page until restart_epoch is i, or timeout"""
     tries = 5
     response_json = {}
@@ -186,35 +187,43 @@ async def wait_for_envoy_epoch(i):
 
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):
 
-    async def test_connection_handoffs(self):
+    async def asyncSetUp(self) -> None:
         tmpdir = os.environ["TEST_TMPDIR"]
-        slow_config_path = os.path.join(tmpdir, "slow_config.yaml")
-        fast_config_path = os.path.join(tmpdir, "fast_config.yaml")
-        base_id_path = os.path.join(tmpdir, "base_id.txt")
-        make_envoy_config_yaml(upstream_port=UPSTREAM_SLOW_PORT, file_path=slow_config_path)
-        make_envoy_config_yaml(upstream_port=UPSTREAM_FAST_PORT, file_path=fast_config_path)
-        log.info("starting upstreams")
-        slow_upstream = Upstream()
-        await slow_upstream.start()
-        fast_upstream = Upstream(True)
-        await fast_upstream.start()
-        envoy_args = [
+        self.slow_config_path = os.path.join(tmpdir, "slow_config.yaml")
+        self.fast_config_path = os.path.join(tmpdir, "fast_config.yaml")
+        self.base_id_path = os.path.join(tmpdir, "base_id.txt")
+        make_envoy_config_yaml(upstream_port=UPSTREAM_SLOW_PORT, file_path=self.slow_config_path)
+        make_envoy_config_yaml(upstream_port=UPSTREAM_FAST_PORT, file_path=self.fast_config_path)
+        self.base_envoy_args = [
             ENVOY_BINARY,
             "--socket-path",
             SOCKET_PATH,
             "--socket-mode",
             str(SOCKET_MODE),
         ]
+        log.info("starting upstreams")
+        await super().asyncSetUp()
+        self.slow_upstream = Upstream()
+        await self.slow_upstream.start()
+        self.fast_upstream = Upstream(True)
+        await self.fast_upstream.start()
+    
+    async def asyncTearDown(self) -> None:
+        await self.slow_upstream.stop()
+        await self.fast_upstream.stop()
+        return await super().asyncTearDown()
+
+    async def test_connection_handoffs(self) -> None:
         log.info("starting envoy")
         envoy_process_1 = await asyncio.create_subprocess_exec(
-            *envoy_args,
+            *self.base_envoy_args,
             "--restart-epoch",
             "0",
             "--use-dynamic-base-id",
             "--base-id-path",
-            base_id_path,
+            self.base_id_path,
             "-c",
-            slow_config_path,
+            self.slow_config_path,
         )
         log.info("waiting for envoy ready")
         await wait_for_envoy_epoch(0)
@@ -222,11 +231,11 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         slow_response = http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
         log.info("waiting for response to begin")
         self.assertEqual(await anext(slow_response, None), b"start\n")
-        with open(base_id_path, "r") as base_id_file:
+        with open(self.base_id_path, "r") as base_id_file:
             base_id = int(base_id_file.read())
         log.info(f"starting envoy hot restart for base id {base_id}")
         envoy_process_2 = await asyncio.create_subprocess_exec(
-            *envoy_args,
+            *self.base_envoy_args,
             "--restart-epoch",
             "1",
             "--parent-shutdown-time-s",
@@ -234,7 +243,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "--base-id",
             str(base_id),
             "-c",
-            fast_config_path,
+            self.fast_config_path,
         )
         log.info("waiting for new envoy instance to begin")
         await wait_for_envoy_epoch(1)
@@ -257,8 +266,6 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         log.info("shutting everything down")
         envoy_process_1.terminate()
         envoy_process_2.terminate()
-        await slow_upstream.stop()
-        await fast_upstream.stop()
         await envoy_process_1.wait()
         await envoy_process_2.wait()
 
