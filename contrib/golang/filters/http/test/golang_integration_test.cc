@@ -177,7 +177,7 @@ typed_config:
         [so_id](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          // for testing http filter level config, a new virtualhost wihtout per route config
+          // for testing http filter level config, a new virtualhost without per route config
           auto vh = hcm.mutable_route_config()->add_virtual_hosts();
           vh->add_domains("filter-level.com");
           vh->set_name("filter-level.com");
@@ -500,7 +500,7 @@ typed_config:
     EXPECT_EQ(header_0_existing,
               !response->headers().get(Http::LowerCaseString("x-test-header-0")).empty());
 
-    if (set_header != "") {
+    if (!set_header.empty()) {
       EXPECT_EQ("test-value", getHeader(response->headers(), set_header));
     }
     cleanup();
@@ -565,7 +565,7 @@ typed_config:
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    // 100 + 200 > 150, excced buffer limit.
+    // 100 + 200 > 150, exceed buffer limit.
     codec_client_->sendData(request_encoder, std::string(100, '-'), false);
     codec_client_->sendData(request_encoder, std::string(200, '-'), true);
 
@@ -762,10 +762,10 @@ TEST_P(GolangIntegrationTest, Passthrough) {
 
   ASSERT_TRUE(response->waitForEndStream());
 
-  // check status for pasthrough
+  // check status for passthrough
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  // check body for pasthrough
+  // check body for passthrough
   auto body = absl::StrFormat("%s%s", good, bye);
   EXPECT_EQ(body, response->body());
 
@@ -933,7 +933,7 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamPeriodic) {
   cleanup();
 }
 
-// Mertic API testing
+// Metric API testing
 TEST_P(GolangIntegrationTest, Metric) { testMetric("/test"); }
 
 // Metric API testing in async mode.
@@ -996,7 +996,7 @@ TEST_P(GolangIntegrationTest, LocalReply_DecodeData_Async) {
 }
 
 // The next filter(lua filter) send local reply after Go filter continue in decode header phase.
-// Go filter will terimiate when lua filter send local reply.
+// Go filter will terminate when lua filter send local reply.
 TEST_P(GolangIntegrationTest, LuaRespondAfterGoHeaderContinue) {
   // put lua filter after golang filter
   // golang filter => lua filter.

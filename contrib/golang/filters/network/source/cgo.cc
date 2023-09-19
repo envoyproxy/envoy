@@ -82,7 +82,7 @@ void envoyGoFilterDownstreamFinalize(void* f, int reason) {
   auto* wrapper = reinterpret_cast<FilterWrapper*>(f);
   FilterWeakPtr& weak_ptr = wrapper->filter_ptr_;
   if (FilterSharedPtr filter = weak_ptr.lock()) {
-    // make sure that the deconstructor is also executed by envoy wrk thread.
+    // make sure that the deconstructor is also executed by envoy work thread.
     filter->dispatcher()->post([wrapper] { delete wrapper; });
   } else {
     // the Filter is already deleted, just release the wrapper.
@@ -116,7 +116,9 @@ CAPIStatus envoyGoFilterDownstreamInfo(void* f, int info_type, void* ret) {
 // Upstream
 //
 
-void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, unsigned long long int connID) {
+void* envoyGoFilterUpstreamConnect(
+    void* library_id, void* addr,
+    unsigned long long int connID) { // NOLINT(readability-identifier-naming)
   std::string id = copyGoString(library_id);
   auto dynamic_lib = Dso::DsoManager<Dso::NetworkFilterDsoImpl>::getDsoByID(id);
   UpstreamConnPtr conn_ptr =
@@ -157,7 +159,7 @@ void envoyGoFilterUpstreamFinalize(void* u, int reason) {
   UNREFERENCED_PARAMETER(reason);
   auto* wrapper = reinterpret_cast<UpstreamConnWrapper*>(u);
   UpstreamConnPtr& conn_ptr = wrapper->conn_ptr_;
-  // make sure that the deconstructor is also executed by envoy wrk thread
+  // make sure that the deconstructor is also executed by envoy work thread
   conn_ptr->dispatcher()->post([wrapper] { delete wrapper; });
 }
 
