@@ -86,8 +86,8 @@ class Upstream:
 
 async def _http_request(url):
     # Separate session per request is against aiohttp idioms, but is
-    # intentional here because we're testing where connections go - we
-    # definitely don't want to accidentally reuse a connection!
+    # intentional here because the point of the test is verifying
+    # where connections go - reusing a connection would do the wrong thing.
     async with ClientSession() as session:
         retries = 5
         while retries:
@@ -107,8 +107,8 @@ async def _http_request(url):
 
 async def _full_http_request(url: str) -> str:
     # Separate session per request is against aiohttp idioms, but is
-    # intentional here because we're testing where connections go - we
-    # definitely don't want to accidentally reuse a connection!
+    # intentional here because the point of the test is verifying
+    # where connections go - reusing a connection would do the wrong thing.
     async with ClientSession() as session:
         async with session.get(url) as response:
             return await response.text()
