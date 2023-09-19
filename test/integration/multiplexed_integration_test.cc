@@ -193,6 +193,24 @@ TEST_P(MultiplexedIntegrationTest, LargeRequestTrailersRejected) {
   testLargeRequestTrailers(66, 60);
 }
 
+TEST_P(MultiplexedIntegrationTest, RequestContainsHostAndAuthority) {
+#ifdef ENVOY_CONFIG_COVERAGE
+  // Avoid excessive logging at UDP packet level, which causes log spamming, as well as worse
+  // contention: https://github.com/envoyproxy/envoy/issues/19595
+  ENVOY_LOG_MISC(warn, "manually lowering logs to error");
+  LogLevelSetter save_levels(spdlog::level::err);
+#endif
+  initialize();
+  codec_client_ = makeHttpConnection(
+      makeClientConnection((lookupPort("http"))));
+  default_request_headers_.addCopy("host", "example.com");
+  const uint64_t request_size = 10;
+  const uint64_t response_size = 100;
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, request_size, default_response_headers_, response_size, 0, TestUtility::DefaultTimeout);
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
+}
+
 // Verify downstream codec stream flush timeout.
 TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
   config_helper_.setBufferLimits(1024, 1024);
@@ -1803,22 +1821,27 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
 
 struct FrameIntegrationTestParam {
   Network::Address::IpVersion ip_version;
+  Http2Impl http2_implementation;
 };
 
 std::string
 frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
-  return TestUtility::ipVersionToString(params.param.ip_version);
+  return absl::StrCat(TestUtility::ipVersionToString(params.param.ip_version),
+                      "_", http2ImplementationToString(params.param.http2_implementation));
 }
 
 class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
                                   public Http2RawFrameIntegrationTest {
 public:
-  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {}
+  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {
+    setupHttp2ImplOverrides(GetParam().http2_implementation);
+  }
 
   static std::vector<FrameIntegrationTestParam> testParams() {
     std::vector<FrameIntegrationTestParam> v;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-      v.push_back({ip_version});
+      v.push_back({ip_version, Http2Impl::Nghttp2});
+      v.push_back({ip_version, Http2Impl::Oghttp2});
     }
     return v;
   }
@@ -2055,6 +2078,44 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
       << " stream wire bytes from Envoy but access log reported " << hcm_logged_wire_bytes_sent;
 
   // Cleanup.
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, HostDifferentFromAuthority) {
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx), "one.example.com", "/path", {{"host", "two.example.com"}});
+  sendFrame(request);
+
+  // if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+  //   // Oghttp2 treats different values for host and :authority as an error
+  //   tcp_client_->waitForDisconnect();
+  // } else {
+    // nghttp2 accepts request with :authority and host header having different values
+    waitForNextUpstreamRequest();
+    EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,two.example.com");
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    auto frame = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+    EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+    tcp_client_->close();
+  // }
+}
+
+TEST_P(Http2FrameIntegrationTest, HostSameAsAuthority) {
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx), "one.example.com", "/path", {{"host", "one.example.com"}});
+  sendFrame(request);
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,one.example.com");
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
   tcp_client_->close();
 }
 
