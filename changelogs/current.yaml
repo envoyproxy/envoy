@@ -30,6 +30,11 @@ minor_behavior_changes:
     Don't append the local address to ``x-forwarded-for`` header when sending an http (not gRPC) auth request.
     This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.ext_authz_http_send_original_xff`` to false.
+- area: ext_proc
+  change: |
+    Envoy will only take
+    :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    when waiting for the header responses. It will be ignored if it is in other processing states.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.

@@ -279,8 +279,8 @@ public:
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
   envoy::service::ext_proc::v3::ProcessingRequest
-  setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, const bool end_stream);
-  void sendBodyChunk(ProcessorState& state, const ProcessorState::CallbackState new_state,
+  setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
+  void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                      envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);

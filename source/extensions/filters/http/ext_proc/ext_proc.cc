@@ -289,7 +289,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // The body has been buffered and we need to send the buffer
       ENVOY_LOG(debug, "Sending request body message");
       state.addBufferedData(data);
-      auto req = setupBodyChunk(state, *state.bufferedData(), true);
+      auto req = setupBodyChunk(state, *state.bufferedData(), end_stream);
       sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
       // Since we just just moved the data into the buffer, return NoBuffer
       // so that we do not buffer this chunk twice.
@@ -534,7 +534,7 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 }
 
 ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::Instance& data,
-                                         const bool end_stream) {
+                                         bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
   ProcessingRequest req;
   auto* body_req = state.mutableBody(req);
@@ -543,7 +543,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
   return req;
 }
 
-void Filter::sendBodyChunk(ProcessorState& state, const ProcessorState::CallbackState new_state,
+void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
