@@ -18,11 +18,13 @@ import logging
 import subprocess
 import sys
 
+
 def random_loopback_host():
     """Returns a randomized loopback IP.
     This can be used to reduce the chance of port conflicts when tests are
     running in parallel."""
     return f"127.{random.randrange(0,256)}.{random.randrange(0,256)}.{random.randrange(1, 255)}"
+
 
 UPSTREAM_SLOW_PORT = 54321
 UPSTREAM_FAST_PORT = 54322
@@ -42,6 +44,7 @@ log.level = logging.INFO
 _stream_handler = logging.StreamHandler(sys.stdout)
 log.addHandler(_stream_handler)
 
+
 class Upstream:
     # This class runs a server which takes an http request to
     # path=/ and responds with "start\n" [three second pause] "end\n".
@@ -49,7 +52,7 @@ class Upstream:
     # connection will persist.
     # If initialized with True it will instead respond with
     # "fast instance" immediately.
-    def __init__(self, fast_version = False):
+    def __init__(self, fast_version=False):
         self.port = UPSTREAM_FAST_PORT if fast_version else UPSTREAM_SLOW_PORT
         self.app = web.Application()
         self.app.add_routes([
@@ -68,17 +71,20 @@ class Upstream:
         log.debug("runner cleaned up")
 
     async def fast_response(self, request):
-        return web.Response(status=200, reason='OK', headers={'content-type': 'text/plain'}, body='fast instance')
+        return web.Response(
+            status=200, reason='OK', headers={'content-type': 'text/plain'}, body='fast instance')
 
     async def slow_response(self, request):
         log.debug("slow request received")
-        response = web.StreamResponse(status=200, reason='OK', headers={'content-type': 'text/plain'})
+        response = web.StreamResponse(
+            status=200, reason='OK', headers={'content-type': 'text/plain'})
         await response.prepare(request)
         await response.write(b"start\n")
         await asyncio.sleep(3)
         await response.write(b"end\n")
         await response.write_eof()
         return response
+
 
 async def http_request(url):
     async with ClientSession() as session:
@@ -97,9 +103,11 @@ async def http_request(url):
                 if retries <= 3:
                     log.debug(f"retrying request ({retries} remain)\n")
 
+
 def make_envoy_config_yaml(upstream_port, file_path):
     with open(file_path, "w") as file:
-        file.write(f"""
+        file.write(
+            f"""
 admin:
   address:
     socket_address: {{ address: {ENVOY_HOST}, port_value: {ENVOY_ADMIN_PORT} }}
@@ -144,11 +152,13 @@ static_resources:
                 port_value: {upstream_port}
 """)
 
+
 async def full_http_request(path):
     response_lines = []
     async for line in http_request(path):
         response_lines.append(line.decode())
     return "".join(response_lines)
+
 
 async def wait_for_envoy_epoch(i):
     """Load the admin/server_info page until restart_epoch is i, or timeout"""
@@ -165,10 +175,12 @@ async def wait_for_envoy_epoch(i):
             pass
         await asyncio.sleep(0.2)
     # Envoy instance with expected restart_epoch should have started up
-    assert response_json and response_json["command_line_options"] and response_json["command_line_options"]["restart_epoch"] == i, f"server_info={response}"
+    assert response_json and response_json["command_line_options"] and response_json[
+        "command_line_options"]["restart_epoch"] == i, f"server_info={response}"
 
 
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):
+
     async def test_connection_handoffs(self):
         tmpdir = os.environ["TEST_TMPDIR"]
         slow_config_path = os.path.join(tmpdir, "slow_config.yaml")
@@ -183,16 +195,22 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         await fast_upstream.start()
         envoy_args = [
             ENVOY_BINARY,
-            "--socket-path", SOCKET_PATH,
-            "--socket-mode", str(SOCKET_MODE),
+            "--socket-path",
+            SOCKET_PATH,
+            "--socket-mode",
+            str(SOCKET_MODE),
         ]
         log.info("starting envoy")
-        envoy_process_1 = subprocess.Popen(envoy_args + [
-            "--restart-epoch", "0",
-            "--use-dynamic-base-id",
-            "--base-id-path", base_id_path,
-            "-c", slow_config_path,
-        ])
+        envoy_process_1 = subprocess.Popen(
+            envoy_args + [
+                "--restart-epoch",
+                "0",
+                "--use-dynamic-base-id",
+                "--base-id-path",
+                base_id_path,
+                "-c",
+                slow_config_path,
+            ])
         log.info("waiting for envoy ready")
         await wait_for_envoy_epoch(0)
         log.info("making request")
@@ -200,26 +218,36 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         log.info("waiting for response to begin")
         self.assertEqual(await anext(slow_response, None), b"start\n")
         with open(base_id_path, "r") as base_id_file:
-            base_id=int(base_id_file.read())
+            base_id = int(base_id_file.read())
         log.info(f"starting envoy hot restart for base id {base_id}")
-        envoy_process_2 = subprocess.Popen(envoy_args + [
-            "--restart-epoch", "1",
-            "--parent-shutdown-time-s", "3",
-            "--base-id", str(base_id),
-            "-c", fast_config_path,
-        ])
+        envoy_process_2 = subprocess.Popen(
+            envoy_args + [
+                "--restart-epoch",
+                "1",
+                "--parent-shutdown-time-s",
+                "3",
+                "--base-id",
+                str(base_id),
+                "-c",
+                fast_config_path,
+            ])
         log.info("waiting for new envoy instance to begin")
         await wait_for_envoy_epoch(1)
         log.info("sending request to fast upstream")
         fast_response = await full_http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
-        self.assertEqual(fast_response, "fast instance", "new requests after hot restart begins should go to new cluster")
+        self.assertEqual(
+            fast_response, "fast instance",
+            "new requests after hot restart begins should go to new cluster")
         # Now we can wait for the slow request to complete, and make sure it still gets the
         # response from the old instance.
         log.info("waiting for completion of original slow request")
         t1 = datetime.now()
         self.assertEqual(await anext(slow_response, None), b"end\n")
         t2 = datetime.now()
-        self.assertGreater((t2 - t1).total_seconds(), 0.5, "slow request should be incomplete when we wait for it, otherwise the test is not necessarily validating during-drain behavior")
+        self.assertGreater(
+            (t2 - t1).total_seconds(), 0.5,
+            "slow request should be incomplete when we wait for it, otherwise the test is not necessarily validating during-drain behavior"
+        )
         self.assertIsNone(await anext(slow_response, None))
         log.info("shutting everything down")
         envoy_process_1.terminate()
@@ -228,7 +256,6 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         await fast_upstream.stop()
         envoy_process_1.wait()
         envoy_process_2.wait()
-
 
 
 if __name__ == '__main__':
