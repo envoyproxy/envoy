@@ -56,6 +56,12 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
+  if [[ "$DOCKER_IN_DOCKER" ]]; then
+      DOCKER_START_EXTRA="apt-get -qq update -y && apt-get -qq install -y --no-install-recommends skopeo"
+  else
+      DOCKER_START_EXTRA=":"
+  fi
+
   START_COMMAND=(
       "/bin/bash"
       "-lc"
@@ -64,6 +70,7 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
+          && ${DOCKER_START_EXTRA} \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
