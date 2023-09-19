@@ -506,7 +506,7 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
 Utility::QueryParamsMulti Utility::QueryParamsMulti::parseQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    return Utility::QueryParamsMulti();
+    return {};
   }
 
   start++;
@@ -528,7 +528,7 @@ Utility::QueryParamsMulti
 Utility::QueryParamsMulti::parseAndDecodeQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    return Utility::QueryParamsMulti();
+    return {};
   }
 
   start++;
@@ -622,8 +622,7 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 std::string Utility::stripQueryString(const HeaderString& path) {
   absl::string_view path_str = path.getStringView();
   size_t query_offset = path_str.find('?');
-  return std::string(path_str.data(),
-                     query_offset != path_str.npos ? query_offset : path_str.size());
+  return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
 std::string Utility::replaceQueryString(const HeaderString& path,

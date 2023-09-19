@@ -77,12 +77,24 @@ class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:
   MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
 
-  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddress,
-              (const Network::Address::InstanceConstSharedPtr& address,
-               const Network::ConnectionSocket::OptionsSharedPtr& connection_socket_options),
-              (const));
+  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddressImpl,
+              (const Network::Address::InstanceConstSharedPtr& address), (const));
 
   Network::Address::InstanceConstSharedPtr& address_;
+};
+
+class MockUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
+public:
+  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, createLocalAddressSelector,
+              (std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
+               absl::optional<std::string> cluster_name),
+              (const));
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Empty>();
+  }
+
+  std::string name() const override { return "mock.upstream.local.address.selector"; }
 };
 
 class MockClusterInfo : public ClusterInfo {
@@ -161,7 +173,7 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(std::shared_ptr<UpstreamLocalAddressSelector>, getUpstreamLocalAddressSelector, (),
+  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, getUpstreamLocalAddressSelector, (),
               (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));

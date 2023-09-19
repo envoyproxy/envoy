@@ -92,7 +92,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
-      is_redis_cluster_(false), client_factory_(parent->client_factory_), config_(parent->config_),
+      client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
       refresh_manager_(parent->refresh_manager_) {

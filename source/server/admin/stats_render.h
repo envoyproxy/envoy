@@ -77,18 +77,40 @@ public:
                 const Stats::ParentHistogram& histogram) override;
   void finalize(Buffer::Instance& response) override;
 
+  /**
+   * Streams the supported percentiles into a JSON array. Note that no histogram
+   * context is provided for this; this is a static property of the binary.
+   *
+   * @param array the json streaming array array to stream into.
+   */
+  static void populateSupportedPercentiles(Json::Streamer::Array& array);
+
+  /**
+   * Streams detail about the provided histogram into the provided JSON map.
+   *
+   * @param name the name of the histogram (usually the same as histogram.name(),
+   *             but is passed in explicitly because it may already have been
+   *             computed when filtering stats, and it is somewhat expensive
+   *             to compute the name.
+   * @param histogram the histogram to stream
+   * @param map the json map to stream into.
+   *
+   */
+  static void generateHistogramDetail(const std::string& name,
+                                      const Stats::ParentHistogram& histogram,
+                                      Json::Streamer::Map& map);
+
 private:
   // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
                       const std::vector<uint64_t>& interval_buckets,
                       const std::vector<uint64_t>& cumulative_buckets);
 
-  void generateHistogramDetail(const std::string& name, const Stats::ParentHistogram& histogram);
-  void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
-                              Json::Streamer::Map& map);
+  static void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                                     Json::Streamer::Map& map);
   void renderHistogramStart();
-  void populateSupportedPercentiles(Json::Streamer::Map& map);
-  void populatePercentiles(const Stats::ParentHistogram& histogram, Json::Streamer::Map& map);
+  static void populatePercentiles(const Stats::ParentHistogram& histogram,
+                                  Json::Streamer::Map& map);
 
   // This function irons out an API mistake made when defining the StatsRender
   // interface. The issue is that callers can provide a response buffer when

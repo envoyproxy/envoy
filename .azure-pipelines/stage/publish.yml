@@ -101,18 +101,16 @@ jobs:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.release"
-      itemPattern: "bazel.release/**/bin/*"
+      artifactName: "release"
+      itemPattern: "release/**/bin/*"
       targetPath: $(Build.StagingDirectory)
   - template: ../bazel.yml
     parameters:
       ciTarget: docker-upload
+      cacheName: docker-upload
       publishEnvoy: false
       publishTestResults: false
       pathDockerBind: ""
-      cacheKeyDocker: "$(cacheKeyDockerBuild)"
-      cacheKeyVersion: "$(cacheKeyDockerBuildVersion)"
-      pathCacheTemp: /var/azpcache
       tmpfsCacheDisabled: true
       diskspaceHack: true
       env:
@@ -122,39 +120,24 @@ jobs:
           echo "disk space at beginning of Docker build:"
           df -h
         displayName: "Check disk space before Docker build"
+      # TODO(phlax): switch docker <> docker-upload as main task
       - bash: |
           set -e
-
-          mkdir -p linux/amd64 linux/arm64
-
-          # x64
-          cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/release.tar.zst linux/amd64/release.tar.zst
-          cp -a $(Build.StagingDirectory)/bazel.release/x64/bin/schema_validator_tool linux/amd64/schema_validator_tool
-
-          # arm64
-          cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/release.tar.zst linux/arm64/release.tar.zst
-          cp -a $(Build.StagingDirectory)/bazel.release/arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
-
-          # Debug what files appear to have been downloaded
-          find linux -type f -name "*" | xargs ls -l
-
-          ci/docker_ci.sh
+          mkdir -p $(Build.StagingDirectory)/envoy
+          rm -rf $(Build.StagingDirectory)/envoy/*
+          mv $(Build.StagingDirectory)/release/* $(Build.StagingDirectory)/envoy
+          ./ci/run_envoy_docker.sh 'ci/do_ci.sh docker'
         displayName: Build Docker images
         timeoutInMinutes: ${{ parameters.timeoutDockerPublish }}
         workingDirectory: $(Build.SourcesDirectory)
         env:
-          AZP_BRANCH: $(Build.SourceBranch)
-          AZP_SHA1: $(Build.SourceVersion)
+          CI_BRANCH: $(Build.SourceBranch)
+          CI_SHA1: $(Build.SourceVersion)
           DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
           DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
           DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
-      stepsPost:
-      - script: |
-          set -e
-          sudo .azure-pipelines/docker/save_cache.sh /var/azpcache/docker true
-          sudo rm -rf /var/lib/docker
-        displayName: "Cache/save (publish_docker)"
-        condition: and(succeeded(), ne(variables.DOCKER_CACHE_RESTORED, 'true'))
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          ENVOY_DOCKER_IN_DOCKER: 1
 
 - job: package_x64
   displayName: Linux debs (x64)
@@ -169,12 +152,13 @@ jobs:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.release"
-      itemPattern: "bazel.release/x64/bin/*"
+      artifactName: "release"
+      itemPattern: "release/x64/bin/*"
       targetPath: $(Build.StagingDirectory)
   - template: ../bazel.yml
     parameters:
-      ciTarget: bazel.distribution
+      ciTarget: distribution
+      cacheName: distribution
       publishTestResults: false
       stepsPre:
       - template: ../gpg.yml
@@ -201,14 +185,15 @@ jobs:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.release"
-      itemPattern: "bazel.release/arm64/bin/*"
+      artifactName: "release"
+      itemPattern: "release/arm64/bin/*"
       targetPath: $(Build.StagingDirectory)
 
   - template: ../bazel.yml
     parameters:
       managedAgent: false
-      ciTarget: bazel.distribution
+      ciTarget: distribution
+      cacheName: distribution
       rbe: false
       artifactSuffix: ".arm64"
       bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
@@ -239,11 +224,12 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: docs
+      cacheName: docs
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
       publishTestResults: false
       env:
-        AZP_BRANCH: $(Build.SourceBranch)
+        CI_BRANCH: $(Build.SourceBranch)
       stepsPost:
 
       - script: |
@@ -315,18 +301,19 @@ jobs:
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.release"
-      itemPattern: "bazel.release/**/bin/*"
+      artifactName: "release"
+      itemPattern: "release/**/bin/*"
       targetPath: $(Build.StagingDirectory)
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: current
-      artifactName: "bazel.distribution"
-      itemPattern: "bazel.distribution/**/packages.*.tar.gz"
+      artifactName: "distribution"
+      itemPattern: "distribution/**/packages.*.tar.gz"
       targetPath: $(Build.StagingDirectory)
   - template: ../bazel.yml
     parameters:
       ciTarget: release.signed
+      cacheName: release-signed
       publishTestResults: false
       env:
         GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
@@ -370,6 +357,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: verify.trigger
+      cacheName: verify-trigger
       authGithub: "$(key.value)"
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false

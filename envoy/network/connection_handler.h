@@ -91,8 +91,10 @@ public:
    * Stop listeners using the listener tag as a key. This will not close any connections and is used
    * for draining.
    * @param listener_tag supplies the tag passed to addListener().
+   * @param options additional options to be passed through to shutdownListener.
    */
-  virtual void stopListeners(uint64_t listener_tag) PURE;
+  virtual void stopListeners(uint64_t listener_tag,
+                             const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.
