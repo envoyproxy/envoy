@@ -370,7 +370,7 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
 
   JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, 0)),
                           &cluster_name_out);
-  for (int i = 1; i < len; i += 3) {
+  for (size_t i = 1; i < len; i += 3) {
     std::string name;
     std::string type_as_string;
     std::string value;
