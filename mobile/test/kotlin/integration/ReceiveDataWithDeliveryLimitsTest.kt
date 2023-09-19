@@ -12,9 +12,9 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val TEST_RESPONSE_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 
-class ReceiveDataTest {
+class ReceiveDataWithDeliveryLimitsTest {
 
   init {
     JniLibrary.loadTestLibrary()
@@ -24,7 +24,7 @@ class ReceiveDataTest {
   fun `data is received with min delivery size set`() {
 
     val engine = EngineBuilder(Standard())
-      .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
+      .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
       .build()
     val client = engine.streamClient()
 
