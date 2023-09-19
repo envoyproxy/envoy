@@ -537,6 +537,14 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
   auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster(bootstrap_yaml);
   create(bootstrap);
 
+  EXPECT_CALL(factory_, create(_))
+      .Times(2)
+      .WillRepeatedly(
+          testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
+            callbacks_ = &data.callbacks_;
+            return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+          }));
+
   const std::string eds_cluster_yaml = R"EOF(
       name: cluster_1
       connect_timeout: 0.25s
@@ -551,18 +559,8 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
             - eds
             refresh_delay: 1s
     )EOF";
-
-  EXPECT_CALL(factory_, create(_))
-      .Times(2)
-      .WillRepeatedly(
-          testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
-            callbacks_ = &data.callbacks_;
-            return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-          }));
-
-  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
-      parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
+  auto cluster = parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType());
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "version1"));
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
@@ -575,36 +573,26 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
   // RING_HASH lb policy requires Envoy re-create the load balancer when the cluster is updated.
   EXPECT_TRUE(initiailization_instance->load_balancer_factory_->recreateOnHostChange());
 
-  const std::string new_eds_cluster_yaml = R"EOF(
-      name: cluster_1
-      connect_timeout: 0.25s
-      lb_policy: ROUND_ROBIN
-      eds_cluster_config:
-        service_name: new_fare
-        eds_config:
-          api_config_source:
-            api_type: REST
-            transport_api_version: V3
-            cluster_names:
-            - eds
-            refresh_delay: 1s
-    )EOF";
+  // Update the cluster with a different lb policy. Now it's a different cluster and should
+  // not be merged.
+  cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "version2"));
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
-      parseClusterFromV3Yaml(new_eds_cluster_yaml, getEdsClusterType()), "version2"));
-  envoy::config::endpoint::v3::ClusterLoadAssignment new_cluster_load_assignment;
-  new_cluster_load_assignment.set_cluster_name("new_fare");
-  addEndpoint(new_cluster_load_assignment, 100);
-  doOnConfigUpdateVerifyNoThrow(new_cluster_load_assignment);
+  // Because the eds_service_name is the same, we can reuse the same load assignment here.
+  cluster_load_assignment.clear_endpoints();
+  // Note we only add one endpoint to the priority 1 to the new cluster.
+  addEndpoint(cluster_load_assignment, 100, 1);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   auto new_initialization_instance =
       cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
   EXPECT_NE(initiailization_instance.get(), new_initialization_instance.get());
-  // If no merge happened, the ROUND_ROBIN lb policy should be used and the load balancer factory
-  // should be null.
-  // TODO(wbpcode): if we remove the legacy LB policy and configure all LB policies via new
-  // TypedLoadBalancerFactory, we need a new way to check the LB policy.
-  EXPECT_EQ(nullptr, new_initialization_instance->load_balancer_factory_);
+
+  EXPECT_EQ(1, new_initialization_instance->per_priority_state_.at(1).hosts_added_.size());
+  // Ensure the hosts_added_ is empty for priority 0. Because if unexpected merge happens,
+  // the hosts_added_ will be non-empty.
+  EXPECT_TRUE(!new_initialization_instance->per_priority_state_.contains(0) ||
+              new_initialization_instance->per_priority_state_.at(0).hosts_added_.empty());
 }
 
 // Test that removed hosts do not appear when initializing a deferred eds cluster.
