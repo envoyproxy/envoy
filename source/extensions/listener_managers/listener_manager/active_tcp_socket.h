@@ -13,6 +13,7 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/common/linked_object.h"
+#include "source/common/network/generic_listener_filter_impl_base.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/server/active_listener_base.h"
 
@@ -39,39 +40,19 @@ public:
   void unlink();
   void newConnection();
 
-  class GenericListenerFilter : public Network::ListenerFilter {
+  class GenericListenerFilter
+      : public Network::GenericListenerFilterImplBase<Network::ListenerFilter> {
   public:
     GenericListenerFilter(const Network::ListenerFilterMatcherSharedPtr& matcher,
                           Network::ListenerFilterPtr listener_filter)
-        : listener_filter_(std::move(listener_filter)), matcher_(std::move(matcher)) {}
-    Network::FilterStatus onAccept(ListenerFilterCallbacks& cb) override {
-      if (isDisabled(cb)) {
-        return Network::FilterStatus::Continue;
-      }
-      return listener_filter_->onAccept(cb);
-    }
+        : Network::GenericListenerFilterImplBase<Network::ListenerFilter>(
+              std::move(matcher), std::move(listener_filter)) {}
 
     Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override {
       return listener_filter_->onData(buffer);
     }
 
     size_t maxReadBytes() const override { return listener_filter_->maxReadBytes(); }
-
-    /**
-     * Check if this listener filter should be disabled on the incoming socket.
-     * @param cb the callbacks the filter instance can use to communicate with the filter chain.
-     **/
-    bool isDisabled(ListenerFilterCallbacks& cb) {
-      if (matcher_ == nullptr) {
-        return false;
-      } else {
-        return matcher_->matches(cb);
-      }
-    }
-
-  private:
-    const Network::ListenerFilterPtr listener_filter_;
-    const Network::ListenerFilterMatcherSharedPtr matcher_;
   };
   using ListenerFilterWrapperPtr = std::unique_ptr<GenericListenerFilter>;
 

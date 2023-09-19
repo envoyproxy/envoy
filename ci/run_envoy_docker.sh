@@ -129,6 +129,8 @@ docker run --rm \
        -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
        -e BAZEL_STARTUP_EXTRA_OPTIONS \
+       -e CI_BRANCH \
+       -e CI_SHA1 \
        -e CI_TARGET_BRANCH \
        -e DOCKERHUB_USERNAME \
        -e DOCKERHUB_PASSWORD \
@@ -150,8 +152,11 @@ docker run --rm \
        -e ENVOY_HEAD_REF \
        -e ENVOY_PUBLISH_DRY_RUN \
        -e ENVOY_REPO \
+       -e ENVOY_TARBALL_DIR \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
+       -e GITHUB_REF_NAME \
+       -e GITHUB_REF_TYPE \
        -e GITHUB_TOKEN \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \

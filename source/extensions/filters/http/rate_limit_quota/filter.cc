@@ -9,8 +9,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using ::envoy::type::v3::RateLimitStrategy;
-
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);

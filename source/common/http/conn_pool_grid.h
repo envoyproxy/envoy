@@ -69,7 +69,7 @@ public:
       const PoolIterator pool_it_;
       // The handle to cancel this connection attempt.
       // This is owned by the pool which created it.
-      Cancellable* cancellable_;
+      Cancellable* cancellable_{nullptr};
     };
     using ConnectionAttemptCallbacksPtr = std::unique_ptr<ConnectionAttemptCallbacks>;
 

@@ -14,6 +14,7 @@ HTTP filters
   buffer_filter
   cache_filter
   cdn_loop_filter
+  checksum_filter
   compressor_filter
   composite_filter
   connect_grpc_bridge_filter

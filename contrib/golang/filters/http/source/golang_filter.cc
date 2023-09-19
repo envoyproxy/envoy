@@ -807,6 +807,27 @@ CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::drainBuffer(Buffer::Instance* buffer, uint64_t length) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (!state.doDataList.checkExisting(buffer)) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  buffer->drain(length);
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                                    bufferAction action) {
   // lock until this function return since it may running in a Go thread.

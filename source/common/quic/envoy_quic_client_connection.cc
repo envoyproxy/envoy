@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"

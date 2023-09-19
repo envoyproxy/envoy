@@ -28,10 +28,8 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
   ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
-  Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service());
-  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Grpc::GrpcServiceConfigWithHashKey(proto_config.rate_limit_service().grpc_service());
-  return [config_with_hash_key, &context, timeout,
+  THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
+  return [proto_config, &context, timeout,
           filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(
         filter_config,

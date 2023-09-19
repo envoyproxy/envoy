@@ -85,10 +85,10 @@ private:
   void streamBufferedResponseBody();
 
   // Functions for request/response caught time stamp
-  void setTimeStamp(long& pTimeStamp) {
-    pTimeStamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                     config_->timeSource().systemTime().time_since_epoch())
-                     .count();
+  void setTimeStamp(long& p_time_stamp) {
+    p_time_stamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       config_->timeSource().systemTime().time_since_epoch())
+                       .count();
   }
 
   HttpTapConfigSharedPtr config_;

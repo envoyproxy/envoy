@@ -288,7 +288,7 @@ VaryHeaderUtils::getVaryValues(const Http::ResponseHeaderMap& headers) {
 
   std::vector<absl::string_view> values =
       CacheHeadersUtils::parseCommaDelimitedHeader(vary_headers);
-  return absl::btree_set<absl::string_view>(values.begin(), values.end());
+  return {values.begin(), values.end()};
 }
 
 namespace {
