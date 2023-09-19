@@ -8,7 +8,6 @@ TODO(ravenblack): perform the same tests for quic connections once they will wor
 """
 
 import asyncio
-import json
 import logging
 import os
 import random
@@ -166,23 +165,19 @@ static_resources:
 
 async def wait_for_envoy_epoch(i: int):
     """Load the admin/server_info page until restart_epoch is i, or timeout"""
+    expected_substring = f'"restart_epoch": {i}'
     tries = 5
-    response_json = {}
     while tries:
         tries -= 1
         try:
             response = await full_http_request(f"http://{ENVOY_HOST}:{ENVOY_ADMIN_PORT}/server_info")
-            response_json = json.loads(response)
-            if response_json["command_line_options"]["restart_epoch"] == i:
+            if expected_substring in response:
                 return
-        except json.decoder.JSONDecodeError:
-            pass
         except client_exceptions.ClientConnectorError:
             pass
         await asyncio.sleep(0.2)
     # Envoy instance with expected restart_epoch should have started up
-    assert response_json and response_json["command_line_options"] and response_json[
-        "command_line_options"]["restart_epoch"] == i, f"server_info={response}"
+    assert expected_substring in response, f"server_info={response}"
 
 
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):
