@@ -176,7 +176,8 @@ async def _wait_for_envoy_epoch(i: int):
     while tries:
         tries -= 1
         try:
-            response = await _full_http_request(f"http://{ENVOY_HOST}:{ENVOY_ADMIN_PORT}/server_info")
+            response = await _full_http_request(
+                f"http://{ENVOY_HOST}:{ENVOY_ADMIN_PORT}/server_info")
             if expected_substring in response:
                 return
         except client_exceptions.ClientConnectorError:
@@ -208,7 +209,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         await self.slow_upstream.start()
         self.fast_upstream = Upstream(True)
         await self.fast_upstream.start()
-    
+
     async def asyncTearDown(self) -> None:
         await self.slow_upstream.stop()
         await self.fast_upstream.stop()
@@ -253,7 +254,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             fast_response, "fast instance",
             "new requests after hot restart begins should go to new cluster")
-        # Now we can wait for the slow request to complete, and make sure it still gets the
+        # Now wait for the slow request to complete, and make sure it still gets the
         # response from the old instance.
         log.info("waiting for completion of original slow request")
         t1 = datetime.now()
@@ -261,7 +262,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         t2 = datetime.now()
         self.assertGreater(
             (t2 - t1).total_seconds(), 0.5,
-            "slow request should be incomplete when we wait for it, otherwise the test is not necessarily validating during-drain behavior"
+            "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior"
         )
         self.assertIsNone(await anext(slow_response, None))
         log.info("shutting everything down")
