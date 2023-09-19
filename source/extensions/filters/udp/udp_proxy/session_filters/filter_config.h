@@ -33,7 +33,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                Server::Configuration::FactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.udp.session_filters"; }
+  std::string category() const override { return "envoy.filters.udp.session"; }
 };
 
 } // namespace SessionFilters
