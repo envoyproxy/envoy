@@ -56,7 +56,7 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  if [[ "$DOCKER_IN_DOCKER" ]]; then
+  if [[ -n "$DOCKER_IN_DOCKER" ]]; then
       DOCKER_START_EXTRA="apt-get -qq update -y && apt-get -qq install -y --no-install-recommends skopeo"
   else
       DOCKER_START_EXTRA=":"
