@@ -127,6 +127,5 @@ message UdpProxyConfig {
 
   // Optional session filters that will run for each UDP session.
   // Only one of use_per_packet_load_balancing or session_filters can be used.
-  // [#extension-category: envoy.filters.udp.session]
   repeated SessionFilter session_filters = 11;
 }
