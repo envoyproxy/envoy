@@ -5,8 +5,8 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
+#include "quiche/common/capsule.h"
 #include "quiche/common/simple_buffer_allocator.h"
-#include "quiche/quic/core/http/quic_spdy_stream.h"
 
 namespace Envoy {
 namespace Extensions {

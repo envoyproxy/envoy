@@ -1,11 +1,11 @@
 #include "source/extensions/filters/udp/udp_proxy/session_filters/http_capsule/http_capsule.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/hex.h"
 
 #include "absl/strings/escaping.h"
 #include "quiche/common/masque/connect_udp_datagram_payload.h"
 #include "quiche/common/simple_buffer_allocator.h"
-#include "quiche/quic/core/http/quic_spdy_stream.h"
 
 namespace Envoy {
 namespace Extensions {
