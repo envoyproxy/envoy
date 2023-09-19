@@ -217,9 +217,9 @@ HashPolicyImpl::HashPolicyImpl(
       hash_impls_.emplace_back(
           new FilterStateHashMethod(hash_policy->filter_state().key(), hash_policy->terminal()));
       break;
-    default:
-      throw EnvoyException(
-          absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
+        POLICY_SPECIFIER_NOT_SET:
+      PANIC("hash policy not set");
     }
   }
 }
