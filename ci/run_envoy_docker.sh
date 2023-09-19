@@ -56,6 +56,16 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
+  if [[ -n "$DOCKER_IN_DOCKER" ]]; then
+      DOCKER_START_EXTRA=(
+          "echo 'deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/ /' | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list"
+          "&& curl -fsSL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/xUbuntu_20.04/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/devel_kubic_libcontainers_stable.gpg > /dev/null"
+          "&& apt-get -qq update -y"
+          "&& apt-get -qq install -y --no-install-recommends skopeo")
+  else
+      DOCKER_START_EXTRA=(":")
+  fi
+
   START_COMMAND=(
       "/bin/bash"
       "-lc"
@@ -64,6 +74,7 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
+          && ${DOCKER_START_EXTRA[*]} \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
@@ -129,6 +140,8 @@ docker run --rm \
        -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
        -e BAZEL_STARTUP_EXTRA_OPTIONS \
+       -e CI_BRANCH \
+       -e CI_SHA1 \
        -e CI_TARGET_BRANCH \
        -e DOCKERHUB_USERNAME \
        -e DOCKERHUB_PASSWORD \
@@ -150,8 +163,11 @@ docker run --rm \
        -e ENVOY_HEAD_REF \
        -e ENVOY_PUBLISH_DRY_RUN \
        -e ENVOY_REPO \
+       -e ENVOY_TARBALL_DIR \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
+       -e GITHUB_REF_NAME \
+       -e GITHUB_REF_TYPE \
        -e GITHUB_TOKEN \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \

@@ -14,9 +14,9 @@
 
 from datetime import datetime
 import os
-from sphinx.directives.code import CodeBlock
-from envoy.docs.sphinx_runner import sphinx_rtd_theme
 import sys
+from sphinx.directives.code import CodeBlock
+import sphinx_rtd_theme
 
 
 # https://stackoverflow.com/questions/44761197/how-to-use-substitution-definitions-with-code-blocks

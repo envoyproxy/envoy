@@ -710,13 +710,10 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(
-          rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info())
-              .ok()),
-      EnvoyException,
-      "Unexpected RDS configuration (expecting foo_route_config): "
-      "INVALID_NAME_FOR_route_config");
+  EXPECT_EQ(rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info())
+                .message(),
+            "Unexpected RDS configuration (expecting foo_route_config): "
+            "INVALID_NAME_FOR_route_config");
 
   // Verify that the config is still the old value.
   ASSERT_EQ(config_impl_pointer, rds_subscription->routeConfigProvider()->config());
@@ -1226,11 +1223,10 @@ TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   envoy::config::route::v3::RouteConfiguration route_config;
   const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
-                      ->onConfigUpdate(decoded_resources.refvec_, "")
-                      .ok()),
-      EnvoyException, "Unexpected RDS resource length: 2");
+  EXPECT_EQ(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources.refvec_, "")
+                .message(),
+            "Unexpected RDS resource length: 2");
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/7939

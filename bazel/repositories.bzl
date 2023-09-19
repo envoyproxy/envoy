@@ -16,6 +16,13 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.opencensus",
 ]
 
+NO_HTTP3_SKIP_TARGETS = [
+    "envoy.quic.crypto_stream.server.quiche",
+    "envoy.quic.deterministic_connection_id_generator",
+    "envoy.quic.crypto_stream.server.quiche",
+    "envoy.quic.proof_source.filter_chain",
+]
+
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
 def _build_all_content(exclude = []):
@@ -388,7 +395,7 @@ def _com_github_axboe_liburing():
     )
     native.bind(
         name = "uring",
-        actual = "@envoy//bazel/foreign_cc:liburing",
+        actual = "@envoy//bazel/foreign_cc:liburing_linux",
     )
 
 def _com_github_bazel_buildtools():

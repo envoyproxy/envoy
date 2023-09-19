@@ -15,6 +15,7 @@ py_binary(
     srcs = ["protoprint.py"],
     data = [
         "//:.clang-format",
+        "//tools/clang-format",
         "//tools/type_whisperer:api_type_db.pb_text",
     ],
     visibility = ["//visibility:public"],

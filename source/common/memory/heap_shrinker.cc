@@ -12,8 +12,7 @@ namespace Memory {
 constexpr std::chrono::milliseconds kTimerInterval = std::chrono::milliseconds(10000);
 
 HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManager& overload_manager,
-                           Stats::Scope& stats)
-    : active_(false) {
+                           Stats::Scope& stats) {
   const auto action_name = Server::OverloadActionNames::get().ShrinkHeap;
   if (overload_manager.registerForAction(
           action_name, dispatcher,

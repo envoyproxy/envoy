@@ -135,7 +135,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
 
   if (b3.length() == 1) { // possibly sampling flags
     if (validSamplingFlags(b3[0])) {
-      return std::pair<SpanContext, bool>(SpanContext(), false);
+      return {SpanContext(), false};
     }
     throw ExtractorException(fmt::format("Invalid input: invalid sampling flag {}", b3[0]));
   }
