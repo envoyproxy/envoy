@@ -17,7 +17,6 @@ import asyncio
 import logging
 import subprocess
 import sys
-import threading
 
 def random_loopback_host():
     """Returns a randomized loopback IP.
@@ -44,7 +43,7 @@ _stream_handler = logging.StreamHandler(sys.stdout)
 log.addHandler(_stream_handler)
 
 class Upstream:
-    # This class runs a server on a thread which takes an http request to
+    # This class runs a server which takes an http request to
     # path=/ and responds with "start\n" [three second pause] "end\n".
     # This allows us to test that during hot restart an already-opened
     # connection will persist.
@@ -55,33 +54,18 @@ class Upstream:
         self.app = web.Application()
         self.app.add_routes([
             web.get('/', self.fast_response) if fast_version else web.get('/', self.slow_response),
-            web.get('/shutdown', self.handle_shutdown),
         ])
 
-    def start(self):
-        def run():
-            event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(event_loop)
-            log.debug("running test upstream service")
-            try:
-                web.run_app(self.app, host=UPSTREAM_HOST, port=self.port, handle_signals=False)
-            except web_runner.GracefulExit:
-                pass
-            event_loop.close()
-
-        self.thread = threading.Thread(target=run)
-        self.thread.start()
+    async def start(self):
+        self.runner = web.AppRunner(self.app, handle_signals=False)
+        await self.runner.setup()
+        site = web.TCPSite(self.runner, host=UPSTREAM_HOST, port=self.port)
+        await site.start()
 
     async def stop(self):
-        log.debug("requesting upstream shutdown")
-        try:
-            async for _ in http_request(f"http://{UPSTREAM_HOST}:{self.port}/shutdown"):
-                pass
-        except client_exceptions.ServerDisconnectedError:
-            # ServerDisconnected is the expectation since we requested it to shut down!
-            pass
-        self.thread.join()
-        log.debug("upstream thread joined")
+        await self.runner.shutdown()
+        await self.runner.cleanup()
+        log.debug("runner cleaned up")
 
     async def fast_response(self, request):
         return web.Response(status=200, reason='OK', headers={'content-type': 'text/plain'}, body='fast instance')
@@ -95,10 +79,6 @@ class Upstream:
         await response.write(b"end\n")
         await response.write_eof()
         return response
-    
-    async def handle_shutdown(self, request):
-        log.debug("shutdown request received")
-        raise web_runner.GracefulExit()
 
 async def http_request(url):
     async with ClientSession() as session:
@@ -198,9 +178,9 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         make_envoy_config_yaml(upstream_port=UPSTREAM_FAST_PORT, file_path=fast_config_path)
         log.info("starting upstreams")
         slow_upstream = Upstream()
-        slow_upstream.start()
+        await slow_upstream.start()
         fast_upstream = Upstream(True)
-        fast_upstream.start()
+        await fast_upstream.start()
         envoy_args = [
             ENVOY_BINARY,
             "--socket-path", SOCKET_PATH,
