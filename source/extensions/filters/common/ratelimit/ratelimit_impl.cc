@@ -123,7 +123,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
-                          const Grpc::GrpcServiceConfigWithHashKey config_with_hash_key,
+                          const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                           const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
