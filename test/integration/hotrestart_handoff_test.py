@@ -7,16 +7,15 @@ Specifically, tests that:
 TODO(ravenblack): perform the same tests for quic connections once they will work as expected.
 """
 
-from datetime import datetime
+import asyncio
 import json
+import logging
 import os
 import random
-import unittest
-from aiohttp import client_exceptions, web, web_runner, ClientSession
-import asyncio
-import logging
-import subprocess
 import sys
+import unittest
+from datetime import datetime
+from aiohttp import client_exceptions, web, ClientSession
 
 
 def random_loopback_host():
@@ -201,16 +200,16 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             str(SOCKET_MODE),
         ]
         log.info("starting envoy")
-        envoy_process_1 = subprocess.Popen(
-            envoy_args + [
-                "--restart-epoch",
-                "0",
-                "--use-dynamic-base-id",
-                "--base-id-path",
-                base_id_path,
-                "-c",
-                slow_config_path,
-            ])
+        envoy_process_1 = await asyncio.create_subprocess_exec(
+            *envoy_args,
+            "--restart-epoch",
+            "0",
+            "--use-dynamic-base-id",
+            "--base-id-path",
+            base_id_path,
+            "-c",
+            slow_config_path,
+        )
         log.info("waiting for envoy ready")
         await wait_for_envoy_epoch(0)
         log.info("making request")
@@ -220,17 +219,17 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         with open(base_id_path, "r") as base_id_file:
             base_id = int(base_id_file.read())
         log.info(f"starting envoy hot restart for base id {base_id}")
-        envoy_process_2 = subprocess.Popen(
-            envoy_args + [
-                "--restart-epoch",
-                "1",
-                "--parent-shutdown-time-s",
-                "3",
-                "--base-id",
-                str(base_id),
-                "-c",
-                fast_config_path,
-            ])
+        envoy_process_2 = await asyncio.create_subprocess_exec(
+            *envoy_args,
+            "--restart-epoch",
+            "1",
+            "--parent-shutdown-time-s",
+            "3",
+            "--base-id",
+            str(base_id),
+            "-c",
+            fast_config_path,
+        )
         log.info("waiting for new envoy instance to begin")
         await wait_for_envoy_epoch(1)
         log.info("sending request to fast upstream")
@@ -254,8 +253,8 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         envoy_process_2.terminate()
         await slow_upstream.stop()
         await fast_upstream.stop()
-        envoy_process_1.wait()
-        envoy_process_2.wait()
+        await envoy_process_1.wait()
+        await envoy_process_2.wait()
 
 
 if __name__ == '__main__':
