@@ -46,6 +46,7 @@ constexpr absl::string_view CodeDetails = "code_details";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
 constexpr absl::string_view GrpcStatus = "grpc_status";
+constexpr absl::string_view FilterName = "filter_name";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";

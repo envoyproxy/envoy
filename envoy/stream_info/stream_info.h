@@ -598,6 +598,12 @@ public:
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
   /**
+   * @param rc_filter_name the response filter name string to set for this request. It should not
+   * contain any empty or space characters (' ', '\t', '\f', '\v', '\n', '\r'). See
+   */
+  virtual void setResponseFilterName(absl::string_view rc_filter_name) PURE;
+
+  /**
    * @param connection_termination_details the termination details string to set for this
    * connection.
    */
@@ -676,6 +682,11 @@ public:
    * @return the response code details.
    */
   virtual const absl::optional<std::string>& responseCodeDetails() const PURE;
+
+  /**
+   * @return the response filter name details.
+   */
+  virtual const absl::optional<std::string>& responseFilterName() const PURE;
 
   /**
    * @return the termination details of the connection.

@@ -498,7 +498,7 @@ message HTTPRequestProperties {
   uint64 downstream_header_bytes_received = 15;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HTTPResponseProperties {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.HTTPResponseProperties";
@@ -532,4 +532,7 @@ message HTTPResponseProperties {
 
   // Number of header bytes sent to the downstream by the http stream, including protocol overhead.
   uint64 downstream_header_bytes_sent = 8;
+
+  // The HTTP response filter name.
+  string response_filter_name = 9;
 }

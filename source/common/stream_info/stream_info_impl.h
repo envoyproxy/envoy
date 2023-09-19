@@ -210,11 +210,20 @@ struct StreamInfoImpl : public StreamInfo {
     return response_code_details_;
   }
 
+  const absl::optional<std::string>& responseFilterName() const override {
+    return response_filter_name_;
+  }
+
   void setResponseCode(uint32_t code) override { response_code_ = code; }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
     ASSERT(!StringUtil::hasEmptySpace(rc_details));
     response_code_details_.emplace(rc_details);
+  }
+
+  void setResponseFilterName(absl::string_view rc_filter_name) override {
+    ASSERT(!StringUtil::hasEmptySpace(rc_filter_name));
+    response_filter_name_.emplace(rc_filter_name);
   }
 
   const absl::optional<std::string>& connectionTerminationDetails() const override {
@@ -420,6 +429,7 @@ private:
 
 public:
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> response_filter_name_;
   absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   bool health_check_request_{};

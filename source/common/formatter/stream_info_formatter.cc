@@ -797,6 +797,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.responseCodeDetails();
                   });
             }}},
+          {"RESPONSE_FILTER_NAME",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.responseFilterName();
+                  });
+            }}},
           {"CONNECTION_TERMINATION_DETAILS",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {

@@ -184,6 +184,12 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
       return CelValue::CreateString(&details.value());
     }
     return {};
+  } else if (value == FilterName) {
+    const absl::optional<std::string>& filter_name = info_.responseFilterName();
+    if (filter_name.has_value()) {
+      return CelValue::CreateString(&filter_name.value());
+    }
+    return {};
   }
   return {};
 }
