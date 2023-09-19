@@ -84,8 +84,8 @@ jobs:
       ci/docker_ci.sh
     workingDirectory: $(Build.SourcesDirectory)
     env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      AZP_SHA1: $(Build.SourceVersion)
+      CI_BRANCH: $(Build.SourceBranch)
+      CI_SHA1: $(Build.SourceVersion)
       DOCKERHUB_USERNAME: $(DockerUsername)
       DOCKERHUB_PASSWORD: $(DockerPassword)
       WINDOWS_BUILD_TYPE: $(windowsBuildType)
