@@ -84,7 +84,10 @@ class Upstream:
         return response
 
 
-async def http_request(url):
+async def _http_request(url):
+    # Separate session per request is against aiohttp idioms, but is
+    # intentional here because we're testing where connections go - we
+    # definitely don't want to accidentally reuse a connection!
     async with ClientSession() as session:
         retries = 5
         while retries:
@@ -102,13 +105,16 @@ async def http_request(url):
                     log.debug(f"retrying request ({retries} remain)\n")
 
 
-async def full_http_request(url: str) -> str:
+async def _full_http_request(url: str) -> str:
+    # Separate session per request is against aiohttp idioms, but is
+    # intentional here because we're testing where connections go - we
+    # definitely don't want to accidentally reuse a connection!
     async with ClientSession() as session:
         async with session.get(url) as response:
             return await response.text()
 
 
-def make_envoy_config_yaml(upstream_port, file_path):
+def _make_envoy_config_yaml(upstream_port, file_path):
     with open(file_path, "w") as file:
         file.write(
             f"""
@@ -163,14 +169,14 @@ static_resources:
 """)
 
 
-async def wait_for_envoy_epoch(i: int):
+async def _wait_for_envoy_epoch(i: int):
     """Load the admin/server_info page until restart_epoch is i, or timeout"""
     expected_substring = f'"restart_epoch": {i}'
     tries = 5
     while tries:
         tries -= 1
         try:
-            response = await full_http_request(f"http://{ENVOY_HOST}:{ENVOY_ADMIN_PORT}/server_info")
+            response = await _full_http_request(f"http://{ENVOY_HOST}:{ENVOY_ADMIN_PORT}/server_info")
             if expected_substring in response:
                 return
         except client_exceptions.ClientConnectorError:
@@ -187,8 +193,8 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.slow_config_path = os.path.join(tmpdir, "slow_config.yaml")
         self.fast_config_path = os.path.join(tmpdir, "fast_config.yaml")
         self.base_id_path = os.path.join(tmpdir, "base_id.txt")
-        make_envoy_config_yaml(upstream_port=UPSTREAM_SLOW_PORT, file_path=self.slow_config_path)
-        make_envoy_config_yaml(upstream_port=UPSTREAM_FAST_PORT, file_path=self.fast_config_path)
+        _make_envoy_config_yaml(upstream_port=UPSTREAM_SLOW_PORT, file_path=self.slow_config_path)
+        _make_envoy_config_yaml(upstream_port=UPSTREAM_FAST_PORT, file_path=self.fast_config_path)
         self.base_envoy_args = [
             ENVOY_BINARY,
             "--socket-path",
@@ -221,9 +227,9 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             self.slow_config_path,
         )
         log.info("waiting for envoy ready")
-        await wait_for_envoy_epoch(0)
+        await _wait_for_envoy_epoch(0)
         log.info("making request")
-        slow_response = http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
+        slow_response = _http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
         log.info("waiting for response to begin")
         self.assertEqual(await anext(slow_response, None), b"start\n")
         with open(self.base_id_path, "r") as base_id_file:
@@ -241,9 +247,9 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             self.fast_config_path,
         )
         log.info("waiting for new envoy instance to begin")
-        await wait_for_envoy_epoch(1)
+        await _wait_for_envoy_epoch(1)
         log.info("sending request to fast upstream")
-        fast_response = await full_http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
+        fast_response = await _full_http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
         self.assertEqual(
             fast_response, "fast instance",
             "new requests after hot restart begins should go to new cluster")
