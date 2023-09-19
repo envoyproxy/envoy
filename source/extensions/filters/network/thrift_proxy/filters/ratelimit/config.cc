@@ -31,12 +31,13 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 
   Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service());
-  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key = Grpc::GrpcServiceConfigWithHashKey(proto_config.rate_limit_service().grpc_service());
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+      Grpc::GrpcServiceConfigWithHashKey(proto_config.rate_limit_service().grpc_service());
   return [config_with_hash_key, &context, timeout,
           config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Filter>(
-        config, Filters::Common::RateLimit::rateLimitClient(
-                    context, config_with_hash_key, timeout)));
+        config,
+        Filters::Common::RateLimit::rateLimitClient(context, config_with_hash_key, timeout)));
   };
 }
 

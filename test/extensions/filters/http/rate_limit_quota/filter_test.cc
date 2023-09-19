@@ -85,7 +85,8 @@ public:
 
   void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
-    Grpc::GrpcServiceConfigWithHashKey config_with_hash_key = Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
+    Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+        Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
     filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, bucket_cache_,
                                                      thread_local_client_, config_with_hash_key);
     if (set_callback) {

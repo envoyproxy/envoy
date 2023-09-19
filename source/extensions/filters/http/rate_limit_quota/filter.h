@@ -49,9 +49,10 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
-                       BucketsCache& quota_buckets, ThreadLocalClient& client, Grpc::GrpcServiceConfigWithHashKey config_with_hash_key)
-      : config_(std::move(config)), config_with_hash_key_(config_with_hash_key), factory_context_(factory_context),
-        quota_buckets_(quota_buckets), client_(client),
+                       BucketsCache& quota_buckets, ThreadLocalClient& client,
+                       Grpc::GrpcServiceConfigWithHashKey config_with_hash_key)
+      : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
+        factory_context_(factory_context), quota_buckets_(quota_buckets), client_(client),
         time_source_(factory_context.mainThreadDispatcher().timeSource()) {
     createMatcher();
   }

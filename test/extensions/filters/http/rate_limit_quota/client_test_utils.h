@@ -62,9 +62,11 @@ public:
           .WillOnce(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
     }
 
-    Grpc::GrpcServiceConfigWithHashKey config_with_hash_key = Grpc::GrpcServiceConfigWithHashKey(grpc_service);
+    Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+        Grpc::GrpcServiceConfigWithHashKey(grpc_service);
 
-    client_ = createRateLimitClient(context, &callbacks_, bucket_cache_, domain_, config_with_hash_key);
+    client_ =
+        createRateLimitClient(context, &callbacks_, bucket_cache_, domain_, config_with_hash_key);
   }
 
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
