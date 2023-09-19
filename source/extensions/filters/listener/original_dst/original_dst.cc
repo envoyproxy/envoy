@@ -89,7 +89,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
         socket.connectionInfoProvider().restoreLocalAddress(local_address);
       } else {
         ENVOY_LOG_MISC(debug, "original_dst: failed to parse address: {}",
-                       local_address->asString());
+                       local_value.DebugString());
       }
     } else {
       const auto* local_object =
