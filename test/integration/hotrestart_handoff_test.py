@@ -104,11 +104,9 @@ async def http_request(url):
 
 
 async def full_http_request(url: str) -> str:
-    """Uses http_request so as to share the retry behavior."""
-    response_lines = []
-    async for line in http_request(url):
-        response_lines.append(line.decode())
-    return "".join(response_lines)
+    async with ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.text()
 
 
 def make_envoy_config_yaml(upstream_port, file_path):
@@ -172,12 +170,14 @@ async def wait_for_envoy_epoch(i: int):
     response_json = {}
     while tries:
         tries -= 1
-        response = await full_http_request(f"http://{ENVOY_HOST}:{ENVOY_ADMIN_PORT}/server_info")
         try:
+            response = await full_http_request(f"http://{ENVOY_HOST}:{ENVOY_ADMIN_PORT}/server_info")
             response_json = json.loads(response)
             if response_json["command_line_options"]["restart_epoch"] == i:
                 return
         except json.decoder.JSONDecodeError:
+            pass
+        except client_exceptions.ClientConnectorError:
             pass
         await asyncio.sleep(0.2)
     # Envoy instance with expected restart_epoch should have started up
