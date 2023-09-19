@@ -192,8 +192,9 @@ bool LocalRateLimiterImpl::requestAllowed(
       }
     }
   }
-  // Since global tokens are not sorted, it should be larger than other descriptors.
+
   if (!matched_descriptor || always_consume_default_token_bucket_) {
+    // Since global tokens are not sorted, it should be larger than other descriptors.
     return requestAllowedHelper(tokens_);
   }
   return true;

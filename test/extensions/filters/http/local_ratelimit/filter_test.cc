@@ -519,7 +519,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFoundWithConsumeDefaultTokenTrue)
               getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
-      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+      .WillOnce(testing::SetArgReferee<0>(descriptor_not_found_));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
