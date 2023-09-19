@@ -1808,8 +1808,8 @@ struct FrameIntegrationTestParam {
 
 std::string
 frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
-  return absl::StrCat(TestUtility::ipVersionToString(params.param.ip_version),
-                      "_", http2ImplementationToString(params.param.http2_implementation));
+  return absl::StrCat(TestUtility::ipVersionToString(params.param.ip_version), "_",
+                      http2ImplementationToString(params.param.http2_implementation));
 }
 
 class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
@@ -2067,7 +2067,8 @@ TEST_P(Http2FrameIntegrationTest, HostDifferentFromAuthority) {
   beginSession();
 
   uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx), "one.example.com", "/path", {{"host", "two.example.com"}});
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", "two.example.com"}});
   sendFrame(request);
 
   waitForNextUpstreamRequest();
@@ -2083,7 +2084,8 @@ TEST_P(Http2FrameIntegrationTest, HostSameAsAuthority) {
   beginSession();
 
   uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx), "one.example.com", "/path", {{"host", "one.example.com"}});
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", "one.example.com"}});
   sendFrame(request);
 
   waitForNextUpstreamRequest();
