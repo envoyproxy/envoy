@@ -107,7 +107,7 @@ private:
   Config::SubscriptionPtr subscription_;
   const std::string sds_config_name_;
 
-  uint64_t secret_hash_;
+  uint64_t secret_hash_{0};
   uint64_t files_hash_;
   Cleanup clean_up_;
   Config::SubscriptionFactory& subscription_factory_;
