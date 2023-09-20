@@ -22,19 +22,6 @@ public:
 
 using FilterNames = ConstSingleton<FilterNameValues>;
 
-class AddressObject : public StreamInfo::FilterState::Object, public Hashable {
-public:
-  AddressObject(const Network::Address::InstanceConstSharedPtr& address) : address_(address) {}
-  absl::optional<std::string> serializeAsString() const override { return address_->asString(); }
-  // Implements hashing interface because the value is applied once per the internal connection.
-  // Multiple streams sharing the internal upstream connection must have the same address object.
-  absl::optional<uint64_t> hash() const override;
-  const Network::Address::InstanceConstSharedPtr& address() const { return address_; }
-
-private:
-  const Network::Address::InstanceConstSharedPtr address_;
-};
-
 /**
  * Implementation of an original destination listener filter.
  */

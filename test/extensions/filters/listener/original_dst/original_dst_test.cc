@@ -64,12 +64,14 @@ TEST_F(OriginalDstTest, InternalFilterState) {
   EXPECT_CALL(socket_, addressType()).WillRepeatedly(Return(Network::Address::Type::EnvoyInternal));
   const auto local = Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
   const auto remote = Network::Utility::parseInternetAddress("127.0.0.1", 8000, false);
-  cb_.filter_state_.setData(
-      "envoy.filters.listener.original_dst.local_ip", std::make_shared<AddressObject>(local),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
-  cb_.filter_state_.setData(
-      "envoy.filters.listener.original_dst.remote_ip", std::make_shared<AddressObject>(remote),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  cb_.filter_state_.setData("envoy.filters.listener.original_dst.local_ip",
+                            std::make_shared<Network::AddressObject>(local),
+                            StreamInfo::FilterState::StateType::Mutable,
+                            StreamInfo::FilterState::LifeSpan::Connection);
+  cb_.filter_state_.setData("envoy.filters.listener.original_dst.remote_ip",
+                            std::make_shared<Network::AddressObject>(remote),
+                            StreamInfo::FilterState::StateType::Mutable,
+                            StreamInfo::FilterState::LifeSpan::Connection);
   filter_.onAccept(cb_);
   EXPECT_TRUE(socket_.connectionInfoProvider().localAddressRestored());
   EXPECT_EQ(local->asString(), socket_.connectionInfoProvider().localAddress()->asString());

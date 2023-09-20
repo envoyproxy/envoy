@@ -3,8 +3,8 @@
 #include "envoy/network/listen_socket.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/hash.h"
 #include "source/common/config/metadata.h"
+#include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/network/utility.h"
@@ -13,10 +13,6 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
-
-absl::optional<uint64_t> AddressObject::hash() const {
-  return Envoy::HashUtil::xxHash64(address_->asStringView());
-}
 
 Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Network::Socket& sock) {
   return Network::Utility::getOriginalDst(sock);
@@ -92,16 +88,16 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
                        local_value.DebugString());
       }
     } else {
-      const auto* local_object =
-          cb.filterState().getDataReadOnly<AddressObject>(FilterNames::get().LocalFilterStateKey);
+      const auto* local_object = cb.filterState().getDataReadOnly<Network::AddressObject>(
+          FilterNames::get().LocalFilterStateKey);
       if (local_object) {
         ENVOY_LOG_MISC(debug, "original_dst: set destination from filter state to {}",
                        local_object->address()->asString());
         socket.connectionInfoProvider().restoreLocalAddress(local_object->address());
       }
     }
-    const auto* remote_object =
-        cb.filterState().getDataReadOnly<AddressObject>(FilterNames::get().RemoteFilterStateKey);
+    const auto* remote_object = cb.filterState().getDataReadOnly<Network::AddressObject>(
+        FilterNames::get().RemoteFilterStateKey);
     if (remote_object) {
       ENVOY_LOG_MISC(debug, "original_dst: set source from filter state to {}",
                      remote_object->address()->asString());

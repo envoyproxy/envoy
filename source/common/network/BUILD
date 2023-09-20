@@ -507,9 +507,10 @@ envoy_cc_library(
     hdrs = ["filter_state_dst_address.h"],
     deps = [
         ":utility_lib",
+        "//envoy/common:hashable_interface",
         "//envoy/network:address_interface",
-        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:hash_lib",
         "//source/common/common:macros",
     ],
 )
