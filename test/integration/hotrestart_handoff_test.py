@@ -95,7 +95,6 @@ async def _http_request(url) -> AsyncIterator[str]:
         async with session.get(url) as response:
             async for line in response.content:
                 yield line
-            return
 
 
 async def _full_http_request(url: str) -> str:
