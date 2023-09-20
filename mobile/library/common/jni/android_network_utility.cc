@@ -148,6 +148,8 @@ envoy_cert_validation_result verify_x509_cert_chain(const std::vector<std::strin
   case CERT_VERIFY_STATUS_NOT_YET_VALID:
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_UNKNOWN,
             "AndroidNetworkLibrary_verifyServerCertificates failed: not yet valid."};
+  default:
+    PANIC_DUE_TO_CORRUPT_ENUM
   }
 }
 

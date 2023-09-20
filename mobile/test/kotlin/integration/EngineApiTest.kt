@@ -1,7 +1,6 @@
 package test.kotlin.integration
 
 import io.envoyproxy.envoymobile.Element
-import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.engine.JniLibrary

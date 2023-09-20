@@ -80,7 +80,6 @@ class StreamIdleTimeoutTest {
       )
       .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
       .addStreamIdleTimeoutSeconds(1)
-      .setOnEngineRunning {}
       .build()
 
     val client = engine.streamClient()
