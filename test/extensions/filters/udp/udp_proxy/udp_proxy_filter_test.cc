@@ -937,6 +937,28 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
   ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
 }
 
+TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndSessionFilters) {
+  auto config = R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(readConfig(config)), EnvoyException,
+      "Only one of use_per_packet_load_balancing or session_filters can be used.");
+}
+
 // Verify that on second data packet sent from the client, another upstream host is selected.
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingBasicFlow) {
   InSequence s;

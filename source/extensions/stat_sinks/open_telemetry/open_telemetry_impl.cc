@@ -14,7 +14,7 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
       use_tag_extracted_name_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
-      stat_prefix_(sink_config.prefix() != "" ? sink_config.prefix() + "." : "") {}
+      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : "") {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)

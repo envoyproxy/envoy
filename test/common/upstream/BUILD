@@ -70,6 +70,7 @@ envoy_cc_test(
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
         "//test/mocks/config:config_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",

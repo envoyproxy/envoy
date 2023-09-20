@@ -25,7 +25,7 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
       dispatcher_(dispatcher), api_(api),
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
-      sds_config_name_(sds_config_name), secret_hash_(0), clean_up_(std::move(destructor_cb)),
+      sds_config_name_(sds_config_name), clean_up_(std::move(destructor_cb)),
       subscription_factory_(subscription_factory),
       time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
                                               time_source_.systemTime()} {
@@ -81,12 +81,15 @@ void SdsApi::onWatchUpdate() {
 
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                     const std::string& version_info) {
-  validateUpdateSize(resources.size());
+  const absl::Status status = validateUpdateSize(resources.size());
+  if (!status.ok()) {
+    return status;
+  }
   const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
       resources[0].get().resource());
 
   if (secret.name() != sds_config_name_) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name()));
   }
 
@@ -135,7 +138,10 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                     const Protobuf::RepeatedPtrField<std::string>&,
                                     const std::string&) {
-  validateUpdateSize(added_resources.size());
+  const absl::Status status = validateUpdateSize(added_resources.size());
+  if (!status.ok()) {
+    return status;
+  }
   return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
@@ -146,14 +152,16 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
   init_target_.ready();
 }
 
-void SdsApi::validateUpdateSize(int num_resources) {
+absl::Status SdsApi::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
   }
   if (num_resources != 1) {
-    throw EnvoyException(fmt::format("Unexpected SDS secrets length: {}", num_resources));
+    return absl::InvalidArgumentError(
+        fmt::format("Unexpected SDS secrets length: {}", num_resources));
   }
+  return absl::OkStatus();
 }
 
 void SdsApi::initialize() {

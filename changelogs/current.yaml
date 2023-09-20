@@ -25,6 +25,11 @@ behavior_changes:
     Switch from http_parser to BalsaParser for handling HTTP/1.1 traffic. See https://github.com/envoyproxy/envoy/issues/21245 for
     details. This behavioral change can be reverted by setting runtime flag ``envoy.reloadable_features.http1_use_balsa_parser`` to
     false.
+- area: udp_proxy
+  change: |
+    When the UDP proxy has session filters, choosing the upstream host and creating a socket only happens after iterating all
+    ``onNewSession()`` calls for all the filters in the chain. Upstream host health check for each downstream datagram does
+    not apply when there are session filters, and per-packet load balancing can't be used when there are session filters.
 - area: zone-aware routing
   change: |
     Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
@@ -35,6 +40,13 @@ behavior_changes:
     Previously, zone-aware routing would not route fairly in this case.
     To revert the entire change, set the runtime flag ``envoy.reloadable_features.locality_routing_use_new_routing_logic``
     to false to get the old behavior and well-tested codepaths, undoing both changes.
+
+- area: UHV
+  change: |
+    Introduced runtime flag ``envoy.reloadable_features.enable_universal_header_validator`` for toggling Universal Header Validator
+    (UHV) on and off.
+    The default value is off. This option is currently functional only when the ``ENVOY_ENABLE_UHV`` build flag is enabled.
+    See https://github.com/envoyproxy/envoy/issues/10646 for more information about UHV.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -133,9 +145,18 @@ bug_fixes:
 - area: router check tool
   change: |
     Fixed a bug where the route coverage is not correctly calculated when a route has weighted clusters.
+- area: unix domain sockets
+  change: |
+    Fixed a crash on some versions of macOS when using a listener on a unix-domain socket.
+- area: redis
+  change: |
+    Fixed a bug where redis key with % in the key is failing with a validation error.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: listener
+  change: |
+    Removed ``envoy.reloadable_features.enable_update_listener_socket_options`` runtime flag and legacy code paths.
 - area: tcp
   change: |
     Removed runtime key ``envoy.reloadable_features.tcp_pool_idle_timeout``.
@@ -196,6 +217,10 @@ new_features:
 - area: extension_discovery_service
   change: |
     added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
+- area: quic
+  change: |
+    added support for QUIC listener filters with ECDS support reusing the same config API
+    :ref:`listener_filters <envoy_v3_api_field_config.listener.v3.Listener.listener_filters>` as TCP does.
 - area: redis
   change: |
     added support for time command (returns a local response).
@@ -218,18 +243,44 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: tls
+  change: |
+    added :ref:`disable_stateful_session_resumption
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` config option to
+    disable stateful TLS session resumption.
 - area: udp_proxy
   change: |
     added :ref:`session_filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>` config to
     support optional filters that will run for each upstream UDP session. More information can be found in the UDP proxy documentation.
+- area: udp_proxy
+  change: |
+    added ``injectDatagramToFilterChain()`` callback to UDP session filters that allows session filters to inject datagrams downstream
+    or upstream the filter chain during a filter chain iteration. This can be used, for example, by session filters that are required
+    to buffer datagrams due to an asynchronous call.
 - area: otlp_stats_sink
   change: |
     added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
     to OTLP stats sink that enables adding a static prefix to all stats flushed by this sink.
+- area: udp_proxy
+  change: |
+    added :ref:`http_capsule <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig>` UDP session filter
+    that can be used to encapsule or decapsulate UDP datagrams in HTTP, when used for UDP tunneling.
 - area: tap
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: tls
+  change: |
+    added fallback :ref:`fallback
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.PrivateKeyProvider.fallback>`
+    to support private key provider to fallback to boringssl tls handshake.
+    If the private key provider isn't available (eg. the required hardware capability doesn't existed),
+    Envoy will fallback to the BoringSSL default implementation when the fallback is true.
+    The default value is false.
+- area: tcp
+  change: |
+    added the support to detect and send TCP RST for raw buffer socket based connections. This is currently supported on Linux only.
+    It can be disabled by the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
 
 - area: upstream
   change: |

@@ -5,7 +5,6 @@ import androidx.test.core.app.ApplicationProvider
 
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
-import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.FilterDataStatus
 import io.envoyproxy.envoymobile.FilterHeadersStatus
@@ -28,7 +27,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
