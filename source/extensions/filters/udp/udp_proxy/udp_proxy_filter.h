@@ -330,6 +330,9 @@ private:
   absl::optional<std::reference_wrapper<TunnelCreationCallbacks>> tunnel_creation_callbacks_;
 };
 
+/**
+ * Provide method to create upstream HTTP stream for UDP tunneling.
+ */
 class TunnelingConnectionPool {
 public:
   virtual ~TunnelingConnectionPool() = default;
