@@ -52,8 +52,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
       auto rate_limit_strategy =
           quota_buckets_[bucket_id]->bucket_action.quota_assignment_action().rate_limit_strategy();
 
-      // TODO(tyxia) Currently only ALLOW_ALL and token bucket strageties are implemented.
-      // Change to switch case when more stragegies are implemented.
+      // TODO(tyxia) Currently only ALLOW_ALL and token bucket strategies are implemented.
+      // Change to switch case when more strategies are implemented.
       if (rate_limit_strategy.has_blanket_rule() &&
           rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
         quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;

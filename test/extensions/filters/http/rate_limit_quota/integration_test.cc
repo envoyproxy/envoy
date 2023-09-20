@@ -421,12 +421,12 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
   int tokens_per_fill = 30;
   int fill_interval_sec = 60;
   int fill_one_token_in_ms = fill_interval_sec / tokens_per_fill * 1000;
-  // 1st request: allowed; fail-open, default no assignment policy.
-  // 2nd request: allowed; one token remaining, token bucket's max_token is 1.
-  // 3nd request: allowed: token bucket has been refilled by advacning 2s.
-  // 4th requset: rejected: no token left and no token refilled
+  // First request: allowed; fail-open, default no assignment policy.
+  // Second request: allowed; one token remaining, token bucket's max_token is 1.
+  // Third request: allowed: token bucket has been refilled by advancing 2s.
+  // Fourth request: rejected: no token left and no token refilled
   for (int i = 0; i < 4; ++i) {
-    // We advance time 2s for 3rd request (i.e. i=2) so that token bucket can
+    // We advance time by 2s for third request (i.e. i=2) so that token bucket can
     // be refilled.
     if (i == 2) {
       simTime().advanceTimeAndRun(std::chrono::milliseconds(fill_one_token_in_ms), *dispatcher_,
@@ -441,12 +441,12 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
       // Start the gRPC stream to RLQS server.
       ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
       ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
-      // repots should be built in filter.cc
+
       envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
       ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
       rlqs_stream_->startGrpcStream();
 
-      // Build the resposne.
+      // Build the response.
       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
       absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
       custom_headers_cpy.insert({"name", "prod"});
