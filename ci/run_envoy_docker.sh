@@ -64,6 +64,10 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
+          && curl -fsSL https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add - \
+          && echo \"deb https://apt.kitware.com/ubuntu/ focal main\" >> /etc/apt/sources.list \
+          && apt-get -qq update -y \
+          && apt-get -qq install --no-install-recommends cmake ninja-build \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
