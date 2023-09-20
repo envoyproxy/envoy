@@ -20,7 +20,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // When the request is not matched by any matchers, it is ALLOWED by default (i.e., fail-open)
     // and its quota usage will not be reported to RLQS server.
     // TODO(tyxia) Add stats here and other places throughout the filter. e.g. request
-    // allowed/denied, matching succeed/fail ann so on.
+    // allowed/denied, matching succeed/fail and so on.
     ENVOY_LOG(debug,
               "The request is not matched by any matchers: ", match_result.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
@@ -60,7 +60,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
       } else if (rate_limit_strategy.has_token_bucket()) {
         ASSERT(quota_buckets_[bucket_id]->token_bucket_limiter != nullptr);
         TokenBucketImpl* limiter = quota_buckets_[bucket_id]->token_bucket_limiter.get();
-        // Try to consume 1 token from.
+        // Try to consume 1 token from the bucket.
         if (limiter->consume(1, /*allow_partial=*/false)) {
           // Request is allowed.
           quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
