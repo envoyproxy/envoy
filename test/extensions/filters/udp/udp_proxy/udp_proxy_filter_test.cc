@@ -1670,6 +1670,7 @@ TEST_F(HttpUpstreamImplTest, DecodeData) {
 
 TEST_F(HttpUpstreamImplTest, DecodeDataAfterSuccessHeaders) {
   setup();
+  setAndExpectRequestEncoder(expectedHeaders());
 
   Buffer::OwnedImpl data;
   Http::ResponseHeaderMapPtr response_headers(
@@ -1697,6 +1698,7 @@ TEST_F(HttpUpstreamImplTest, DecodeTrailers) {
 
 TEST_F(HttpUpstreamImplTest, DecodeTrailersAfterSuccessHeaders) {
   setup();
+  setAndExpectRequestEncoder(expectedHeaders());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}});
@@ -1840,6 +1842,8 @@ TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
+  setup();
+
   TunnelingConnectionPoolFactory factory;
   auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_FALSE(valid_pool == nullptr);
