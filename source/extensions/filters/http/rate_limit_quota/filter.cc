@@ -59,7 +59,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
         quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
       } else if (rate_limit_strategy.has_token_bucket()) {
         ASSERT(quota_buckets_[bucket_id]->token_bucket_limiter != nullptr);
-        // TokenBucketImpl* limiter = quota_buckets_[bucket_id]->token_bucket_limiter.get();
         TokenBucket* limiter = quota_buckets_[bucket_id]->token_bucket_limiter.get();
         // Try to consume 1 token from the bucket.
         if (limiter->consume(1, /*allow_partial=*/false)) {
