@@ -17,6 +17,8 @@ struct HttpProtocolTestParams {
   bool use_universal_header_validator;
 };
 
+absl::string_view http2ImplementationToString(Http2Impl impl);
+
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
 //
 // Usage:

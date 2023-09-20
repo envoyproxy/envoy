@@ -1782,6 +1782,7 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_list_bytes = max_headers_kb * 1024;
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
+  og_options_.allow_different_host_and_authority = true;
 
 #ifdef ENVOY_ENABLE_UHV
   // UHV - disable header validations in oghttp2
