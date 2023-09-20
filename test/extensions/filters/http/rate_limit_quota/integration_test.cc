@@ -421,14 +421,16 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
   int tokens_per_fill = 30;
   int fill_interval_sec = 60;
   int fill_one_token_in_ms = fill_interval_sec / tokens_per_fill * 1000;
-  // First request: allowed; fail-open, default no assignment policy.
+  // First  request: allowed; fail-open, default no assignment policy.
   // Second request: allowed; one token remaining, token bucket's max_token is 1.
-  // Third request: allowed: token bucket has been refilled by advancing 2s.
-  // Fourth request: rejected: no token left and no token refilled
-  for (int i = 0; i < 4; ++i) {
-    // We advance time by 2s for third request (i.e. i=2) so that token bucket can
+  // Third  request: allowed; token bucket has been refilled by advancing 2s.
+  // Fourth request: rejected; no token left and no token refilled.
+  // Fifth  request: allowed; token bucket has been refilled by advancing 2s.
+  // Sixth  request: rejected; no token left and no token refilled.
+  for (int i = 0; i < 6; ++i) {
+    // We advance time by 2s for 3rd and 5th requests so that token bucket can
     // be refilled.
-    if (i == 2) {
+    if (i == 2 || i == 4) {
       simTime().advanceTimeAndRun(std::chrono::milliseconds(fill_one_token_in_ms), *dispatcher_,
                                   Envoy::Event::Dispatcher::RunType::NonBlock);
     }
@@ -466,8 +468,8 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
       rlqs_stream_->sendGrpcMessage(rlqs_response);
     }
 
-    // 4th request is throttled.
-    if (i == 3) {
+    // 4th and 6th request are throttled.
+    if (i == 3 || i == 5) {
       ASSERT_TRUE(response_->waitForEndStream());
       EXPECT_TRUE(response_->complete());
       EXPECT_EQ(response_->headers().getStatusValue(), "429");
