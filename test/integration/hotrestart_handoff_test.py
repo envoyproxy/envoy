@@ -13,7 +13,7 @@ import os
 import pathlib
 import random
 import sys
-from typing import Iterator
+from typing import AsyncIterator
 import unittest
 from datetime import datetime, timedelta
 from aiohttp import client_exceptions, web, ClientSession
@@ -87,7 +87,7 @@ class Upstream:
         return response
 
 
-async def _http_request(url) -> Iterator[str]:
+async def _http_request(url) -> AsyncIterator[str]:
     # Separate session per request is against aiohttp idioms, but is
     # intentional here because the point of the test is verifying
     # where connections go - reusing a connection would do the wrong thing.
