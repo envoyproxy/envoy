@@ -4393,7 +4393,8 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
-  EXPECT_EQ(altered_headers->getProxyStatusValue(), "custom_server_name; error=http_response_timeout");
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "custom_server_name; error=http_response_timeout");
   // Unchanged.
   EXPECT_EQ(altered_headers->getStatusValue(), "403");
   // Since remove_details=true, we should not have "baz", the value of
