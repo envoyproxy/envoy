@@ -1765,9 +1765,9 @@ TEST_F(HttpUpstreamImplTest, TargetHostPercentEncoding) {
   EXPECT_CALL(*config_, proxyHost(_)).WillRepeatedly(Return("proxy.host"));
   EXPECT_CALL(*config_, targetHost(_)).WillRepeatedly(Return("2001:db8::42"));
 
-  auto expected_headers = expectedHeaders(
-      is_ssl, /*use_post=*/false, /*opt_authority=*/"proxy.host:10",
-      /*opt_path=*/"/.well-known/masque/udp/2001%3Adb8%3A%3A42/20/");
+  auto expected_headers =
+      expectedHeaders(is_ssl, /*use_post=*/false, /*opt_authority=*/"proxy.host:10",
+                      /*opt_path=*/"/.well-known/masque/udp/2001%3Adb8%3A%3A42/20/");
 
   setAndExpectRequestEncoder(expected_headers, is_ssl);
 }
