@@ -13,6 +13,7 @@ import os
 import pathlib
 import random
 import sys
+from typing import Iterator
 import unittest
 from datetime import datetime, timedelta
 from aiohttp import client_exceptions, web, ClientSession
@@ -86,25 +87,15 @@ class Upstream:
         return response
 
 
-async def _http_request(url):
+async def _http_request(url) -> Iterator[str]:
     # Separate session per request is against aiohttp idioms, but is
     # intentional here because the point of the test is verifying
     # where connections go - reusing a connection would do the wrong thing.
     async with ClientSession() as session:
-        retries = 5
-        while retries:
-            try:
-                retries -= 1
-                async with session.get(url) as response:
-                    async for line in response.content:
-                        yield line
-                    return
-            except client_exceptions.ClientConnectorError as e:
-                if not retries:
-                    raise e
-                await asyncio.sleep(0.2)
-                if retries <= 3:
-                    log.debug(f"retrying request ({retries} remain)\n")
+        async with session.get(url) as response:
+            async for line in response.content:
+                yield line
+            return
 
 
 async def _full_http_request(url: str) -> str:
