@@ -594,8 +594,10 @@ public:
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
                                   ServerConnectionCallbacks& callbacks,
-                                  Server::OverloadManager& overload_manager) override {
-    return ServerConnectionPtr{createCodec_(connection, instance, callbacks, overload_manager)};
+                                  Server::OverloadManager& overload_manager,
+                                  bool uhv_enabled) override {
+    return ServerConnectionPtr{
+        createCodec_(connection, instance, callbacks, overload_manager, uhv_enabled)};
   }
 
   MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
@@ -605,7 +607,7 @@ public:
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&,
-               Server::OverloadManager&));
+               Server::OverloadManager&, bool uhv_enabled));
   MOCK_METHOD(DateProvider&, dateProvider, ());
   MOCK_METHOD(std::chrono::milliseconds, drainTimeout, (), (const));
   MOCK_METHOD(FilterChainFactory&, filterFactory, ());

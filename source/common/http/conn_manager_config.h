@@ -238,7 +238,8 @@ public:
   virtual ServerConnectionPtr createCodec(Network::Connection& connection,
                                           const Buffer::Instance& data,
                                           ServerConnectionCallbacks& callbacks,
-                                          Server::OverloadManager& overload_manager) PURE;
+                                          Server::OverloadManager& overload_manager,
+                                          bool uhv_enabled) PURE;
 
   /**
    * @return DateProvider& the date provider to use for

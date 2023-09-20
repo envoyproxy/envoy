@@ -117,6 +117,7 @@ public:
 
   void setClearHopByHopResponseHeaders(bool value) { clear_hop_by_hop_response_headers_ = value; }
   bool clearHopByHopResponseHeaders() const { return clear_hop_by_hop_response_headers_; }
+  ServerHeaderValidatorPtr makeHeaderValidator();
 
 private:
   struct ActiveStream;
@@ -612,6 +613,8 @@ private:
   const std::string proxy_name_; // for Proxy-Status.
 
   const bool refresh_rtt_after_request_{};
+  // HCM latches the flag to enable UHV at its creation
+  const bool universal_header_validator_enabled_{false};
 };
 
 } // namespace Http

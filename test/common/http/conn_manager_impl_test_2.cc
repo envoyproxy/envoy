@@ -3409,8 +3409,12 @@ TEST_F(HttpConnectionManagerImplTest, DirectLocalReplyCausesDisconnect) {
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
+#ifdef ENVOY_ENABLE_UHV
+// The following tests can only be run in builds with ENVOY_ENABLE_UHV enabled.
+// In builds without ENVOY_ENABLE_UHV HCM never uses UHV
+
 // Header validator rejects header map for HTTP/1.x protocols
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectsHttp1) {
   setup(false, "");
   expectUhvHeaderCheck(HeaderValidator::ValidationResult(
                            HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
@@ -3753,6 +3757,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
+#endif // ENVOY_ENABLE_UHV
 
 TEST_F(HttpConnectionManagerImplTest, NoProxyProtocolAdded) {
   add_proxy_protocol_connection_state_ = false;

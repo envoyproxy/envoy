@@ -459,7 +459,8 @@ public:
   }
 
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&, Server::OverloadManager&) override {
+                                  ServerConnectionCallbacks&, Server::OverloadManager&,
+                                  bool) override {
     if (codec_ == nullptr) {
       codec_ = new NiceMock<MockServerConnection>();
     }

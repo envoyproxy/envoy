@@ -164,7 +164,8 @@ public:
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks,
-                                        Server::OverloadManager& overload_manager) override;
+                                        Server::OverloadManager& overload_manager,
+                                        bool uhv_enabled) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
@@ -280,14 +281,6 @@ private:
   const envoy::config::trace::v3::Tracing_Http* getPerFilterTracerConfig(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           filter_config);
-
-  bool uhvEnabled() const {
-#ifdef ENVOY_ENABLE_UHV
-    return header_validator_factory_ != nullptr;
-#else
-    return false;
-#endif
-  }
 
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   Server::Configuration::FactoryContext& context_;

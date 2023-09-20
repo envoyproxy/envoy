@@ -55,6 +55,18 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+bool isUniversalHeaderValidatorRuntimeEnabled() {
+#ifdef ENVOY_ENABLE_UHV
+  return Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.enable_universal_header_validator");
+#else
+  // To make it safer always return false in non UHV mode.
+  return false;
+#endif
+}
+} // namespace
+
 bool requestWasConnect(const RequestHeaderMapSharedPtr& headers, Protocol protocol) {
   if (!headers) {
     return false;
@@ -111,7 +123,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                      /*server_name=*/config_.serverName(),
                                      /*proxy_status_config=*/config_.proxyStatusConfig())),
       refresh_rtt_after_request_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")),
+      universal_header_validator_enabled_(isUniversalHeaderValidatorRuntimeEnabled()) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -433,7 +446,8 @@ void ConnectionManagerImpl::handleCodecOverloadError(absl::string_view error) {
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   ASSERT(!codec_);
-  codec_ = config_.createCodec(read_callbacks_->connection(), data, *this, overload_manager_);
+  codec_ = config_.createCodec(read_callbacks_->connection(), data, *this, overload_manager_,
+                               universal_header_validator_enabled_);
 
   switch (codec_->protocol()) {
   case Protocol::Http3:
@@ -746,6 +760,18 @@ absl::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInte
       *parent_.request_headers_);
 }
 
+ServerHeaderValidatorPtr ConnectionManagerImpl::makeHeaderValidator() {
+  // universal_header_validator_enabled_ can only be true when ENVOY_ENABLE_UHV is defined
+  if (universal_header_validator_enabled_) {
+    // When ENVOY_ENABLE_UHV is defined HCM config always creates UHV factory, which
+    // should always produce a UHV object
+    ServerHeaderValidatorPtr uhv = config_.makeHeaderValidator(codec_->protocol());
+    ENVOY_BUG(uhv != nullptr, "HCM UHV factory did not produce UHV");
+    return uhv;
+  }
+  return nullptr;
+}
+
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
                                                   uint32_t buffer_limit,
                                                   Buffer::BufferMemoryAccountSharedPtr account)
@@ -767,8 +793,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       expand_agnostic_stream_lifetime_(
           Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)),
-      header_validator_(
-          connection_manager.config_.makeHeaderValidator(connection_manager.codec_->protocol())) {
+      header_validator_(connection_manager.makeHeaderValidator()) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() != nullptr &&

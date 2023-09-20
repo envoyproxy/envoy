@@ -133,11 +133,6 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_universal_header_validator")) {
-    // This will cause codecs to use legacy header validation and path normalization
-    return nullptr;
-  }
   ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
   if (!config.has_typed_header_validation_config()) {
     // If header validator is not configured ensure that the defaults match Envoy's original
@@ -672,13 +667,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
 Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
     Network::Connection& connection, const Buffer::Instance& data,
-    Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
+    Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager,
+    bool uhv_enabled) {
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction(), overload_manager, uhvEnabled());
+        headersWithUnderscoresAction(), overload_manager, uhv_enabled);
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
@@ -698,7 +694,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-        overload_manager, uhvEnabled());
+        overload_manager, uhv_enabled);
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

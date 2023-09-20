@@ -70,7 +70,8 @@ public:
     return access_log_flush_interval_;
   }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&, Server::OverloadManager&) override {
+                                  ServerConnectionCallbacks&, Server::OverloadManager&,
+                                  bool) override {
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }

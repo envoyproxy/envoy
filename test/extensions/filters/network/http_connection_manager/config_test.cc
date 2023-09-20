@@ -3084,9 +3084,10 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfigWithRuntimeDisabled
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
-  // Without envoy.reloadable_features.enable_universal_header_validator runtime set, UHV is always
-  // disabled
-  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+
+  // UHV factory is created even if envoy.reloadable_features.enable_universal_header_validatoris
+  // false. This runtime flag is used in when HCM is created to determine if UHV should be used.
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #else
   // If UHV is disabled, providing config should result in rejection
   EXPECT_THROW(
@@ -3175,9 +3176,22 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
 
-  // Without envoy.reloadable_features.enable_universal_header_validator runtime set, UHV is always
-  // disabled
+#ifdef ENVOY_ENABLE_UHV
+  // UHV factory is created even if envoy.reloadable_features.enable_universal_header_validatoris
+  // false. This runtime flag is used in when HCM is created to determine if UHV should be used.
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+  EXPECT_FALSE(proto_config.restrict_http_methods());
+  EXPECT_FALSE(proto_config.strip_fragment_from_path());
+  EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_path_normalization());
+  EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_merging_slashes());
+  EXPECT_EQ(proto_config.uri_path_normalization_options().path_with_escaped_slashes_action(),
+            ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
+                UriPathNormalizationOptions::KEEP_UNCHANGED);
+  EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
+#else
+  // In non UHV build UHV is always disabled
   EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+#endif
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderValidatorConfig) {
@@ -3197,8 +3211,6 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
   )EOF";
 
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   // Make sure the http_reject_path_with_fragment runtime value is reflected in config
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
@@ -3211,11 +3223,11 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
-#ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_);
+#ifdef ENVOY_ENABLE_UHV
   EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
   EXPECT_TRUE(proto_config.strip_fragment_from_path());
   EXPECT_FALSE(proto_config.restrict_http_methods());
@@ -3226,16 +3238,8 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                 UriPathNormalizationOptions::UNESCAPE_AND_FORWARD);
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled, enabling envoy.reloadable_features.enable_universal_header_validator should
-  // result in rejection
-  EXPECT_THROW(
-      {
-        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
-                                           context_, date_provider_, route_config_provider_manager_,
-                                           scoped_routes_config_provider_manager_, tracer_manager_,
-                                           filter_config_provider_manager_);
-      },
-      EnvoyException);
+  // In non UHV build UHV is always disabled
+  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #endif
 }
 
