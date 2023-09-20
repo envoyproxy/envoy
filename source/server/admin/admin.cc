@@ -517,6 +517,7 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   }
 }
 
+#ifdef ENVOY_ENABLE_UHV
 ::Envoy::Http::HeaderValidatorStats&
 AdminImpl::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) {
   switch (protocol) {
@@ -532,6 +533,7 @@ AdminImpl::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) {
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
+#endif
 
 } // namespace Server
 } // namespace Envoy

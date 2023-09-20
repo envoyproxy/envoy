@@ -240,7 +240,9 @@ public:
 private:
   friend class AdminTestingPeer;
 
+#ifdef ENVOY_ENABLE_UHV
   ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
+#endif
 
   /**
    * Creates a Request from the request in the admin stream.
