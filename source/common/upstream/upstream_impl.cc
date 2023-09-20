@@ -1175,8 +1175,11 @@ ClusterInfoImpl::ClusterInfoImpl(
     load_balancer_factory_ = lb_pair.second;
     lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
 
-    RELEASE_ASSERT(load_balancer_factory_,
-                   "No load balancer factory found from legacy LB configuration.");
+    RELEASE_ASSERT(
+        load_balancer_factory_,
+        fmt::format(
+            "No load balancer factory found from legacy LB configuration (type: {}, subset: {}).",
+            static_cast<int>(config.lb_policy()), config.has_lb_subset_config()));
 
     // Clear unnecessary legacy config because all legacy config is wrapped in load_balancer_config_
     // except the original_dst_lb_config.

@@ -1934,6 +1934,9 @@ TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
   TestScopedRuntime runtime;
   runtime.mergeValues({{"envoy.reloadable_features.convert_legacy_lb_config", "false"}});
 
+  // Reset the cluster after the runtime change.
+  resetCluster();
+
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
