@@ -222,15 +222,25 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::ServerHeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
-    // TODO(yanavlasov): admin interface should use the default validator
+  Http::ServerHeaderValidatorPtr
+  makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
+#ifdef ENVOY_ENABLE_UHV
+    ENVOY_BUG(header_validator_factory_ != nullptr,
+              "Admin HCM config can not have null UHV factory.");
+    return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
+                                           protocol, getHeaderValidatorStats(protocol))
+                                     : nullptr;
+#else
     return nullptr;
+#endif
   }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
 
 private:
   friend class AdminTestingPeer;
+
+  ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 
   /**
    * Creates a Request from the request in the admin stream.
@@ -525,6 +535,7 @@ private:
   const absl::optional<std::string> scheme_{};
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
+  const Http::HeaderValidatorFactoryPtr header_validator_factory_;
 };
 
 } // namespace Server
