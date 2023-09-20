@@ -665,6 +665,7 @@ void HttpUpstreamImpl::setRequestEncoder(Http::RequestEncoder& request_encoder, 
 
 const std::string HttpUpstreamImpl::resolveTargetTunnelPath() {
   std::string target_host = tunnel_config_.targetHost(downstream_info_);
+  target_host = Http::Utility::PercentEncoding::encode(target_host, ":");
 
   const auto* dynamic_port =
       downstream_info_.filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
@@ -677,6 +678,7 @@ const std::string HttpUpstreamImpl::resolveTargetTunnelPath() {
     target_port = std::to_string(tunnel_config_.defaultTargetPort());
   }
 
+  // TODO(ohadvano): support configurable URI template.
   return absl::StrCat("/.well-known/masque/udp/", target_host, "/", target_port, "/");
 }
 
@@ -712,6 +714,7 @@ TunnelingConnectionPoolImpl::TunnelingConnectionPoolImpl(
     StreamInfo::StreamInfo& downstream_info)
     : upstream_callbacks_(upstream_callbacks), tunnel_config_(tunnel_config),
       downstream_info_(downstream_info) {
+  // TODO(ohadvano): support upstream HTTP/3.
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   conn_pool_data_ =
       thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);

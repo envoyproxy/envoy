@@ -1617,17 +1617,6 @@ TEST_F(HttpUpstreamImplTest, FailureResponseHeadersNot200Status) {
   upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/false);
 }
 
-TEST_F(HttpUpstreamImplTest, FailureResponseHeadersNotCapsuleProtocol) {
-  setup();
-  setAndExpectRequestEncoder(expectedHeaders());
-
-  EXPECT_CALL(creation_callbacks_, onStreamFailure());
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/false);
-}
-
 TEST_F(HttpUpstreamImplTest, FailureResponseHeadersEndStream) {
   setup();
   setAndExpectRequestEncoder(expectedHeaders());
@@ -1765,6 +1754,20 @@ TEST_F(HttpUpstreamImplTest, EncodeHeadersWithFilterStateOverrides) {
   auto expected_headers = expectedHeaders(
       is_ssl, /*use_post=*/false, /*opt_authority=*/"proxy.host:30",
       /*opt_path=*/"/.well-known/masque/udp/target.host/60/", /*header_to_add=*/header);
+
+  setAndExpectRequestEncoder(expected_headers, is_ssl);
+}
+
+TEST_F(HttpUpstreamImplTest, TargetHostPercentEncoding) {
+  bool is_ssl = false;
+  setup();
+
+  EXPECT_CALL(*config_, proxyHost(_)).WillRepeatedly(Return("proxy.host"));
+  EXPECT_CALL(*config_, targetHost(_)).WillRepeatedly(Return("2001:db8::42"));
+
+  auto expected_headers = expectedHeaders(
+      is_ssl, /*use_post=*/false, /*opt_authority=*/"proxy.host:10",
+      /*opt_path=*/"/.well-known/masque/udp/2001%3Adb8%3A%3A42/20/");
 
   setAndExpectRequestEncoder(expected_headers, is_ssl);
 }

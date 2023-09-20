@@ -81,6 +81,9 @@ struct UdpProxyUpstreamStats {
   ALL_UDP_PROXY_UPSTREAM_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * Configuration for raw UDP tunneling over HTTP streams.
+ */
 class UdpTunnelingConfig {
 public:
   virtual ~UdpTunnelingConfig() = default;
@@ -138,6 +141,10 @@ private:
   absl::optional<uint64_t> hash_;
 };
 
+/**
+ * Represents an upstream HTTP stream handler, which is able to send data and signal
+ * the downstream about upstream events.
+ */
 class HttpUpstream {
 public:
   virtual ~HttpUpstream() = default;
@@ -155,6 +162,9 @@ public:
   virtual void onDownstreamEvent(Network::ConnectionEvent event) PURE;
 };
 
+/**
+ * Callbacks to signal the status of upstream HTTP stream creation to the downstream.
+ */
 class HttpStreamCallbacks {
 public:
   virtual ~HttpStreamCallbacks() = default;
@@ -185,6 +195,9 @@ public:
                                Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 
+/**
+ * Callbacks to signal the status of upstream HTTP stream creation to the connection pool.
+ */
 class TunnelCreationCallbacks {
 public:
   virtual ~TunnelCreationCallbacks() = default;
@@ -201,6 +214,9 @@ public:
   virtual void onStreamFailure() PURE;
 };
 
+/**
+ * Callbacks that allows upstream stream to signal events to the downstream.
+ */
 class UpstreamTunnelCallbacks {
 public:
   virtual ~UpstreamTunnelCallbacks() = default;
@@ -279,9 +295,8 @@ private:
 
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       bool is_valid_response = Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers));
-      bool is_capsule_protocol = Http::HeaderUtility::isCapsuleProtocol(*headers);
 
-      if (!is_valid_response || !is_capsule_protocol || end_stream) {
+      if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.tunnel_creation_callbacks_.has_value()) {
         parent_.tunnel_creation_callbacks_.value().get().onStreamSuccess(*parent_.request_encoder_);
