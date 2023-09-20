@@ -1641,6 +1641,7 @@ TEST_F(HttpUpstreamImplTest, FailureResponseHeadersEndStream) {
 
 TEST_F(HttpUpstreamImplTest, SuccessResponseHeaders) {
   setup();
+  setAndExpectRequestEncoder(expectedHeaders());
 
   EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
   EXPECT_CALL(creation_callbacks_, onStreamSuccess(_));
