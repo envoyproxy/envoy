@@ -363,8 +363,12 @@ envoy_py_test(
         "//conditions:default": ["hotrestart_handoff_test.py"],
     }),
     data = [":hotrestart_main"],
-    # Hot restart does not apply on Windows, skipping
-    tags = ["skip_on_windows"],
+    # Hot restart does not apply on Windows.
+    # py_test doesn't do coverage.
+    tags = [
+        "nocoverage",
+        "skip_on_windows",
+    ],
     deps = [
         requirement("aiohttp"),
     ],
