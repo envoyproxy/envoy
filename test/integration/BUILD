@@ -1073,6 +1073,7 @@ envoy_cc_test_library(
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
