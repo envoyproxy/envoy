@@ -56,16 +56,6 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  if [[ -n "$DOCKER_IN_DOCKER" ]]; then
-      DOCKER_START_EXTRA=(
-          "echo 'deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/ /' | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list"
-          "&& curl -fsSL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable/xUbuntu_20.04/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/devel_kubic_libcontainers_stable.gpg > /dev/null"
-          "&& apt-get -qq update -y"
-          "&& apt-get -qq install -y --no-install-recommends skopeo")
-  else
-      DOCKER_START_EXTRA=(":")
-  fi
-
   START_COMMAND=(
       "/bin/bash"
       "-lc"
@@ -74,7 +64,6 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
-          && ${DOCKER_START_EXTRA[*]} \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
@@ -171,6 +160,8 @@ docker run --rm \
        -e GITHUB_TOKEN \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \
+       -e MOBILE_DOCS_CHECKOUT_DIR \
+       -e MOBILE_PUSH_CHANGES \
        -e NETLIFY_TRIGGER_URL \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
