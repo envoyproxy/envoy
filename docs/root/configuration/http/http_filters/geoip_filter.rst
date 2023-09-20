@@ -8,6 +8,7 @@ Upon a successful lookup request will be enriched with the configured geolocatio
 In case the configured geolocation headers are present in the incoming request, they will be overriden by the filter.
 Geolocation filter emits stats for the number of the successful lookups and the number of total lookups.
 English language is used for the geolocation lookups, the result of the lookup will be UTF-8 encoded.
+Please note that Geolocation filter and providers are not yet supported on Windows.
 
 Configuration
 -------------
@@ -19,7 +20,6 @@ Configuration
 Geolocation Providers
 ---------------------
 Currently only `Maxmind <https://www.maxmind.com/en/geoip2-services-and-databases>` geolocation provider is supported.
-Please note that Maxmind geolocation provider is not yet supported on Windows.
 This provider should be configured with the type URL ``type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig``.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`

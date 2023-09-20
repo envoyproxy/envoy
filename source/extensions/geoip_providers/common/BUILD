@@ -11,6 +11,7 @@ envoy_extension_package()
 envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/geoip:geoip_provider_driver_interface",
         "//source/common/config:utility_lib",

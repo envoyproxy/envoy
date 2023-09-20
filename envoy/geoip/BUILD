@@ -16,6 +16,7 @@ envoy_cc_extension(
     hdrs = [
         "geoip_provider_driver.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/network:address_interface",

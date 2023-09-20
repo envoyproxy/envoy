@@ -23,6 +23,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.geoip"],
+    tags = ["skip_on_windows"],
     deps = [
         ":geoip_mocks",
         "//source/common/http:message_lib",
@@ -39,6 +40,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["geoip_filter_test.cc"],
     extension_names = ["envoy.filters.http.geoip"],
+    tags = ["skip_on_windows"],
     deps = [
         ":dummy_cc_proto",
         ":geoip_mocks",
@@ -78,6 +80,7 @@ envoy_extension_cc_mock(
     name = "geoip_mocks",
     hdrs = ["mocks.h"],
     extension_names = ["envoy.filters.http.geoip"],
+    tags = ["skip_on_windows"],
     deps = [
         ":dummy_cc_proto",
         "//envoy/geoip:geoip_provider_driver_interface",

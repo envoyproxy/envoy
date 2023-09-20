@@ -16,6 +16,7 @@ envoy_cc_library(
     name = "geoip_filter_lib",
     srcs = ["geoip_filter.cc"],
     hdrs = ["geoip_filter.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/geoip:geoip_provider_driver_interface",
         "//envoy/http:filter_interface",
@@ -33,6 +34,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/geoip:geoip_provider_driver_interface",
         "//source/common/config:utility_lib",
