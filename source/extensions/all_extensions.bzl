@@ -7,6 +7,8 @@ _required_extensions = {
     "envoy.http.original_ip_detection.xff": "//source/extensions/http/original_ip_detection/xff:config",
     "envoy.request_id.uuid": "//source/extensions/request_id/uuid:config",
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
+    # To provide default round robin load balancer.
+    "envoy.load_balancing_policies.round_robin": "//source/extensions/clusters/load_balancer:round_robin_lb",
 }
 
 # Return the extension cc_library target after select

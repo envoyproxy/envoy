@@ -35,6 +35,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(Factory);
+
 } // namespace RoundRobin
 } // namespace LoadBalancingPolices
 } // namespace Extensions

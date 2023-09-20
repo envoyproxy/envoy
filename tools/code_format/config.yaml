@@ -407,3 +407,4 @@ visibility_excludes:
 - source/extensions/config_subscription/grpc/BUILD
 - source/extensions/load_balancing_policies/subset/BUILD
 - source/extensions/load_balancing_policies/ring_hash/BUILD
+- source/extensions/load_balancing_policies/round_robin/

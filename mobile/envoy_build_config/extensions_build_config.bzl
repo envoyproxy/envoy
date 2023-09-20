@@ -31,6 +31,7 @@ EXTENSIONS = {
     "envoy_mobile.cert_validator.platform_bridge_cert_validator": "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:config",
     "envoy.listener_manager_impl.api":                     "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
     "envoy.connection_handler.default":                    "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
+    "envoy.load_balancing_policies.round_robin":           "//source/extensions/load_balancing_policies/round_robin:config",
 }
 WINDOWS_EXTENSIONS = {}
 LEGACY_ALWAYSLINK = 1
