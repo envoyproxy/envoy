@@ -13,12 +13,6 @@ namespace Server {
  */
 class HotRestartingChild : public HotRestartingBase {
 public:
-  HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
-                     mode_t socket_mode);
-  ~HotRestartingChild();
-
-  void initialize(Event::Dispatcher& dispatcher);
-  void shutdown();
   // A structure to record the set of registered UDP listeners keyed on their addresses,
   // to support QUIC packet forwarding.
   class UdpForwardingContext {
@@ -45,6 +39,13 @@ public:
     // Map keyed on address as a string, because Network::Address::Instance isn't hashable.
     absl::flat_hash_map<std::string, ForwardEntry> listener_map_;
   };
+
+  HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
+                     mode_t socket_mode);
+  ~HotRestartingChild() = default;
+
+  void initialize(Event::Dispatcher& dispatcher);
+  void shutdown();
 
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,

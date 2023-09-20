@@ -63,10 +63,6 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                               socket_mode);
 }
 
-// Destructor must be specified in the cc file because UdpForwardingContext must be defined first
-// so that the destructor knows how to destroy it.
-HotRestartingChild::~HotRestartingChild() = default;
-
 void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
   socket_event_udp_forwarding_ = dispatcher.createFileEvent(
       udp_forwarding_rpc_stream_.domain_socket_,
