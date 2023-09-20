@@ -125,7 +125,7 @@ fi
 
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
-docker run \
+docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
        -e AZP_BRANCH \
