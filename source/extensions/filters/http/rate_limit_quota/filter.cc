@@ -19,7 +19,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   if (!match_result.ok()) {
     // When the request is not matched by any matchers, it is ALLOWED by default (i.e., fail-open)
     // and its quota usage will not be reported to RLQS server.
-    // TODO(tyxia) Add stats here and other places throughout the filter (if needed).
+    // TODO(tyxia) Add stats here and other places throughout the filter. e.g. request
+    // allowed/denied, matching succeed/fail ann so on.
     ENVOY_LOG(debug,
               "The request is not matched by any matchers: ", match_result.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
@@ -47,14 +48,31 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   } else {
     // Found the cached bucket entry.
     // First, get the quota assignment (if exists) from the cached bucket action.
-    // TODO(tyxia) Implement other assignment type besides ALLOW ALL.
     if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
       auto rate_limit_strategy =
           quota_buckets_[bucket_id]->bucket_action.quota_assignment_action().rate_limit_strategy();
 
+      // TODO(tyxia) Currently only ALLOW_ALL and token bucket strageties are implemented.
+      // Change to switch case when more stragegies are implemented.
       if (rate_limit_strategy.has_blanket_rule() &&
           rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
         quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+      } else if (rate_limit_strategy.has_token_bucket()) {
+        ASSERT(quota_buckets_[bucket_id]->token_bucket_limiter != nullptr);
+        TokenBucketImpl* limiter = quota_buckets_[bucket_id]->token_bucket_limiter.get();
+        // Try to consume 1 token from.
+        if (limiter->consume(1, /*allow_partial=*/false)) {
+          // Request is allowed.
+          quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+        } else {
+          // Request is throttled.
+          quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
+
+          callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, RateLimitedMessage,
+                                     nullptr, absl::nullopt, "");
+          callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+          return Envoy::Http::FilterHeadersStatus::StopIteration;
+        }
       }
     }
   }

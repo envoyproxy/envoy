@@ -30,6 +30,7 @@ using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
     BucketAction::QuotaAssignmentAction;
 
+inline constexpr absl::string_view RateLimitedMessage = "Request has been rate limited";
 /**
  * Possible async results for a limit call.
  */
