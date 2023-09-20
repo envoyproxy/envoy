@@ -1274,15 +1274,20 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
   auto entry = cluster_initialization_map_.find(cluster_name);
   // TODO(kbaichoo): if EDS can be configured via cluster_type() then modify the
   // merging logic below.
-  // We should only merge if the cluster type is the same as before and this is
-  // an EDS cluster. This is due to the fact that EDS clusters get
-  // ClusterLoadAssignment from the configuration server but pass per priority
-  // deltas in updates to the ClusterManager. In the future we may decide to
-  // change how the updates propagate among those components.
+  //
+  // This method may be called multiple times to create multiple ClusterInitializationObject
+  // instances for the same cluster. And before the thread local clusters are actually initialized,
+  // the new instances will override the old instances in the work threads. But part of data is be
+  // created only once, such as load balancer factory. So we should always to merge the new instance
+  // with the old one to keep the latest instance have all necessary data.
+  //
+  // More specifically, this will happen in the following scenarios for now:
+  // 1. EDS clusters: the ClusterLoadAssignment of EDS cluster may be updated multiples before
+  //   the thread local cluster is initialized.
+  // 2. Clusters in the unit tests: the cluster in the unit test may be updated multiples before
+  //   the thread local cluster is initialized by calling 'updateHosts' manually.
   const bool should_merge_with_prior_cluster =
-      entry != cluster_initialization_map_.end() &&
-      entry->second->cluster_info_->type() == cluster_info->type() &&
-      cluster_info->type() == envoy::config::cluster::v3::Cluster::EDS;
+      entry != cluster_initialization_map_.end() && entry->second->cluster_info_ == cluster_info;
 
   if (should_merge_with_prior_cluster) {
     // We need to copy from an existing Cluster Initialization Object. In
@@ -1355,9 +1360,6 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
       load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map) {
 
-  ASSERT(cluster_info_->type() == envoy::config::cluster::v3::Cluster::EDS,
-         fmt::format("Using merge constructor on possible non-mergable cluster of type {}",
-                     cluster_info_->type()));
   // Because EDS Clusters receive the entire ClusterLoadAssignment but only
   // provides the delta we must process the hosts_added and hosts_removed and
   // not simply overwrite with hosts added.

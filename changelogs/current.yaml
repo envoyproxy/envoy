@@ -256,6 +256,10 @@ new_features:
   change: |
     added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
     to OTLP stats sink that enables adding a static prefix to all stats flushed by this sink.
+- area: udp_proxy
+  change: |
+    added :ref:`http_capsule <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig>` UDP session filter
+    that can be used to encapsule or decapsulate UDP datagrams in HTTP, when used for UDP tunneling.
 - area: tap
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`

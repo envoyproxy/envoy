@@ -20,7 +20,7 @@ public:
 private:
   void shrinkHeap();
 
-  bool active_;
+  bool active_{false};
   Envoy::Stats::Counter* shrink_counter_;
   Envoy::Event::TimerPtr timer_;
 };

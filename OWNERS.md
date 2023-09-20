@@ -29,6 +29,8 @@ routing PRs, questions, etc. to the right place.
   * Docs, tooling, CI, containers and sandbox examples
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3, upstream connection management, Envoy Mobile.
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 
 # Maintainers
 
@@ -38,8 +40,6 @@ routing PRs, questions, etc. to the right place.
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
   * Data plane, overload management, flow control.
-* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
-  * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
   * Bazel, CI, compilers, linkers, general build issues, etc.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)

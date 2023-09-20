@@ -89,6 +89,13 @@ upstream, similar to network filters.
   Additionally, since :ref:`per packet load balancing <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing>` require
   choosing the upstream host for each received datagram, session filters can't be used when this option is enabled.
 
+Envoy has the following builtin UDP session filters.
+
+.. toctree::
+  :maxdepth: 2
+
+  session_filters/http_capsule
+
 Example configuration
 ---------------------
 

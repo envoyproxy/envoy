@@ -20,12 +20,12 @@ It also shows how Go plugins can be independently configured at runtime.
 Step 1: Compile the go plugin library
 *************************************
 
-Change to the ``examples/golang`` directory and build the go plugin library.
+Change to the ``examples/golang-http`` directory and build the go plugin library.
 
 .. code-block:: console
 
    $ pwd
-   envoy/examples/golang
+   envoy/examples/golang-http
    $ docker compose -f docker-compose-go.yaml run --rm go_plugin_compile
 
 The compiled library should now be in the ``lib`` folder.
