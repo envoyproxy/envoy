@@ -131,6 +131,23 @@ public:
   std::string name() const override { return "envoy.test.filter"; }
 };
 
+class TestQuicListenerFilterFactory
+    : public TestFilterFactory,
+      public Server::Configuration::NamedQuicListenerFilterConfigFactory {
+public:
+  Network::QuicListenerFilterFactoryCb
+  createListenerFilterFactoryFromProto(const Protobuf::Message&,
+                                       const Network::ListenerFilterMatcherSharedPtr&,
+                                       Server::Configuration::ListenerFactoryContext&) override {
+    created_ = true;
+    return [](Network::QuicListenerFilterManager&) -> void {};
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return "envoy.test.filter"; }
+};
+
 class FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryTestBase() {
@@ -358,6 +375,23 @@ public:
   }
 };
 
+// QUIC listener filter test
+class QuicListenerFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<
+          Network::QuicListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
+          QuicListenerFilterConfigProviderManagerImpl, TestQuicListenerFilterFactory,
+          Server::Configuration::NamedQuicListenerFilterConfigFactory,
+          Server::Configuration::MockFactoryContext> {
+public:
+  const std::string getFilterType() const override { return "listener"; }
+  const std::string getConfigReloadCounter() const override {
+    return "extension_config_discovery.quic_listener_filter.foo.config_reload";
+  }
+  const std::string getConfigFailCounter() const override {
+    return "extension_config_discovery.quic_listener_filter.foo.config_fail";
+  }
+};
+
 /***************************************************************************************
  *                  Parameterized test for                                             *
  *     HTTP filter, Network filter, TCP listener filter And UDP listener filter        *
@@ -370,7 +404,8 @@ class FilterConfigDiscoveryImplTestParameter : public testing::Test {};
 using FilterConfigDiscoveryTestTypes = ::testing::Types<
     HttpFilterConfigDiscoveryImplTest, HttpUpstreamFilterConfigDiscoveryImplTest,
     NetworkFilterConfigDiscoveryImplTest, NetworkUpstreamFilterConfigDiscoveryImplTest,
-    TcpListenerFilterConfigDiscoveryImplTest, UdpListenerFilterConfigDiscoveryImplTest>;
+    TcpListenerFilterConfigDiscoveryImplTest, UdpListenerFilterConfigDiscoveryImplTest,
+    QuicListenerFilterConfigDiscoveryImplTest>;
 
 TYPED_TEST_SUITE(FilterConfigDiscoveryImplTestParameter, FilterConfigDiscoveryTestTypes);
 

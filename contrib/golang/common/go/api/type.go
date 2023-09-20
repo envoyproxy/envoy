@@ -200,12 +200,6 @@ type DataBufferBase interface {
 	// buffer becomes too large, Write will panic with ErrTooLarge.
 	WriteUint64(p uint64) error
 
-	// Peek returns n bytes from buffer, without draining any buffered data.
-	// If n > readable buffer, nil will be returned.
-	// It can be used in codec to check first-n-bytes magic bytes
-	// Note: do not change content in return bytes, use write instead
-	Peek(n int) []byte
-
 	// Bytes returns all bytes from buffer, without draining any buffered data.
 	// It can be used to get fixed-length content, such as headers, body.
 	// Note: do not change content in return bytes, use write instead

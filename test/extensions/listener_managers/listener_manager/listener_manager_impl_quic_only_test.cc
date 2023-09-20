@@ -8,6 +8,8 @@
 #include "test/extensions/listener_managers/listener_manager/listener_manager_impl_test.h"
 #include "test/server/utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/mocks/network/mocks.h"
+#include "test/integration/filters/test_listener_filter.h"
 
 namespace Envoy {
 namespace Server {
@@ -339,6 +341,76 @@ udp_listener_config:
                    ->listenerFactory()
                    .isTransportConnectionless());
 }
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFilterFromConfig) {
+  std::string yaml = getBasicConfig();
+  yaml = yaml + R"EOF(
+listener_filters:
+- name: envoy.filters.quic_listener.test
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.TestQuicListenerFilterConfig
+    added_value: xyz
+  )EOF";
+
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+  // Configure GSO support but later verify that the default writer is used instead.
+  ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
+  EXPECT_CALL(server_.api_.random_, uuid());
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
+#else
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
+#endif
+                           ListenerComponentFactory::BindType::ReusePort);
+
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef SO_RXQ_OVFL
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_RXQ_OVFL,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#endif
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_REUSEPORT,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef UDP_GRO
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
+                     /* expected_sockopt_name */ UDP_GRO,
+                     /* expected_value */ 1,
+                     /* expected_num_calls */ 1);
+  }
+#endif
+
+  addOrUpdateListener(listener_proto);
+  EXPECT_EQ(1u, manager_->listeners().size());
+  // Verify that the right filter chain type is installed.
+  Network::MockQuicListenerFilterManager filter_manager;
+  Network::QuicListenerFilterPtr listener_filter;
+  EXPECT_CALL(filter_manager, addFilter(_, _))
+      .WillOnce([&listener_filter](const Network::ListenerFilterMatcherSharedPtr&,
+                                   Network::QuicListenerFilterPtr&& filter) {
+        listener_filter = std::move(filter);
+      });
+  manager_->listeners()[0].get().filterChainFactory().createQuicListenerFilterChain(filter_manager);
+  ASSERT_NE(nullptr, listener_filter);
+  Network::MockListenerFilterCallbacks callbacks;
+  EXPECT_CALL(callbacks, filterState());
+  listener_filter->onAccept(callbacks);
+  auto* added_filter_state =
+      callbacks.filter_state_.getDataReadOnly<TestQuicListenerFilter::TestStringFilterState>(
+          TestQuicListenerFilter::TestStringFilterState::key());
+  ASSERT_NE(nullptr, added_filter_state);
+  EXPECT_EQ("xyz", added_filter_state->asString());
+}
+
 #endif
 
 TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithWrongTransportSocket) {

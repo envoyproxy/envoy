@@ -18,7 +18,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
@@ -685,6 +685,9 @@ void ConnectionImpl::onReadReady() {
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
+    if (result.bytes_processed_ != 0) {
+      onRead(new_buffer_size);
+    }
     setDetectedCloseType(DetectedCloseType::RemoteReset);
     closeSocket(ConnectionEvent::RemoteClose);
     return;

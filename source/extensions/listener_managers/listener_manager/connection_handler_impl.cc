@@ -357,8 +357,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
       listener_it != tcp_listener_map_by_address_.end() &&
       listener_it->second->listener_->listener() != nullptr) {
-    return Network::BalancedConnectionHandlerOptRef(
-        listener_it->second->tcpListener().value().get());
+    return {listener_it->second->tcpListener().value().get()};
   }
 
   OptRef<ConnectionHandlerImpl::PerAddressActiveListenerDetails> details;

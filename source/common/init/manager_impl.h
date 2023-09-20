@@ -49,10 +49,10 @@ private:
   const std::string name_;
 
   // Current state.
-  State state_;
+  State state_{State::Uninitialized};
 
   // Current number of registered targets that have not yet initialized.
-  uint32_t count_;
+  uint32_t count_{0};
 
   // Handle to the watcher passed in `initialize`, to be called when initialization completes.
   WatcherHandlePtr watcher_handle_;

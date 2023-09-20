@@ -12,7 +12,7 @@ constexpr absl::string_view kDefaultLocalAddressSelectorName =
 void validate(const std::vector<::Envoy::Upstream::UpstreamLocalAddress>& upstream_local_addresses,
               absl::optional<std::string> cluster_name) {
 
-  if (upstream_local_addresses.size() == 0) {
+  if (upstream_local_addresses.empty()) {
     throw EnvoyException(fmt::format("{}'s upstream binding config has no valid source address.",
                                      !(cluster_name.has_value())
                                          ? "Bootstrap"

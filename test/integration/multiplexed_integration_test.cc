@@ -2182,13 +2182,7 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
 }
 
 TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
-#ifdef ENVOY_ENABLE_UHV
-  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
-      downstreamProtocol() == Http::CodecType::HTTP2) {
-    return;
-  }
-#endif
-
+  disable_client_header_validation_ = true;
   autonomous_allow_incomplete_streams_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
@@ -2254,6 +2248,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
 // reset the request.
 TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
 #ifdef ENVOY_ENABLE_UHV
+  // TODO(#29071): reject responses with 101 in H/2 and H/3 UHV
   if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
       downstreamProtocol() == Http::CodecType::HTTP2) {
     return;
