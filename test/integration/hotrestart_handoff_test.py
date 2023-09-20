@@ -26,7 +26,20 @@ def random_loopback_host():
     return f"127.{random.randrange(0,256)}.{random.randrange(0,256)}.{random.randrange(1, 255)}"
 
 
-STARTUP_TOLERANCE_SECONDS = 3
+# This is a timeout that must be long enough that the hot restarted
+# instance can reliably be fully started up within this many seconds, or the
+# test will be flaky. 3 seconds is enough on a not-busy host with a non-tsan
+# non-coverage build; 10 seconds should be enough to be not flaky in most
+# configurations.
+#
+# Unfortunately, because the test is verifying the behavior of a connection
+# during drain, the first connection must last for the full tolerance duration,
+# so increasing this value increases the duration of the test. For this
+# reason we want to keep it as low as possible without causing flaky failure.
+#
+# Ideally this would be adjusted (3x) for tsan and coverage runs, but making that
+# possible for python is outside the scope of this test.
+STARTUP_TOLERANCE_SECONDS = 10
 UPSTREAM_SLOW_PORT = 54321
 UPSTREAM_FAST_PORT = 54322
 UPSTREAM_HOST = random_loopback_host()
@@ -181,6 +194,7 @@ async def _wait_for_envoy_epoch(i: int):
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
+        print(os.environ)
         tmpdir = os.environ["TEST_TMPDIR"]
         self.slow_config_path = pathlib.Path(tmpdir, "slow_config.yaml")
         self.fast_config_path = pathlib.Path(tmpdir, "fast_config.yaml")
