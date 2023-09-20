@@ -526,6 +526,7 @@ AdminImpl::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) {
   case Http::Protocol::Http3:
     IS_ENVOY_BUG("HTTP/3 is not supported for admin UI");
     // Return H/2 stats object, since we do not have H/3 stats.
+    ABSL_FALLTHROUGH_INTENDED;
   case Http::Protocol::Http2:
     return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *server_.stats().rootScope());
   }
