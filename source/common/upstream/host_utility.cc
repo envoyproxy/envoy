@@ -206,19 +206,20 @@ void forEachMetric(const ClusterManager& cluster_manager,
     if (cluster_ref.get().info()->perEndpointStats()) {
       for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
         for (auto& host : host_set->hosts()) {
+          Stats::TagVector tags = {{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name},
+                                   {"envoy.endpoint_address", host->address()->asString()}};
+          const auto& hostname = host->hostname();
+          if (!hostname.empty()) {
+            tags.push_back({"envoy.endpoint_hostname", hostname});
+          }
+
           for (auto& [counter_name, primitive] : get_stats_vector(*host)) {
             HostUtility::PrimitiveMetric<StatType> metric(primitive.get());
 
             metric.name_ = absl::StrCat("cluster.", cluster_name, ".endpoint.", counter_name, ".",
                                         host->address()->asStringView());
             metric.tag_extracted_name_ = absl::StrCat("cluster.endpoint.", counter_name);
-            metric.tags_ = {{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name},
-                            {"envoy.endpoint_address", host->address()->asString()}};
-
-            const auto& hostname = host->hostname();
-            if (!hostname.empty()) {
-              metric.tags_.push_back({"envoy.endpoint_hostname", hostname});
-            }
+            metric.tags_ = tags;
 
             cb(std::move(metric));
           }
