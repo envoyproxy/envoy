@@ -21,12 +21,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val hcmType =
-  "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val localErrorFilterType =
-  "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
-private const val filterName = "error_validation_filter"
+private const val PBF_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+private const val FILTER_NAME = "error_validation_filter"
 
 class GRPCReceiveErrorTest {
   init {
@@ -84,17 +80,14 @@ class GRPCReceiveErrorTest {
 
     val engine = EngineBuilder(Standard())
       .addPlatformFilter(
-        name = filterName,
+        name = FILTER_NAME,
         factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
       )
-      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $pbfType, platform_filter_name: $filterName}")
-      .setOnEngineRunning {}
+      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}")
       .build()
 
     GRPCClient(engine.streamClient())
       .newGRPCStreamPrototype()
-      .setOnResponseHeaders { _, _, _ -> }
-      .setOnResponseMessage { _, _ -> }
       .setOnError { _, _ ->
         callbackReceivedError.countDown()
       }

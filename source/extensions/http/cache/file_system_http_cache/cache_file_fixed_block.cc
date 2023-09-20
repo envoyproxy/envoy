@@ -24,8 +24,7 @@ constexpr std::array<char, 4> ExpectedCacheVersionId = {'0', '0', '0', '0'};
 } // namespace
 
 CacheFileFixedBlock::CacheFileFixedBlock()
-    : file_id_(ExpectedFileId), cache_version_id_(ExpectedCacheVersionId), header_size_(0),
-      trailer_size_(0), body_size_(0) {}
+    : file_id_(ExpectedFileId), cache_version_id_(ExpectedCacheVersionId) {}
 
 void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
   // The string view should be the size of the buffer, and

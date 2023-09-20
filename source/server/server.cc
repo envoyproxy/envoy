@@ -82,10 +82,10 @@ InstanceImpl::InstanceImpl(
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
     Buffer::WatermarkFactorySharedPtr watermark_factory)
-    : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
-      options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             options.ignoreUnknownDynamicFields()),
+    : init_manager_(init_manager), live_(false), options_(options),
+      validation_context_(options_.allowUnknownStaticFields(),
+                          !options.rejectUnknownDynamicFields(),
+                          options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
@@ -98,7 +98,6 @@ InstanceImpl::InstanceImpl(
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
-      terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),

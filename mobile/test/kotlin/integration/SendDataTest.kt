@@ -15,26 +15,24 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
-private const val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
-private const val requestStringMatch = "match_me"
+private const val ASSERTION_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+private const val REQUEST_STRING_MATCH = "match_me"
 
 class SendDataTest {
   init {
-    AndroidJniLibrary.loadTestLibrary();
+    AndroidJniLibrary.loadTestLibrary()
     JniLibrary.load()
   }
 
   @Test
   fun `successful sending data`() {
-    TestJni.startHttp2TestServer();
-    val port = TestJni.getServerPort();
+    TestJni.startHttp2TestServer()
+    val port = TestJni.getServerPort()
 
     val expectation = CountDownLatch(1)
     val engine = EngineBuilder(Standard())
-      .addNativeFilter("envoy.filters.http.assertion", "{'@type': $assertionFilterType, match_config: {http_request_generic_body_match: {patterns: [{string_match: $requestStringMatch}]}}}")
+      .addNativeFilter("envoy.filters.http.assertion", "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_generic_body_match: {patterns: [{string_match: $REQUEST_STRING_MATCH}]}}}")
       .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
-      .setOnEngineRunning { }
       .build()
 
     val client = engine.streamClient()
@@ -42,12 +40,12 @@ class SendDataTest {
     val requestHeaders = RequestHeadersBuilder(
       method = RequestMethod.GET,
       scheme = "https",
-      authority = "localhost:" + port,
+      authority = "localhost:$port",
       path = "/simple.txt"
     )
       .build()
 
-    val body = ByteBuffer.wrap(requestStringMatch.toByteArray(Charsets.UTF_8))
+    val body = ByteBuffer.wrap(REQUEST_STRING_MATCH.toByteArray(Charsets.UTF_8))
 
     var responseStatus: Int? = null
     var responseEndStream = false

@@ -178,7 +178,7 @@ private:
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
-  MutexTracer* mutex_tracer_;
+  MutexTracer* mutex_tracer_{nullptr};
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
