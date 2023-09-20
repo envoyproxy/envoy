@@ -36,6 +36,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(Factory);
+
 } // namespace LeastRequest
 } // namespace LoadBalancingPolices
 } // namespace Extensions

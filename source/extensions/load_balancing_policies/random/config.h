@@ -33,6 +33,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(Factory);
+
 } // namespace Random
 } // namespace LoadBalancingPolices
 } // namespace Extensions

@@ -35,6 +35,7 @@ _core_extensions = [
     "envoy.transport_sockets.raw_buffer",
     "envoy.network.dns_resolver.cares",
     "envoy.network.dns_resolver.apple",
+    "envoy.load_balancing_policies.round_robin",
 ]
 
 # Return all core extensions to be compiled into Envoy.

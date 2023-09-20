@@ -26,6 +26,8 @@ public:
                                               TimeSource& time_source) override;
 };
 
+DECLARE_FACTORY(Factory);
+
 } // namespace ClusterProvided
 } // namespace LoadBalancingPolices
 } // namespace Extensions
