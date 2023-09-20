@@ -319,7 +319,7 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
        std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
            {ResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
            {ResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
-           {ResponseFlag::UpstreamRequestTimeout, ProxyStatusError::ConnectionTimeout},
+           {ResponseFlag::UpstreamRequestTimeout, ProxyStatusError::HttpResponseTimeout},
            {ResponseFlag::LocalReset, ProxyStatusError::ConnectionTimeout},
            {ResponseFlag::UpstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
            {ResponseFlag::UpstreamConnectionFailure, ProxyStatusError::ConnectionRefused},
