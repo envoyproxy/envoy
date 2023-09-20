@@ -146,6 +146,9 @@ bug_fixes:
 - area: redis
   change: |
     Fixed a bug where redis key with % in the key is failing with a validation error.
+- area: redis
+  change: |
+    Fixed a bug causing crash if incoming redis key does not match against a prefix_route and catch_all_route is not defined.    
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
