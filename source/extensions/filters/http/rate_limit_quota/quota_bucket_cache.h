@@ -44,8 +44,8 @@ struct Bucket {
   BucketAction bucket_action;
   // Cache quota usage.
   QuotaUsage quota_usage;
-
-  std::unique_ptr<TokenBucketImpl> token_bucket_limiter;
+  // Rate limiter based on token bucket algorithm.
+  TokenBucketPtr token_bucket_limiter;
 };
 
 using BucketsCache = absl::flat_hash_map<size_t, std::unique_ptr<Bucket>>;
