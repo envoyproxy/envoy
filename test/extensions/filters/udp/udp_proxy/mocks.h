@@ -57,7 +57,7 @@ public:
 
   std::string default_proxy_host_ = "default.host.com";
   std::string default_target_host_ = "default.target.host";
-  uint32_t default_proxy_port_{10};
+  const absl::optional<uint32_t> default_proxy_port_ = 10;
   uint32_t default_target_port_{20};
   std::string post_path_ = "/default/post";
   Http::HeaderEvaluator& header_evaluator_;
