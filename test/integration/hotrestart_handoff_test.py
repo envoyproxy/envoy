@@ -10,6 +10,7 @@ TODO(ravenblack): perform the same tests for quic connections once they will wor
 import asyncio
 import logging
 import os
+import pathlib
 import random
 import sys
 import unittest
@@ -115,8 +116,7 @@ async def _full_http_request(url: str) -> str:
 
 
 def _make_envoy_config_yaml(upstream_port, file_path):
-    with open(file_path, "w") as file:
-        file.write(
+    file_path.write_text(
             f"""
 admin:
   address:
@@ -191,9 +191,9 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
         tmpdir = os.environ["TEST_TMPDIR"]
-        self.slow_config_path = os.path.join(tmpdir, "slow_config.yaml")
-        self.fast_config_path = os.path.join(tmpdir, "fast_config.yaml")
-        self.base_id_path = os.path.join(tmpdir, "base_id.txt")
+        self.slow_config_path = pathlib.Path(tmpdir, "slow_config.yaml")
+        self.fast_config_path = pathlib.Path(tmpdir, "fast_config.yaml")
+        self.base_id_path = pathlib.Path(tmpdir, "base_id.txt")
         _make_envoy_config_yaml(upstream_port=UPSTREAM_SLOW_PORT, file_path=self.slow_config_path)
         _make_envoy_config_yaml(upstream_port=UPSTREAM_FAST_PORT, file_path=self.fast_config_path)
         self.base_envoy_args = [
@@ -233,8 +233,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         slow_response = _http_request(f"http://{ENVOY_HOST}:{ENVOY_PORT}/")
         log.info("waiting for response to begin")
         self.assertEqual(await anext(slow_response, None), b"start\n")
-        with open(self.base_id_path, "r") as base_id_file:
-            base_id = int(base_id_file.read())
+        base_id = int(self.base_id_path.read_text())
         log.info(f"starting envoy hot restart for base id {base_id}")
         envoy_process_2 = await asyncio.create_subprocess_exec(
             *self.base_envoy_args,
