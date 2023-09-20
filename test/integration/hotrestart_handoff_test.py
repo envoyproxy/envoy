@@ -14,7 +14,7 @@ import pathlib
 import random
 import sys
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from aiohttp import client_exceptions, web, ClientSession
 
 
@@ -25,6 +25,7 @@ def random_loopback_host():
     return f"127.{random.randrange(0,256)}.{random.randrange(0,256)}.{random.randrange(1, 255)}"
 
 
+STARTUP_TOLERANCE_SECONDS = 3
 UPSTREAM_SLOW_PORT = 54321
 UPSTREAM_FAST_PORT = 54322
 UPSTREAM_HOST = random_loopback_host()
@@ -79,7 +80,7 @@ class Upstream:
             status=200, reason='OK', headers={'content-type': 'text/plain'})
         await response.prepare(request)
         await response.write(b"start\n")
-        await asyncio.sleep(3)
+        await asyncio.sleep(STARTUP_TOLERANCE_SECONDS + 0.5)
         await response.write(b"end\n")
         await response.write_eof()
         return response
@@ -172,9 +173,9 @@ static_resources:
 async def _wait_for_envoy_epoch(i: int):
     """Load the admin/server_info page until restart_epoch is i, or timeout"""
     expected_substring = f'"restart_epoch": {i}'
-    tries = 5
-    while tries:
-        tries -= 1
+    deadline = datetime.now() + timedelta(seconds=STARTUP_TOLERANCE_SECONDS)
+    response = "admin port not responding within timeout"
+    while datetime.now() < deadline:
         try:
             response = await _full_http_request(
                 f"http://{ENVOY_HOST}:{ENVOY_ADMIN_PORT}/server_info")
@@ -240,7 +241,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "--restart-epoch",
             "1",
             "--parent-shutdown-time-s",
-            "3",
+            str(STARTUP_TOLERANCE_SECONDS + 1),
             "--base-id",
             str(base_id),
             "-c",
