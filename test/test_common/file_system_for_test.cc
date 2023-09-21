@@ -126,8 +126,7 @@ Api::IoCallBoolResult MemfileInstanceImpl::createPath(absl::string_view) {
   return resultSuccess(true);
 }
 
-MemfileInstanceImpl::MemfileInstanceImpl()
-    : file_system_{new InstanceImpl()}, use_memfiles_(false) {}
+MemfileInstanceImpl::MemfileInstanceImpl() : file_system_{new InstanceImpl()} {}
 
 MemfileInstanceImpl& fileSystemForTest() {
   static MemfileInstanceImpl* file_system = new MemfileInstanceImpl();

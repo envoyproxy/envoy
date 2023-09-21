@@ -13,7 +13,7 @@ START_WASM_PLUGIN(HttpWasmTestCpp)
 
 class MyGrpcCallHandler : public GrpcCallHandler<google::protobuf::Value> {
 public:
-  MyGrpcCallHandler() : GrpcCallHandler<google::protobuf::Value>() {}
+  MyGrpcCallHandler() = default;
   void onSuccess(size_t body_size) override {
     if (call_done_) {
       proxy_done();

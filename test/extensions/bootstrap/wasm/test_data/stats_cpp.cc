@@ -7,7 +7,7 @@
 #include "include/proxy-wasm/null_plugin.h"
 #endif
 
-template <typename T> std::unique_ptr<T> wrap_unique(T* ptr) { return std::unique_ptr<T>(ptr); }
+template <typename T> std::unique_ptr<T> wrapUnique(T* ptr) { return std::unique_ptr<T>(ptr); }
 
 START_WASM_PLUGIN(WasmStatsCpp)
 
@@ -71,11 +71,11 @@ WASM_EXPORT(void, proxy_on_tick, (uint32_t)) {
 
 // Test the high level interface.
 WASM_EXPORT(void, proxy_on_log, (uint32_t /* context_zero */)) {
-  auto c = wrap_unique(
+  auto c = wrapUnique(
       Counter<std::string, int, bool>::New("test_counter", "string_tag", "int_tag", "bool_tag"));
   auto g =
-      wrap_unique(Gauge<std::string, std::string>::New("test_gauge", "string_tag1", "string_tag2"));
-  auto h = wrap_unique(Histogram<int, std::string, bool>::New("test_histogram", "int_tag",
+      wrapUnique(Gauge<std::string, std::string>::New("test_gauge", "string_tag1", "string_tag2"));
+  auto h = wrapUnique(Histogram<int, std::string, bool>::New("test_histogram", "int_tag",
                                                               "string_tag", "bool_tag"));
 
   c->increment(1, "test_tag", 7, true);
@@ -90,9 +90,9 @@ WASM_EXPORT(void, proxy_on_log, (uint32_t /* context_zero */)) {
   logWarn(std::string("get gauge = ") + std::to_string(g->get("test_tag1", "test_tag2")));
 
   h->record(3, 7, "test_tag", true);
-  auto base_h = wrap_unique(Counter<int>::New("test_histogram", "int_tag"));
+  auto base_h = wrapUnique(Counter<int>::New("test_histogram", "int_tag"));
   auto complete_h =
-      wrap_unique(base_h->extendAndResolve<std::string, bool>(7, "string_tag", "bool_tag"));
+      wrapUnique(base_h->extendAndResolve<std::string, bool>(7, "string_tag", "bool_tag"));
   auto simple_h = complete_h->resolve("test_tag", true);
   logError(std::string("h_id = ") + complete_h->nameFromIdSlow(simple_h.metric_id));
 
