@@ -359,7 +359,7 @@ envoy_py_test(
     name = "hotrestart_handoff_test",
     size = "medium",
     srcs = select({
-        "//bazel:disable_hot_restart_or_admin": [],
+        "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
         "//conditions:default": ["hotrestart_handoff_test.py"],
     }),
     data = [":hotrestart_main"],
