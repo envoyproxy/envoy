@@ -36,11 +36,11 @@ envoy_cc_test_library(
 envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
-    extension_names = ["envoy.filters.udp_session.filter_state_dynamic_forward_proxy"],
+    extension_names = ["envoy.filters.udp.session.dynamic_forward_proxy"],
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
-        "//source/extensions/filters/udp/udp_proxy/session_filters/filter_state_dfp:config",
+        "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/extensions/filters/udp/udp_proxy:mocks",
         "//test/mocks/server:factory_context_mocks",
