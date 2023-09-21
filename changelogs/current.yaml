@@ -90,6 +90,10 @@ minor_behavior_changes:
     The redis network filter :ref:`connection_rate_limit_per_sec
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
     must be greater than 0. A config that sets this value to 0 will be rejected.
+- area: http
+  change: |
+    change the proxy status for UpstreamRequestTimeout to HttpResponseTimeout.
+    It can be disabled by the runtime guard ``envoy_reloadable_features_proxy_status_upstream_request_timeout``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
