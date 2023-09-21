@@ -1,4 +1,5 @@
 #include "source/common/network/filter_state_dst_address.h"
+#include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 
@@ -20,6 +21,11 @@ class OriginalDstTest : public testing::Test {
 public:
   OriginalDstTest() : filter_(envoy::config::core::v3::TrafficDirection::OUTBOUND) {
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
+  }
+
+  void expectInternalAddress() {
+    EXPECT_CALL(socket_, addressType())
+        .WillRepeatedly(Return(Network::Address::Type::EnvoyInternal));
     EXPECT_CALL(cb_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
     EXPECT_CALL(cb_, filterState()).Times(testing::AtLeast(1));
   }
@@ -30,14 +36,27 @@ public:
   envoy::config::core::v3::Metadata metadata_;
 };
 
+TEST_F(OriginalDstTest, Pipe) {
+  EXPECT_EQ(0, filter_.maxReadBytes());
+  EXPECT_CALL(socket_, addressType()).WillRepeatedly(Return(Network::Address::Type::Pipe));
+  filter_.onAccept(cb_);
+  EXPECT_FALSE(socket_.connectionInfoProvider().localAddressRestored());
+
+  NiceMock<Network::MockIoHandle> io_handle;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  Network::ListenerFilterBufferImpl buffer(
+      io_handle, dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, 1);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_.onData(buffer));
+}
+
 TEST_F(OriginalDstTest, InternalNone) {
-  EXPECT_CALL(socket_, addressType()).WillRepeatedly(Return(Network::Address::Type::EnvoyInternal));
+  expectInternalAddress();
   filter_.onAccept(cb_);
   EXPECT_FALSE(socket_.connectionInfoProvider().localAddressRestored());
 }
 
 TEST_F(OriginalDstTest, InternalDynamicMetadata) {
-  EXPECT_CALL(socket_, addressType()).WillRepeatedly(Return(Network::Address::Type::EnvoyInternal));
+  expectInternalAddress();
   TestUtility::loadFromYaml(R"EOF(
     filter_metadata:
       envoy.filters.listener.original_dst:
@@ -50,7 +69,7 @@ TEST_F(OriginalDstTest, InternalDynamicMetadata) {
 }
 
 TEST_F(OriginalDstTest, InternalDynamicMetadataFailure) {
-  EXPECT_CALL(socket_, addressType()).WillRepeatedly(Return(Network::Address::Type::EnvoyInternal));
+  expectInternalAddress();
   TestUtility::loadFromYaml(R"EOF(
     filter_metadata:
       envoy.filters.listener.original_dst:
@@ -62,7 +81,7 @@ TEST_F(OriginalDstTest, InternalDynamicMetadataFailure) {
 }
 
 TEST_F(OriginalDstTest, InternalFilterState) {
-  EXPECT_CALL(socket_, addressType()).WillRepeatedly(Return(Network::Address::Type::EnvoyInternal));
+  expectInternalAddress();
   const auto local = Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
   const auto remote = Network::Utility::parseInternetAddress("127.0.0.1", 8000, false);
   cb_.filter_state_.setData("envoy.filters.listener.original_dst.local_ip",

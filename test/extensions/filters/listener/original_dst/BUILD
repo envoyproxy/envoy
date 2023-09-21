@@ -45,6 +45,7 @@ envoy_cc_test(
     srcs = ["original_dst_test.cc"],
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
+        "//source/common/network:listener_filter_buffer_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/filters/listener/original_dst:original_dst_lib",
         "//test/mocks/network:network_mocks",

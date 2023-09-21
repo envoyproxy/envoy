@@ -103,6 +103,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
                      remote_object->address()->asString());
       socket.connectionInfoProvider().setRemoteAddress(remote_object->address());
     }
+    break;
   }
   default:
     break;
