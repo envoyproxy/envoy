@@ -32,7 +32,7 @@ class RateLimitClientImpl : public RateLimitClient,
                                 envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>,
                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  RateLimitClientImpl(Grpc::GrpcServiceConfigWithHashKey config_with_hash_key,
+  RateLimitClientImpl(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                       Server::Configuration::FactoryContext& context, absl::string_view domain_name,
                       RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets)
       : domain_name_(domain_name),
