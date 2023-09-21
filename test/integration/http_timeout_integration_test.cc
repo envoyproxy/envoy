@@ -1,5 +1,7 @@
 #include "test/integration/http_timeout_integration_test.h"
 
+#include "test/test_common/test_runtime.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -15,6 +17,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HttpTimeoutIntegrationTest,
 TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
