@@ -65,7 +65,7 @@ public:
     http_service:
       cluster_name: "my_o11y_backend"
       path: "/otlp/v1/traces"
-      hostname: "some-o11y.com"
+      authority: "some-o11y.com"
       request_headers_to_add:
       - header:
           key: "Authorization"
@@ -111,7 +111,7 @@ TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
       timeout: 0.250s
     http_service:
       cluster_name: "my_o11y_backend"
-      hostname: "some-o11y.com"
+      authority: "some-o11y.com"
       timeout: 0.250s
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;

@@ -54,7 +54,7 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerWithHttpExporter) {
         http_service:
           cluster_name: "my_o11y_backend"
           path: "/otlp/v1/traces"
-          hostname: "some-o11y.com"
+          authority: "some-o11y.com"
           request_headers_to_add:
           - header:
               key: "Authorization"

@@ -52,7 +52,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   std::string yaml_string = fmt::format(R"EOF(
   cluster_name: "my_o11y_backend"
   path: "/otlp/v1/traces"
-  hostname: "some-o11y.com"
+  authority: "some-o11y.com"
   request_headers_to_add:
   - header:
       key: "Authorization"
@@ -125,7 +125,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalClus
   std::string yaml_string = fmt::format(R"EOF(
   cluster_name: "my_o11y_backend"
   path: "/otlp/v1/traces"
-  hostname: "some-o11y.com"
+  authority: "some-o11y.com"
   timeout: 0.250s
   )EOF");
 
@@ -149,7 +149,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalClus
 TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpanWithDefaultPath) {
   std::string yaml_string = fmt::format(R"EOF(
   cluster_name: "my_o11y_backend"
-  hostname: "some-o11y.com"
+  authority: "some-o11y.com"
   timeout: 0.250s
   )EOF");
 

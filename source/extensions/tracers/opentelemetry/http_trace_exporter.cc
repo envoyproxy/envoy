@@ -39,7 +39,7 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
     message->headers().setPath(http_service_.path());
   }
 
-  message->headers().setHost(http_service_.hostname());
+  message->headers().setHost(http_service_.authority());
 
   // add all custom headers to the request
   for (const auto& header_value_option : http_service_.request_headers_to_add()) {

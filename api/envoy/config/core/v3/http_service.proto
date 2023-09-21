@@ -42,7 +42,7 @@ message HttpService {
     gte {}
   }];
 
-  // Specifies the hostname that should be added to the Host header to each request.
+  // Specifies the authority that should be added to the Host header to each request.
   // The default is an empty string.
-  string hostname = 5;
+  string authority = 5;
 }
