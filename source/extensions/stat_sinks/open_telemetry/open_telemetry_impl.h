@@ -79,20 +79,22 @@ public:
   MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot) const override;
 
 private:
-  void flushGauge(opentelemetry::proto::metrics::v1::Metric& metric, const Stats::Gauge& gauge,
+  template <class GaugeType>
+  void flushGauge(opentelemetry::proto::metrics::v1::Metric& metric, const GaugeType& gauge,
                   int64_t snapshot_time_ns) const;
 
-  void flushCounter(opentelemetry::proto::metrics::v1::Metric& metric,
-                    const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-                    int64_t snapshot_time_ns) const;
+  template <class CounterType>
+  void flushCounter(opentelemetry::proto::metrics::v1::Metric& metric, const CounterType& counter,
+                    uint64_t value, uint64_t delta, int64_t snapshot_time_ns) const;
 
   void flushHistogram(opentelemetry::proto::metrics::v1::Metric& metric,
                       const Stats::ParentHistogram& parent_histogram,
                       int64_t snapshot_time_ns) const;
 
+  template <class StatType>
   void setMetricCommon(opentelemetry::proto::metrics::v1::Metric& metric,
                        opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
-                       int64_t snapshot_time_ns, const Stats::Metric& stat) const;
+                       int64_t snapshot_time_ns, const StatType& stat) const;
 
   void setMetricCommon(opentelemetry::proto::metrics::v1::Metric& metric,
                        opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point,

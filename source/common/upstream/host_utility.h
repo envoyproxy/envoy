@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/stats/primitive_stats.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -29,21 +30,13 @@ public:
   static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, HostStatusSet status,
                                                LoadBalancerContext* context);
 
-  template <class StatType> struct PrimitiveMetric {
-    PrimitiveMetric(const StatType& stat) : stat_(stat) {}
-    std::string name_;
-    std::string tag_extracted_name_;
-    Stats::TagVector tags_;
-    const StatType& stat_;
-  };
-
-  static void forEachHostCounter(
-      const ClusterManager& cluster_manager,
-      const std::function<void(PrimitiveMetric<Stats::PrimitiveCounter>&& metric)>& cb);
+  static void
+  forEachHostCounter(const ClusterManager& cluster_manager,
+                     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& cb);
 
   static void
   forEachHostGauge(const ClusterManager& cluster_manager,
-                   const std::function<void(PrimitiveMetric<Stats::PrimitiveGauge>&& metric)>& cb);
+                   const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& cb);
 };
 
 } // namespace Upstream

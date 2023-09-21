@@ -200,7 +200,7 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
 namespace {
 template <class StatType, typename GetStatsFunc>
 void forEachMetric(const ClusterManager& cluster_manager,
-                   const std::function<void(HostUtility::PrimitiveMetric<StatType>&& metric)>& cb,
+                   const std::function<void(StatType&& metric)>& cb,
                    GetStatsFunc get_stats_vector) {
   for (const auto& [cluster_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
     if (cluster_ref.get().info()->perEndpointStats()) {
@@ -213,12 +213,12 @@ void forEachMetric(const ClusterManager& cluster_manager,
             tags.push_back({"envoy.endpoint_hostname", hostname});
           }
 
-          for (auto& [counter_name, primitive] : get_stats_vector(*host)) {
-            HostUtility::PrimitiveMetric<StatType> metric(primitive.get());
+          for (auto& [metric_name, primitive] : get_stats_vector(*host)) {
+            StatType metric(primitive.get());
 
-            metric.name_ = absl::StrCat("cluster.", cluster_name, ".endpoint.", counter_name, ".",
+            metric.name_ = absl::StrCat("cluster.", cluster_name, ".endpoint.", metric_name, ".",
                                         host->address()->asStringView());
-            metric.tag_extracted_name_ = absl::StrCat("cluster.endpoint.", counter_name);
+            metric.tag_extracted_name_ = absl::StrCat("cluster.endpoint.", metric_name);
             metric.tags_ = tags;
 
             cb(std::move(metric));
@@ -232,13 +232,13 @@ void forEachMetric(const ClusterManager& cluster_manager,
 
 void HostUtility::forEachHostCounter(
     const ClusterManager& cluster_manager,
-    const std::function<void(PrimitiveMetric<Stats::PrimitiveCounter>&& metric)>& cb) {
+    const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& cb) {
   forEachMetric(cluster_manager, cb, [](Host& host) { return host.counters(); });
 }
 
 void HostUtility::forEachHostGauge(
     const ClusterManager& cluster_manager,
-    const std::function<void(PrimitiveMetric<Stats::PrimitiveGauge>&& metric)>& cb) {
+    const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& cb) {
   forEachMetric(cluster_manager, cb, [](Host& host) { return host.gauges(); });
 }
 

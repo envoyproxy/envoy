@@ -83,9 +83,9 @@ struct MetricLessThan {
   }
 };
 
-template <class StatType> struct PrimitiveMetricLessThan {
-  bool operator()(const Upstream::HostUtility::PrimitiveMetric<StatType>* a,
-                  const Upstream::HostUtility::PrimitiveMetric<StatType>* b) {
+struct PrimitiveMetricSnapshotLessThan {
+  bool operator()(const Stats::PrimitiveMetricMetadata* a,
+                  const Stats::PrimitiveMetricMetadata* b) {
     return a->name_ < b->name_;
   }
 };
@@ -177,8 +177,7 @@ uint64_t outputStatType(
 
 template <class StatType>
 uint64_t outputPrimitiveStatType(
-    Buffer::Instance& response, const StatsParams& params,
-    const std::vector<Upstream::HostUtility::PrimitiveMetric<StatType>>& metrics,
+    Buffer::Instance& response, const StatsParams& params, const std::vector<StatType>& metrics,
     const std::function<std::string(uint64_t value, const Stats::TagVector& tags,
                                     const std::string& prefixed_tag_extracted_name)>&
         generate_output,
@@ -199,8 +198,7 @@ uint64_t outputPrimitiveStatType(
   // be sorted before producing the final output to satisfy the "preferred" ordering from the
   // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
   // consistent across calls.
-  using StatTypeUnsortedCollection =
-      std::vector<const Upstream::HostUtility::PrimitiveMetric<StatType>*>;
+  using StatTypeUnsortedCollection = std::vector<const StatType*>;
 
   // Return early to avoid crashing when getting the symbol table from the first metric.
   if (metrics.empty()) {
@@ -232,11 +230,11 @@ uint64_t outputPrimitiveStatType(
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.second.begin(), group.second.end(), PrimitiveMetricLessThan<StatType>());
+    std::sort(group.second.begin(), group.second.end(), PrimitiveMetricSnapshotLessThan());
 
     for (const auto& metric : group.second) {
-      response.add(generate_output(metric->stat_.value(), metric->tags_,
-                                   prefixed_tag_extracted_name.value()));
+      response.add(
+          generate_output(metric->value(), metric->tags(), prefixed_tag_extracted_name.value()));
     }
   }
   return result;
@@ -373,27 +371,25 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   // other stats. If this is not true, then the counters/gauges for per-endpoint need to be combined
   // with the above counter/gauge calls so that stats can be properly grouped.
   {
-    std::vector<Upstream::HostUtility::PrimitiveMetric<Stats::PrimitiveCounter>> host_counters;
-    Upstream::HostUtility::forEachHostCounter(
-        cluster_manager,
-        [&](Upstream::HostUtility::PrimitiveMetric<Stats::PrimitiveCounter>&& metric) {
-          host_counters.emplace_back(std::move(metric));
-          ASSERT(metric.name_.empty());
-        });
-    metric_name_count += outputPrimitiveStatType<Stats::PrimitiveCounter>(
+    std::vector<Stats::PrimitiveCounterSnapshot> host_counters;
+    Upstream::HostUtility::forEachHostCounter(cluster_manager,
+                                              [&](Stats::PrimitiveCounterSnapshot&& metric) {
+                                                host_counters.emplace_back(std::move(metric));
+                                                ASSERT(metric.name_.empty());
+                                              });
+    metric_name_count += outputPrimitiveStatType<Stats::PrimitiveCounterSnapshot>(
         response, params, host_counters, generateNumericOutput, "counter", custom_namespaces);
   }
 
   {
-    std::vector<Upstream::HostUtility::PrimitiveMetric<Stats::PrimitiveGauge>> host_gauges;
-    Upstream::HostUtility::forEachHostGauge(
-        cluster_manager,
-        [&](Upstream::HostUtility::PrimitiveMetric<Stats::PrimitiveGauge>&& metric) {
-          host_gauges.emplace_back(std::move(metric));
-          ASSERT(metric.name_.empty());
-        });
-    metric_name_count += outputPrimitiveStatType<Stats::PrimitiveGauge>(
-        response, params, host_gauges, generateNumericOutput, "gauge", custom_namespaces);
+    std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges;
+    Upstream::HostUtility::forEachHostGauge(cluster_manager,
+                                            [&](Stats::PrimitiveGaugeSnapshot&& metric) {
+                                              host_gauges.emplace_back(std::move(metric));
+                                              ASSERT(metric.name_.empty());
+                                            });
+    metric_name_count += outputPrimitiveStatType(response, params, host_gauges,
+                                                 generateNumericOutput, "gauge", custom_namespaces);
   }
 
   return metric_name_count;

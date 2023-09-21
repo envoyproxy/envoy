@@ -942,10 +942,7 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  bool perEndpointStats() const override {
-    // TODO: get from proto
-    return true;
-  }
+  bool perEndpointStats() const override { return per_endpoint_stats_; }
 
   UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
@@ -1120,6 +1117,7 @@ private:
   const bool added_via_api_ : 1;
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
+  const bool per_endpoint_stats_ : 1;
 };
 
 /**
