@@ -150,7 +150,7 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
     return createSessionWithOptionalHost(std::move(addresses), optional_host, false);
   }
 
-  auto host = chooseHost(addresses.peer_);
+  auto host = chooseHost(addresses.peer_, nullptr);
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
     cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
@@ -178,8 +178,9 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOpt
 }
 
 Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(
-    const Network::Address::InstanceConstSharedPtr& peer_address) const {
-  UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address);
+    const Network::Address::InstanceConstSharedPtr& peer_address,
+    const StreamInfo::StreamInfo* stream_info) const {
+  UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address, stream_info);
   Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
   return host;
 }
@@ -211,7 +212,7 @@ Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::
       // If a host becomes unhealthy, we optimally would like to replace it with a new session
       // to a healthy host. We may eventually want to make this behavior configurable, but for now
       // this will be the universal behavior.
-      auto host = chooseHost(data.addresses_.peer_);
+      auto host = chooseHost(data.addresses_.peer_, nullptr);
       if (host != nullptr && host->coarseHealth() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host().value().get()) {
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
@@ -237,7 +238,7 @@ UdpProxyFilter::PerPacketLoadBalancingClusterInfo::PerPacketLoadBalancingCluster
 
 Network::FilterStatus
 UdpProxyFilter::PerPacketLoadBalancingClusterInfo::onData(Network::UdpRecvData& data) {
-  auto host = chooseHost(data.addresses_.peer_);
+  auto host = chooseHost(data.addresses_.peer_, nullptr);
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
     cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
@@ -519,7 +520,7 @@ void UdpProxyFilter::ActiveSession::createSocketDeferred() {
     return;
   }
 
-  host_ = cluster_.chooseHost(addresses_.peer_);
+  host_ = cluster_.chooseHost(addresses_.peer_, &udp_session_info_);
   if (host_ == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
     cluster_.cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
