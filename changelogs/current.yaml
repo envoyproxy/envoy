@@ -251,6 +251,10 @@ new_features:
   change: |
     added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
     to OTLP stats sink that enables adding a static prefix to all stats flushed by this sink.
+- area: stats
+  change: |
+    added :ref:`per_endpoint_stats <envoy_v3_api_field_config_cluster_v3.TrackClusterStats.per_endpoint_stats>` to get some metrics
+    for each endpoint in a cluster.
 - area: tap
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
