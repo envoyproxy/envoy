@@ -580,21 +580,51 @@ case $CI_TARGET in
         fi
         ;;
 
-    docs)
-        setup_clang_toolchain
-        echo "generating docs..."
-        # Build docs.
-        "${ENVOY_SRCDIR}/docs/build.sh"
-        ;;
-
-    docs-upload)
-        setup_clang_toolchain
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
-        ;;
-
-    docs-publish-latest)
-        BUILD_SHA=$(git rev-parse HEAD)
-        curl -X POST -d "$BUILD_SHA" "$NETLIFY_TRIGGER_URL"
+    docker)
+        # This is limited to linux x86/arm64 and expects `release` or `release.server_only` to have
+        # been run first.
+        if ! docker ps &> /dev/null; then
+            echo "Unable to build with Docker. If you are running with ci/run_envoy_docker.sh" \
+                 "you should set ENVOY_DOCKER_IN_DOCKER=1"
+            exit 1
+        fi
+        if [[ -z "$CI_SHA1" ]]; then
+            CI_SHA1="$(git rev-parse HEAD~1)"
+            export CI_SHA1
+        fi
+        ENVOY_ARCH_DIR="$(dirname "${ENVOY_BUILD_DIR}")"
+        ENVOY_TARBALL_DIR="${ENVOY_TARBALL_DIR:-${ENVOY_ARCH_DIR}}"
+        _PLATFORMS=()
+        PLATFORM_NAMES=(
+            x64:linux/amd64
+            arm64:linux/arm64)
+        # TODO(phlax): avoid copying bins
+        for platform_name in "${PLATFORM_NAMES[@]}"; do
+            path="$(echo "${platform_name}" | cut -d: -f1)"
+            platform="$(echo "${platform_name}" | cut -d: -f2)"
+            bin_folder="${ENVOY_TARBALL_DIR}/${path}/bin"
+            if [[ ! -e "${bin_folder}/release.tar.zst" ]]; then
+                continue
+            fi
+            _PLATFORMS+=("$platform")
+            if [[ -e "$platform" ]]; then
+                rm -rf "$platform"
+            fi
+            mkdir -p "${platform}"
+            cp -a "${bin_folder}"/* "$platform"
+        done
+        if [[ -z "${_PLATFORMS[*]}" ]]; then
+            echo "No tarballs found in ${ENVOY_TARBALL_DIR}, did you run \`release\` first?" >&2
+            exit 1
+        fi
+        PLATFORMS="$(IFS=, ; echo "${_PLATFORMS[*]}")"
+        export DOCKER_PLATFORM="$PLATFORMS"
+        if [[ -z "${DOCKERHUB_PASSWORD}" && "${#_PLATFORMS[@]}" -eq 1 ]]; then
+            # if you are not pushing the images and there is only one platform
+            # then load to Docker (ie local build)
+            export DOCKER_LOAD_IMAGES=1
+        fi
+        "${ENVOY_SRCDIR}/ci/docker_ci.sh"
         ;;
 
     docker-upload)
@@ -614,6 +644,23 @@ case $CI_TARGET in
               --remote_download_toplevel \
               //distribution/dockerhub:readme
         cat bazel-bin/distribution/dockerhub/readme.md
+        ;;
+
+    docs)
+        setup_clang_toolchain
+        echo "generating docs..."
+        # Build docs.
+        "${ENVOY_SRCDIR}/docs/build.sh"
+        ;;
+
+    docs-publish-latest)
+        BUILD_SHA=$(git rev-parse HEAD)
+        curl -X POST -d "$BUILD_SHA" "$NETLIFY_TRIGGER_URL"
+        ;;
+
+    docs-upload)
+        setup_clang_toolchain
+        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
         ;;
 
     fetch|fetch-*)
@@ -736,18 +783,24 @@ case $CI_TARGET in
               -- "${PUBLISH_ARGS[@]}"
         ;;
 
-    release)
-        # When testing memory consumption, we want to test against exact byte-counts
-        # where possible. As these differ between platforms and compile options, we
-        # define the 'release' builds as canonical and test them only in CI, so the
-        # toolchain is kept consistent. This ifdef is checked in
-        # test/common/stats/stat_test_utility.cc when computing
-        # Stats::TestUtil::MemoryTest::mode().
-        if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
+    release|release.server_only)
+        if [[ "$CI_TARGET" == "release" ]]; then
+            # When testing memory consumption, we want to test against exact byte-counts
+            # where possible. As these differ between platforms and compile options, we
+            # define the 'release' builds as canonical and test them only in CI, so the
+            # toolchain is kept consistent. This ifdef is checked in
+            # test/common/stats/stat_test_utility.cc when computing
+            # Stats::TestUtil::MemoryTest::mode().
+            if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+                BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
+            fi
         fi
         setup_clang_toolchain
         ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
+        if [[ -e "${ENVOY_BINARY_DIR}" ]]; then
+            echo "Existing output directory found (${ENVOY_BINARY_DIR}), removing ..."
+            rm -rf "${ENVOY_BINARY_DIR}"
+        fi
         mkdir -p "$ENVOY_BINARY_DIR"
         # As the binary build package enforces compiler options, adding here to ensure the tests and distribution build
         # reuse settings and any already compiled artefacts, the bundle itself will always be compiled
@@ -755,16 +808,18 @@ case $CI_TARGET in
         BAZEL_RELEASE_OPTIONS=(
             --stripopt=--strip-all
             -c opt)
-        # Run release tests
-        echo "Testing with:"
-        echo "  targets: ${TEST_TARGETS[*]}"
-        echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
-        echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --remote_download_minimal \
-            "${BAZEL_RELEASE_OPTIONS[@]}" \
-            "${TEST_TARGETS[@]}"
+        if [[ "$CI_TARGET" == "release" ]]; then
+            # Run release tests
+            echo "Testing with:"
+            echo "  targets: ${TEST_TARGETS[*]}"
+            echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
+            echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" \
+                --remote_download_minimal \
+                "${BAZEL_RELEASE_OPTIONS[@]}" \
+                "${TEST_TARGETS[@]}"
+        fi
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_RELEASE_OPTIONS[@]}" \
@@ -783,12 +838,7 @@ case $CI_TARGET in
         cp -a \
            bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
            "${ENVOY_BINARY_DIR}/schema_validator_tool"
-        ;;
-
-    release.server_only)
-        setup_clang_toolchain
-        echo "bazel release build..."
-        bazel_envoy_binary_build release
+        echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 
     release.signed)

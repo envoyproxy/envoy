@@ -163,22 +163,31 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
 absl::Status
 EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                const std::string&) {
-  if (!validateUpdateSize(resources.size())) {
+  if (resources.size() == 0) {
+    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", edsServiceName());
+    info_->configUpdateStats().update_empty_.inc();
+    onPreInitComplete();
     return absl::OkStatus();
   }
+  if (resources.size() != 1) {
+    return absl::InvalidArgumentError(
+        fmt::format("Unexpected EDS resource length: {}", resources.size()));
+  }
+
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
           resources[0].get().resource());
   if (cluster_load_assignment.cluster_name() != edsServiceName()) {
-    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", edsServiceName(),
-                                     cluster_load_assignment.cluster_name()));
+    return absl::InvalidArgumentError(fmt::format("Unexpected EDS cluster (expecting {}): {}",
+                                                  edsServiceName(),
+                                                  cluster_load_assignment.cluster_name()));
   }
   // Validate that each locality doesn't have both LEDS and endpoints defined.
   // TODO(adisuissa): This is only needed for the API v3 support. In future major versions
   // the oneof definition will take care of it.
   for (const auto& locality : cluster_load_assignment.endpoints()) {
     if (locality.has_leds_cluster_locality_config() && locality.lb_endpoints_size() > 0) {
-      throw EnvoyException(fmt::format(
+      return absl::InvalidArgumentError(fmt::format(
           "A ClusterLoadAssignment for cluster {} cannot include both LEDS (resource: {}) and a "
           "list of endpoints.",
           edsServiceName(), locality.leds_cluster_locality_config().leds_collection_name()));
@@ -287,24 +296,7 @@ void EdsClusterImpl::update(
 absl::Status
 EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  if (!validateUpdateSize(added_resources.size())) {
-    return absl::OkStatus();
-  }
-  return onConfigUpdate(added_resources, added_resources[0].get().version());
-}
-
-bool EdsClusterImpl::validateUpdateSize(int num_resources) {
-  if (num_resources == 0) {
-    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", edsServiceName());
-    info_->configUpdateStats().update_empty_.inc();
-    onPreInitComplete();
-    return false;
-  }
-  if (num_resources != 1) {
-    throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", num_resources));
-    // (would be a return false here)
-  }
-  return true;
+  return onConfigUpdate(added_resources, "");
 }
 
 void EdsClusterImpl::onAssignmentTimeout() {

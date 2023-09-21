@@ -67,7 +67,7 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
-      target_xds_authority_(grpc_mux_context.target_xds_authority_), first_stream_request_(true),
+      target_xds_authority_(grpc_mux_context.target_xds_authority_),
       dispatcher_(grpc_mux_context.dispatcher_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(

@@ -787,8 +787,8 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
     return false;
   }
   if (!config_query_parameters_.empty()) {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.getPathValue());
+    auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
     if (!matches) {
       return false;
