@@ -264,6 +264,11 @@ new_features:
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: udp_proxy
+  change: |
+    added :ref:`dynamic_forward_proxy <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig>`
+    UDP session filter that can be used to have dynamic forward proxy UDP flows, when used in conjunction with another session filter
+    that sets required filter state values.
 - area: tls
   change: |
     added fallback :ref:`fallback
