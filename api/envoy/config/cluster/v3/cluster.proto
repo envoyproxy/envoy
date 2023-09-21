@@ -1260,5 +1260,15 @@ message TrackClusterStats {
 
   // If `per_endpoint_stats` is true, some stats will be emitted per-endpoint, similar to the stats in
   // admin `/clusters` output.
+  //
+  // This does not currently output correct stats during a hot-restart.
+  //
+  // This is not currently implemented by all stat sinks.
+  //
+  // These stats do not honor filtering or tag extraction rules in :ref:`StatsConfig
+  // <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
+  //
+  // This may not be used at the same time as
+  // :ref:`load_stats_config <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.load_stats_config>`.
   bool per_endpoint_stats = 3;
 }
