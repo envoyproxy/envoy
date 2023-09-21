@@ -46,11 +46,6 @@ type headerMapImpl struct {
 	mutex       sync.Mutex
 }
 
-// ByteSize return size of HeaderMap
-func (h *headerMapImpl) ByteSize() uint64 {
-	return h.headerBytes
-}
-
 type requestOrResponseHeaderMapImpl struct {
 	headerMapImpl
 }
@@ -337,17 +332,19 @@ type httpBuffer struct {
 var _ api.BufferInstance = (*httpBuffer)(nil)
 
 func (b *httpBuffer) Write(p []byte) (n int, err error) {
-	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(p), api.AppendBuffer)
-	return len(p), nil
+	return b.WriteString(string(p))
 }
 
 func (b *httpBuffer) WriteString(s string) (n int, err error) {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, s, api.AppendBuffer)
-	return len(s), nil
+	n = len(s)
+	b.length += uint64(n)
+	return n, nil
 }
 
 func (b *httpBuffer) WriteByte(p byte) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(p), api.AppendBuffer)
+	b.length++
 	return nil
 }
 
@@ -409,31 +406,35 @@ func (b *httpBuffer) String() string {
 }
 
 func (b *httpBuffer) Append(data []byte) error {
-	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(data), api.AppendBuffer)
-	return nil
+	_, err := b.Write(data)
+	return err
 }
 
 func (b *httpBuffer) Prepend(data []byte) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(data), api.PrependBuffer)
+	b.length += uint64(len(data))
 	return nil
 }
 
 func (b *httpBuffer) AppendString(s string) error {
-	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, s, api.AppendBuffer)
-	return nil
+	_, err := b.WriteString(s)
+	return err
 }
 
 func (b *httpBuffer) PrependString(s string) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, s, api.PrependBuffer)
+	b.length += uint64(len(s))
 	return nil
 }
 
 func (b *httpBuffer) Set(data []byte) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(data), api.SetBuffer)
+	b.length = uint64(len(data))
 	return nil
 }
 
 func (b *httpBuffer) SetString(s string) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, s, api.SetBuffer)
+	b.length = uint64(len(s))
 	return nil
 }

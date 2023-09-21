@@ -794,6 +794,8 @@ TEST_P(GolangIntegrationTest, BufferReset) { testBufferApi("Reset"); }
 
 TEST_P(GolangIntegrationTest, BufferResetAfterDrain) { testBufferApi("ResetAfterDrain"); }
 
+TEST_P(GolangIntegrationTest, BufferLen) { testBufferApi("Len"); }
+
 TEST_P(GolangIntegrationTest, Property) {
   initializePropertyConfig(PROPERTY, genSoPath(PROPERTY), PROPERTY);
   initialize();

@@ -298,6 +298,9 @@ TEST(HttpUtility, testQueryParamModification) {
   EXPECT_EQ(params.toString(), "?a=1&a=2&b=3&c=4");
   params.overwrite("b", "foo");
   EXPECT_EQ(params.toString(), "?a=1&a=2&b=foo&c=4");
+  EXPECT_EQ(params.getFirstValue("a").value(), "1");
+  EXPECT_EQ(params.getFirstValue("b").value(), "foo");
+  EXPECT_FALSE(params.getFirstValue("d").has_value());
   params.remove("b");
   EXPECT_EQ(params.toString(), "?a=1&a=2&c=4");
   params.overwrite("a", "bar");
