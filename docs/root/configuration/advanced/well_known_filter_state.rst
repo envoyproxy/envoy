@@ -24,7 +24,7 @@ The following list of filter state objects are consumed by Envoy extensions:
        | - ``port``: port value as a number.
    * - ``envoy.filters.listener.original_dst.local_ip``
      - | :ref:`Original destination listener filter <config_listener_filters_original_dst>`
-       | destination address selection forthe internal listeners.
+       | destination address selection for the internal listeners.
        | Accepts an `IP:PORT` string as a constructor.
        | Fields:
        | - ``ip``: IP address value as a string;
