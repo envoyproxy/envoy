@@ -154,6 +154,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/http/original_ip_detection/xff/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/extensions/load_balancing_policies/cluster_provided/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto_descriptor",
