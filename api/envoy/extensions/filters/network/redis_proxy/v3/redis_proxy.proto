@@ -168,6 +168,7 @@ message RedisProxy {
         bool exclude_read_commands = 3;
       }
 
+      // ReadCommandPolicy controls how Envoy routes read commands to another cluster.
       message ReadCommandPolicy {
         string cluster = 1 [(validate.rules).string = {min_len: 1}];
       }
@@ -189,6 +190,7 @@ message RedisProxy {
       // expression, use %KEY% as a string replacement command.
       string key_formatter = 5;
 
+      // Indicates that the route has a read command policy
       ReadCommandPolicy read_command_policy = 6;
     }
 
