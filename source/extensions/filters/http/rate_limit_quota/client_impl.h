@@ -32,12 +32,13 @@ class RateLimitClientImpl : public RateLimitClient,
                                 envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>,
                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
+  RateLimitClientImpl(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                       Server::Configuration::FactoryContext& context, absl::string_view domain_name,
                       RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets)
       : domain_name_(domain_name),
-        aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-            grpc_service, context.scope(), true)),
+        aync_client_(
+            context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
+                config_with_hash_key, context.scope(), true)),
         rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
         time_source_(context.mainThreadDispatcher().timeSource()) {}
 
@@ -83,11 +84,11 @@ using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
  */
 inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
-                      const envoy::config::core::v3::GrpcService& grpc_service,
                       RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets,
-                      absl::string_view domain_name) {
-  return std::make_unique<RateLimitClientImpl>(grpc_service, context, domain_name, callbacks,
-                                               quota_buckets);
+                      absl::string_view domain_name,
+                      Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
+  return std::make_unique<RateLimitClientImpl>(config_with_hash_key, context, domain_name,
+                                               callbacks, quota_buckets);
 }
 
 } // namespace RateLimitQuota

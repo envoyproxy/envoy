@@ -141,8 +141,8 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
 
   // Create the gRPC client if it has not been created.
   if (client_.rate_limit_client == nullptr) {
-    client_.rate_limit_client = createRateLimitClient(factory_context_, config_->rlqs_server(),
-                                                      this, quota_buckets_, config_->domain());
+    client_.rate_limit_client = createRateLimitClient(factory_context_, this, quota_buckets_,
+                                                      config_->domain(), config_with_hash_key_);
   } else {
     // Callback has been reset to nullptr when filter was destroyed last time.
     // Reset it here when new filter has been created.
