@@ -139,6 +139,8 @@ public:
    */
   virtual OverloadManager& overloadManager() PURE;
 
+  virtual NullOverloadManager& nullOverloadManager() PURE;
+
   /**
    * @return the server's secret manager
    */

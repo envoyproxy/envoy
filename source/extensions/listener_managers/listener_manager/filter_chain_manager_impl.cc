@@ -163,6 +163,10 @@ OverloadManager& PerFilterChainFactoryContextImpl::overloadManager() {
   return parent_context_.overloadManager();
 }
 
+NullOverloadManager& PerFilterChainFactoryContextImpl::nullOverloadManager() {
+  return parent_context_.nullOverloadManager();
+}
+
 bool PerFilterChainFactoryContextImpl::bypassOverloadManager() {
   return parent_context_.bypassOverloadManager();
 }

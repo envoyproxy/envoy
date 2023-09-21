@@ -262,6 +262,9 @@ Singleton::Manager& ListenerFactoryContextBaseImpl::singletonManager() {
 OverloadManager& ListenerFactoryContextBaseImpl::overloadManager() {
   return server_.overloadManager();
 }
+NullOverloadManager& ListenerFactoryContextBaseImpl::nullOverloadManager() {
+  return server_.nullOverloadManager();
+}
 ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
   return server_.threadLocal();
 }
@@ -908,6 +911,9 @@ Singleton::Manager& PerListenerFactoryContextImpl::singletonManager() {
 }
 OverloadManager& PerListenerFactoryContextImpl::overloadManager() {
   return listener_factory_context_base_->overloadManager();
+}
+NullOverloadManager& PerListenerFactoryContextImpl::nullOverloadManager() {
+  return listener_factory_context_base_->nullOverloadManager();
 }
 ThreadLocal::Instance& PerListenerFactoryContextImpl::threadLocal() {
   return listener_factory_context_base_->threadLocal();

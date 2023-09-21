@@ -145,6 +145,7 @@ public:
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
+  NullOverloadManager& nullOverloadManager() override;
   bool bypassOverloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   OptRef<Admin> admin() override;
@@ -224,6 +225,7 @@ public:
   Stats::Scope& serverScope() override { return listener_factory_context_base_->serverScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
+  NullOverloadManager& nullOverloadManager() override;
   bool bypassOverloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   OptRef<Admin> admin() override;

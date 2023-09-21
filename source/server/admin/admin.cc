@@ -56,7 +56,6 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
   for (const auto& access_log : access_logs) {
     access_logs_.emplace_back(access_log);
   }
-  null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   RELEASE_ASSERT(0 == socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_,
                  "listen() failed on admin listener");
@@ -91,7 +90,6 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           server_.api().randomGenerator())),
       profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
                                        "http.admin.", *server_.stats().rootScope())),
-      null_overload_manager_(server_.threadLocal()),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.",
                                                                        *no_op_store_.rootScope())),
       route_config_provider_(server.timeSource()),
@@ -257,8 +255,8 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.api().randomGenerator(), server_.httpContext(),
-      server_.runtime(), server_.localInfo(), server_.clusterManager(), null_overload_manager_,
-      server_.timeSource(), true)});
+      server_.runtime(), server_.localInfo(), server_.clusterManager(), server_.nullOverloadManager(),
+      server_.timeSource())});
   return true;
 }
 

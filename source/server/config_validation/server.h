@@ -99,6 +99,7 @@ public:
   void shutdownAdmin() override {}
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
+  NullOverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
   bool healthCheckFailed() override { return false; }
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { PANIC("not implemented"); }
@@ -180,6 +181,7 @@ private:
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
+  std::unique_ptr<NullOverloadManager> null_overload_manager_;
   MutexTracer* mutex_tracer_{nullptr};
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

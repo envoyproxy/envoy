@@ -593,6 +593,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       *dispatcher_, *stats_store_.rootScope(), thread_local_, bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
 
+  null_overload_manager_ = std::make_unique<NullOverloadManager>(thread_local_);
+
   heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_,
                                                           *stats_store_.rootScope());
 
@@ -857,7 +859,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      Init::Manager& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> post_init_cb)
+                     NullOverloadManager& null_overload_manager, std::function<void()> post_init_cb)
     : init_watcher_("RunHelper", [&instance, post_init_cb]() {
         if (!instance.isShutdown()) {
           post_init_cb();
@@ -892,6 +894,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+  null_overload_manager.start();
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -925,7 +928,8 @@ void InstanceImpl::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
-                                    access_log_manager_, init_manager_, overloadManager(), [this] {
+                                    access_log_manager_, init_manager_, overloadManager(),
+                                    nullOverloadManager(), [this] {
                                       notifyCallbacksForStage(Stage::PostInit);
                                       startWorkers();
                                     });

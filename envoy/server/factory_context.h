@@ -270,6 +270,12 @@ public:
   virtual OverloadManager& overloadManager() PURE;
 
   /**
+   * @return NullOverloadManager& the dummy overload manager for the server for
+   * listeners that are bypassing a configured OverloadManager
+   */
+  virtual NullOverloadManager& nullOverloadManager() PURE;
+
+  /**
    * @return Http::Context& a reference to the http context.
    */
   virtual Http::Context& httpContext() PURE;

@@ -74,6 +74,7 @@ public:
   Stats::Scope& serverScope() override { return parent_context_.serverScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
+  NullOverloadManager& nullOverloadManager() override;
   bool bypassOverloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
   OptRef<Admin> admin() override;

@@ -157,6 +157,7 @@ public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
             Init::Manager& init_manager, OverloadManager& overload_manager,
+            NullOverloadManager& null_overload_manager,
             std::function<void()> workers_start_cb);
 
 private:
@@ -265,6 +266,7 @@ public:
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
+  NullOverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
@@ -387,6 +389,8 @@ private:
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  // Used for listeners which explicitly bypass overload manager
+  std::unique_ptr<NullOverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;

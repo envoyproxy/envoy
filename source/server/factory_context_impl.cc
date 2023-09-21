@@ -27,6 +27,7 @@ Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime()
 Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }
 OverloadManager& FactoryContextImpl::overloadManager() { return server_.overloadManager(); }
+NullOverloadManager& FactoryContextImpl::nullOverloadManager() { return server_.nullOverloadManager(); }
 bool FactoryContextImpl::bypassOverloadManager() { return config_.bypass_overload_manager(); }
 ThreadLocal::SlotAllocator& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
 OptRef<Admin> FactoryContextImpl::admin() { return server_.admin(); }

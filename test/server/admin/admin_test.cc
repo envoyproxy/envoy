@@ -294,7 +294,7 @@ public:
   AdminImpl::NullScopedRouteConfigProvider& scopedRouteConfigProvider() {
     return scoped_route_config_provider_;
   }
-  AdminImpl::NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
+  AdminImpl::NullOverloadManager& overloadManager() { return server_.nullOverloadManager(); }
   AdminImpl::NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
   AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
   AdminImpl::AdminListener& listener() { return listener_; }
