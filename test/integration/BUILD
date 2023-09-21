@@ -363,6 +363,10 @@ envoy_py_test(
         "//conditions:default": ["hotrestart_handoff_test.py"],
     }),
     data = [":hotrestart_main"],
+    main = select({
+        "//bazel:disable_hot_restart_or_admin": "null_test.py",
+        "//conditions:default": "hotrestart_handoff_test.py",
+    }),
     # Hot restart does not apply on Windows.
     # py_test doesn't do coverage.
     tags = [
