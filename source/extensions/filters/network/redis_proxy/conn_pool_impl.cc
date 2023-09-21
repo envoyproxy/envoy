@@ -37,8 +37,9 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 static uint16_t default_port = 6379;
 
 bool isClusterProvidedLb(const Upstream::ClusterInfo& info) {
-  bool cluster_provided_lb = info.lbType() == Upstream::LoadBalancerType::ClusterProvided;
-  if (info.lbType() == Upstream::LoadBalancerType::LoadBalancingPolicyConfig) {
+  const auto lb_type = info.lbType();
+  bool cluster_provided_lb = lb_type == Upstream::LoadBalancerType::ClusterProvided;
+  if (lb_type == Upstream::LoadBalancerType::LoadBalancingPolicyConfig) {
     auto* typed_lb_factory = info.loadBalancerFactory();
     RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
     cluster_provided_lb =
