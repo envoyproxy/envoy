@@ -3,6 +3,7 @@
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
@@ -48,9 +49,10 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
-                       BucketsCache& quota_buckets, ThreadLocalClient& client)
-      : config_(std::move(config)), factory_context_(factory_context),
-        quota_buckets_(quota_buckets), client_(client),
+                       BucketsCache& quota_buckets, ThreadLocalClient& client,
+                       Grpc::GrpcServiceConfigWithHashKey config_with_hash_key)
+      : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
+        factory_context_(factory_context), quota_buckets_(quota_buckets), client_(client),
         time_source_(factory_context.mainThreadDispatcher().timeSource()) {
     createMatcher();
   }
@@ -91,6 +93,7 @@ private:
                                                 const RateLimitOnMatchAction& match_action);
 
   FilterConfigConstSharedPtr config_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};

@@ -38,7 +38,7 @@ public:
   void setStatPrefix(const std::string& stat_prefix) { stat_prefix_ = stat_prefix; }
 
   const std::string getFullStatName(const std::string& stat_name) {
-    if (stat_prefix_ == "") {
+    if (stat_prefix_.empty()) {
       return stat_name;
     }
 

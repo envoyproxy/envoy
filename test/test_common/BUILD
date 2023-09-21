@@ -354,7 +354,7 @@ envoy_basic_cc_library(
 
 envoy_cc_test_library(
     name = "delegating_route_utility_lib",
-    srcs = ["delegating_route_utility.h"],
+    hdrs = ["delegating_route_utility.h"],
     deps = [
         "//source/common/router:delegating_route_lib",
     ],

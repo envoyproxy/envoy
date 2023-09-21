@@ -36,6 +36,8 @@ Third, an upstream cluster must include an endpoint with an internal address ref
             envoy_internal_address:
               server_listener_name: internal_listener
 
+.. _config_internal_upstream_transport:
+
 Internal upstream transport
 ---------------------------
 
