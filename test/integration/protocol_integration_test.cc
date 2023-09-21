@@ -1379,6 +1379,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 // Test hitting the encoder buffer filter with too many response bytes to buffer. Given the request
 // headers are sent on early, the stream/connection will be reset.
 TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_"
+                                    "quic_no_send_alarm_unless_necessary",
+                                    "false");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
