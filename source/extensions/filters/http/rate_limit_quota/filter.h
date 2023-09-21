@@ -30,7 +30,6 @@ using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
     BucketAction::QuotaAssignmentAction;
 
-inline constexpr absl::string_view RateLimitedMessage = "Request has been rate limited";
 /**
  * Possible async results for a limit call.
  */
@@ -91,6 +90,7 @@ private:
   Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
 
+  Http::FilterHeadersStatus processCachedBucket(size_t bucket_id);
   FilterConfigConstSharedPtr config_;
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;

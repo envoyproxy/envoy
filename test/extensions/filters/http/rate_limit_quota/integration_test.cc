@@ -473,7 +473,6 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
       ASSERT_TRUE(response_->waitForEndStream());
       EXPECT_TRUE(response_->complete());
       EXPECT_EQ(response_->headers().getStatusValue(), "429");
-      EXPECT_EQ(response_->body(), RateLimitedMessage);
     } else {
       // Handle the request received by upstream.
       ASSERT_TRUE(
