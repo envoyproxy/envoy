@@ -28,19 +28,20 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
 
   if (parent_context.ok()) { // there is already a trace,
     result.decision = Decision::RECORD_AND_SAMPLE;
-    //Expects a tracestate like "FW4;129;12;-2023406815;4539717;5555;17;66;c511;2h02;3h12345678;4h676767"
+    // Expects a tracestate like
+    // "<tenantID>-<clusterID>@dt=fw4;0;0;0;0;<isIgnored>;8;<rootPathRandom>;<extensionChecksum>"
     std::vector<absl::string_view> tracestate_components =
         absl::StrSplit(parent_context->tracestate(), ';', absl::AllowEmpty());
-    if (tracestate_components.size() > 6) {
-      att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracestate_components[5];
+    if (tracestate_components.size() > 7) {
+      att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracestate_components[6];
     }
     result.trace_state = parent_context.value().tracestate();
   } else { // start new trace
 
     if (current_counter % 2 == 0) {
       result.decision = Decision::RECORD_AND_SAMPLE;
-      result.trace_state = "FW4;129;12;-2023406815;4539717;1000;17;66;c511;2h02;3h12345678;4h676767";
-      att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = "1000";
+      result.trace_state = "<tenantID>-<clusterID>@dt=fw4;0;0;0;0;<isIgnored>;8;<rootPathRandom>;<extensionChecksum>";
+      att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = "8";
     } else {
       result.decision = Decision::RECORD_ONLY;
       if (parent_context.ok()) {
@@ -55,6 +56,16 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
 }
 
 std::string DynatraceSampler::getDescription() const { return "DynatraceSampler"; }
+
+std::string DynatraceSampler::modifyTraceState(const std::string& span_id,
+                                               const std::string& current_trace_state) const {
+  (void)span_id;
+  (void)current_trace_state;
+  std::string new_trace_state(current_trace_state);
+  new_trace_state.append(";7h");
+  new_trace_state.append(span_id);
+  return new_trace_state;
+}
 
 } // namespace OpenTelemetry
 } // namespace Tracers

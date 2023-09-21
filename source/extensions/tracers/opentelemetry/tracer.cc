@@ -64,7 +64,14 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   // Set the traceparent in the trace_context.
   trace_context.setByReferenceKey(kTraceParent, traceparent_header_value);
   // Also set the tracestate.
-  trace_context.setByReferenceKey(kTraceState, span_.trace_state());
+  std::string trace_state;
+  if (parent_tracer_.sampler()) {
+    trace_state = parent_tracer_.sampler()->modifyTraceState(span_id_hex, span_.trace_state());
+  } 
+  if (trace_state.empty()) {
+    trace_state = span_.trace_state();
+  }
+  trace_context.setByReferenceKey(kTraceState, trace_state);
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {

@@ -64,6 +64,9 @@ public:
                                       const std::set<SpanContext> links) PURE;
 
   virtual std::string getDescription() const PURE;
+
+  // allow tracers to provide a vendor specific tracestate
+  virtual std::string modifyTraceState(const std::string &span_id, const std::string &current_trace_state) const PURE;
 };
 
 using SamplerPtr = std::shared_ptr<Sampler>;

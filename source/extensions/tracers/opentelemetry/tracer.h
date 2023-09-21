@@ -47,6 +47,8 @@ public:
   Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,
                              SystemTime start_time, const SpanContext& previous_span_context);
 
+  SamplerPtr sampler(){ return sampler_; }
+
 private:
   /**
    * Enables the span-flushing timer.

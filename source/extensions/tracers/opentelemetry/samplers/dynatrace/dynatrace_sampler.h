@@ -28,6 +28,8 @@ public:
                             
   std::string getDescription() const override;
 
+  std::string modifyTraceState(const std::string &span_id, const std::string &current_trace_state) const  override;
+
 private:
   std::atomic<uint32_t> counter_;
 };

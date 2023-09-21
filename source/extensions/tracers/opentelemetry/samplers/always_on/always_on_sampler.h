@@ -26,6 +26,8 @@ public:
                               const std::set<SpanContext> links) override;
   std::string getDescription() const override;
 
+  std::string modifyTraceState(const std::string &/*span_id*/, const std::string &/*current_trace_state*/) const  override { return {}; };
+
 private:
 };
 
