@@ -126,9 +126,6 @@ type HeaderMap interface {
 
 	// RangeWithCopy calls f sequentially for each key and value copied from the map.
 	RangeWithCopy(f func(key, value string) bool)
-
-	// ByteSize return size of HeaderMap
-	ByteSize() uint64
 }
 
 type RequestHeaderMap interface {

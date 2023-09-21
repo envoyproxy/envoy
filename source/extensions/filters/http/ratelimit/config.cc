@@ -28,11 +28,13 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 
   THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
-  return [proto_config, &context, timeout,
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+      Grpc::GrpcServiceConfigWithHashKey(proto_config.rate_limit_service().grpc_service());
+  return [config_with_hash_key, &context, timeout,
           filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(
-        filter_config, Filters::Common::RateLimit::rateLimitClient(
-                           context, proto_config.rate_limit_service().grpc_service(), timeout)));
+        filter_config,
+        Filters::Common::RateLimit::rateLimitClient(context, config_with_hash_key, timeout)));
   };
 }
 

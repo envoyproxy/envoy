@@ -20,7 +20,7 @@ namespace Tcp {
 
 class AsyncTcpClientImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  AsyncTcpClientImplTest() {}
+  AsyncTcpClientImplTest() = default;
 
   void setUpClient() {
     cluster_manager_.initializeClusters({"fake_cluster"}, {});

@@ -21,7 +21,7 @@ MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()>, std::fu
   ASSERT(0); // This constructor is not supported for OwnedImpl.
 }
 
-template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase() {}
+template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(){};
 
 MockBufferFactory::MockBufferFactory() = default;
 MockBufferFactory::~MockBufferFactory() = default;

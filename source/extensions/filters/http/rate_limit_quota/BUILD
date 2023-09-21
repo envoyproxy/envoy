@@ -17,6 +17,7 @@ envoy_cc_library(
         ":client_lib",
         ":matcher_lib",
         ":quota_bucket_cache",
+        "//envoy/grpc:async_client_manager_interface",
         "//envoy/registry",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -39,6 +40,7 @@ envoy_cc_extension(
     deps = [
         ":client_interface",
         ":rate_limit_quota",
+        "//envoy/grpc:async_client_manager_interface",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",

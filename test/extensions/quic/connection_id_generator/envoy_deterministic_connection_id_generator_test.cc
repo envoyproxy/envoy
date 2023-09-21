@@ -16,7 +16,6 @@ using ::quic::QuicConnectionId;
 using ::quic::test::QuicTest;
 using ::quic::test::TestConnectionId;
 using ::quic::test::TestConnectionIdNineBytesLong;
-using ::testing::ElementsAre;
 
 class EnvoyDeterministicConnectionIdGeneratorTest : public QuicTest {
 public:
@@ -25,7 +24,7 @@ public:
         generator_(EnvoyDeterministicConnectionIdGenerator(connection_id_length_)) {}
 
 protected:
-  int connection_id_length_;
+  int connection_id_length_ = 0;
   EnvoyDeterministicConnectionIdGenerator generator_;
 };
 
