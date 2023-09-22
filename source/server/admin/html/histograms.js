@@ -347,6 +347,11 @@ function assignPercentilesAndIntervalsToBuckets(histogram, supportedPercentiles)
     maxCount = Math.max(maxCount, bucket.count);
     bucket.annotations = [];
 
+    // Attach percentile records with values between the previous bucket and
+    // this one. We will drop percentiles before the first bucket. Thus each
+    // bucket starting with the second one will have a 'percentiles' property
+    // with pairs of [percentile, value], which can then be used while
+    // rendering the bucket.
     for (; percentileIndex < percentileValues.length; ++percentileIndex) {
       const percentileValue = percentileValues[percentileIndex].cumulative;
       if (nextBucket && percentileValue >= nextBucket.lower_bound) {
