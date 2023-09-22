@@ -98,18 +98,18 @@ TEST_P(SslLibraryCipherSuiteSupport, CipherSuitesNotRemoved) {
 class SslContextImplTest : public SslCertsTest {
 public:
   ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(Envoy::Ssl::ClientContextSharedPtr& context) {
-    return Cleanup([&manager = manager_, &context]() {
+    return {[&manager = manager_, &context]() {
       if (context != nullptr) {
         manager.removeContext(context);
       }
-    });
+    }};
   }
   ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(Envoy::Ssl::ServerContextSharedPtr& context) {
-    return Cleanup([&manager = manager_, &context]() {
+    return {[&manager = manager_, &context]() {
       if (context != nullptr) {
         manager.removeContext(context);
       }
-    });
+    }};
   }
   void loadConfig(ServerContextConfigImpl& cfg) {
     Envoy::Ssl::ServerContextSharedPtr server_ctx(
@@ -1149,11 +1149,11 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledWhenKeyI
 class ClientContextConfigImplTest : public SslCertsTest {
 public:
   ABSL_MUST_USE_RESULT Cleanup cleanUpHelper(Envoy::Ssl::ClientContextSharedPtr& context) {
-    return Cleanup([&manager = manager_, &context]() {
+    return {[&manager = manager_, &context]() {
       if (context != nullptr) {
         manager.removeContext(context);
       }
-    });
+    }};
   }
 
   Event::SimulatedTimeSystem time_system_;

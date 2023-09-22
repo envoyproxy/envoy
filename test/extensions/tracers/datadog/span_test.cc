@@ -108,7 +108,7 @@ private:
   }
 
 protected:
-  const std::uint64_t id_;
+  const std::uint64_t id_ = 0;
   const std::shared_ptr<MockCollector> collector_;
   const datadog::tracing::TracerConfig config_;
   datadog::tracing::Tracer tracer_;
