@@ -24,7 +24,7 @@ The following list of filter state objects are consumed by Envoy extensions:
        | configuration.
        | Accepts a comma-separated list of protocols as a constructor, e.g. "h2,http/1.1".
    * - ``envoy.network.upstream_subject_alt_names``
-       | Enables additional verification of the upstream peer certificate SAN names.
+     - | Enables additional verification of the upstream peer certificate SAN names.
        | Accepts a comma-separated list of SAN names as a constructor.
    * - ``envoy.tcp_proxy.cluster``
      - | :ref:`TCP proxy <config_network_filters_tcp_proxy>` dynamic cluster name selection
