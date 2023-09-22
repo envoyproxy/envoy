@@ -45,7 +45,7 @@ jobs:
   timeoutInMinutes: ${{ parameters.timeoutBuild }}
   pool: ${{ parameters.pool }}
   steps:
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       managedAgent: ${{ parameters.managedAgent }}
       ciTarget: release
