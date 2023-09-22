@@ -13,13 +13,11 @@ import sys
 import traceback
 import shutil
 from functools import cached_property
-from typing import Callable, Dict, List, Pattern, Tuple, Union
+from typing import Callable, Dict, Iterator, List, Pattern, Tuple, Union
 
 # The way this script is currently used (ie no bazel) it relies on system deps.
 # As `pyyaml` is present in `envoy-build-ubuntu` it should be safe to use here.
 import yaml
-
-import paths
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +25,10 @@ logger = logging.getLogger(__name__)
 class FormatConfig:
     """Provides a format config object based on parsed YAML config."""
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, args, source_path) -> None:
         self.path = path
+        self.args = args
+        self.source_path = source_path
 
     def __getitem__(self, k):
         return self.config.__getitem__(k)
@@ -36,17 +36,29 @@ class FormatConfig:
     @cached_property
     def buildifier_path(self) -> str:
         """Path to the buildifer binary."""
-        return paths.get_buildifier()
+        path = (
+            os.path.join(self.source_path, self.args.buildifier_path)
+            if self.source_path else self.args.buildifier_path)
+        # v ugly hack
+        os.environ["BUILDIFIER_PATH"] = path
+        return path
 
     @cached_property
     def buildozer_path(self) -> str:
         """Path to the buildozer binary."""
-        return paths.get_buildozer()
+        path = (
+            os.path.join(self.source_path, self.args.buildozer_path)
+            if self.source_path else self.args.buildozer_path)
+        os.environ["BUILDOZER_PATH"] = path
+        return path
 
     @cached_property
     def clang_format_path(self) -> str:
         """Path to the clang-format binary."""
-        return os.getenv("CLANG_FORMAT", "clang-format-14")
+        path = (
+            os.path.join(self.source_path, self.args.clang_format_path)
+            if self.source_path else self.args.clang_format_path)
+        return path
 
     @cached_property
     def config(self) -> Dict:
@@ -114,13 +126,109 @@ class FormatConfig:
 class FormatChecker:
 
     def __init__(self, args):
-        self.args = args
-        self.config_path = args.config_path
-        self.operation_type = args.operation_type
-        self.target_path = args.target_path
-        self.api_prefix = args.api_prefix
-        self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
-        self._include_dir_order = args.include_dir_order
+        self._args = args
+        # TODO(phlax): completely rewrite file discovery in this file - its a mess
+        self.source_path = os.getcwd()
+        if self.args.path:
+            os.chdir(self.args.path)
+        self._include_dir_order = self.args.include_dir_order
+
+    @property
+    def api_prefix(self):
+        return self.args.api_prefix
+
+    @property
+    def config_path(self):
+        return self.args.config_path
+
+    @property
+    def envoy_build_rule_check(self):
+        return not self.args.skip_envoy_build_rule_check
+
+    @property
+    def excluded_prefixes(self):
+        return (
+            self.config.paths["excluded"] + tuple(self.args.add_excluded_prefixes)
+            if self.args.add_excluded_prefixes else self.config.paths["excluded"])
+
+    @cached_property
+    def error_messages(self):
+        return []
+
+    @property
+    def operation_type(self):
+        return self.args.operation_type
+
+    @cached_property
+    def args(self):
+        parser = argparse.ArgumentParser(description="Check or fix file format.")
+        parser.add_argument(
+            "operation_type",
+            type=str,
+            choices=["check", "fix"],
+            help="specify if the run should 'check' or 'fix' format.")
+        parser.add_argument(
+            "target_path",
+            nargs="*",
+            default=["."],
+            help="specify the root directory for the script to recurse over. Default '.'.")
+        parser.add_argument("--path", default=".", help="specify the root path.")
+        parser.add_argument(
+            "--config_path",
+            default="./tools/code_format/config.yaml",
+            help="specify the config path. Default './tools/code_format/config.yaml'.")
+        parser.add_argument(
+            "--fail_on_diff",
+            action="store_true",
+            help="exit with failure if running fix produces changes.")
+        parser.add_argument(
+            "--add-excluded-prefixes", type=str, nargs="+", help="exclude additional prefixes.")
+        parser.add_argument(
+            "-j",
+            "--num-workers",
+            type=int,
+            default=multiprocessing.cpu_count(),
+            help="number of worker processes to use; defaults to one per core.")
+        parser.add_argument(
+            "--api-prefix", type=str, default="./api/", help="path of the API tree.")
+        parser.add_argument(
+            "--skip_envoy_build_rule_check",
+            action="store_true",
+            help="skip checking for '@envoy//' prefix in build rules.")
+        parser.add_argument(
+            "--namespace_check",
+            type=str,
+            nargs="?",
+            default="Envoy",
+            help="specify namespace check string. Default 'Envoy'.")
+        parser.add_argument(
+            "--namespace_check_excluded_paths",
+            type=str,
+            nargs="+",
+            default=[],
+            help="exclude paths from the namespace_check.")
+        parser.add_argument(
+            "--build_fixer_check_excluded_paths",
+            type=str,
+            nargs="+",
+            default=[],
+            help="exclude paths from envoy_build_fixer check.")
+        parser.add_argument(
+            "--bazel_tools_check_excluded_paths",
+            type=str,
+            nargs="+",
+            default=[],
+            help="exclude paths from bazel_tools check.")
+        parser.add_argument(
+            "--clang_format_path", type=str, help="Path to clang-format executable.")
+        parser.add_argument("--buildifier_path", type=str, help="Path to buildifier executable.")
+        parser.add_argument("--buildozer_path", type=str, help="Path to buildozer executable.")
+        parser.add_argument(
+            "--include_dir_order",
+            type=str,
+            default="",
+            help="specify the header block include directory order.")
+        return parser.parse_args(self._args)
 
     @cached_property
     def build_fixer_check_excluded_paths(self):
@@ -130,7 +238,7 @@ class FormatChecker:
 
     @cached_property
     def config(self) -> FormatConfig:
-        return FormatConfig(self.config_path)
+        return FormatConfig(self.config_path, self.args, self.source_path)
 
     @cached_property
     def include_dir_order(self):
@@ -159,13 +267,21 @@ class FormatChecker:
         format_flag = True
         output_lines = []
         for line_number, line in enumerate(self.read_lines(path)):
+            if line_number == 0 and path.endswith(".h"):
+                if line == "":
+                    error_message = f"{path}:{line_number + 1}: the first line is empty for header files"
+                    continue
+                elif not line.startswith("#pragma once"):
+                    error_message = f"{path}:{line_number + 1}: #pragma once missed for header files"
+                    output_lines.append("#pragma once")
+                    output_lines.append("")
             if line.find("// clang-format off") != -1:
                 if not format_flag and error_message is None:
-                    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested off")
+                    error_message = f"{path}:{line_number + 1}: clang-format nested off"
                 format_flag = False
             if line.find("// clang-format on") != -1:
                 if format_flag and error_message is None:
-                    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested on")
+                    error_message = f"{path}:{line_number + 1}: clang-format nested on"
                 format_flag = True
             if format_flag:
                 output_lines.append(line_xform(line, line_number))
@@ -176,7 +292,7 @@ class FormatChecker:
         if write:
             pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
         if not format_flag and error_message is None:
-            error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format remains off")
+            error_message = f"{path}:{line_number + 1}: clang-format remains off"
         return error_message
 
     # Obtain all the lines in a given file.
@@ -209,56 +325,6 @@ class FormatChecker:
     def executable_by_others(self, executable):
         st = os.stat(os.path.expandvars(executable))
         return bool(st.st_mode & stat.S_IXOTH)
-
-    # Check whether all needed external tools (clang-format, buildifier, buildozer) are
-    # available.
-    def check_tools(self):
-        error_messages = []
-
-        clang_format_abs_path = self.look_path(self.config.clang_format_path)
-        if clang_format_abs_path:
-            if not self.executable_by_others(clang_format_abs_path):
-                error_messages.append(
-                    "command {} exists, but cannot be executed by other "
-                    "users".format(self.config.clang_format_path))
-        else:
-            error_messages.append(
-                "Command {} not found. If you have clang-format in version 12.x.x "
-                "installed, but the binary name is different or it's not available in "
-                "PATH, please use CLANG_FORMAT environment variable to specify the path. "
-                "Examples:\n"
-                "    export CLANG_FORMAT=clang-format-14.0.0\n"
-                "    export CLANG_FORMAT=/opt/bin/clang-format-14\n"
-                "    export CLANG_FORMAT=/usr/local/opt/llvm@14/bin/clang-format".format(
-                    self.config.clang_format_path))
-
-        def check_bazel_tool(name, path, var):
-            bazel_tool_abs_path = self.look_path(path)
-            if bazel_tool_abs_path:
-                if not self.executable_by_others(bazel_tool_abs_path):
-                    error_messages.append(
-                        "command {} exists, but cannot be executed by other "
-                        "users".format(path))
-            elif self.path_exists(path):
-                if not self.executable_by_others(path):
-                    error_messages.append(
-                        "command {} exists, but cannot be executed by other "
-                        "users".format(path))
-            else:
-
-                error_messages.append(
-                    "Command {} not found. If you have {} installed, but the binary "
-                    "name is different or it's not available in $GOPATH/bin, please use "
-                    "{} environment variable to specify the path. Example:\n"
-                    "    export {}=`which {}`\n"
-                    "If you don't have {} installed, you can install it by:\n"
-                    "    go get -u github.com/bazelbuild/buildtools/{}".format(
-                        path, name, var, var, name, name, name))
-
-        check_bazel_tool('buildifier', self.config.buildifier_path, 'BUILDIFIER_BIN')
-        check_bazel_tool('buildozer', self.config.buildozer_path, 'BUILDOZER_BIN')
-
-        return error_messages
 
     def check_namespace(self, file_path):
         for excluded_path in self.namespace_check_excluded_paths:
@@ -413,6 +479,9 @@ class FormatChecker:
 
         if self.has_invalid_angle_bracket_directory(line):
             line = line.replace("<", '"').replace(">", '"')
+
+        if "[[fallthrough]];" in line:
+            line = line.replace("[[fallthrough]];", "FALLTHRU;")
 
         # Fix incorrect protobuf namespace references.
         for invalid_construct, valid_construct in self.config.replacements[
@@ -643,6 +712,8 @@ class FormatChecker:
             report_error("Don't use 'using testing::Test;, elaborate the type instead")
         if line.startswith("using testing::TestWithParams;"):
             report_error("Don't use 'using testing::Test;, elaborate the type instead")
+        if "[[fallthrough]];" in line:
+            report_error("Use 'FALLTHRU;' instead like the other parts of the code")
         if self.config.re["test_name_starting_lc"].search(line):
             # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
             # with a lowercase letter.
@@ -748,44 +819,38 @@ class FormatChecker:
 
     def fix_build_path(self, file_path):
         self.evaluate_lines(file_path, functools.partial(self.fix_build_line, file_path))
-
         error_messages = []
 
         # TODO(htuch): Add API specific BUILD fixer script.
-        if not self.is_build_fixer_excluded_file(file_path) and not self.is_api_file(
-                file_path) and not self.is_starlark_file(file_path) and not self.is_workspace_file(
-                    file_path):
-            if os.system("%s %s %s" %
-                         (self.config.paths["build_fixer_py"], file_path, file_path)) != 0:
-                error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
+        if self._run_build_fixer(file_path):
+            fixer_command = f"{self.config.paths['build_fixer_py']} {file_path} {file_path}"
+            if os.system(fixer_command) != 0:
+                error_messages.append(f"envoy_build_fixer rewrite failed for file: {file_path}")
 
-        if os.system("%s -lint=fix -mode=fix %s" % (self.config.buildifier_path, file_path)) != 0:
-            error_messages += ["buildifier rewrite failed for file: %s" % file_path]
+        buildifier_command = f"{self.config.buildifier_path} -lint=fix -mode=fix {file_path}"
+        if os.system(buildifier_command) != 0:
+            error_messages.append(f"buildifier rewrite failed for file: {file_path}")
         return error_messages
 
     def check_build_path(self, file_path):
         error_messages = []
-
-        if not self.is_build_fixer_excluded_file(file_path) and not self.is_api_file(
-                file_path) and not self.is_starlark_file(file_path) and not self.is_workspace_file(
-                    file_path):
-            command = "%s %s | diff %s -" % (
-                self.config.paths["build_fixer_py"], file_path, file_path)
-            error_messages += self.execute_command(
-                command, "envoy_build_fixer check failed", file_path)
-
-        if self.is_build_file(file_path) and file_path.startswith(self.api_prefix + "envoy"):
+        if self._run_build_fixer(file_path):
+            command = f"{self.config.paths['build_fixer_py']} {file_path} | diff {file_path} -"
+            error_messages.extend(
+                self.execute_command(command, "envoy_build_fixer check failed", file_path))
+        envoy_api_build_file = (
+            self.is_build_file(file_path) and file_path.startswith(f"{self.api_prefix}envoy"))
+        if envoy_api_build_file:
             found = False
             for line in self.read_lines(file_path):
                 if "api_proto_package(" in line:
                     found = True
                     break
             if not found:
-                error_messages += ["API build file does not provide api_proto_package()"]
-
-        command = "%s -mode=diff %s" % (self.config.buildifier_path, file_path)
-        error_messages += self.execute_command(command, "buildifier check failed", file_path)
-        error_messages += self.check_file_contents(file_path, self.check_build_line)
+                error_messages.append("API build file does not provide api_proto_package()")
+        command = f"{self.config.buildifier_path} -mode=diff {file_path}"
+        error_messages.extend(self.execute_command(command, "buildifier check failed", file_path))
+        error_messages.extend(self.check_file_contents(file_path, self.check_build_line))
         return error_messages
 
     def fix_source_path(self, file_path):
@@ -800,7 +865,6 @@ class FormatChecker:
 
     def check_source_path(self, file_path):
         error_messages = self.check_file_contents(file_path, self.check_source_line)
-
         if not file_path.endswith(self.config.suffixes["proto"]):
             error_messages += self.check_namespace(file_path)
             command = (
@@ -809,8 +873,7 @@ class FormatChecker:
                     file_path))
             error_messages += self.execute_command(
                 command, "header_order.py check failed", file_path)
-        command = ("%s %s | diff %s -" % (self.config.clang_format_path, file_path, file_path))
-        error_messages += self.execute_command(command, "clang-format check failed", file_path)
+        error_messages.extend(self.clang_format(file_path, check=True))
         return error_messages
 
     # Example target outputs are:
@@ -826,9 +889,11 @@ class FormatChecker:
             return []
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
-                return ["ERROR: something went wrong while executing: %s" % e.cmd]
+                return [
+                    f"ERROR: something went wrong while executing: {e.cmd}\n{e.output.decode()}"
+                ]
             # In case we can't find any line numbers, record an error message first.
-            error_messages = ["%s for file: %s" % (error_message, file_path)]
+            error_messages = [f"{error_message} for file: {file_path}\n{e.output.decode()}"]
             for line in e.output.decode('utf-8').splitlines():
                 for num in regex.findall(line):
                     error_messages.append("  %s:%s" % (file_path, num))
@@ -841,39 +906,48 @@ class FormatChecker:
             return ["header_order.py rewrite error: %s" % (file_path)]
         return []
 
-    def clang_format(self, file_path):
-        command = "%s -i %s" % (self.config.clang_format_path, file_path)
-        if os.system(command) != 0:
-            return ["clang-format rewrite error: %s" % (file_path)]
-        return []
+    def clang_format(self, file_path, check=False):
+        result = []
+        command = (
+            f"{self.config.clang_format_path} {file_path} | diff {file_path} -"
+            if check else f"{self.config.clang_format_path} -i {file_path}")
+
+        if check:
+            result = self.execute_command(command, "clang-format check failed", file_path)
+        else:
+            if os.system(command) != 0:
+                result = [f"clang-format rewrite error: {file_path}"]
+
+        return result
 
     def check_format(self, file_path, fail_on_diff=False):
         error_messages = []
         orig_error_messages = []
         # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
         # an issue, but there's still an error, that's a problem.
-        try_to_fix = self.operation_type == "fix"
-        if self.is_build_file(file_path) or self.is_starlark_file(
-                file_path) or self.is_workspace_file(file_path):
-            if try_to_fix:
+        check_build_path = (
+            self.is_build_file(file_path) or self.is_starlark_file(file_path)
+            or self.is_workspace_file(file_path))
+        if check_build_path:
+            if self.operation_type == "fix":
                 orig_error_messages = self.check_build_path(file_path)
                 if orig_error_messages:
-                    error_messages += self.fix_build_path(file_path)
-                    error_messages += self.check_build_path(file_path)
+                    error_messages.extend(
+                        [*self.fix_build_path(file_path), *self.check_build_path(file_path)])
             else:
-                error_messages += self.check_build_path(file_path)
+                error_messages.extend(self.check_build_path(file_path))
         else:
-            if try_to_fix:
+            if self.operation_type == "fix":
                 orig_error_messages = self.check_source_path(file_path)
                 if orig_error_messages:
-                    error_messages += self.fix_source_path(file_path)
-                    error_messages += self.check_source_path(file_path)
+                    error_messages.extend(
+                        [*self.fix_source_path(file_path), *self.check_source_path(file_path)])
             else:
-                error_messages += self.check_source_path(file_path)
+                error_messages.extend(self.check_source_path(file_path))
 
         if error_messages:
-            return ["From %s" % file_path] + error_messages
-        if not error_messages and fail_on_diff:
+            return [f"From {file_path}", *error_messages]
+        if fail_on_diff:
             return orig_error_messages
         return error_messages
 
@@ -884,58 +958,20 @@ class FormatChecker:
         except:
             return traceback.format_exc().split("\n")
 
-    def check_owners(self, dir_name, owned_directories, error_messages):
-        """Checks to make sure a given directory is present either in CODEOWNERS or OWNED_EXTENSIONS
-    Args:
-      dir_name: the directory being checked.
-      owned_directories: directories currently listed in CODEOWNERS.
-      error_messages: where to put an error message for new unowned directories.
-    """
-        found = False
-        for owned in owned_directories:
-            if owned.startswith(dir_name) or dir_name.startswith(owned):
-                found = True
-                break
-        if not found:
-            error_messages.append(
-                "New directory %s appears to not have owners in CODEOWNERS" % dir_name)
+    def normalize_path(self, path):
+        """Convert path to form ./path/to/dir/ for directories and ./path/to/file otherwise"""
+        if not path.startswith(("./", "/")):
+            path = "./" + path
 
-    def check_format_visitor(self, arg, dir_name, names, fail_on_diff=False):
+        isdir = os.path.isdir(path)
+        if isdir and not path.endswith("/"):
+            path += "/"
+
+        return path
+
+    def check_format_visitor(self, pool, results, files):
         """Run check_format in parallel for the given files.
-        Args:
-          arg: a tuple (pool, result_list, owned_directories, error_messages)
-            pool and result_list are for starting tasks asynchronously.
-            owned_directories tracks directories listed in the CODEOWNERS file.
-            error_messages is a list of string format errors.
-          dir_name: the parent directory of the given files.
-            names: a list of file names.
         """
-
-        # Unpack the multiprocessing.Pool process pool and list of results. Since
-        # python lists are passed as references, this is used to collect the list of
-        # async results (futures) from running check_format and passing them back to
-        # the caller.
-        pool, result_list, owned_directories, error_messages = arg
-
-        # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
-        # manner as it is a small and limited list.
-        source_prefix = './source/'
-        core_extensions_full_prefix = './source/extensions/'
-        # Check to see if this directory is a subdir under /source/extensions
-        # Also ignore top level directories under /source/extensions since we don't
-        # need owners for source/extensions/access_loggers etc, just the subdirectories.
-        if dir_name.startswith(
-                core_extensions_full_prefix) and '/' in dir_name[len(core_extensions_full_prefix):]:
-            self.check_owners(dir_name[len(source_prefix):], owned_directories, error_messages)
-
-        # For contrib extensions we track ownership at the top level only.
-        contrib_prefix = './contrib/'
-        if dir_name.startswith(contrib_prefix):
-            top_level = pathlib.PurePath('/', *pathlib.PurePath(dir_name).parts[:2], '/')
-            self.check_owners(str(top_level), owned_directories, error_messages)
-
-        dir_name = normalize_path(dir_name)
-
         # TODO(phlax): improve class/process handling - this is required because if these
         #   are not cached before the class is sent into the pool, it only caches them on the
         #   forked proc
@@ -945,120 +981,93 @@ class FormatChecker:
         self.config.replacements
         self.config.dir_order
 
-        for file_name in names:
-            result = pool.apply_async(
-                self.check_format_return_trace_on_error, args=(dir_name + file_name, fail_on_diff))
-            result_list.append(result)
+        for filepath in files:
+            results.append(
+                pool.apply_async(
+                    self.check_format_return_trace_on_error,
+                    args=(filepath, self.args.fail_on_diff)))
 
     # check_error_messages iterates over the list with error messages and prints
     # errors and returns a bool based on whether there were any errors.
-    def check_error_messages(self, error_messages):
-        if error_messages:
-            for e in error_messages:
-                print("ERROR: %s" % e)
+    def check_error_messages(self):
+        if self.error_messages:
+            for e in self.error_messages:
+                print(f"ERROR: {e}")
             return True
         return False
 
-    def included_for_memcpy(self, file_path):
-        return file_path in self.config.paths["memcpy"]["include"]
+    def pooled_check_format(self, files) -> list[str]:
+        pool = multiprocessing.Pool(processes=self.args.num_workers)
+        # For each file in target_path, start a new task in the pool and collect the
+        # results (results is passed by reference, and is used as an output).
+        results = []
+        self.check_format_visitor(pool, results, files)
+        # Close the pool to new tasks, wait for all of the running tasks to finish,
+        # then collect the error messages.
+        pool.close()
+        pool.join()
+        return results
 
+    @property
+    def target_paths(self) -> Iterator[str]:
+        _files = []
+        for target in self.args.target_path:
+            if os.path.isfile(target):
+                # All of our `excluded_prefixes` start with "./", but the provided
+                # target path argument might not. Add it here if it is missing,
+                # and use that normalized path for both lookup and `check_format`.
+                normalized_target_path = self.normalize_path(target)
+                skip = (
+                    normalized_target_path.startswith(self.excluded_prefixes)
+                    or not normalized_target_path.endswith(self.config.suffixes["included"]))
+                if not skip:
+                    yield normalized_target_path
+            else:
+                for root, _, files in os.walk(target):
+                    for filename in files:
+                        file_path = os.path.join(root, filename)
+                        check_file = (
+                            not file_path.startswith(self.excluded_prefixes)
+                            and file_path.endswith(self.config.suffixes["included"]) and not (
+                                file_path.endswith(self.config.suffixes["proto"])
+                                and root.startswith(self.args.api_prefix)))
+                        if check_file:
+                            yield file_path
 
-def normalize_path(path):
-    """Convert path to form ./path/to/dir/ for directories and ./path/to/file otherwise"""
-    if not path.startswith("./"):
-        path = "./" + path
+    def run_checks(self):
+        # these are needed curently to put the build tool paths into the env
+        self.config.buildifier_path
+        self.config.buildozer_path
+        self.check_visibility()
+        # We first run formatting on non-BUILD files, since the BUILD file format
+        # requires analysis of srcs/hdrs in the BUILD file, and we don't want these
+        # to be rewritten by other multiprocessing pooled processes.
+        results = [
+            *self.pooled_check_format(f for f in self.target_paths if not self.is_build_file(f)),
+            *self.pooled_check_format(f for f in self.target_paths if self.is_build_file(f))
+        ]
+        self.error_messages.extend(sum((r.get() for r in results), []))
 
-    isdir = os.path.isdir(path)
-    if isdir and not path.endswith("/"):
-        path += "/"
+        if self.check_error_messages():
+            if self.args.operation_type == "check":
+                print(
+                    "ERROR: check format failed. run 'bazel run //tools/code_format:check_format -- fix'"
+                )
+            else:
+                print("ERROR: check format failed. diff has been applied'")
+            sys.exit(1)
 
-    return path
+        if self.args.operation_type == "check":
+            print("PASS")
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Check or fix file format.")
-    parser.add_argument(
-        "operation_type",
-        type=str,
-        choices=["check", "fix"],
-        help="specify if the run should 'check' or 'fix' format.")
-    parser.add_argument(
-        "target_path",
-        type=str,
-        nargs="?",
-        default=".",
-        help="specify the root directory for the script to recurse over. Default '.'.")
-    parser.add_argument(
-        "--config_path",
-        default="./tools/code_format/config.yaml",
-        help="specify the config path. Default './tools/code_format/config.yaml'.")
-    parser.add_argument(
-        "--fail_on_diff",
-        action="store_true",
-        help="exit with failure if running fix produces changes.")
-    parser.add_argument(
-        "--add-excluded-prefixes", type=str, nargs="+", help="exclude additional prefixes.")
-    parser.add_argument(
-        "-j",
-        "--num-workers",
-        type=int,
-        default=multiprocessing.cpu_count(),
-        help="number of worker processes to use; defaults to one per core.")
-    parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
-    parser.add_argument(
-        "--skip_envoy_build_rule_check",
-        action="store_true",
-        help="skip checking for '@envoy//' prefix in build rules.")
-    parser.add_argument(
-        "--namespace_check",
-        type=str,
-        nargs="?",
-        default="Envoy",
-        help="specify namespace check string. Default 'Envoy'.")
-    parser.add_argument(
-        "--namespace_check_excluded_paths",
-        type=str,
-        nargs="+",
-        default=[],
-        help="exclude paths from the namespace_check.")
-    parser.add_argument(
-        "--build_fixer_check_excluded_paths",
-        type=str,
-        nargs="+",
-        default=[],
-        help="exclude paths from envoy_build_fixer check.")
-    parser.add_argument(
-        "--bazel_tools_check_excluded_paths",
-        type=str,
-        nargs="+",
-        default=[],
-        help="exclude paths from bazel_tools check.")
-    parser.add_argument(
-        "--include_dir_order",
-        type=str,
-        default="",
-        help="specify the header block include directory order.")
-    args = parser.parse_args()
-
-    format_checker = FormatChecker(args)
-
-    excluded_prefixes = format_checker.config.paths["excluded"]
-    if args.add_excluded_prefixes:
-        excluded_prefixes += tuple(args.add_excluded_prefixes)
-
-    # Check whether all needed external tools are available.
-    ct_error_messages = format_checker.check_tools()
-    if format_checker.check_error_messages(ct_error_messages):
-        sys.exit(1)
-
-    def check_visibility(error_messages):
+    def check_visibility(self):
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
-            % "".join([f"':(exclude){c}' " for c in format_checker.config["visibility_excludes"]]))
+            % "".join([f"':(exclude){c}' " for c in self.config["visibility_excludes"]]))
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
-                error_messages.append(
+                self.error_messages.append(
                     "This change appears to add visibility rules. Please get senior maintainer "
                     "approval to add an exemption to visibility_excludes in tools/code_format/config.yaml"
                 )
@@ -1067,133 +1076,24 @@ if __name__ == "__main__":
                 shell=True,
                 stderr=subprocess.STDOUT).strip()
             if output:
-                error_messages.append(
+                self.error_messages.append(
                     "envoy_package is not allowed to be used in source/extensions BUILD files.")
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
-                error_messages.append("Failed to check visibility with command %s" % command)
+                self.error_messages.append("Failed to check visibility with command %s" % command)
 
-    def get_owners():
-        with open('./OWNERS.md') as f:
-            maintainers = ["@UNOWNED"]
-            for line in f:
-                if "Senior extension maintainers" in line:
-                    return maintainers
-                m = format_checker.config.re["maintainers"].search(line)
-                if m is not None:
-                    maintainers.append("@" + m.group(1).lower())
+    def included_for_memcpy(self, file_path):
+        return file_path in self.config.paths["memcpy"]["include"]
 
-    # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
-    # error_messages.
-    def owned_directories(error_messages):
-        owned = []
-        try:
-            maintainers = get_owners()
+    def _run_build_fixer(self, filepath: str) -> bool:
+        return (
+            not self.is_build_fixer_excluded_file(filepath) and not self.is_api_file(filepath)
+            and not self.is_starlark_file(filepath) and not self.is_workspace_file(filepath))
 
-            with open('./CODEOWNERS') as f:
-                for line in f:
-                    # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
-                    # name and store it in the list of directories with documented owners.
-                    m = format_checker.config.re["codeowners_extensions"].search(line)
-                    if m is not None and not line.startswith('#'):
-                        owned.append(m.group(1).strip())
-                        owners = format_checker.config.re["owner"].findall(m.group(2).strip())
-                        if len(owners) < 2:
-                            error_messages.append(
-                                "Extensions require at least 2 owners in CODEOWNERS:\n"
-                                "    {}".format(line))
-                        maintainer = len(set(owners).intersection(set(maintainers))) > 0
-                        if not maintainer:
-                            error_messages.append(
-                                "Extensions require at least one maintainer OWNER:\n"
-                                "    {}".format(line))
 
-                    m = format_checker.config.re["codeowners_contrib"].search(line)
-                    if m is not None and not line.startswith('#'):
-                        stripped_path = m.group(1).strip()
-                        if not stripped_path.endswith('/'):
-                            error_messages.append(
-                                "Contrib CODEOWNERS entry '{}' must end in '/'".format(
-                                    stripped_path))
-                            continue
+def main(*args):
+    FormatChecker(args).run_checks()
 
-                        if not (stripped_path.count('/') == 3 or
-                                (stripped_path.count('/') == 4
-                                 and stripped_path.startswith('/contrib/common/'))):
-                            error_messages.append(
-                                "Contrib CODEOWNERS entry '{}' must be 2 directories deep unless in /contrib/common/ and then it can be 3 directories deep"
-                                .format(stripped_path))
-                            continue
 
-                        owned.append(stripped_path)
-                        owners = format_checker.config.re["owner"].findall(m.group(2).strip())
-                        if len(owners) < 2:
-                            error_messages.append(
-                                "Contrib extensions require at least 2 owners in CODEOWNERS:\n"
-                                "    {}".format(line))
-
-            return owned
-        except IOError:
-            return []  # for the check format tests.
-
-    # Calculate the list of owned directories once per run.
-    error_messages = []
-    owned_directories = owned_directories(error_messages)
-
-    check_visibility(error_messages)
-
-    if os.path.isfile(args.target_path):
-        # All of our `excluded_prefixes` start with "./", but the provided
-        # target path argument might not. Add it here if it is missing,
-        # and use that normalized path for both lookup and `check_format`.
-        normalized_target_path = normalize_path(args.target_path)
-        if not normalized_target_path.startswith(
-                excluded_prefixes) and normalized_target_path.endswith(
-                    format_checker.config.suffixes["included"]):
-            error_messages += format_checker.check_format(normalized_target_path)
-    else:
-        results = []
-
-        def pooled_check_format(path_predicate):
-            pool = multiprocessing.Pool(processes=args.num_workers)
-            # For each file in target_path, start a new task in the pool and collect the
-            # results (results is passed by reference, and is used as an output).
-            for root, _, files in os.walk(args.target_path):
-                _files = []
-                for filename in files:
-                    file_path = os.path.join(root, filename)
-                    check_file = (
-                        path_predicate(filename) and not file_path.startswith(excluded_prefixes)
-                        and file_path.endswith(format_checker.config.suffixes["included"]) and not (
-                            file_path.endswith(format_checker.config.suffixes["proto"])
-                            and root.startswith(args.api_prefix)))
-                    if check_file:
-                        _files.append(filename)
-                if not _files:
-                    continue
-                format_checker.check_format_visitor(
-                    (pool, results, owned_directories, error_messages), root, _files,
-                    args.fail_on_diff)
-
-            # Close the pool to new tasks, wait for all of the running tasks to finish,
-            # then collect the error messages.
-            pool.close()
-            pool.join()
-
-        # We first run formatting on non-BUILD files, since the BUILD file format
-        # requires analysis of srcs/hdrs in the BUILD file, and we don't want these
-        # to be rewritten by other multiprocessing pooled processes.
-        pooled_check_format(lambda f: not format_checker.is_build_file(f))
-        pooled_check_format(lambda f: format_checker.is_build_file(f))
-
-        error_messages += sum((r.get() for r in results), [])
-
-    if format_checker.check_error_messages(error_messages):
-        if args.operation_type == "check":
-            print("ERROR: check format failed. run 'tools/code_format/check_format.py fix'")
-        else:
-            print("ERROR: check format failed. diff has been applied'")
-        sys.exit(1)
-
-    if args.operation_type == "check":
-        print("PASS")
+if __name__ == "__main__":
+    main(*sys.argv[1:])

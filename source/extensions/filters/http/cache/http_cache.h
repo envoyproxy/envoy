@@ -134,24 +134,34 @@ class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
   //
-  // Implementations must call insert_complete(true) on success, or
-  // insert_complete(false) to attempt to abort the insertion.
+  // Implementations MUST call insert_complete(true) on success, or
+  // insert_complete(false) to attempt to abort the insertion. This
+  // call may be made asynchronously, but any async operation that can
+  // potentially silently fail must include a timeout, to avoid memory leaks.
   virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                              const ResponseMetadata& metadata, InsertCallback insert_complete,
                              bool end_stream) PURE;
 
-  // The insertion is streamed into the cache in chunks whose size is determined
+  // The insertion is streamed into the cache in fragments whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
   // data into cache too fast for the cache to handle, clients should wait for
-  // the cache to call readyForNextChunk() before streaming the next chunk.
+  // the cache to call ready_for_next_fragment before sending the next fragment.
   //
   // The client can abort the streaming insertion by dropping the
   // InsertContextPtr. A cache can abort the insertion by passing 'false' into
-  // ready_for_next_chunk.
-  virtual void insertBody(const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk,
+  // ready_for_next_fragment.
+  //
+  // The cache implementation MUST call ready_for_next_fragment. This call may be
+  // made asynchronously, but any async operation that can potentially silently
+  // fail must include a timeout, to avoid memory leaks.
+  virtual void insertBody(const Buffer::Instance& fragment, InsertCallback ready_for_next_fragment,
                           bool end_stream) PURE;
 
   // Inserts trailers into the cache.
+  //
+  // The cache implementation MUST call insert_complete. This call may be
+  // made asynchronously, but any async operation that can potentially silently
+  // fail must include a timeout, to avoid memory leaks.
   virtual void insertTrailers(const Http::ResponseTrailerMap& trailers,
                               InsertCallback insert_complete) PURE;
 
@@ -169,7 +179,7 @@ public:
   // --> RPCInsertContext's destructor and onRpcDone cause a data race in RpcInsertContext.
   // onDestroy() should cancel any outstanding async operations and, if necessary,
   // it should block on that cancellation to avoid data races. InsertContext must not invoke any
-  // callbacks to the CacheFilter after having onDestroy() invoked.
+  // callbacks to the CacheFilter after returning from onDestroy().
   virtual void onDestroy() PURE;
 
   virtual ~InsertContext() = default;
@@ -185,7 +195,7 @@ public:
   // twice.
   virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
 
-  // Reads the next chunk from the cache, calling cb when the chunk is ready.
+  // Reads the next fragment from the cache, calling cb when the fragment is ready.
   // The Buffer::InstancePtr passed to cb must not be null.
   //
   // The cache must call cb with a range of bytes starting at range.start() and
@@ -194,10 +204,10 @@ public:
   // can report an error, and cause the response to be aborted, by calling cb
   // with nullptr.
   //
-  // If a cache happens to load data in chunks of a set size, it may be
+  // If a cache happens to load data in fragments of a set size, it may be
   // efficient to respond with fewer than the requested number of bytes. For
   // example, assuming a 23 byte full-bodied response from a cache that reads in
-  // absurdly small 10 byte chunks:
+  // absurdly small 10 byte fragments:
   //
   // getBody requests bytes  0-23 .......... callback with bytes 0-9
   // getBody requests bytes 10-23 .......... callback with bytes 10-19

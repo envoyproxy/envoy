@@ -29,6 +29,16 @@ public:
       return nullptr;
     }
 
+    Network::IoSocketError* returnConnectOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
+      absl::MutexLock lock(&mutex_);
+      if (block_connect_ && socket_type_ == io_handle->getSocketType() &&
+          (io_handle->localAddress()->ip()->port() == src_port_ ||
+           (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
+        return Network::IoSocketError::getIoSocketEagainInstance();
+      }
+      return nullptr;
+    }
+
     // Source port to match. The port specified should be associated with a listener.
     void setSourcePort(uint32_t port) {
       absl::WriterMutexLock lock(&mutex_);
@@ -54,6 +64,12 @@ public:
       error_ = error;
     }
 
+    void setConnectBlock(bool block) {
+      absl::WriterMutexLock lock(&mutex_);
+      ASSERT(src_port_ != 0 || dst_port_ != 0);
+      block_connect_ = block;
+    }
+
     void setResumeWrites();
 
   private:
@@ -63,6 +79,7 @@ public:
     Network::IoSocketError* error_ ABSL_GUARDED_BY(mutex_) = nullptr;
     Network::TestIoSocketHandle* matched_iohandle_{};
     Network::Socket::Type socket_type_;
+    bool block_connect_ ABSL_GUARDED_BY(mutex_) = false;
   };
 
   explicit SocketInterfaceSwap(Network::Socket::Type socket_type);

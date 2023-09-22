@@ -27,6 +27,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // As the Dlb connection balancer provides assistance from dedicated Dlb hardware, it can be used for a proxy with a large number of connections
 // (e.g., a gateway).
 message Dlb {
+  // The fallback policy if any error occurs.
+  // The default policy is None.
+  enum FallbackPolicy {
+    // No fallback policy.
+    None = 0;
+
+    // Fall back to Nop Connection Balance.
+    NopConnectionBalance = 1;
+
+    // Fall back to Exact Connection Balance.
+    ExactConnectionBalance = 2;
+  }
+
   // The ID of the Dlb hardware, start from 0.
   // If not specified, use the first available device as default.
   uint32 id = 1;
@@ -34,4 +47,6 @@ message Dlb {
   // Maximum number of retries when sending to DLB device fails.
   // No retry as default.
   uint32 max_retries = 2;
+
+  FallbackPolicy fallback_policy = 3;
 }

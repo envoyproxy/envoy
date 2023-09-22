@@ -136,6 +136,12 @@ public:
    * @return The maximum number of session keys to store.
    */
   virtual size_t maxSessionKeys() const PURE;
+
+  /**
+   * @return true if the enforcement that handshake will fail if the keyUsage extension is present
+   * and incompatible with the TLS usage is enabled.
+   */
+  virtual bool enforceRsaKeyUsage() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
@@ -182,6 +188,11 @@ public:
    * @return True if stateless TLS session resumption is disabled, false otherwise.
    */
   virtual bool disableStatelessSessionResumption() const PURE;
+
+  /**
+   * @return True if stateful TLS session resumption is disabled, false otherwise.
+   */
+  virtual bool disableStatefulSessionResumption() const PURE;
 
   /**
    * @return True if we allow full scan certificates when there is no cert matching SNI during

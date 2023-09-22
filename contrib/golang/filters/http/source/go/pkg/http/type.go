@@ -22,7 +22,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 // panic error messages when C API return not ok
@@ -31,6 +31,10 @@ const (
 	errFilterDestroyed = "golang filter has been destroyed"
 	errNotInGo         = "not proccessing Go"
 	errInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
+
+	errInternalFailure      = "internal failure"
+	errValueNotFound        = "value not found"
+	errSerializationFailure = "serialization failure"
 )
 
 // api.HeaderMap
@@ -40,11 +44,6 @@ type headerMapImpl struct {
 	headerNum   uint64
 	headerBytes uint64
 	mutex       sync.Mutex
-}
-
-// ByteSize return size of HeaderMap
-func (h *headerMapImpl) ByteSize() uint64 {
-	return h.headerBytes
 }
 
 type requestOrResponseHeaderMapImpl struct {
@@ -129,6 +128,24 @@ func (h *requestOrResponseHeaderMapImpl) Range(f func(key, value string) bool) {
 	defer h.mutex.Unlock()
 	h.initHeaders()
 	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
+}
+
+func (h *requestOrResponseHeaderMapImpl) RangeWithCopy(f func(key, value string) bool) {
+	// There is no dead lock risk in RangeWithCopy, but copy may introduce performance cost.
+	h.mutex.Lock()
+	h.initHeaders()
+	copied_headers := make(map[string][]string)
+	for key, values := range h.headers {
+		copied_headers[key] = values
+	}
+	h.mutex.Unlock()
+	for key, values := range copied_headers {
 		for _, value := range values {
 			if !f(key, value) {
 				return
@@ -272,6 +289,24 @@ func (h *requestOrResponseTrailerMapImpl) Range(f func(key, value string) bool) 
 	}
 }
 
+func (h *requestOrResponseTrailerMapImpl) RangeWithCopy(f func(key, value string) bool) {
+	// There is no dead lock risk in RangeWithCopy, but copy may introduce performance cost.
+	h.mutex.Lock()
+	h.initTrailers()
+	copied_headers := make(map[string][]string)
+	for key, values := range h.headers {
+		copied_headers[key] = values
+	}
+	h.mutex.Unlock()
+	for key, values := range copied_headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
+}
+
 // api.RequestTrailerMap
 type requestTrailerMapImpl struct {
 	requestOrResponseTrailerMapImpl
@@ -297,17 +332,19 @@ type httpBuffer struct {
 var _ api.BufferInstance = (*httpBuffer)(nil)
 
 func (b *httpBuffer) Write(p []byte) (n int, err error) {
-	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(p), api.AppendBuffer)
-	return len(p), nil
+	return b.WriteString(string(p))
 }
 
 func (b *httpBuffer) WriteString(s string) (n int, err error) {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, s, api.AppendBuffer)
-	return len(s), nil
+	n = len(s)
+	b.length += uint64(n)
+	return n, nil
 }
 
 func (b *httpBuffer) WriteByte(p byte) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(p), api.AppendBuffer)
+	b.length++
 	return nil
 }
 
@@ -329,10 +366,6 @@ func (b *httpBuffer) WriteUint64(p uint64) error {
 	return err
 }
 
-func (b *httpBuffer) Peek(n int) []byte {
-	panic("implement me")
-}
-
 func (b *httpBuffer) Bytes() []byte {
 	if b.length == 0 {
 		return nil
@@ -342,7 +375,18 @@ func (b *httpBuffer) Bytes() []byte {
 }
 
 func (b *httpBuffer) Drain(offset int) {
-	panic("implement me")
+	if offset <= 0 || b.length == 0 {
+		return
+	}
+
+	size := uint64(offset)
+	if size > b.length {
+		size = b.length
+	}
+
+	cAPI.HttpDrainBuffer(unsafe.Pointer(b.request.req), b.envoyBufferInstance, size)
+
+	b.length -= size
 }
 
 func (b *httpBuffer) Len() int {
@@ -350,7 +394,7 @@ func (b *httpBuffer) Len() int {
 }
 
 func (b *httpBuffer) Reset() {
-	panic("implement me")
+	b.Drain(b.Len())
 }
 
 func (b *httpBuffer) String() string {
@@ -362,31 +406,35 @@ func (b *httpBuffer) String() string {
 }
 
 func (b *httpBuffer) Append(data []byte) error {
-	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(data), api.AppendBuffer)
-	return nil
+	_, err := b.Write(data)
+	return err
 }
 
 func (b *httpBuffer) Prepend(data []byte) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(data), api.PrependBuffer)
+	b.length += uint64(len(data))
 	return nil
 }
 
 func (b *httpBuffer) AppendString(s string) error {
-	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, s, api.AppendBuffer)
-	return nil
+	_, err := b.WriteString(s)
+	return err
 }
 
 func (b *httpBuffer) PrependString(s string) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, s, api.PrependBuffer)
+	b.length += uint64(len(s))
 	return nil
 }
 
 func (b *httpBuffer) Set(data []byte) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(data), api.SetBuffer)
+	b.length = uint64(len(data))
 	return nil
 }
 
 func (b *httpBuffer) SetString(s string) error {
 	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, s, api.SetBuffer)
+	b.length = uint64(len(s))
 	return nil
 }

@@ -227,7 +227,7 @@ TEST_F(LocalRateLimitSharedTokenBucketTest, Shared) {
 // Test that the Key from SharedRateLimitSingleton::get() is valid/stable even if
 // many entries are added and the hash table is rehashed.
 TEST_F(LocalRateLimitSharedTokenBucketTest, RehashPointerStability) {
-  const char* yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 stat_prefix: local_rate_limit_stats
 share_key: key_{}
 token_bucket:

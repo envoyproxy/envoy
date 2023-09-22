@@ -175,6 +175,11 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
           headers_to_add.emplace_back(key, value);
         }
         break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS:
+        if (headers.get(key).empty()) {
+          break;
+        }
+        FALLTHRU;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         headers_to_overwrite.emplace_back(key, value);
         break;

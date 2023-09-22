@@ -37,7 +37,7 @@ HdsDelegate::HdsDelegate(Server::Configuration::ServerFactoryContext& server_con
       async_client_(std::move(async_client)), dispatcher_(server_context.mainThreadDispatcher()),
       server_context_(server_context), store_stats_(stats),
       ssl_context_manager_(ssl_context_manager), info_factory_(info_factory),
-      tls_(server_context_.threadLocal()), specifier_hash_(0) {
+      tls_(server_context_.threadLocal()) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       server_context.localInfo().node());
   backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -521,7 +521,7 @@ void HdsCluster::updateHosts(
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
   priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                            hosts_added, hosts_removed, absl::nullopt);
+                            hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
@@ -571,7 +571,7 @@ void HdsCluster::initialize(std::function<void()> callback) {
     }
     // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                              *hosts_, {}, absl::nullopt);
+                              *hosts_, {}, absl::nullopt, absl::nullopt);
 
     initialized_ = true;
   }

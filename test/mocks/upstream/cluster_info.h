@@ -52,6 +52,7 @@ public:
   MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
   MOCK_METHOD(bool, panicModeAny, (), (const));
   MOCK_METHOD(bool, listAsAny, (), (const));
+  MOCK_METHOD(bool, allowRedundantKeys, (), (const));
 
   std::vector<SubsetSelectorPtr> subset_selectors_;
 };
@@ -76,12 +77,24 @@ class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:
   MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
 
-  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddress,
-              (const Network::Address::InstanceConstSharedPtr& address,
-               const Network::ConnectionSocket::OptionsSharedPtr& connection_socket_options),
-              (const));
+  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddressImpl,
+              (const Network::Address::InstanceConstSharedPtr& address), (const));
 
   Network::Address::InstanceConstSharedPtr& address_;
+};
+
+class MockUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
+public:
+  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, createLocalAddressSelector,
+              (std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
+               absl::optional<std::string> cluster_name),
+              (const));
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Empty>();
+  }
+
+  std::string name() const override { return "mock.upstream.local.address.selector"; }
 };
 
 class MockClusterInfo : public ClusterInfo {
@@ -152,7 +165,7 @@ public:
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
-  MOCK_METHOD(LazyClusterTrafficStats&, trafficStats, (), (const));
+  MOCK_METHOD(DeferredCreationCompatibleClusterTrafficStats&, trafficStats, (), (const));
   MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
   MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
   MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
@@ -160,7 +173,7 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(std::shared_ptr<UpstreamLocalAddressSelector>, getUpstreamLocalAddressSelector, (),
+  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, getUpstreamLocalAddressSelector, (),
               (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
@@ -213,7 +226,7 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
-  LazyClusterTrafficStats traffic_stats_;
+  mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
   ClusterConfigUpdateStats config_update_stats_;
   ClusterLbStats lb_stats_;
   ClusterEndpointStats endpoint_stats_;

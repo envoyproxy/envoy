@@ -65,7 +65,7 @@ public:
   void setupMatcher(std::string action, std::string on_no_match_action) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
-    const std::string matcher_yaml = R"EOF(
+    constexpr absl::string_view matcher_yaml = R"EOF(
 matcher_list:
   matchers:
   - predicate:
@@ -112,7 +112,7 @@ on_no_match:
       name: none
       action: {}
 )EOF";
-    const std::string shadow_matcher_yaml = R"EOF(
+    constexpr absl::string_view shadow_matcher_yaml = R"EOF(
 matcher_list:
   matchers:
   - predicate:

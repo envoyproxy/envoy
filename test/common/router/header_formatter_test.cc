@@ -830,6 +830,57 @@ response_headers_to_add:
   }
 }
 
+TEST(HeaderParserTest, EvaluateHeadersOverwriteIfPresent) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "foo"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-bar-header"
+      value: "bar"
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-per-header"
+      value: "per"
+    append_action: ADD_IF_ABSENT
+  - header:
+      key: "x-overwrite"
+      value: "overwritten"
+    append_action: OVERWRITE_IF_EXISTS
+)EOF";
+
+  const auto route = parseRouteFromV3Yaml(yaml);
+  HeaderParserPtr resp_header_parser = HeaderParser::configure(route.response_headers_to_add());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  {
+    Http::TestResponseHeaderMapImpl header_map;
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
+    EXPECT_EQ("foo", header_map.get_("x-foo-header"));
+    EXPECT_EQ("bar", header_map.get_("x-bar-header"));
+    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    // If the response headers do not contain "x-overwrite" header,
+    // the final set should also not contain it.
+    EXPECT_FALSE(header_map.has("x-overwrite"));
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl header_map{{"x-overwrite", "to overwrite"}};
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
+    EXPECT_EQ("foo", header_map.get_("x-foo-header"));
+    EXPECT_EQ("bar", header_map.get_("x-bar-header"));
+    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    // If the response headers contain "x-overwrite" header it should
+    // be overwritten with the new value.
+    EXPECT_EQ("overwritten", header_map.get_("x-overwrite"));
+  }
+}
+
 TEST(HeaderParserTest, DEPRECATED_FEATURE_TEST(EvaluateRequestHeadersAddWithDeprecatedAppend)) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }

@@ -5,10 +5,13 @@
 
 #include "source/extensions/common/tap/admin.h"
 #include "source/extensions/common/tap/tap.h"
+#include "source/extensions/common/tap/tap_config_base.h"
 
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -20,6 +23,7 @@ using ::testing::_;
 using ::testing::AtLeast;
 using ::testing::Between;
 using ::testing::DoAll;
+using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::ReturnRef;
 using ::testing::SaveArg;
@@ -145,6 +149,93 @@ tap_config:
   // destruction, and the code that satisfies the expected calls on sink_ is in the TearDown method.
   StrictMock<Http::MockStreamDecoderFilterCallbacks> sink_;
 };
+
+using Extensions::Common::Tap::TapSinkFactory;
+class MockTapSinkFactory : public TapSinkFactory {
+public:
+  MockTapSinkFactory() = default;
+  ~MockTapSinkFactory() override = default;
+
+  MOCK_METHOD(SinkPtr, createSinkPtr, (const Protobuf::Message& config, SinkContext), (override));
+
+  MOCK_METHOD(std::string, name, (), (const, override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
+};
+
+class TestConfigImpl : public TapConfigBaseImpl {
+public:
+  TestConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
+                 Extensions::Common::Tap::Sink* admin_streamer, SinkContext context)
+      : TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
+};
+
+TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
+
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY
+        custom_sink:
+          name: custom_sink
+          typed_config:
+            "@type": type.googleapis.cm/google.protobuf.StringValue
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  MockTapSinkFactory factory_impl;
+  EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+        return std::make_unique<ProtobufWkt::StringValue>();
+      }));
+  EXPECT_CALL(
+      factory_impl,
+      createSinkPtr(
+          _,
+          testing::VariantWith<std::reference_wrapper<Server::Configuration::FactoryContext>>(_)));
+  Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl(tap_config, nullptr, factory_context);
+}
+
+TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
+
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY
+        custom_sink:
+          name: custom_sink
+          typed_config:
+            "@type": type.googleapis.cm/google.protobuf.StringValue
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  MockTapSinkFactory factory_impl;
+  EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+        return std::make_unique<ProtobufWkt::StringValue>();
+      }));
+  EXPECT_CALL(
+      factory_impl,
+      createSinkPtr(
+          _, testing::VariantWith<
+                 std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(_)));
+  Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  TestConfigImpl(tap_config, nullptr, factory_context);
+}
 
 // Make sure warn if using a pipe address for the admin handler.
 TEST_F(AdminHandlerTest, AdminWithPipeSocket) {

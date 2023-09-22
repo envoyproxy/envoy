@@ -145,21 +145,22 @@ bool isHeaderNameValid(absl::string_view name) {
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
                          bool enable_trailers, bool allow_custom_methods)
-    : message_type_(type), connection_(connection), allow_custom_methods_(allow_custom_methods) {
+    : message_type_(type), connection_(connection), enable_trailers_(enable_trailers),
+      allow_custom_methods_(allow_custom_methods) {
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
   http_validation_policy.disallow_header_continuation_lines = true;
   http_validation_policy.require_header_colon = true;
-  http_validation_policy.disallow_multiple_content_length = false;
+  http_validation_policy.disallow_multiple_content_length = true;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
   http_validation_policy.validate_transfer_encoding = false;
+  http_validation_policy.require_content_length_if_body_required = false;
+  http_validation_policy.disallow_invalid_header_characters_in_response = true;
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
-  if (enable_trailers) {
-    framer_.set_balsa_trailer(&trailers_);
-  }
+  framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
   framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
@@ -272,10 +273,10 @@ void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
 void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*/) {}
 
 void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
-  processHeadersOrTrailersImpl(headers);
+  validateAndProcessHeadersOrTrailersImpl(headers, /* trailers = */ false);
 }
 void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
-  processHeadersOrTrailersImpl(trailer);
+  validateAndProcessHeadersOrTrailersImpl(trailer, /* trailers = */ true);
 }
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
@@ -329,7 +330,7 @@ void BalsaParser::OnChunkLength(size_t chunk_length) {
 
 void BalsaParser::OnChunkExtensionInput(absl::string_view /*input*/) {}
 
-void BalsaParser::OnInterimHeaders(BalsaHeaders /*headers*/) {}
+void BalsaParser::OnInterimHeaders(std::unique_ptr<BalsaHeaders> /*headers*/) {}
 
 void BalsaParser::HeaderDone() {
   if (status_ == ParserStatus::Error) {
@@ -376,6 +377,9 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
   case BalsaFrameEnums::INVALID_HEADER_CHARACTER:
     error_message_ = "header value contains invalid chars";
     break;
+  case BalsaFrameEnums::MULTIPLE_CONTENT_LENGTH_KEYS:
+    error_message_ = "HPE_UNEXPECTED_CONTENT_LENGTH";
+    break;
   default:
     error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
   }
@@ -387,7 +391,8 @@ void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
   }
 }
 
-void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers) {
+void BalsaParser::validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers,
+                                                          bool trailers) {
   for (const std::pair<absl::string_view, absl::string_view>& key_value : headers.lines()) {
     if (status_ == ParserStatus::Error) {
       return;
@@ -398,6 +403,10 @@ void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& heade
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_HEADER_TOKEN";
       return;
+    }
+
+    if (trailers && !enable_trailers_) {
+      continue;
     }
 
     status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));

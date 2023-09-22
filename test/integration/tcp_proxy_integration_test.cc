@@ -25,7 +25,6 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::HasSubstr;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
@@ -1527,7 +1526,7 @@ class FakeMysqlUpstream : public FakeUpstream {
   using FakeUpstream::FakeUpstream;
 
   bool createNetworkFilterChain(Network::Connection& connection,
-                                const std::vector<Network::FilterFactoryCb>& cb) override {
+                                const Filter::NetworkFilterFactoriesList& cb) override {
     Buffer::OwnedImpl to_write("P");
     connection.write(to_write, false);
     return FakeUpstream::createNetworkFilterChain(connection, cb);

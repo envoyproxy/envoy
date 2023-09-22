@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -109,11 +108,7 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
   // The old socket is not closed in this call, because it could still receive useful packets.
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket(*connectionSocket(), delegate_);
-  if (connection_migration_use_new_cid()) {
-    MigratePath(self_address, peer_address, writer.release(), true);
-  } else {
-    SetQuicPacketWriter(writer.release(), true);
-  }
+  MigratePath(self_address, peer_address, writer.release(), true);
 }
 
 void EnvoyQuicClientConnection::OnPathDegradingDetected() {
@@ -122,8 +117,7 @@ void EnvoyQuicClientConnection::OnPathDegradingDetected() {
 }
 
 void EnvoyQuicClientConnection::maybeMigratePort() {
-  if (!IsHandshakeConfirmed() || !connection_migration_use_new_cid() ||
-      HasPendingPathValidation() || !migrate_port_on_path_degrading_) {
+  if (!IsHandshakeConfirmed() || HasPendingPathValidation() || !migrate_port_on_path_degrading_) {
     return;
   }
 

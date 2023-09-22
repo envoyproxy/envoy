@@ -52,10 +52,12 @@ void GrpcAccessLoggerImpl::initMessageRoot(
   auto* resource_logs = message_.add_resource_logs();
   root_ = resource_logs->add_scope_logs();
   auto* resource = resource_logs->mutable_resource();
-  *resource->add_attributes() = getStringKeyValue("log_name", config.common_config().log_name());
-  *resource->add_attributes() = getStringKeyValue("zone_name", local_info.zoneName());
-  *resource->add_attributes() = getStringKeyValue("cluster_name", local_info.clusterName());
-  *resource->add_attributes() = getStringKeyValue("node_name", local_info.nodeName());
+  if (!config.disable_builtin_labels()) {
+    *resource->add_attributes() = getStringKeyValue("log_name", config.common_config().log_name());
+    *resource->add_attributes() = getStringKeyValue("zone_name", local_info.zoneName());
+    *resource->add_attributes() = getStringKeyValue("cluster_name", local_info.clusterName());
+    *resource->add_attributes() = getStringKeyValue("node_name", local_info.nodeName());
+  }
 
   for (const auto& pair : config.resource_attributes().values()) {
     *resource->add_attributes() = pair;

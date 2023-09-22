@@ -116,12 +116,34 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+                                  TimeSource& time_source,
+                                  envoy::config::core::v3::Locality locality, uint32_t weight = 1,
+                                  uint32_t priority = 0,
+                                  Host::HealthStatus status = Host::HealthStatus::UNKNOWN) {
+  return std::make_shared<HostImpl>(
+      cluster, "", Network::Utility::resolveUrl(url), nullptr, weight, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), priority,
+      status, time_source);
+}
+
+inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
                                   const envoy::config::core::v3::Metadata& metadata,
                                   TimeSource& time_source, uint32_t weight = 1) {
   return std::make_shared<HostImpl>(
       cluster, "", Network::Utility::resolveUrl(url),
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), weight,
       envoy::config::core::v3::Locality(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN, time_source);
+}
+
+inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+                                  const envoy::config::core::v3::Metadata& metadata,
+                                  envoy::config::core::v3::Locality locality,
+                                  TimeSource& time_source, uint32_t weight = 1) {
+  return std::make_shared<HostImpl>(
+      cluster, "", Network::Utility::resolveUrl(url),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), weight, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
       envoy::config::core::v3::UNKNOWN, time_source);
 }

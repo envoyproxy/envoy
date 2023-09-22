@@ -1,9 +1,11 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/server/admin.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/json/json_streamer.h"
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/utils.h"
 
@@ -75,36 +77,76 @@ public:
                 const Stats::ParentHistogram& histogram) override;
   void finalize(Buffer::Instance& response) override;
 
+  /**
+   * Streams the supported percentiles into a JSON array. Note that no histogram
+   * context is provided for this; this is a static property of the binary.
+   *
+   * @param array the json streaming array array to stream into.
+   */
+  static void populateSupportedPercentiles(Json::Streamer::Array& array);
+
+  /**
+   * Streams detail about the provided histogram into the provided JSON map.
+   *
+   * @param name the name of the histogram (usually the same as histogram.name(),
+   *             but is passed in explicitly because it may already have been
+   *             computed when filtering stats, and it is somewhat expensive
+   *             to compute the name.
+   * @param histogram the histogram to stream
+   * @param map the json map to stream into.
+   *
+   */
+  static void generateHistogramDetail(const std::string& name,
+                                      const Stats::ParentHistogram& histogram,
+                                      Json::Streamer::Map& map);
+
 private:
-  using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
-
-  // Summarizes the buckets in the specified histogram, collecting JSON objects.
-  // Note, we do not flush this buffer to the network when it grows large, and
-  // if this becomes an issue it should be possible to do, noting that we are
-  // one or two levels nesting below the list of scalar stats due to the Envoy
-  // stats json schema, where histograms are grouped together.
-  void populateQuantiles(const Stats::ParentHistogram& histogram, absl::string_view label,
-                         ProtobufWkt::ListValue* computed_quantile_value_array);
-
   // Collects the buckets from the specified histogram.
   void collectBuckets(const std::string& name, const Stats::ParentHistogram& histogram,
                       const std::vector<uint64_t>& interval_buckets,
                       const std::vector<uint64_t>& cumulative_buckets);
 
-  void populateDetail(absl::string_view name,
-                      const std::vector<Stats::ParentHistogram::Bucket>& buckets,
-                      ProtoMap& histogram_obj_fields);
-  static void populateVector(absl::string_view name, const std::vector<double>& values,
-                             uint32_t multiplier, ProtoMap& histograms_obj_fields);
+  static void populateBucketsVerbose(const std::vector<Stats::ParentHistogram::Bucket>& buckets,
+                                     Json::Streamer::Map& map);
+  void renderHistogramStart();
+  static void populatePercentiles(const Stats::ParentHistogram& histogram,
+                                  Json::Streamer::Map& map);
 
-  ProtobufWkt::Struct histograms_obj_;
-  ProtobufWkt::Struct histograms_obj_container_;
-  std::unique_ptr<ProtobufWkt::ListValue> histogram_array_;
-  bool found_used_histogram_{false};
-  absl::string_view delim_{""};
+  // This function irons out an API mistake made when defining the StatsRender
+  // interface. The issue is that callers can provide a response buffer when
+  // constructing a StatsRender instance, but can switch to a different response
+  // buffer when rendering specific values.
+  //
+  // The problem comes with JSON histograms where each histogram is nested in a
+  // structure with other histograms, so if you switch buffers you need to
+  // ensure the pending bytes in the previous buffer is fully
+  // drained. Unfortunately this buffer-switching is used in practice.
+  void drainIfNeeded(Buffer::Instance& response);
+
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
+  bool histograms_initialized_{false};
+
+  // Captures the hierarchy of maps and arrays used to render scalar stats and
+  // histograms in various formats. This is separated in its own structure to
+  // facilitate clearing these structures in the reverse order of how they were
+  // created during finalize().
+  //
+  // Another option to consider: flattening the member variables of JsonContext
+  // into StatsJsonRender, and ensure that Render objects are always destructed
+  // before the output stream is considered complete.
+  struct JsonContext {
+    explicit JsonContext(Buffer::Instance& response);
+    Json::Streamer streamer_;
+    Json::Streamer::MapPtr stats_map_;
+    Json::Streamer::ArrayPtr stats_array_;
+    Json::Streamer::MapPtr histogram_map1_;
+    Json::Streamer::MapPtr histogram_map2_;
+    Json::Streamer::ArrayPtr histogram_array_;
+  };
+  std::unique_ptr<JsonContext> json_;
+  Buffer::Instance& response_;
 };
 
 } // namespace Server

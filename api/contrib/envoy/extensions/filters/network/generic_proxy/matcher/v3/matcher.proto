@@ -47,7 +47,6 @@ message PropertyMatchInput {
   string property_name = 1 [(validate.rules).string = {min_len: 1}];
 }
 
-// [#not-implemented-hide:]
 // Used to match an whole generic downstream request.
 message RequestMatchInput {
 }

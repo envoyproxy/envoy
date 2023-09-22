@@ -50,7 +50,7 @@ public:
 };
 
 /**
- * Used to select upstream local address based on the endpoint address.
+ * Interface to select upstream local address based on the endpoint address.
  */
 class UpstreamLocalAddressSelector {
 public:
@@ -63,9 +63,47 @@ public:
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
    * options.
    */
-  virtual UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address,
-      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const PURE;
+  UpstreamLocalAddress
+  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr& endpoint_address,
+                          const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
+    UpstreamLocalAddress local_address = getUpstreamLocalAddressImpl(endpoint_address);
+    Network::ConnectionSocket::OptionsSharedPtr connection_options =
+        std::make_shared<Network::ConnectionSocket::Options>(
+            socket_options ? *socket_options
+                           : std::vector<Network::ConnectionSocket::OptionConstSharedPtr>{});
+    return {local_address.address_,
+            local_address.socket_options_ != nullptr
+                ? Network::Socket::appendOptions(connection_options, local_address.socket_options_)
+                : connection_options};
+  }
+
+private:
+  /*
+   * The implementation is responsible for picking the ``UpstreamLocalAddress``
+   * based on the ``endpoint_address``. However adding the connection socket
+   * options is the responsibility of the base class.
+   */
+  virtual UpstreamLocalAddress getUpstreamLocalAddressImpl(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
+};
+
+using UpstreamLocalAddressSelectorConstSharedPtr =
+    std::shared_ptr<const UpstreamLocalAddressSelector>;
+
+class UpstreamLocalAddressSelectorFactory : public Config::TypedFactory {
+public:
+  ~UpstreamLocalAddressSelectorFactory() override = default;
+
+  /**
+   * @param cluster_name is set to the name of the cluster if ``bind_config`` is
+   *   from cluster config. If the bind config from the cluster manager, the param
+   *   is empty.
+   */
+  virtual UpstreamLocalAddressSelectorConstSharedPtr
+  createLocalAddressSelector(std::vector<UpstreamLocalAddress> upstream_local_addresses,
+                             absl::optional<std::string> cluster_name) const PURE;
+
+  std::string category() const override { return "envoy.upstream.local_address_selector"; }
 };
 
 /**
@@ -175,6 +213,18 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  /**
+   * Atomically get multiple health flags that are set for a host. Flags are specified
+   * as a bitset of HealthFlags.
+   */
+  virtual uint32_t healthFlagsGetAll() const PURE;
+
+  /**
+   * Atomically set the health flag for a host. Flags are specified as a bitset
+   * of HealthFlags.
+   */
+  virtual void healthFlagsSetAll(uint32_t bits) PURE;
+
   enum class Health {
     /**
      * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
@@ -206,6 +256,16 @@ public:
    * a priority.
    */
   virtual HealthStatus healthStatus() const PURE;
+
+  /**
+   * Set the EDS health status of the host. This is used when the host status is updated via EDS.
+   */
+  virtual void setEdsHealthStatus(HealthStatus health_status) PURE;
+
+  /**
+   * @return the EDS health status of the host.
+   */
+  virtual HealthStatus edsHealthStatus() const PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
@@ -299,7 +359,10 @@ public:
   /**
    * @return const std::vector<HostVector>& list of hosts organized per
    *         locality. The local locality is the first entry if
-   *         hasLocalLocality() is true.
+   *         hasLocalLocality() is true. All hosts within the same entry have the same locality
+   *         and all hosts with a given locality are in the same entry. With the exception of
+   *         the local locality entry (if present), all entries are sorted by locality with
+   *         those considered less by the LocalityLess comparator ordered earlier in the list.
    */
   virtual const std::vector<HostVector>& get() const PURE;
 
@@ -452,6 +515,11 @@ public:
    * @return uint32_t the overprovisioning factor of this host set.
    */
   virtual uint32_t overprovisioningFactor() const PURE;
+
+  /**
+   * @return true to use host weights to calculate the health of a priority.
+   */
+  virtual bool weightedPriorityHealth() const PURE;
 };
 
 using HostSetPtr = std::unique_ptr<HostSet>;
@@ -526,13 +594,15 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
-   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
+   * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
    * @param cross_priority_host_map read only cross-priority host map which is created in the main
    * thread and shared by all the worker threads.
    */
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<bool> weighted_priority_health,
                            absl::optional<uint32_t> overprovisioning_factor,
                            HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
@@ -550,11 +620,13 @@ public:
      * @param locality_weights supplies a map from locality to associated weight.
      * @param hosts_added supplies the hosts added since the last update.
      * @param hosts_removed supplies the hosts removed since the last update.
-     * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+     * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
+     * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
      */
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<bool> weighted_priority_health,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 
@@ -591,6 +663,7 @@ public:
 #define ALL_CLUSTER_CONFIG_UPDATE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)         \
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
+  COUNTER(assignment_use_cached)                                                                   \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_empty)                                                                            \
   COUNTER(update_failure)                                                                          \
@@ -768,12 +841,8 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
-/*
- * NOTE: LazyClusterTrafficStats for now is an alias of "std::unique_ptr<ClusterTrafficStats>",
- * this is to make way for future lazy-init on trafficStats(). See
- * https://github.com/envoyproxy/envoy/pull/23921#issuecomment-1335239116 for more context.
- */
-using LazyClusterTrafficStats = std::unique_ptr<ClusterTrafficStats>;
+using DeferredCreationCompatibleClusterTrafficStats =
+    Stats::DeferredCreationCompatibleStats<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -1076,8 +1145,7 @@ public:
   /**
    * @return  all traffic related stats for this cluster.
    */
-  virtual LazyClusterTrafficStats& trafficStats() const PURE;
-
+  virtual DeferredCreationCompatibleClusterTrafficStats& trafficStats() const PURE;
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
    *         stats that will be freed when the cluster is removed.
@@ -1104,8 +1172,7 @@ public:
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
-  virtual std::shared_ptr<UpstreamLocalAddressSelector>
-  getUpstreamLocalAddressSelector() const PURE;
+  virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 
   /**
    * @return the configuration for load balancer subsets.

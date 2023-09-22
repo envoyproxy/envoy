@@ -40,7 +40,23 @@ absl::string_view stringViewFromGoSlice(void* slice) {
   return {static_cast<const char*>(go_slice->data), static_cast<size_t>(go_slice->len)};
 }
 
-const FilterLogger& getFilterLogger() { CONSTRUCT_ON_FIRST_USE(FilterLogger); }
+std::vector<std::string> stringsFromGoSlice(void* slice) {
+  std::vector<std::string> list;
+  if (slice == nullptr) {
+    return list;
+  }
+  auto go_slice = reinterpret_cast<GoSlice*>(slice);
+  auto str = reinterpret_cast<GoString*>(go_slice->data);
+  for (auto i = 0; i < go_slice->len; i += 2) {
+    auto key = std::string(static_cast<const char*>(str->p), str->n);
+    str++;
+    auto value = std::string(static_cast<const char*>(str->p), str->n);
+    str++;
+    list.push_back(key);
+    list.push_back(value);
+  }
+  return list;
+}
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +68,16 @@ CAPIStatus envoyGoFilterHandlerWrapper(void* r,
   auto weak_filter = req->weakFilter();
   if (auto filter = weak_filter.lock()) {
     return f(filter);
+  }
+  return CAPIStatus::CAPIFilterIsGone;
+}
+
+CAPIStatus
+envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<FilterConfig>&)> fc) {
+  auto config = reinterpret_cast<httpConfigInternal*>(c);
+  auto weak_filter_config = config->weakFilterConfig();
+  if (auto filter_config = weak_filter_config.lock()) {
+    return fc(filter_config);
   }
   return CAPIStatus::CAPIFilterIsGone;
 }
@@ -69,13 +95,23 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* bod
       r,
       [response_code, body_text, headers, grpc_status,
        details](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        UNREFERENCED_PARAMETER(headers);
+        auto header_values = stringsFromGoSlice(headers);
+        std::function<void(Http::ResponseHeaderMap&)> modify_headers =
+            [header_values](Http::ResponseHeaderMap& headers) -> void {
+          for (size_t i = 0; i < header_values.size(); i += 2) {
+            const auto& key = header_values[i];
+            const auto& value = header_values[i + 1];
+            if (value.length() > 0) {
+              headers.setCopy(Http::LowerCaseString(key), value);
+            }
+          }
+        };
         auto status = static_cast<Grpc::Status::GrpcStatus>(grpc_status);
 
         // Deep clone the GoString into C++, since the GoString may be freed after the function
         // returns, while they may still be used in the callback.
         return filter->sendLocalReply(static_cast<Http::Code>(response_code),
-                                      copyGoString(body_text), nullptr, status,
+                                      copyGoString(body_text), modify_headers, status,
                                       copyGoString(details));
       });
 }
@@ -119,6 +155,15 @@ CAPIStatus envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer_ptr
       r, [buffer_ptr, data](std::shared_ptr<Filter>& filter) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         return filter->copyBuffer(buffer, reinterpret_cast<char*>(data));
+      });
+}
+
+CAPIStatus envoyGoFilterHttpDrainBuffer(void* r, unsigned long long int buffer_ptr,
+                                        uint64_t length) {
+  return envoyGoFilterHandlerWrapper(
+      r, [buffer_ptr, length](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
+        return filter->drainBuffer(buffer, length);
       });
 }
 
@@ -170,12 +215,13 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, void* value) {
   });
 }
 
-void envoyGoFilterHttpLog(uint32_t level, void* message) {
-  auto mesg = referGoString(message);
-  getFilterLogger().log(level, mesg);
+CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name, void* buf) {
+  return envoyGoFilterHandlerWrapper(r, [name, buf](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    auto name_str = copyGoString(name);
+    auto buf_slice = reinterpret_cast<GoSlice*>(buf);
+    return filter->getDynamicMetadata(name_str, buf_slice);
+  });
 }
-
-uint32_t envoyGoFilterHttpLogLevel() { return getFilterLogger().level(); }
 
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name, void* key, void* buf) {
   return envoyGoFilterHandlerWrapper(
@@ -193,6 +239,13 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   // phase of the go object.
   auto req = reinterpret_cast<httpRequestInternal*>(r);
   delete req;
+}
+
+void envoyGoConfigHttpFinalize(void* c) {
+  // config is used by go, so need to use raw memory and then it is safe to release at the gc
+  // finalize phase of the go object.
+  auto config = reinterpret_cast<httpConfigInternal*>(c);
+  delete config;
 }
 
 CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details) {
@@ -222,6 +275,48 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value
                                        auto value_str = reinterpret_cast<GoString*>(value);
                                        return filter->getStringFilterState(key_str, value_str);
                                      });
+}
+
+CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key, void* value, int* rc) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key, value, rc](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto key_str = referGoString(key);
+        auto value_str = reinterpret_cast<GoString*>(value);
+        return filter->getStringProperty(key_str, value_str, rc);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name,
+                                         void* metric_id) {
+  return envoyGoConfigHandlerWrapper(
+      c,
+      [metric_type, name, metric_id](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        auto name_str = referGoString(name);
+        auto metric_id_int = reinterpret_cast<uint32_t*>(metric_id);
+        return filter_config->defineMetric(metric_type, name_str, metric_id_int);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, offset](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        return filter_config->incrementMetric(metric_id, offset);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, void* value) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        auto value_int = reinterpret_cast<uint64_t*>(value);
+        return filter_config->getMetric(metric_id, value_int);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value) {
+  return envoyGoConfigHandlerWrapper(
+      c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        return filter_config->recordMetric(metric_id, value);
+      });
 }
 
 #ifdef __cplusplus

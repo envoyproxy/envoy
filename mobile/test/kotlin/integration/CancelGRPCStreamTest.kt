@@ -9,7 +9,6 @@ import io.envoyproxy.envoymobile.FilterTrailersStatus
 import io.envoyproxy.envoymobile.FinalStreamIntel
 import io.envoyproxy.envoymobile.GRPCClient
 import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
-import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
@@ -22,9 +21,9 @@ import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-private val filterName = "cancel_validation_filter"
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+private const val FILTER_NAME = "cancel_validation_filter"
+private const val PBF_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+private const val LOCAL_ERROR_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
 
 class CancelGRPCStreamTest {
 
@@ -73,12 +72,11 @@ class CancelGRPCStreamTest {
   fun `cancel grpc stream calls onCancel callback`() {
     val engine = EngineBuilder(Standard())
       .addPlatformFilter(
-        name = filterName,
+        name = FILTER_NAME,
         factory = { CancelValidationFilter(filterExpectation) }
       )
-      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $pbfType, platform_filter_name: $filterName}")
-      .addNativeFilter("envoy.filters.http.local_error", "{'@type': $localErrorFilterType}")
-      .setOnEngineRunning {}
+      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}")
+      .addNativeFilter("envoy.filters.http.local_error", "{'@type': $LOCAL_ERROR_FILTER_TYPE}")
       .build()
 
     val client = GRPCClient(engine.streamClient())

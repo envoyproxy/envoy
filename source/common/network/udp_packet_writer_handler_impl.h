@@ -36,7 +36,7 @@ public:
   }
 
 private:
-  bool write_blocked_;
+  bool write_blocked_{false};
   Network::IoHandle& io_handle_;
 };
 

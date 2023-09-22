@@ -16,7 +16,6 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::InSequence;

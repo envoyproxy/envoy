@@ -324,8 +324,18 @@ message HeaderValue {
   // The same :ref:`format specifier <config_access_log_format>` as used for
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of ``-``.
+  // Header value is encoded as string. This does not work for non-utf8 characters.
+  // Only one of ``value`` or ``raw_value`` can be set.
   string value = 2 [
-    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
+    (udpa.annotations.field_migrate).oneof_promotion = "value_type"
+  ];
+
+  // Header value is encoded as bytes which can support non-utf8 characters.
+  // Only one of ``value`` or ``raw_value`` can be set.
+  bytes raw_value = 3 [
+    (validate.rules).bytes = {min_len: 0 max_len: 16384},
+    (udpa.annotations.field_migrate).oneof_promotion = "value_type"
   ];
 }
 
@@ -349,6 +359,10 @@ message HeaderValueOption {
     // the header already exists. If the header doesn't exist then this will add the header
     // with specified key and value.
     OVERWRITE_IF_EXISTS_OR_ADD = 2;
+
+    // This action will overwrite the specified value by discarding any existing values if
+    // the header already exists. If the header doesn't exist then this will be no-op.
+    OVERWRITE_IF_EXISTS = 3;
   }
 
   // Header name/value pair that this option applies to.

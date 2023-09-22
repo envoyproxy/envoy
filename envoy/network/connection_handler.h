@@ -17,6 +17,24 @@
 namespace Envoy {
 namespace Network {
 
+// This interface allows for a listener to perform an alternative behavior when a
+// packet can't be routed correctly during draining; for example QUIC packets that
+// are not for an existing connection.
+// This is currently supported for QUIC listeners to forward packets to the child instance.
+// TODO(mattklein123): determine if other UDP listeners have a reason to do this.
+class NonDispatchedUdpPacketHandler {
+public:
+  virtual ~NonDispatchedUdpPacketHandler() = default;
+  virtual void handle(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
+};
+
+// Additional options for ConnectionHandler::ActiveListener::shutdownListener.
+// As a struct so that in the event of future additional parameters, the change
+// is isolated rather than cascading through all layers, mocks, etc.
+struct ExtraShutdownListenerOptions {
+  OptRef<NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
+};
+
 /**
  * Abstract connection handler.
  */
@@ -73,8 +91,10 @@ public:
    * Stop listeners using the listener tag as a key. This will not close any connections and is used
    * for draining.
    * @param listener_tag supplies the tag passed to addListener().
+   * @param options additional options to be passed through to shutdownListener.
    */
-  virtual void stopListeners(uint64_t listener_tag) PURE;
+  virtual void stopListeners(uint64_t listener_tag,
+                             const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.
@@ -133,8 +153,11 @@ public:
 
     /**
      * Stop listening according to implementation's own definition.
+     * @param options provides extra options that some subset of listeners might
+     *                use, e.g. Quic listeners may need to configure packet forwarding
+     *                during hot restart.
      */
-    virtual void shutdownListener() PURE;
+    virtual void shutdownListener(const ExtraShutdownListenerOptions& options) PURE;
 
     /**
      * Update the listener config.

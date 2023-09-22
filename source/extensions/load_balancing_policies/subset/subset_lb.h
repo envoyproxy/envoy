@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <bitset>
 #include <cstdint>
 #include <functional>
@@ -13,6 +14,7 @@
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/macros.h"
@@ -122,13 +124,23 @@ public:
         enabled_(!subset_config.subset_selectors().empty()),
         locality_weight_aware_(subset_config.locality_weight_aware()),
         scale_locality_weight_(subset_config.scale_locality_weight()),
-        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
+        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()),
+        allow_redundant_keys_(subset_config.allow_redundant_keys()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
         subset_selectors_.emplace_back(std::make_shared<Upstream::SubsetSelectorImpl>(
             subset.keys(), static_cast<SubsetFallbackPolicy>(subset.fallback_policy()),
             subset.fallback_keys_subset(), subset.single_host_per_subset()));
       }
+    }
+
+    if (allow_redundant_keys_) {
+      // Sort subset selectors by number of keys, descending. This will ensure that the longest
+      // matching subset selector will be at the beginning of the list.
+      std::stable_sort(subset_selectors_.begin(), subset_selectors_.end(),
+                       [](const SubsetSelectorPtr& a, const SubsetSelectorPtr& b) -> bool {
+                         return a->selectorKeys().size() > b->selectorKeys().size();
+                       });
     }
   }
 
@@ -146,6 +158,7 @@ public:
   bool scaleLocalityWeight() const override { return scale_locality_weight_; }
   bool panicModeAny() const override { return panic_mode_any_; }
   bool listAsAny() const override { return list_as_any_; }
+  bool allowRedundantKeys() const override { return allow_redundant_keys_; }
 
 private:
   const ProtobufWkt::Struct default_subset_;
@@ -158,6 +171,7 @@ private:
   const bool scale_locality_weight_ : 1;
   const bool panic_mode_any_ : 1;
   const bool list_as_any_ : 1;
+  const bool allow_redundant_keys_{};
 };
 
 class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
@@ -203,7 +217,8 @@ private:
   public:
     HostSubsetImpl(const HostSet& original_host_set, bool locality_weight_aware,
                    bool scale_locality_weight)
-        : HostSetImpl(original_host_set.priority(), original_host_set.overprovisioningFactor()),
+        : HostSetImpl(original_host_set.priority(), original_host_set.weightedPriorityHealth(),
+                      original_host_set.overprovisioningFactor()),
           original_host_set_(original_host_set), locality_weight_aware_(locality_weight_aware),
           scale_locality_weight_(scale_locality_weight) {}
 
@@ -248,7 +263,7 @@ private:
     LoadBalancerPtr lb_;
 
   protected:
-    HostSetImplPtr createHostSet(uint32_t priority,
+    HostSetImplPtr createHostSet(uint32_t priority, absl::optional<bool> weighted_priority_health,
                                  absl::optional<uint32_t> overprovisioning_factor) override;
 
   private:
@@ -281,6 +296,10 @@ public:
                                const std::set<std::string>& filtered_metadata_match_criteria_names);
 
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
+                               Router::MetadataMatchCriteriaConstPtr metadata_match_criteria)
+        : wrapped_(wrapped), metadata_match_(std::move(metadata_match_criteria)) {}
+
+    LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
                                const ProtobufWkt::Struct& metadata_match_criteria_override);
     // LoadBalancerContext
     absl::optional<uint64_t> computeHashKey() override { return wrapped_->computeHashKey(); }
@@ -289,6 +308,9 @@ public:
     }
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
+    }
+    const StreamInfo::StreamInfo* requestStreamInfo() const override {
+      return wrapped_->requestStreamInfo();
     }
     const Http::RequestHeaderMap* downstreamHeaders() const override {
       return wrapped_->downstreamHeaders();
@@ -460,9 +482,6 @@ private:
   void processSubsets(uint32_t priority, const HostVector& all_hosts);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
-  HostConstSharedPtr
-  tryChooseHostFromMetadataMatchCriteriaSingle(const Router::MetadataMatchCriteria& match_criteria,
-                                               bool& host_chosen);
 
   absl::optional<SubsetSelectorFallbackParamsRef>
   tryFindSelectorFallbackParams(LoadBalancerContext* context);
@@ -523,6 +542,7 @@ private:
   const bool locality_weight_aware_ : 1;
   const bool scale_locality_weight_ : 1;
   const bool list_as_any_ : 1;
+  const bool allow_redundant_keys_{};
 
   friend class SubsetLoadBalancerInternalStateTester;
 };

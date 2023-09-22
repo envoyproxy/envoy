@@ -31,7 +31,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
 
   // TODO(refactor) move unshared variables into their specific methods.
   private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
-  private final EnvoyLogger mEnvoyLogger = null;
   private final EnvoyEventTracker mEnvoyEventTracker = null;
   private String mGrpcStatsDomain = null;
   private int mConnectTimeoutSeconds = 30;
@@ -61,20 +60,10 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private boolean mEnablePlatformCertificatesValidation = true;
-  private String mRtdsLayerName = "";
-  private int mRtdsTimeoutSeconds = 0;
-  private String mAdsAddress = "";
-  private int mAdsPort = 0;
-  private String mAdsToken = "";
-  private int mAdsTokenLifetime = 0;
-  private String mAdsRootCerts = "";
   private String mNodeId = "";
   private String mNodeRegion = "";
   private String mNodeZone = "";
   private String mNodeSubZone = "";
-  private String mCdsResourcesLocator = "";
-  private int mCdsTimeoutSeconds = 0;
-  private boolean mEnableCds = false;
 
   /**
    * Builder for Native Cronet Engine. Default config enables SPDY, disables QUIC and HTTP cache.
@@ -115,12 +104,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return new CronvoyUrlRequestContext(this);
   }
 
-  EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning) {
-    AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, mEnvoyLogger,
+  EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning, EnvoyLogger envoyLogger,
+                           String logLevel) {
+    AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger,
                                                      mEnvoyEventTracker, mEnableProxying);
     AndroidJniLibrary.load(getContext());
     AndroidNetworkMonitor.load(getContext(), engine);
-    engine.runWithConfig(createEnvoyConfiguration(), getLogLevel());
+    engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;
   }
 
@@ -135,14 +125,17 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), mEnableGzipDecompression, brotliEnabled(),
+        mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
+        quicClientConnectionOptions(), quicHints(), mEnableGzipDecompression, brotliEnabled(),
         mEnableSocketTag, mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
         mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
         mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, statSinks, runtimeGuards, mEnablePlatformCertificatesValidation,
-        mRtdsLayerName, mRtdsTimeoutSeconds, mAdsAddress, mAdsPort, mAdsToken, mAdsTokenLifetime,
-        mAdsRootCerts, mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, mCdsResourcesLocator,
-        mCdsTimeoutSeconds, mEnableCds);
+        /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
+        /*xdsPort=*/0, /*xdsAuthenticationHeader=*/"", /*xdsAuthenticationToken=*/"",
+        /*xdsJwtToken=*/"", /*xdsJwtTokenLifetime=*/0, /*xdsSslRootCerts=*/"",
+        /*xdsSni=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone, /*cdsResourcesLocator=*/"",
+        /*cdsTimeoutSeconds=*/0, /*enableCds=*/false);
   }
 }

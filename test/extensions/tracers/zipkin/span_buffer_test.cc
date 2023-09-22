@@ -138,7 +138,7 @@ template <typename Type> std::string serializedMessageToJson(const std::string& 
   Type message;
   message.ParseFromString(serialized);
   std::string json;
-  Protobuf::util::MessageToJsonString(message, &json);
+  Protobuf::util::MessageToJsonString(message, &json).IgnoreError();
   return json;
 }
 

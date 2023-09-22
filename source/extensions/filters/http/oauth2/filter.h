@@ -232,7 +232,9 @@ private:
  * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
  * beyond that is broken into component classes.
  */
-class OAuth2Filter : public Http::PassThroughDecoderFilter, public FilterCallbacks {
+class OAuth2Filter : public Http::PassThroughDecoderFilter,
+                     FilterCallbacks,
+                     Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
                TimeSource& time_source);

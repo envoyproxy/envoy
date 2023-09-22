@@ -77,18 +77,17 @@ public:
    *         is not found, status with Code::NOT_FOUND is returned. If the method is found, but
    * fields cannot be resolved, status with Code::INVALID_ARGUMENT is returned.
    */
-  ProtobufUtil::Status
-  createTranscoder(const Http::RequestHeaderMap& headers,
-                   Protobuf::io::ZeroCopyInputStream& request_input,
-                   google::grpc::transcoding::TranscoderInputStream& response_input,
-                   std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-                   MethodInfoSharedPtr& method_info) const;
+  absl::Status createTranscoder(const Http::RequestHeaderMap& headers,
+                                Protobuf::io::ZeroCopyInputStream& request_input,
+                                google::grpc::transcoding::TranscoderInputStream& response_input,
+                                std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
+                                MethodInfoSharedPtr& method_info) const;
 
   /**
    * Converts an arbitrary protobuf message to JSON.
    */
-  ProtobufUtil::Status translateProtoMessageToJson(const Protobuf::Message& message,
-                                                   std::string* json_out) const;
+  absl::Status translateProtoMessageToJson(const Protobuf::Message& message,
+                                           std::string* json_out) const;
 
   /**
    * If true, skip clearing the route cache after the incoming request has been modified.
@@ -117,17 +116,16 @@ private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
    */
-  ProtobufUtil::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
-                                           google::grpc::transcoding::RequestInfo* info) const;
+  absl::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
+                                   google::grpc::transcoding::RequestInfo* info) const;
 
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
-  ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
-                                    const std::string& field_path_str,
-                                    std::vector<const ProtobufWkt::Field*>* field_path,
-                                    bool* is_http_body);
-  ProtobufUtil::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
-                                        const google::api::HttpRule& http_rule,
-                                        MethodInfoSharedPtr& method_info);
+  absl::Status resolveField(const Protobuf::Descriptor* descriptor,
+                            const std::string& field_path_str,
+                            std::vector<const ProtobufWkt::Field*>* field_path, bool* is_http_body);
+  absl::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
+                                const google::api::HttpRule& http_rule,
+                                MethodInfoSharedPtr& method_info);
 
   Protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<MethodInfoSharedPtr> path_matcher_;

@@ -33,7 +33,6 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
   Config::forceRegisterGrpcMuxFactory();
   Config::forceRegisterNewGrpcMuxFactory();
 
-  override_builder_config_ = false;
   expect_dns_ = false; // doesn't use DFP.
   create_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();

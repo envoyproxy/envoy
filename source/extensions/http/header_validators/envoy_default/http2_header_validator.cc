@@ -46,18 +46,31 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  *
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stats),
+                                           ::Envoy::Http::HeaderValidatorStats& stats,
+                                           const ConfigOverrides& config_overrides)
+    : HeaderValidator(config, protocol, stats, config_overrides),
       request_header_validator_map_{
           {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
           {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
           {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
-          {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {":path", getPathValidationMethod()},
           {":protocol", absl::bind_front(&Http2HeaderValidator::validateProtocolHeader, this)},
           {"te", absl::bind_front(&Http2HeaderValidator::validateTEHeader, this)},
           {"content-length",
            absl::bind_front(&Http2HeaderValidator::validateContentLengthHeader, this)},
       } {}
+
+HeaderValidator::HeaderValidatorFunction Http2HeaderValidator::getPathValidationMethod() {
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
+    if (protocol_ == ::Envoy::Http::Protocol::Http2) {
+      return absl::bind_front(
+          &Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp2, this);
+    }
+    return absl::bind_front(&Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp3,
+                            this);
+  }
+  return absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this);
+}
 
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -95,6 +108,101 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 
   // Validate the header value
   return validateGenericHeaderValue(value);
+}
+
+HeaderValidator::HeaderValueValidationResult
+Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp2(
+    const HeaderString& path_header_value) {
+  ASSERT(config_overrides_.allow_non_compliant_characters_in_path_);
+  // Same table as the kPathHeaderCharTable but with the following additional character allowed
+  // " < > [ ] ^ ` { } \ | SPACE TAB and all extended ASCII
+  // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
+  // runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b11101111111111111111111111111110,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+  };
+
+  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // allowed " < > [ ] ^ ` { } \ | # SPACE TAB and all extended ASCII This table is used when the
+  // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kQueryAndFragmentCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b11111111111111111111111111111111,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+      0b11111111111111111111111111111111,
+  };
+  return HeaderValidator::validatePathHeaderCharacterSet(
+      path_header_value, kPathHeaderCharTableWithAdditionalCharacters,
+      kQueryAndFragmentCharTableWithAdditionalCharacters);
+}
+
+HeaderValidator::HeaderValueValidationResult
+Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp3(
+    const HeaderString& path_header_value) {
+  ASSERT(config_overrides_.allow_non_compliant_characters_in_path_);
+  // Same table as the kPathHeaderCharTable but with the following additional character allowed
+  // " < > [ ] ^ ` { } \ | SPACE TAB
+  // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
+  // runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kPathHeaderCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b11101111111111111111111111111110,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+
+  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // allowed " < > [ ] ^ ` { } \ | # SPACE TAB
+  // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
+  // runtime value is set to "true".
+  static constexpr std::array<uint32_t, 8> kQueryAndFragmentCharTableWithAdditionalCharacters = {
+      // control characters
+      0b00000000010000000000000000000000,
+      // !"#$%&'()*+,-./0123456789:;<=>?
+      0b11111111111111111111111111111111,
+      //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+      0b11111111111111111111111111111111,
+      //`abcdefghijklmnopqrstuvwxyz{|}~
+      0b11111111111111111111111111111110,
+      // extended ascii
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+      0b00000000000000000000000000000000,
+  };
+  return HeaderValidator::validatePathHeaderCharacterSet(
+      path_header_value, kPathHeaderCharTableWithAdditionalCharacters,
+      kQueryAndFragmentCharTableWithAdditionalCharacters);
 }
 
 ValidationResult
@@ -428,11 +536,10 @@ ValidationResult Http2HeaderValidator::validateResponseTrailers(
 ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult
 ServerHttp2HeaderValidator::transformRequestHeaders(::Envoy::Http::RequestHeaderMap& header_map) {
   sanitizeHeadersWithUnderscores(header_map);
-  if (!config_.uri_path_normalization_options().skip_path_normalization()) {
-    auto path_result = path_normalizer_.normalizePathUri(header_map);
-    if (!path_result.ok()) {
-      return path_result;
-    }
+  sanitizePathWithFragment(header_map);
+  auto path_result = transformUrlPath(header_map);
+  if (!path_result.ok()) {
+    return path_result;
   }
 
   // Transform H/2 extended CONNECT to H/1 UPGRADE, so that request processing always observes H/1

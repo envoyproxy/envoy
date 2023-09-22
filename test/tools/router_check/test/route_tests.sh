@@ -57,7 +57,7 @@ fi
 echo "testing bad config output"
 BAD_CONFIG_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Redirect.golden.proto.json" "-t" "${PATH_CONFIG}/TestRoutes.yaml" 2>&1) ||
   echo "${BAD_CONFIG_OUTPUT:-no-output}"
-if [[ "${BAD_CONFIG_OUTPUT}" != *"Protobuf message (type envoy.config.route.v3.RouteConfiguration reason INVALID_ARGUMENT:tests: Cannot find field.) has unknown fields"* ]]; then
+if ! [[ "${BAD_CONFIG_OUTPUT}" =~ .*INVALID_ARGUMENT.*envoy.config.route.v3.RouteConfiguration.*tests.* ]]; then
   exit 1
 fi
 
@@ -109,5 +109,33 @@ echo "testing missing tests output test cases"
 MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/TestRoutes.golden.proto.json" "--details" "--covall" 2>&1) ||
   echo "${MISSING_OUTPUT:-no-output}"
 if [[ "${MISSING_OUTPUT}" != *"Missing test for host: www2_staging, route: prefix: \"/\""*"Missing test for host: default, route: prefix: \"/api/application_data\""* ]]; then
+  exit 1
+fi
+
+# Detaied coverage flag
+echo "test report should contain missing tests with detailed coverage flag"
+MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/DetailedCoverage.yaml" "-t" "${PATH_CONFIG}/DetailedCoverage.golden.proto.json" "--detailed-coverage" 2>&1) ||
+  echo "${MISSING_OUTPUT:-no-output}"
+if ! echo "${MISSING_OUTPUT}" | grep -qE "Missing test for host: localhost, route name: new_endpoint2-.+"; then
+  exit 1
+fi
+
+if ! echo "${MISSING_OUTPUT}" | grep -qE "Missing test for host: localhost, route name: -.+"; then
+  exit 1
+fi
+
+echo "test report shoud not contain missing tests without detailed coverage flag"
+MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/DetailedCoverage.yaml" "-t" "${PATH_CONFIG}/DetailedCoverage.golden.proto.json" 2>&1) ||
+  echo "${MISSING_OUTPUT:-no-output}"
+if echo "${MISSING_OUTPUT}" | grep -qE "Missing test for host:.+"; then
+  exit 1
+fi
+
+#  Correctness of route coverage for weighted clusters
+echo "route coverage should be calculated correctly for weighted clusters"
+MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.json" "--details" 2>&1) ||
+  echo "${MISSING_OUTPUT:-no-output}"
+if ! echo "${MISSING_OUTPUT}" | grep -Fxq "Current route coverage: 100%"; then
+  echo "${MISSING_OUTPUT:-no-output}"
   exit 1
 fi

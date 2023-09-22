@@ -39,6 +39,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(GrpcHealthCheckerFactory);
+
 /**
  * gRPC health checker implementation.
  */

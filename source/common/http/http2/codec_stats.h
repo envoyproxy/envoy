@@ -34,8 +34,9 @@ namespace Http2 {
   COUNTER(tx_reset)                                                                                \
   GAUGE(streams_active, Accumulate)                                                                \
   GAUGE(pending_send_bytes, Accumulate)                                                            \
-  GAUGE(deferred_stream_close, Accumulate)
-
+  GAUGE(deferred_stream_close, Accumulate)                                                         \
+  GAUGE(outbound_frames_active, Accumulate)                                                        \
+  GAUGE(outbound_control_frames_active, Accumulate)
 /**
  * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
  */

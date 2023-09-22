@@ -357,6 +357,7 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       server_name_indication_(config.sni()), allow_renegotiation_(config.allow_renegotiation()),
+      enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, false)),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
@@ -400,6 +401,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
+      disable_stateful_session_resumption_(config.disable_stateful_session_resumption()),
       full_scan_certs_on_sni_mismatch_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, full_scan_certs_on_sni_mismatch,
           !Runtime::runtimeFeatureEnabled(

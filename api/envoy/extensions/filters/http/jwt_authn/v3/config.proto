@@ -330,7 +330,10 @@ message RemoteJwks {
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 10 minutes.
-  google.protobuf.Duration cache_duration = 2;
+  google.protobuf.Duration cache_duration = 2 [(validate.rules).duration = {
+    lt {seconds: 9000000000}
+    gte {nanos: 1000000}
+  }];
 
   // Fetch Jwks asynchronously in the main thread before the listener is activated.
   // Fetched Jwks can be used by all worker threads.
