@@ -132,7 +132,6 @@ private:
     void setAddresses(Network::Address::InstanceConstSharedPtr address,
                       std::vector<Network::Address::InstanceConstSharedPtr>&& list) {
       absl::WriterMutexLock lock{&resolve_lock_};
-      first_resolve_complete_ = true;
       address_ = address;
       address_list_ = std::move(list);
     }
