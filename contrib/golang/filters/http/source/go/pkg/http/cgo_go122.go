@@ -19,6 +19,8 @@ package http
 #cgo nocallback envoyGoFilterHttpRemoveHeader
 #cgo noescape envoyGoFilterHttpGetBuffer
 #cgo nocallback envoyGoFilterHttpGetBuffer
+#cgo noescape envoyGoFilterHttpDrainBuffer
+#cgo nocallback envoyGoFilterHttpDrainBuffer
 #cgo noescape envoyGoFilterHttpSetBufferHelper
 #cgo nocallback envoyGoFilterHttpSetBufferHelper
 #cgo noescape envoyGoFilterHttpCopyTrailers

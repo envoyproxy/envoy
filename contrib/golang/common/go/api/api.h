@@ -51,6 +51,8 @@ typedef enum { // NOLINT(modernize-use-using)
   CAPISerializationFailure = -8,
 } CAPIStatus;
 
+// Don't forget to update cgo_go122.go when adding a new function here.
+
 CAPIStatus envoyGoFilterHttpContinue(void* r, int status);
 CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* body_text,
                                            void* headers, long long int grpc_status, void* details);
