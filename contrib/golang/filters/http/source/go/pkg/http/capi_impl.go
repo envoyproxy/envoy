@@ -183,14 +183,12 @@ func (c *httpCApiImpl) HttpRemoveHeader(r unsafe.Pointer, key *string) {
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64) {
+func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte {
 	buf := make([]byte, length)
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
-	sHeader := (*reflect.StringHeader)(unsafe.Pointer(value))
-	sHeader.Data = bHeader.Data
-	sHeader.Len = int(length)
 	res := C.envoyGoFilterHttpGetBuffer(r, C.ulonglong(bufferPtr), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
+	return buf
 }
 
 func (c *httpCApiImpl) HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) {

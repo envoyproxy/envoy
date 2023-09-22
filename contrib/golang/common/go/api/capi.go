@@ -32,7 +32,7 @@ type HttpCAPI interface {
 	HttpSetHeader(r unsafe.Pointer, key *string, value *string, add bool)
 	HttpRemoveHeader(r unsafe.Pointer, key *string)
 
-	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
+	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte
 	HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64)
 	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
 
