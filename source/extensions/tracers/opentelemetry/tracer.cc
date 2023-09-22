@@ -211,9 +211,9 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
     if (sampling_result.attributes) {
       for (auto const& attribute : *sampling_result.attributes) {
         new_span.setTag(attribute.first, attribute.second);
-        new_span.setTracestate(sampling_result.trace_state);
       }
     }
+    new_span.setTracestate(sampling_result.trace_state);
   }
   return std::make_unique<Span>(new_span);
 }
