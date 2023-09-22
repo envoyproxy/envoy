@@ -176,11 +176,12 @@ private:
    * will be hashed to the same session and will be forwarded to the same upstream, using the same
    * local ephemeral IP/port.
    */
-  class ActiveSession : public Network::UdpPacketProcessor, public FilterChainFactoryCallbacks {
+  class ActiveSession : public FilterChainFactoryCallbacks {
   public:
     ActiveSession(ClusterInfo& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                  const Upstream::HostConstSharedPtr& host, bool defer_socket_creation);
+                  const Upstream::HostConstSharedPtr& host);
     ~ActiveSession() override;
+
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     absl::optional<std::reference_wrapper<const Upstream::Host>> host() const {
       if (host_) {
@@ -189,12 +190,15 @@ private:
 
       return absl::nullopt;
     }
+
     void onNewSession();
     void onData(Network::UdpRecvData& data);
-    void writeUpstream(Network::UdpRecvData& data);
     void writeDownstream(Network::UdpRecvData& data);
-    void createSocket(const Upstream::HostConstSharedPtr& host);
-    void createSocketDeferred();
+    void resetIdleTimer();
+
+    virtual void createUpstream() PURE;
+    virtual void writeUpstream(Network::UdpRecvData& data) PURE;
+    virtual void onIdleTimer() PURE;
 
     void createFilterChain() {
       cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
@@ -229,25 +233,8 @@ private:
       LinkedList::moveIntoList(std::move(write_wrapper), write_filters_);
     };
 
-  private:
-    void onIdleTimer();
-    void onReadReady();
+  protected:
     void fillSessionStreamInfo();
-
-    // Network::UdpPacketProcessor
-    void processPacket(Network::Address::InstanceConstSharedPtr local_address,
-                       Network::Address::InstanceConstSharedPtr peer_address,
-                       Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
-    uint64_t maxDatagramSize() const override {
-      return cluster_.filter_.config_->upstreamSocketConfig().max_rx_datagram_size_;
-    }
-    void onDatagramsDropped(uint32_t dropped) override {
-      cluster_.cluster_stats_.sess_rx_datagrams_dropped_.add(dropped);
-    }
-    size_t numPacketsExpectedPerEventLoop() const final {
-      // TODO(mattklein123) change this to a reasonable number if needed.
-      return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
-    }
 
     /**
      * Struct definition for session access logging.
@@ -264,7 +251,6 @@ private:
     static std::atomic<uint64_t> next_global_session_id_;
 
     ClusterInfo& cluster_;
-    const bool use_original_src_ip_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     Upstream::HostConstSharedPtr host_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
@@ -273,12 +259,6 @@ private:
     // idle timeouts work so we should consider unifying the implementation if we move to a time
     // stamp and scan approach.
     const Event::TimerPtr idle_timer_;
-    // The socket is used for writing packets to the selected upstream host as well as receiving
-    // packets from the upstream host. Note that a a local ephemeral port is bound on the first
-    // write to the upstream host.
-    Network::SocketPtr socket_;
-    // The socket has been connected to avoid port exhaustion.
-    bool connected_{};
 
     UdpProxySessionStats session_stats_{};
     StreamInfo::StreamInfoImpl udp_session_info_;
@@ -288,6 +268,48 @@ private:
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
+
+  class UdpActiveSession : public Network::UdpPacketProcessor, public ActiveSession {
+  public:
+    UdpActiveSession(ClusterInfo& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                     const Upstream::HostConstSharedPtr& host);
+    ~UdpActiveSession() override = default;
+
+    // ActiveSession
+    void createUpstream() override;
+    void writeUpstream(Network::UdpRecvData& data) override;
+    void onIdleTimer() override;
+
+    // Network::UdpPacketProcessor
+    void processPacket(Network::Address::InstanceConstSharedPtr local_address,
+                       Network::Address::InstanceConstSharedPtr peer_address,
+                       Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
+
+    uint64_t maxDatagramSize() const override {
+      return cluster_.filter_.config_->upstreamSocketConfig().max_rx_datagram_size_;
+    }
+
+    void onDatagramsDropped(uint32_t dropped) override {
+      cluster_.cluster_stats_.sess_rx_datagrams_dropped_.add(dropped);
+    }
+
+    size_t numPacketsExpectedPerEventLoop() const final {
+      // TODO(mattklein123) change this to a reasonable number if needed.
+      return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+    }
+
+  private:
+    void onReadReady();
+    void createUdpSocket(const Upstream::HostConstSharedPtr& host);
+
+    // The socket is used for writing packets to the selected upstream host as well as receiving
+    // packets from the upstream host. Note that a a local ephemeral port is bound on the first
+    // write to the upstream host.
+    Network::SocketPtr udp_socket_;
+    // The socket has been connected to avoid port exhaustion.
+    bool connected_{};
+    const bool use_original_src_ip_;
+  };
 
   struct LocalPeerHostAddresses {
     const Network::UdpRecvData::LocalPeerAddresses& local_peer_addresses_;
@@ -390,10 +412,10 @@ private:
       const auto final_prefix = "udp";
       return {ALL_UDP_PROXY_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
     }
+
     ActiveSession*
     createSessionWithOptionalHost(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                  const Upstream::HostConstSharedPtr& host,
-                                  bool defer_socket_creation);
+                                  const Upstream::HostConstSharedPtr& host);
 
     Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
     absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
@@ -423,7 +445,7 @@ private:
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
   };
 
-  virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
+  virtual Network::SocketPtr createUdpSocket(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
     return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
                                                  nullptr, Network::SocketCreationOptions{});
