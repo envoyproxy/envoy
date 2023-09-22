@@ -63,6 +63,11 @@ minor_behavior_changes:
     Don't append the local address to ``x-forwarded-for`` header when sending an http (not gRPC) auth request.
     This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.ext_authz_http_send_original_xff`` to false.
+- area: ext_proc
+  change: |
+    Envoy will only take
+    :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    when waiting for the header responses. It will be ignored if it is in other processing states.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.
@@ -212,6 +217,10 @@ new_features:
 - area: extension_discovery_service
   change: |
     added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
+- area: lua
+  change: |
+    added :ref:`downstreamRemoteAddress() <config_http_filters_lua_stream_info_downstream_remote_address>`
+    method to the Stream info object API.
 - area: quic
   change: |
     added support for QUIC listener filters with ECDS support reusing the same config API
@@ -281,6 +290,9 @@ new_features:
   change: |
     Added the ability to specify a custom upstream local address selector using
     :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
+- area: original_dst
+  change: |
+    added support for the internal listener address recovery using the original destination listener filter.
 
 deprecated:
 - area: tracing

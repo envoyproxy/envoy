@@ -161,7 +161,6 @@ docker run --rm \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \
        -e MOBILE_DOCS_CHECKOUT_DIR \
-       -e MOBILE_PUSH_CHANGES \
        -e NETLIFY_TRIGGER_URL \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
