@@ -17,9 +17,10 @@ void initXdsServer() {
   weak_test_server_ = strong_test_server_;
 }
 
-std::string getXdsServerHost() {
+const char* getXdsServerHost() {
   if (auto server = testServer()) {
-    return server->getHost();
+    const char* host = strdup(server->getHost().c_str());
+    return host;
   }
   return ""; // failure
 }

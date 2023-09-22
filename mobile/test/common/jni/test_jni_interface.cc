@@ -56,7 +56,7 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeGetXdsTestServerHost(JNIEnv* env,
                                                                                  jclass clazz) {
   jni_log("[XTS]", "getting xDS server host");
-  return env->NewStringUTF(getXdsServerHost().c_str());
+  return env->NewStringUTF(getXdsServerHost());
 }
 
 extern "C" JNIEXPORT jint JNICALL

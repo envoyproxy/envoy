@@ -15,7 +15,7 @@ void initXdsServer();
 
 /** Gets the xDS server host. `initXdsServer` must be called prior to calling this function.
  */
-std::string getXdsServerHost();
+const char* getXdsServerHost();
 
 /**
  * Gets the xDS server port. `initXdsServer` must be called prior to calling this function.
