@@ -130,7 +130,7 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -195,6 +195,27 @@ message HttpConnectionManager {
     //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
     //   on OpenCensus side.
     config.trace.v3.Tracing.Http provider = 9;
+
+    // Create separate tracing span for each upstream request if true. And if this flag is set to true,
+    // the tracing provider will assume that Envoy will be independent hop in the trace chain and may
+    // set span type to client or server based on this flag.
+    // This will deprecate the
+    // :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+    // in the router.
+    //
+    // Users should set appropriate value based on their tracing provider and actual scenario:
+    //
+    // * If Envoy is used as sidecar and users want to make the sidecar and its application as only one
+    //   hop in the trace chain, this flag should be set to false. And please also make sure the
+    //   :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+    //   in the router is not set to true.
+    // * If Envoy is used as gateway or independent proxy, or users want to make the sidecar and its
+    //   application as different hops in the trace chain, this flag should be set to true.
+    // * If tracing provider that has explicit requirements on span creation (like SkyWalking),
+    //   this flag should be set to true.
+    //
+    // The default value is false for now for backward compatibility.
+    google.protobuf.BoolValue spawn_upstream_span = 10;
   }
 
   message InternalAddressConfig {
