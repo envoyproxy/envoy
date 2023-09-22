@@ -48,8 +48,9 @@ jobs:
         CI_TARGET: "format"
       protobuf:
         CI_TARGET: "check_and_fix_proto_format"
-      publishing:
-        CI_TARGET: docs
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        publishing:
+          CI_TARGET: docs
   steps:
   - template: ../bazel.yml
     parameters:
