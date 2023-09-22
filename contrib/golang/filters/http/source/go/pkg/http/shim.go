@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -37,8 +37,9 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 var ErrDupRequestKey = errors.New("dup request key")
@@ -106,15 +107,12 @@ func getRequest(r *C.httpRequest) *httpRequest {
 func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
 	var req *httpRequest
 	phase := api.EnvoyRequestPhase(r.phase)
-	if phase == api.DecodeHeaderPhase {
+	// early SendLocalReply or OnLogDownstreamStart may run before the header handling
+	req = getRequest(r)
+	if req == nil {
 		req = createRequest(r)
-	} else {
-		req = getRequest(r)
-		// early sendLocalReply may skip the whole decode phase
-		if req == nil {
-			req = createRequest(r)
-		}
 	}
+
 	if req.pInfo.paniced {
 		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
 		// to prevent error from spreading.
@@ -203,11 +201,41 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 	return uint64(status)
 }
 
+//export envoyGoFilterOnHttpLog
+func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
+	req := getRequest(r)
+	if req == nil {
+		req = createRequest(r)
+	}
+
+	defer req.RecoverPanic()
+	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
+		req.sema.Done()
+	}
+
+	v := api.AccessLogType(logType)
+
+	f := req.httpFilter
+	switch v {
+	case api.AccessLogDownstreamStart:
+		f.OnLogDownstreamStart()
+	case api.AccessLogDownstreamPeriodic:
+		f.OnLogDownstreamPeriodic()
+	case api.AccessLogDownstreamEnd:
+		f.OnLog()
+	default:
+		api.LogErrorf("access log type %d is not supported yet", logType)
+	}
+}
+
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.RecoverPanic()
+	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
+		req.sema.Done()
+	}
 
 	v := api.DestroyReason(reason)
 
@@ -215,10 +243,13 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	f.OnDestroy(v)
 
 	Requests.DeleteReq(r)
+}
 
-	// no one is using req now, we can remove it manually, for better performance.
-	if v == api.Normal {
-		runtime.SetFinalizer(req, nil)
-		req.Finalize(api.GCFinalize)
+//export envoyGoRequestSemaDec
+func envoyGoRequestSemaDec(r *C.httpRequest) {
+	req := getRequest(r)
+	defer req.RecoverPanic()
+	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
+		req.sema.Done()
 	}
 }

@@ -55,9 +55,10 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
 
   // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
   // specify this parameter here at a later stage.
+  quic::QuicPacketWriterParams params;
   quic::WriteResult quic_result = WritePacket(static_cast<char*>(buffer.frontSlice().mem_),
                                               payload_len, self_addr.host(), peer_addr,
-                                              /*quic::PerPacketOptions=*/nullptr);
+                                              /*quic::PerPacketOptions=*/nullptr, params);
   updateUdpGsoBatchWriterStats(quic_result);
 
   return convertQuicWriteResult(quic_result, payload_len);

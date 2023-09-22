@@ -257,6 +257,8 @@ bool TestPrivateKeyMethodProvider::checkFips() {
   return true;
 }
 
+bool TestPrivateKeyMethodProvider::isAvailable() { return test_options_.is_available_; }
+
 TestPrivateKeyConnection::TestPrivateKeyConnection(
     Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
     bssl::UniquePtr<EVP_PKEY> pkey, TestPrivateKeyConnectionTestOptions& test_options)
@@ -333,6 +335,9 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     if (value_it.first == "method_error" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
       test_options_.method_error_ = value.bool_value();
     }
+    if (value_it.first == "is_available" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+      test_options_.is_available_ = value.bool_value();
+    }
     if (value_it.first == "async_method_error" &&
         value.kind_case() == ProtobufWkt::Value::kBoolValue) {
       test_options_.async_method_error_ = value.bool_value();
@@ -350,7 +355,12 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     }
   }
 
-  std::string private_key = factory_context.api().fileSystem().fileReadToEnd(private_key_path);
+  if (!test_options_.is_available_) {
+    return;
+  }
+
+  std::string private_key =
+      factory_context.serverFactoryContext().api().fileSystem().fileReadToEnd(private_key_path);
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));

@@ -364,7 +364,7 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
  */
 std::string makeSetCookieValue(const std::string& key, const std::string& value,
                                const std::string& path, const std::chrono::seconds max_age,
-                               bool httponly);
+                               bool httponly, const Http::CookieAttributeRefVector attributes);
 
 /**
  * Get the response status from the response headers.
@@ -659,15 +659,19 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
 
   absl::optional<ConfigType> merged;
 
-  callbacks->traversePerFilterConfig(
-      [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
-        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-        if (!merged) {
-          merged.emplace(*typed_cfg);
-        } else {
-          reduce(merged.value(), *typed_cfg);
-        }
-      });
+  callbacks->traversePerFilterConfig([&reduce,
+                                      &merged](const Router::RouteSpecificFilterConfig& cfg) {
+    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+    if (typed_cfg == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      return;
+    }
+    if (!merged) {
+      merged.emplace(*typed_cfg);
+    } else {
+      reduce(merged.value(), *typed_cfg);
+    }
+  });
 
   return merged;
 }
@@ -744,6 +748,25 @@ struct RedirectConfig {
   const bool https_redirect_;
   const bool strip_query_;
 };
+
+/**
+ * Validates the provided scheme is valid (either http or https)
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is valid.
+ */
+bool schemeIsValid(const absl::string_view scheme);
+
+/**
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is http.
+ */
+bool schemeIsHttp(const absl::string_view scheme);
+
+/**
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is https.
+ */
+bool schemeIsHttps(const absl::string_view scheme);
 
 /*
  * Compute new path based on RedirectConfig.

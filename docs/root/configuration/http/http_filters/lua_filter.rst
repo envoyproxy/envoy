@@ -26,10 +26,12 @@ The design of the filter and Lua support at a high level is as follows:
 Currently supported high level features
 ---------------------------------------
 
-**NOTE:** It is expected that this list will expand over time as the filter is used in production.
-The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
-safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
-API.
+.. note::
+
+  It is expected that this list will expand over time as the filter is used in production.
+  The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
+  safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
+  API.
 
 * Inspection of headers, body, and trailers while streaming in either the request flow, response
   flow, or both.
@@ -147,7 +149,7 @@ Statistics
 ----------
 .. _config_http_filters_lua_stats:
 
-The lua filter outputs statistics in the *.lua.* namespace by default. When
+The lua filter outputs statistics in the ``.lua.`` namespace by default. When
 there are multiple lua filters configured in a filter chain, stats from
 individual filter instance/script can be tracked by providing a per filter
 :ref:`stat prefix

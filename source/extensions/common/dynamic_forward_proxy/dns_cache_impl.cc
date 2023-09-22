@@ -83,8 +83,10 @@ DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult
-DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port, bool is_proxy_lookup,
-                                LoadDnsCacheEntryCallbacks& callbacks) {
+DnsCacheImpl::loadDnsCacheEntry(absl::string_view raw_host, uint16_t default_port,
+                                bool is_proxy_lookup, LoadDnsCacheEntryCallbacks& callbacks) {
+  std::string host = DnsHostInfo::normalizeHostForDfp(raw_host, default_port);
+
   ENVOY_LOG(debug, "thread local lookup for host '{}' {}", host,
             is_proxy_lookup ? "proxy mode " : "");
   ThreadLocalHostInfo& tls_host_info = *tls_slot_;
@@ -508,10 +510,9 @@ void DnsCacheImpl::addCacheEntry(
   if (address_list.empty()) {
     value = absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
   } else {
-    for (auto& addr : address_list) {
-      value += absl::StrCat((value.empty() ? "" : "\n"), addr->asString(), "|", ttl.count(), "|",
-                            seconds_since_epoch);
-    }
+    value = absl::StrJoin(address_list, "\n", [&](std::string* out, const auto& addr) {
+      absl::StrAppend(out, addr->asString(), "|", ttl.count(), "|", seconds_since_epoch);
+    });
   }
   key_value_store_->addOrUpdate(host, value, absl::nullopt);
 }

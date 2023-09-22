@@ -10,6 +10,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
@@ -24,7 +25,17 @@ class ServerFactoryContext;
 
 namespace Matcher {
 
-using MatchingDataType = absl::variant<absl::monostate, std::string>;
+// Abstract interface for custom matching data.
+// Overrides this interface to provide custom matcher specific implementation.
+class CustomMatchData {
+public:
+  virtual ~CustomMatchData() = default;
+};
+
+using MatchingDataType =
+    absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
+
+inline constexpr absl::string_view DefaultMatchingDataType = "string";
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
 // either matches (resulting in either an action or a new tree to traverse) or doesn't match.
@@ -161,10 +172,22 @@ public:
 
   /**
    * Whether the provided input is a match.
-   * @param absl::optional<absl::string_view> the value to match on. Will be absl::nullopt if the
+   * @param Matcher::MatchingDataType the value to match on. Will be absl::monostate() if the
    * lookup failed.
    */
   virtual bool match(const Matcher::MatchingDataType& input) PURE;
+
+  /**
+   * A set of data input types supported by InputMatcher.
+   * String is default supported data input type because almost all the derived objects support
+   * string only. The name of core types (e.g., std::string, int) is defined string constrant which
+   * produces human-readable form (e.g., "string", "int").
+   *
+   * Override this function to provide matcher specific supported data input types.
+   */
+  virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
+    return absl::flat_hash_set<std::string>{std::string(DefaultMatchingDataType)};
+  }
 };
 
 using InputMatcherPtr = std::unique_ptr<InputMatcher>;
@@ -237,6 +260,16 @@ public:
   virtual ~DataInput() = default;
 
   virtual DataInputGetResult get(const DataType& data) const PURE;
+
+  /**
+   * Input type of DataInput.
+   * String is default data input type since nearly all the DataInput's derived objects' input type
+   * is string. The name of core types (e.g., std::string, int) is defined string constrant which
+   * produces human-readable form (e.g., "string", "int").
+   *
+   * Override this function to provide matcher specific data input type.
+   */
+  virtual absl::string_view dataInputType() const { return DefaultMatchingDataType; }
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;

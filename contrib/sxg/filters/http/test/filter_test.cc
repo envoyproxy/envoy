@@ -360,14 +360,13 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Api::ApiPtr api = Api::createApiForTest();
-  Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   Init::TargetHandlePtr init_handle;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
-  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
-  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
-  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(init_manager, add(_))
       .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
@@ -396,7 +395,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client, typed_secret);
   const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
 
-  certificate_callback->onConfigUpdate(decoded_resources_client.refvec_, "");
+  EXPECT_TRUE(certificate_callback->onConfigUpdate(decoded_resources_client.refvec_, "").ok());
   EXPECT_EQ(secret_reader.certificate(), "certificate_test");
   EXPECT_EQ(secret_reader.privateKey(), "");
 
@@ -409,7 +408,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_token, typed_secret);
   const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
 
-  private_key_callback->onConfigUpdate(decoded_resources_token.refvec_, "");
+  EXPECT_TRUE(private_key_callback->onConfigUpdate(decoded_resources_token.refvec_, "").ok());
   EXPECT_EQ(secret_reader.certificate(), "certificate_test");
   EXPECT_EQ(secret_reader.privateKey(), "private_key_test");
 
@@ -422,7 +421,8 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client_recheck, typed_secret);
   const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
 
-  certificate_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "");
+  EXPECT_TRUE(
+      certificate_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
   EXPECT_EQ(secret_reader.certificate(), "certificate_test_recheck");
   EXPECT_EQ(secret_reader.privateKey(), "private_key_test");
 }

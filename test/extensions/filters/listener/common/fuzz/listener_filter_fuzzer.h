@@ -76,6 +76,9 @@ public:
     return empty_access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+  }
   Init::Manager& initManager() override { return *init_manager_; }
   bool ignoreGlobalConnLimit() const override { return false; }
 

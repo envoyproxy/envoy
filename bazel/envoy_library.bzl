@@ -6,7 +6,7 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
 )
-load(":envoy_pch.bzl", "envoy_pch_copts")
+load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -106,7 +106,8 @@ def envoy_cc_library(
         include_prefix = None,
         textual_hdrs = None,
         alwayslink = None,
-        defines = []):
+        defines = [],
+        linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
@@ -123,18 +124,12 @@ def envoy_cc_library(
         srcs = srcs,
         hdrs = hdrs,
         copts = envoy_copts(repository) + envoy_pch_copts(repository, "//source/common/common:common_pch") + copts,
+        linkopts = linkopts,
         visibility = visibility,
         tags = tags,
         textual_hdrs = textual_hdrs,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//envoy/common:base_includes",
-            repository + "//source/common/common:fmt_lib",
-            repository + "//source/common/common:common_pch",
-            envoy_external_dep_path("abseil_flat_hash_map"),
-            envoy_external_dep_path("abseil_flat_hash_set"),
-            envoy_external_dep_path("abseil_strings"),
-            envoy_external_dep_path("fmtlib"),
-        ],
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
+               envoy_pch_deps(repository, "//source/common/common:common_pch"),
         alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,

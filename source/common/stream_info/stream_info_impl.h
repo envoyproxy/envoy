@@ -8,14 +8,17 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
+#include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_reason.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
 
@@ -185,6 +188,18 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
+  void addBytesRetransmitted(uint64_t bytes_retransmitted) override {
+    bytes_retransmitted_ += bytes_retransmitted;
+  }
+
+  uint64_t bytesRetransmitted() const override { return bytes_retransmitted_; }
+
+  void addPacketsRetransmitted(uint64_t packets_retransmitted) override {
+    packets_retransmitted_ += packets_retransmitted;
+  }
+
+  uint64_t packetsRetransmitted() const override { return packets_retransmitted_; }
+
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
@@ -226,11 +241,9 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t responseFlags() const override { return response_flags_; }
 
-  void setRouteName(absl::string_view route_name) override {
-    route_name_ = std::string(route_name);
+  const std::string& getRouteName() const override {
+    return route_ != nullptr ? route_->routeName() : EMPTY_STRING;
   }
-
-  const std::string& getRouteName() const override { return route_name_; }
 
   void setVirtualClusterName(const absl::optional<std::string>& virtual_cluster_name) override {
     virtual_cluster_name_ = virtual_cluster_name;
@@ -284,7 +297,7 @@ struct StreamInfoImpl : public StreamInfo {
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
-       << DUMP_MEMBER(route_name_);
+       << DUMP_MEMBER(getRouteName());
     DUMP_DETAILS(upstream_info_);
   }
 
@@ -297,11 +310,6 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
-  void setFilterChainName(absl::string_view filter_chain_name) override {
-    filter_chain_name_ = std::string(filter_chain_name);
-  }
-
-  const std::string& filterChainName() const override { return filter_chain_name_; }
   void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
@@ -315,11 +323,7 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setUpstreamBytesMeter(const BytesMeterSharedPtr& upstream_bytes_meter) override {
-    // Accumulate the byte measurement from previous upstream request during a retry.
-    upstream_bytes_meter->addWireBytesSent(upstream_bytes_meter_->wireBytesSent());
-    upstream_bytes_meter->addWireBytesReceived(upstream_bytes_meter_->wireBytesReceived());
-    upstream_bytes_meter->addHeaderBytesSent(upstream_bytes_meter_->headerBytesSent());
-    upstream_bytes_meter->addHeaderBytesReceived(upstream_bytes_meter_->headerBytesReceived());
+    upstream_bytes_meter->captureExistingBytesMeter(*upstream_bytes_meter_);
     upstream_bytes_meter_ = upstream_bytes_meter;
   }
 
@@ -344,6 +348,12 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
+    bytes_retransmitted_ = info.bytesRetransmitted();
+    packets_retransmitted_ = info.packetsRetransmitted();
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http1_connection_close_header_in_redirect")) {
+      should_drain_connection_ = info.shouldDrainConnectionUponCompletion();
+    }
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a
@@ -353,7 +363,6 @@ struct StreamInfoImpl : public StreamInfo {
   // * downstream_connection_info_provider_ is always set in the ctor.
   void setFrom(StreamInfo& info, const Http::RequestHeaderMap* request_headers) {
     setFromForRecreateStream(info);
-    route_name_ = info.getRouteName();
     virtual_cluster_name_ = info.virtualClusterName();
     response_code_ = info.responseCode();
     response_code_details_ = info.responseCodeDetails();
@@ -376,7 +385,6 @@ struct StreamInfoImpl : public StreamInfo {
       stream_id_provider_ = std::make_shared<StreamIdProviderImpl>(std::move(id));
     }
     trace_reason_ = info.traceReason();
-    filter_chain_name_ = info.filterChainName();
     attempt_count_ = info.attemptCount();
     upstream_bytes_meter_ = info.getUpstreamBytesMeter();
     bytes_sent_ = info.bytesSent();
@@ -394,13 +402,23 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_transport_failure_reason_;
   }
 
+  bool shouldDrainConnectionUponCompletion() const override { return should_drain_connection_; }
+
+  void setShouldDrainConnectionUponCompletion(bool should_drain) override {
+    should_drain_connection_ = should_drain;
+  }
+
   TimeSource& time_source_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;
+
+private:
   absl::optional<uint32_t> response_code_;
+
+public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
@@ -408,7 +426,6 @@ struct StreamInfoImpl : public StreamInfo {
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
-  std::string route_name_;
   absl::optional<uint32_t> attempt_count_;
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
@@ -435,19 +452,21 @@ private:
 
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};
+  uint64_t bytes_retransmitted_{};
+  uint64_t packets_retransmitted_{};
   uint64_t bytes_sent_{};
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   const Http::RequestHeaderMap* request_headers_{};
   StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
-  std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
+  bool should_drain_connection_{false};
 };
 
 } // namespace StreamInfo

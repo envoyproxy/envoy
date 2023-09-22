@@ -21,7 +21,9 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params), active_(params.active_html_) {
+    : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml),
+      json_histograms_(!active_ &&
+                       params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed) {
   AdminHtmlUtil::renderHead(response_headers, response);
   if (!active_) {
     StatsParams json_params(params);
@@ -33,13 +35,8 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
 }
 
 void StatsHtmlRender::finalize(Buffer::Instance& response) {
-  // Render all the histograms here using the JSON data we've accumulated
-  // for them.
-  if (!active_) {
-    histogram_json_render_->finalize(json_data_);
-    response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst json = \n");
-    response.add(json_data_);
-    response.add(";\nrenderHistograms(document.getElementById('histograms'), json);\n</script\n");
+  if (first_histogram_) {
+    response.add("</pre>\n");
   }
 
   AdminHtmlUtil::finalize(response);
@@ -67,42 +64,54 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
 
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
+  ASSERT(first_histogram_);
   response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
 }
 
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
+  ASSERT(first_histogram_);
   if (!active_) {
     response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
   }
 }
 
-#if 0
+// When using Detailed mode, we override the generate method for HTML to trigger
+// some JS that will render the histogram graphically. We will render that from
+// JavaScript and convey the histogram data to the JS via JSON, so we can
+// delegate to an instantiated JSON `sub-renderer` that will write into
+// json_data_. that `sub_renderer` will only be populated in Detailed mode.
+//
+// All other modes default to rendering the histogram textually.
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
-  uint32_t index = ++histogram_index_;
-  response.addFragments({"<div id='"histogram-, index,
-          "'></div><script>renderHistogram('histogram-'", index, "', '",
+  if (json_histograms_) {
+    Json::Streamer streamer(response);
 
-><div class='histogram-name'>", Html::Utility::sanitize(name),
-          "</div>
-
-  // Note: we ignore buckets_mode in HTML and always renter a detailed view.
-  switch (histogram_buckets_mode_) {
-  case Utility::HistogramBucketsMode::NoBuckets:
-    response.addFragments({name, ": ", histogram.quantileSummary(), "\n"});
-    break;
-  case Utility::HistogramBucketsMode::Cumulative:
-    response.addFragments({name, ": ", histogram.bucketSummary(), "\n"});
-    break;
-  case Utility::HistogramBucketsMode::Disjoint:
-    addDisjointBuckets(name, histogram, response);
-    break;
-  case Utility::HistogramBucketsMode::Detailed:
-    //addDetailedBuckets(name, histogram, response);
-    break;
+    // If this is the first histogram we are rendering, then we need to first
+    // generate the supported-percentiles array sand save it in a constant.
+    //
+    // We use a separate <script> tag for each histogram so that the browser can
+    // begin parsing each potentially large histogram as it is generated,rather
+    // than building up a huge json structure with all the histograms and
+    // blocking rendering until that is parsed.
+    if (first_histogram_) {
+      first_histogram_ = false;
+      response.add("</pre>\n<div id='histograms'></div>\n<script>\nconst supportedPercentiles = ");
+      { StatsJsonRender::populateSupportedPercentiles(*streamer.makeRootArray()); }
+      response.add(";\nconst histogramDiv = document.getElementById('histograms');\n");
+      // The first histogram will share the first script tag with the histogram
+      // div and supportedPercentiles array constants.
+    } else {
+      response.add("<script>\n");
+    }
+    response.add("renderHistogram(histogramDiv, supportedPercentiles,\n");
+    { StatsJsonRender::generateHistogramDetail(name, histogram, *streamer.makeRootMap()); }
+    response.add(");\n</script>\n");
+  } else {
+    StatsTextRender::generate(response, name, histogram);
   }
 }
-#endif
+>>>>>>> main
 
 } // namespace Server
 } // namespace Envoy

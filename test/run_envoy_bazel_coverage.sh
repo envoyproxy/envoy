@@ -2,7 +2,7 @@
 
 set -e -o pipefail
 
-LLVM_VERSION="14.0.0"
+LLVM_VERSION=${LLVM_VERSION:-"14.0.0"}
 CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ */\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
@@ -32,7 +32,6 @@ fi
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
 read -ra BAZEL_GLOBAL_OPTIONS <<< "${BAZEL_GLOBAL_OPTION_LIST:-}"
-read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
 
 echo "Starting run_envoy_bazel_coverage.sh..."
 echo "    PWD=$(pwd)"
@@ -50,31 +49,34 @@ else
   COVERAGE_TARGETS=(//test/...)
 fi
 
-BAZEL_COVERAGE_OPTIONS=()
+BAZEL_COVERAGE_OPTIONS=(--heap_dump_on_oom)
+
+if [[ -n "${BAZEL_GRPC_LOG}" ]]; then
+    BAZEL_COVERAGE_OPTIONS+=(--remote_grpc_log="${BAZEL_GRPC_LOG}")
+fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     # Filter targets to just fuzz tests.
-    _targets=$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query "${BAZEL_GLOBAL_OPTIONS[@]}" "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
+    _targets=$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" --noshow_loading_progress --noshow_progress "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
     COVERAGE_TARGETS=()
     while read -r line; do COVERAGE_TARGETS+=("$line"); done \
         <<< "$_targets"
     BAZEL_COVERAGE_OPTIONS+=(
-        "--config=fuzz-coverage"
-        "--test_tag_filters=-nocoverage")
+        "--config=fuzz-coverage")
 else
     BAZEL_COVERAGE_OPTIONS+=(
-        "--config=test-coverage"
-        "--test_tag_filters=-nocoverage,-fuzz_target")
+        "--config=test-coverage")
 fi
 
 # Output unusually long logs due to trace logging.
 BAZEL_COVERAGE_OPTIONS+=("--experimental_ui_max_stdouterr_bytes=80000000")
-BAZEL_OUTPUT_BASE="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+BAZEL_OUTPUT_BASE="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
 
 echo "Running bazel coverage with:"
 echo "  Options: ${BAZEL_BUILD_OPTIONS[*]} ${BAZEL_COVERAGE_OPTIONS[*]}"
 echo "  Targets: ${COVERAGE_TARGETS[*]}"
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
+
+bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
 echo "Collecting profile and testlogs"
 if [[ -n "${ENVOY_BUILD_PROFILE}" ]]; then
@@ -82,9 +84,12 @@ if [[ -n "${ENVOY_BUILD_PROFILE}" ]]; then
 fi
 
 if [[ -n "${ENVOY_BUILD_DIR}" ]]; then
+    if [[ -e "${ENVOY_BUILD_DIR}/testlogs.tar.zst" ]]; then
+        rm -f "${ENVOY_BUILD_DIR}/testlogs.tar.zst"
+    fi
     find bazel-testlogs/ -name test.log \
         | tar cf - -T - \
-        | bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+        | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
                 - -T0 -o "${ENVOY_BUILD_DIR}/testlogs.tar.zst"
     echo "Profile/testlogs collected: ${ENVOY_BUILD_DIR}/testlogs.tar.zst"
 fi
@@ -115,12 +120,16 @@ echo "Compressing coveraged data"
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     if [[ -n "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" ]]; then
         tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./fuzz_coverage/' . \
-            | bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+            | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
                     - -T0 -o "${ENVOY_FUZZ_COVERAGE_ARTIFACT}"
     fi
 elif [[ -n "${ENVOY_COVERAGE_ARTIFACT}" ]]; then
+    if [[ -e "${ENVOY_COVERAGE_ARTIFACT}" ]]; then
+        rm "${ENVOY_COVERAGE_ARTIFACT}"
+    fi
+
      tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./coverage/' . \
-         | bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
+         | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
                  - -T0 -o "${ENVOY_COVERAGE_ARTIFACT}"
 fi
 
@@ -138,21 +147,24 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   fi
 fi
 
-# We want to allow per_file_coverage to fail without exiting this script.
-set +e
-if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
-  echo "Checking per-extension coverage"
-  output=$(./test/per_file_coverage.sh)
-  response=$?
+if [[ -e ./test/per_file_coverage.sh ]]; then
+    # We want to allow per_file_coverage to fail without exiting this script.
+    set +e
+    if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
+        echo "Checking per-extension coverage"
+        output=$(./test/per_file_coverage.sh)
+        response=$?
 
-  if [ $response -ne 0 ]; then
-    echo Per-extension coverage failed:
-    echo "$output"
-    COVERAGE_FAILED=1
-    echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
-    exit 1
-  fi
-  echo Per-extension coverage passed.
+        if [ $response -ne 0 ]; then
+            echo Per-extension coverage failed:
+            echo "$output"
+            COVERAGE_FAILED=1
+            echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
+            exit 1
+        fi
+        echo Per-extension coverage passed.
+    fi
+else
+    echo "No per-file-coverage file found"
 fi
-
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"

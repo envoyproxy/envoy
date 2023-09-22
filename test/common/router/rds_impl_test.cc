@@ -26,6 +26,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -180,7 +181,12 @@ http_filters:
       "'google.protobuf.Struct'");
 }
 
-TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
+TEST_F(RdsImplTest, RdsAndStaticWithHcmOptionalUnknownFilterPerVirtualHostConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   const std::string config_yaml = R"EOF(
 route_config:
   virtual_hosts:
@@ -193,6 +199,34 @@ route_config:
         "@type": type.googleapis.com/google.protobuf.Struct
         value:
           seconds: 123
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: filter.unknown
+  is_optional: true
+    )EOF";
+
+  RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
+                                  server_factory_context_, validation_visitor_, outer_init_manager_,
+                                  "foo.", *route_config_provider_manager_);
+}
+
+TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
+  const std::string config_yaml = R"EOF(
+route_config:
+  virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            seconds: 123
 codec_type: auto
 stat_prefix: foo
 http_filters:
@@ -242,11 +276,13 @@ TEST_F(RdsImplTest, Basic) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // 2nd request with same response. Based on hash should not reload config.
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // Load the config and verified shared count.
@@ -292,7 +328,8 @@ TEST_F(RdsImplTest, Basic) {
 
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(Eq("bar"))).Times(0);
-  rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
                        ->clusterName());
@@ -351,14 +388,20 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+      EXPECT_TRUE(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
 }
 
 // validate the optional unknown factory will be ignored for per virtualhost typed config.
-TEST_F(RdsImplTest, OptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+TEST_F(RdsImplTest, HcmOptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   InSequence s;
   const std::string config_yaml = R"EOF(
 rds:
@@ -418,7 +461,77 @@ http_filters:
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+}
+
+// Validate the optional unknown factory will be ignored for per virtualhost typed config.
+TEST_F(RdsImplTest, OptionalUnknownFacotryForPerVirtualHostTypedConfig) {
+  InSequence s;
+  const std::string config_yaml = R"EOF(
+rds:
+  config_source:
+    api_config_source:
+      api_type: REST
+      cluster_names:
+      - foo_cluster
+      refresh_delay: 1s
+  route_config_name: foo_route_config
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: filter.unknown
+  is_optional: true
+    )EOF";
+
+  setup(config_yaml);
+
+  const std::string response1_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {
+          "name": "integration",
+          "domains": [
+            "*"
+          ],
+          "routes": [
+            {
+              "match": {
+                "prefix": "/foo"
+              },
+              "route": {
+                "cluster_header": ":authority"
+              }
+            }
+          ],
+          "typed_per_filter_config": {
+            "filter.unknown": {
+              "@type": "type.googleapis.com/envoy.config.route.v3.FilterConfig",
+              "is_optional": true,
+              "config": {
+                "@type": "type.googleapis.com/google.protobuf.Struct"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
 }
 
 // validate there will be exception throw when unknown factory found for per route typed config.
@@ -468,7 +581,8 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+      EXPECT_TRUE(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
@@ -476,6 +590,11 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
 
 // validate the optional unknown factory will be ignored for per route typed config.
 TEST_F(RdsImplTest, OptionalUnknownFacotryForPerRouteTypedConfig) {
+  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
+
   InSequence s;
   const std::string config_yaml = R"EOF(
 rds:
@@ -535,7 +654,8 @@ http_filters:
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
 }
 
 // Validates behavior when the config is delivered but it fails PGV validation.
@@ -563,8 +683,8 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(valid_json);
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
-  EXPECT_NO_THROW(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   // Sadly the RdsRouteConfigSubscription privately inherited from
   // SubscriptionCallbacks, so we has to use reinterpret_cast here.
   RdsRouteConfigSubscription* rds_subscription =
@@ -591,7 +711,9 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()),
+      EXPECT_TRUE(
+          rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info())
+              .ok()),
       EnvoyException,
       "Unexpected RDS configuration (expecting foo_route_config): "
       "INVALID_NAME_FOR_route_config");
@@ -653,7 +775,8 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_TRUE(rds_->configCast()->usesVhds());
 
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
@@ -889,7 +1012,8 @@ dynamic_route_configs:
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
       universal_name_matcher);
   const auto& route_config_dump3 =
@@ -986,8 +1110,9 @@ virtual_hosts:
 )EOF");
   const auto decoded_resources = TestUtility::decodeResources({route_config});
 
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, "1");
+  EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "1")
+                  .ok());
 
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
@@ -1010,8 +1135,9 @@ virtual_hosts:
       route_config_provider_manager_->createRdsRouteConfigProvider(
           rds2, OptionalHttpFilters(), server_factory_context_, "foo_prefix", outer_init_manager_);
   EXPECT_NE(provider3, provider_);
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, "provider3");
+  EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "provider3")
+                  .ok());
   UniversalStringMatcher universal_name_matcher;
   EXPECT_EQ(2UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
                      ->dynamic_route_configs()
@@ -1071,8 +1197,9 @@ virtual_hosts:
 )EOF");
     const auto decoded_resources = TestUtility::decodeResources({route_config});
 
-    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-        decoded_resources.refvec_, "1");
+    EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                    ->onConfigUpdate(decoded_resources.refvec_, "1")
+                    .ok());
 
     EXPECT_TRUE(provider_->configInfo().has_value());
     EXPECT_TRUE(provider2->configInfo().has_value());
@@ -1086,7 +1213,9 @@ TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
               start(_));
   outer_init_manager_.initialize(init_watcher_);
   EXPECT_CALL(init_watcher_, ready());
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
+  EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate({}, "")
+                  .ok());
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
@@ -1098,8 +1227,9 @@ TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
-      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-          decoded_resources.refvec_, ""),
+      EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                      ->onConfigUpdate(decoded_resources.refvec_, "")
+                      .ok()),
       EnvoyException, "Unexpected RDS resource length: 2");
 }
 
@@ -1160,7 +1290,8 @@ resources:
   EXPECT_CALL(init_watcher_, ready());
 
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+      EXPECT_TRUE(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
       EnvoyException, "Only a single wildcard domain is permitted in route foo_route_config");
 
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](

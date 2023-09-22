@@ -100,6 +100,9 @@ public:
   RequestDecoder& newStream(ResponseEncoder& response_encoder,
                             bool is_internally_created = false) override;
 
+  RequestDecoderHandlePtr newStreamHandle(ResponseEncoder& response_encoder,
+                                          bool is_internally_created = false) override;
+
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
@@ -126,6 +129,7 @@ private:
         : route_config_provider_(route_config_provider), parent_(parent) {}
 
     RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
+                                  OptRef<const Router::ScopeKeyBuilder> scope_key_builder,
                                   ActiveStream& parent)
         // Expect the dynamic cast to succeed because only ScopedRdsConfigProvider is fully
         // implemented. Inline provider will be cast to nullptr here but it is not full implemented
@@ -133,7 +137,7 @@ private:
         // functional inline scope route provider in the future.
         : scoped_route_config_provider_(
               dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)),
-          parent_(parent) {}
+          scope_key_builder_(scope_key_builder), parent_(parent) {}
 
     void
     requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
@@ -147,6 +151,7 @@ private:
   private:
     Router::RouteConfigProvider* route_config_provider_;
     Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
+    OptRef<const Router::ScopeKeyBuilder> scope_key_builder_;
     ActiveStream& parent_;
   };
 
@@ -333,9 +338,9 @@ private:
     struct State {
       State()
           : codec_saw_local_complete_(false), codec_encode_complete_(false),
-            on_reset_stream_called_(false), is_zombie_stream_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_destroyed_(false),
-            is_internally_created_(false), is_tunneling_(false), decorated_propagate_(true) {}
+            on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
+            is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
+            decorated_propagate_(true) {}
 
       // It's possibly for the codec to see the completed response but not fully
       // encode it.
@@ -346,7 +351,6 @@ private:
       bool on_reset_stream_called_ : 1;   // Whether the stream has been reset.
       bool is_zombie_stream_ : 1;         // Whether stream is waiting for signal
                                           // the underlying codec to be destroyed.
-      bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
 
       // True if this stream was the original externally created stream, but was
@@ -407,6 +411,8 @@ private:
     // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
     // HTTP connection manager configuration, then the entire connection is closed.
     bool validateTrailers();
+
+    std::weak_ptr<bool> stillAlive() { return std::weak_ptr<bool>(still_alive_); }
 
     ConnectionManagerImpl& connection_manager_;
     OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
@@ -494,9 +500,30 @@ private:
     const Tracing::CustomTagMap* customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
+
+    std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
+
+  class ActiveStreamHandle : public RequestDecoderHandle {
+  public:
+    explicit ActiveStreamHandle(ActiveStream& stream)
+        : valid_(stream.stillAlive()), stream_(stream) {}
+
+    ~ActiveStreamHandle() override = default;
+
+    OptRef<RequestDecoder> get() override {
+      if (valid_.expired()) {
+        return {};
+      }
+      return stream_;
+    }
+
+  private:
+    std::weak_ptr<bool> valid_;
+    ActiveStream& stream_;
+  };
 
   class HttpStreamIdProviderImpl : public StreamInfo::StreamIdProvider {
   public:
@@ -566,6 +593,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
+  Event::Dispatcher* dispatcher_{};
   ConnectionManagerListenerStats& listener_stats_;
   Server::OverloadManager& overload_manager_;
   Server::ThreadLocalOverloadState& overload_state_;
@@ -582,6 +610,8 @@ private:
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};
   const std::string proxy_name_; // for Proxy-Status.
+
+  const bool refresh_rtt_after_request_{};
 };
 
 } // namespace Http

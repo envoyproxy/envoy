@@ -47,7 +47,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
 
   const std::string component_log_level_string =
-      "Comma separated list of component log levels. For example upstream:debug,config:trace";
+      "Comma-separated list of component log levels. For example upstream:debug,config:trace";
   const std::string log_format_string =
       fmt::format("Log message format in spdlog syntax "
                   "(see https://github.com/gabime/spdlog/wiki/3.-Custom-formatting)"
@@ -56,15 +56,15 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   TCLAP::CmdLine cmd("envoy", ' ', VersionInfo::version());
   TCLAP::ValueArg<uint32_t> base_id(
-      "", "base-id", "base ID so that multiple envoys can run on the same host if needed", false, 0,
+      "", "base-id", "Base ID so that multiple envoys can run on the same host if needed", false, 0,
       "uint32_t", cmd);
   TCLAP::SwitchArg use_dynamic_base_id(
       "", "use-dynamic-base-id",
-      "the server chooses a base ID dynamically. Supersedes a static base ID. May not be used "
+      "The server chooses a base ID dynamically. Supersedes a static base ID. May not be used "
       "when the restart epoch is non-zero.",
       cmd, false);
   TCLAP::ValueArg<std::string> base_id_path(
-      "", "base-id-path", "path to which the base ID is written", false, "", "string", cmd);
+      "", "base-id-path", "Path to which the base ID is written", false, "", "string", cmd);
   TCLAP::ValueArg<uint32_t> concurrency("", "concurrency", "# of worker threads to run", false,
                                         std::thread::hardware_concurrency(), "uint32_t", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file", false,
@@ -74,16 +74,16 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       false, "", "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
-                                        "allow unknown fields in static configuration (DEPRECATED)",
+                                        "Allow unknown fields in static configuration (DEPRECATED)",
                                         cmd, false);
   TCLAP::SwitchArg allow_unknown_static_fields("", "allow-unknown-static-fields",
-                                               "allow unknown fields in static configuration", cmd,
+                                               "Allow unknown fields in static configuration", cmd,
                                                false);
   TCLAP::SwitchArg reject_unknown_dynamic_fields("", "reject-unknown-dynamic-fields",
-                                                 "reject unknown fields in dynamic configuration",
+                                                 "Reject unknown fields in dynamic configuration",
                                                  cmd, false);
   TCLAP::SwitchArg ignore_unknown_dynamic_fields("", "ignore-unknown-dynamic-fields",
-                                                 "ignore unknown fields in dynamic configuration",
+                                                 "Ignore unknown fields in dynamic configuration",
                                                  cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
@@ -107,10 +107,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "Logger mode: enable file level log control (Fine-Grain Logger) or not", cmd, false);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
-  TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
+  TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "Hot restart epoch #", false, 0,
                                           "uint32_t", cmd);
   TCLAP::SwitchArg hot_restart_version_option("", "hot-restart-version",
-                                              "hot restart compatibility version", cmd);
+                                              "Hot restart compatibility version", cmd);
   TCLAP::ValueArg<std::string> service_cluster("", "service-cluster", "Cluster name", false, "",
                                                "string", cmd);
   TCLAP::ValueArg<std::string> service_node("", "service-node", "Node name", false, "", "string",
@@ -161,25 +161,24 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       false, "string", cmd);
 
   cmd.setExceptionHandling(false);
+
+  std::function failure_function = [&](TCLAP::ArgException& e) {
+    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
+    END_TRY
+    CATCH(const TCLAP::ExitException&, {
+      // failure() has already written an informative message to stderr, so all that's left to do
+      // is throw our own exception with the original message.
+      throw MalformedArgvException(e.what());
+    });
+  };
+
   TRY_ASSERT_MAIN_THREAD {
     cmd.parse(args);
     count_ = cmd.getArgList().size();
   }
   END_TRY
-  catch (TCLAP::ArgException& e) {
-    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
-    END_TRY
-    catch (const TCLAP::ExitException&) {
-      // failure() has already written an informative message to stderr, so all that's left to do
-      // is throw our own exception with the original message.
-      throw MalformedArgvException(e.what());
-    }
-  }
-  catch (const TCLAP::ExitException& e) {
-    // parse() throws an ExitException with status 0 after printing the output for --help and
-    // --version.
-    throw NoServingException();
-  }
+  MULTI_CATCH(
+      TCLAP::ArgException & e, { failure_function(e); }, { throw NoServingException(); });
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
@@ -194,6 +193,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   log_format_ = log_format.getValue();
+  log_format_set_ = log_format.isSet();
   log_format_escaped_ = log_format_escaped.getValue();
   enable_fine_grain_logging_ = enable_fine_grain_logging.getValue();
 

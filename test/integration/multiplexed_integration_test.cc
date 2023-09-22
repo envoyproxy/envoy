@@ -2242,7 +2242,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
   } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
-    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.remote_reset"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), "http2.violation.of.messaging.rule");
   } else {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
     // http2.violation.of.messaging.rule
@@ -2406,7 +2406,13 @@ TEST_P(MultiplexedIntegrationTest, ConnectionPoolPerDownstream) {
 // Ordering of inheritance is important here, SocketInterfaceSwap must be
 // destroyed after HttpProtocolIntegrationTest.
 class SocketSwappableMultiplexedIntegrationTest : public SocketInterfaceSwap,
-                                                  public HttpProtocolIntegrationTest {};
+                                                  public HttpProtocolIntegrationTest {
+public:
+  SocketSwappableMultiplexedIntegrationTest()
+      : SocketInterfaceSwap(GetParam().downstream_protocol == Http::CodecType::HTTP3
+                                ? Network::Socket::Type::Datagram
+                                : Network::Socket::Type::Stream) {}
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SocketSwappableMultiplexedIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(

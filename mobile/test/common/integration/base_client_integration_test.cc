@@ -79,20 +79,22 @@ Platform::LogLevel getPlatformLogLevelFromOptions() {
 // Use the Envoy mobile default config as much as possible in this test.
 // There are some config modifiers below which do result in deltas.
 // Note: This function is only used to build the Engine if `override_builder_config_` is true.
-std::string defaultConfig() {
+envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
   Platform::EngineBuilder builder;
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = builder.generateBootstrap();
-  return MessageUtil::getYamlStringFromMessage(*bootstrap);
+  envoy::config::bootstrap::v3::Bootstrap to_return = *bootstrap;
+  return to_return;
 }
 
-BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
-                                                     const std::string& bootstrap_config)
-    : BaseIntegrationTest(ip_version, bootstrap_config) {
+BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version)
+    : BaseIntegrationTest(BaseIntegrationTest::defaultAddressFunction(ip_version), ip_version,
+                          defaultConfig()) {
   skip_tag_extraction_rule_check_ = true;
   full_dispatcher_ = api_->allocateDispatcher("fake_envoy_mobile");
   use_lds_ = false;
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
+  memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
 
   builder_.addLogLevel(getPlatformLogLevelFromOptions());
   // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
@@ -118,6 +120,7 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+        memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
         if (expect_data_streams_) {
           validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
         }
@@ -136,7 +139,7 @@ void BaseClientIntegrationTest::initialize() {
     cc_.terminal_callback->setReady();
   });
 
-  stream_ = (*stream_prototype_).start(explicit_flow_control_);
+  stream_ = (*stream_prototype_).start(explicit_flow_control_, min_delivery_size_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
@@ -198,15 +201,6 @@ void BaseClientIntegrationTest::createEnvoy() {
     if (upstream->localAddress()->ip()) {
       ports.push_back(upstream->localAddress()->ip()->port());
     }
-  }
-
-  if (override_builder_config_) {
-    finalizeConfigWithPorts(config_helper_, ports, use_lds_);
-    ASSERT_FALSE(config_helper_.bootstrap().has_admin())
-        << "Bootstrap config should not have `admin` configured in Envoy Mobile";
-    builder_.setOverrideConfig(MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
-  } else {
-    ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }
 
   absl::Notification engine_running;

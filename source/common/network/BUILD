@@ -1,11 +1,11 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -108,6 +108,7 @@ envoy_cc_library(
         "//envoy/event:timer_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
+        "//envoy/network:socket_interface",
         "//envoy/server/overload:thread_local_overload_state",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
@@ -117,6 +118,8 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/network:socket_option_factory_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:stream_info_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -467,6 +470,7 @@ envoy_cc_library(
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
         "//envoy/common:hashable_interface",
+        "//envoy/common:optref_lib",
         "//envoy/network:proxy_protocol_options_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/stream_info:filter_state_interface",
@@ -491,7 +495,9 @@ envoy_cc_library(
     srcs = ["filter_state_dst_address.cc"],
     hdrs = ["filter_state_dst_address.h"],
     deps = [
+        ":utility_lib",
         "//envoy/network:address_interface",
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],
@@ -567,5 +573,13 @@ envoy_cc_library(
         "//envoy/network:io_handle_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "generic_listener_filter_impl_base_lib",
+    hdrs = ["generic_listener_filter_impl_base.h"],
+    deps = [
+        "//envoy/network:filter_interface",
     ],
 )

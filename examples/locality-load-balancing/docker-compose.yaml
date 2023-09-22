@@ -2,6 +2,7 @@ services:
 
   client-envoy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       target: envoy-load-balancing
     depends_on:

@@ -29,12 +29,13 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/extensions/listener_managers/listener_manager/config.pb.h"
+#include "test/extensions/listener_managers/listener_manager/config.pb.validate.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
@@ -152,7 +153,7 @@ public:
       EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, _, 0));
     }
     EXPECT_CALL(*worker_, addListener(_, _, _, _));
-    EXPECT_CALL(*worker_, stopListener(_, _));
+    EXPECT_CALL(*worker_, stopListener(_, _, _));
     EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
 
     EXPECT_TRUE(addOrUpdateListener(new_listener_proto));
@@ -168,7 +169,7 @@ public:
   void expectRemove(const envoy::config::listener::v3::Listener& listener_proto,
                     ListenerHandle* listener_handle, Network::MockListenSocket& socket) {
 
-    EXPECT_CALL(*worker_, stopListener(_, _));
+    EXPECT_CALL(*worker_, stopListener(_, _, _));
     EXPECT_CALL(socket, close());
     EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
@@ -540,7 +541,7 @@ test: a
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                          "test: Cannot find field");
+                          "test");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, BadListenerConfigNoFilterChains) {
@@ -569,7 +570,7 @@ filter_chains:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                          "foo: Cannot find field");
+                          "foo");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, BadConnectionLessUdpConfigWithFilterChain) {
@@ -598,18 +599,14 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::NonTerminalFilter>();
   }
 
   std::string name() const override { return "non_terminal"; }
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   NonTerminalFilterFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -621,6 +618,8 @@ address:
 filter_chains:
 - filters:
   - name: non_terminal
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.NonTerminalFilter
   name: foo
   )EOF";
 
@@ -680,9 +679,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::TestStatsFilter>();
   }
 
   std::string name() const override { return "stats_test"; }
@@ -700,9 +698,6 @@ private:
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -715,6 +710,8 @@ bind_to_port: false
 filter_chains:
 - filters:
   - name: stats_test
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.TestStatsFilter
   name: foo
   )EOF";
 
@@ -728,9 +725,6 @@ filter_chains:
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, UsingAddressAsStatsPrefixForMultipleAddresses) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   TestStatsConfigFactory filter;
   Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
@@ -748,6 +742,8 @@ bind_to_port: false
 filter_chains:
 - filters:
   - name: stats_test
+    typed_config:
+      "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.TestStatsFilter
   name: foo
   )EOF";
 
@@ -784,10 +780,10 @@ TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "listener foo: has different socket type. The listener only "
-                            "support same socket type for all the addresses.");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true).status().message(),
+      "listener foo: has different socket type. The listener only "
+      "support same socket type for all the addresses.");
 }
 
 TEST_P(ListenerManagerImplTest, RejectNoAddresses) {
@@ -797,9 +793,9 @@ TEST_P(ListenerManagerImplTest, RejectNoAddresses) {
       exact_balance: {}
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "error adding listener named 'foo': address is necessary");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true).status().message(),
+      "error adding listener named 'foo': address is necessary");
 }
 
 TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
@@ -819,10 +815,10 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "error adding listener named 'foo': use internal_listener field "
-                            "instead of address for internal listeners");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true).status().message(),
+      "error adding listener named 'foo': use internal_listener field "
+      "instead of address for internal listeners");
 
   const std::string yaml2 = R"EOF(
     name: "foo"
@@ -842,10 +838,10 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true),
-                            EnvoyException,
-                            "error adding listener named 'foo': use internal_listener field "
-                            "instead of address for internal listeners");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true).status().message(),
+      "error adding listener named 'foo': use internal_listener field "
+      "instead of address for internal listeners");
 
   const std::string yaml3 = R"EOF(
     name: "foo"
@@ -862,10 +858,10 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml3), "", true),
-                            EnvoyException,
-                            "error adding listener named 'foo': use internal_listener field "
-                            "instead of address for internal listeners");
+  EXPECT_EQ(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml3), "", true).status().message(),
+      "error adding listener named 'foo': use internal_listener field "
+      "instead of address for internal listeners");
 }
 
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
@@ -1737,7 +1733,7 @@ dynamic_listeners:
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*duplicated_socket, duplicate());
   EXPECT_CALL(*worker_, addListener(_, _, _, _));
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion();
@@ -2050,94 +2046,6 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsDeprecatedBehavior) {
-  const std::string listener_origin = R"EOF(
-name: foo
-address:
-  socket_address:
-      address: 127.0.0.1
-      port_value: 1234
-enable_reuse_port: true
-socket_options:
-    - level: 1
-      name: 9
-      int_value: 1
-filter_chains:
-- filters: []
-  )EOF";
-
-  const std::string listener_updated = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-enable_reuse_port: true
-socket_options:
-    - level: 1
-      name: 9
-      int_value: 2
-filter_chains:
-- filters: []
-  )EOF";
-  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
-}
-
-TEST_P(ListenerManagerImplTest,
-       UpdateListenerWithDifferentSocketOptionsWithMultiAddressesDeprecatedBehavior) {
-  const std::string listener_origin = R"EOF(
-name: foo
-address:
-  socket_address:
-      address: 127.0.0.1
-      port_value: 1234
-additional_addresses:
-- address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 5678
-  socket_options:
-    socket_options:
-    - level: 1
-      name: 9
-      int_value: 2
-enable_reuse_port: true
-socket_options:
-    - level: 1
-      name: 9
-      int_value: 1
-filter_chains:
-- filters: []
-  )EOF";
-
-  const std::string listener_updated = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-additional_addresses:
-- address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 5678
-  socket_options:
-    socket_options:
-    - level: 1
-      name: 9
-      int_value: 3
-enable_reuse_port: true
-socket_options:
-    - level: 1
-      name: 9
-      int_value: 1
-filter_chains:
-- filters: []
-  )EOF";
-  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated,
-                                                              true);
-}
-
 // The socket options update is only available when enable_reuse_port as true.
 // Linux is the only platform allowing the enable_reuse_port as true.
 #ifdef __linux__
@@ -2391,71 +2299,6 @@ filter_chains:
                                                     expected_error_message);
 }
 
-// The socket options update is only available when enable_reuse_port as true.
-// Linux is the only platform allowing the enable_reuse_port as true.
-#ifdef __linux__
-TEST_P(ListenerManagerImplTest, UpdateListenerRejectReusePortUpdate) {
-  // Add and initialize foo listener and the default value of enable_reuse_port is true.
-  const std::string listener_origin = R"EOF(
-name: foo
-address:
-  socket_address:
-      address: 127.0.0.1
-      port_value: 1234
-enable_reuse_port: true
-filter_chains:
-- filters: []
-  )EOF";
-
-  // update listener foo, with enable_reuse_port as false.
-  const std::string listener_updated = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-enable_reuse_port: false
-filter_chains:
-- filters: []
-  )EOF";
-
-  const std::string expected_error_message =
-      "Listener foo: reuse port cannot be changed during an update";
-  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
-                                                    expected_error_message);
-}
-#endif
-
-// The deprecated behavior is the update of `enable_reuse_port` will be ignored and
-// listener update success.
-TEST_P(ListenerManagerImplTest, UpdateListenerReusePortUpdateDeprecatedBehavior) {
-  // Add and initialize foo listener and the default value of enable_reuse_port is true.
-  const std::string listener_origin = R"EOF(
-name: foo
-address:
-  socket_address:
-      address: 127.0.0.1
-      port_value: 1234
-enable_reuse_port: true
-filter_chains:
-- filters: []
-  )EOF";
-
-  // update listener foo, with enable_reuse_port as false.
-  const std::string listener_updated = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-enable_reuse_port: false
-filter_chains:
-- filters: []
-  )EOF";
-
-  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
-}
-
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
   InSequence s;
 
@@ -2558,12 +2401,13 @@ filter_chains:
 
   // Remove foo into draining.
   std::function<void()> stop_completion;
-  EXPECT_CALL(*worker_, stopListener(_, _))
-      .WillOnce(Invoke(
-          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
-            ASSERT_TRUE(completion != nullptr);
-            stop_completion = std::move(completion);
-          }));
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
+                                          const Network::ExtraShutdownListenerOptions&,
+                                          std::function<void()> completion) -> void {
+        ASSERT_TRUE(completion != nullptr);
+        stop_completion = std::move(completion);
+      }));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -2619,12 +2463,13 @@ filter_chains:
 
   // Remove foo into draining.
   std::function<void()> stop_completion;
-  EXPECT_CALL(*worker_, stopListener(_, _))
-      .WillOnce(Invoke(
-          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
-            ASSERT_TRUE(completion != nullptr);
-            stop_completion = std::move(completion);
-          }));
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
+                                          const Network::ExtraShutdownListenerOptions&,
+                                          std::function<void()> completion) -> void {
+        ASSERT_TRUE(completion != nullptr);
+        stop_completion = std::move(completion);
+      }));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -2678,7 +2523,7 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
   // Remove foo into draining.
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -2732,7 +2577,7 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
   // Remove foo into draining.
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(2);
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -2839,7 +2684,7 @@ filter_chains:
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
 
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -3101,7 +2946,7 @@ filter_chains:
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -3190,7 +3035,7 @@ filter_chains:
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -3258,9 +3103,9 @@ filter_chains:
   EXPECT_EQ(2UL, manager_->listeners().size());
 
   // Validate that stop listener is only called once - for inbound listeners.
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
   // Validate that listener creation in outbound direction is allowed.
@@ -3337,10 +3182,10 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->stopListeners(ListenerManager::StopListenersType::All);
+  manager_->stopListeners(ListenerManager::StopListenersType::All, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
   // Validate that adding a listener is not allowed after all listeners are stopped.
@@ -3407,10 +3252,10 @@ filter_chains:
 
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 }
 
@@ -3721,6 +3566,84 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
   EXPECT_EQ(filter_chain, nullptr);
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       SingleFilterChainWithDestinationIPMatchWithIPSanCerts) {
+  std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.test"
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
+    filter_chains:
+    - filter_chain_match:
+        prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
+      name: foo
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_key.pem" }
+  )EOF",
+                                                 Network::Address::IpVersion::v4);
+  if (use_matcher_) {
+    yaml = yaml + R"EOF(
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: ip
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
+        custom_match:
+          name: ip-matcher
+          typed_config:
+            "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+            range_matchers:
+            - ranges:
+              - address_prefix: 127.0.0.0
+                prefix_len: 8
+              on_match:
+                action:
+                  name: foo
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: foo
+    )EOF";
+  }
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // IPv4 client connects to unknown IP - no match.
+  auto filter_chain = findFilterChain(1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // IPv4 client connects to valid IP - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
+  auto ssl_socket =
+      dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  auto local_ip_sans = ssl_socket->ssl()->ipSansLocalCertificate();
+  EXPECT_EQ(local_ip_sans.size(), 1);
+  EXPECT_EQ(local_ip_sans.front(), "1.1.1.1");
+
+  // Assert twice to ensure a cached value is returned and still valid.
+  local_ip_sans = ssl_socket->ssl()->ipSansLocalCertificate();
+  EXPECT_EQ(local_ip_sans.size(), 1);
+  EXPECT_EQ(local_ip_sans.front(), "1.1.1.1");
+
+  // UDS client - no match.
+  filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesMatch) {
   std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -3784,6 +3707,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+
+  // Assert twice to ensure a cached value is returned and still valid.
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
@@ -5181,7 +5109,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
-  // TLS client with exact SNI match but without ALPN - no match (SNI blackholed by configuration).
+  // TLS client with exact SNI match but without ALPN - no match (SNI blackholed by
+  // configuration).
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls", {}, "127.0.0.1", 111);
   EXPECT_EQ(filter_chain, nullptr);
@@ -5919,18 +5848,14 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<
+        test::extensions::listener_managers::listener_manager::OriginalDstTestFilter>();
   }
 
   std::string name() const override { return "test.listener.original_dst"; }
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -5944,6 +5869,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5988,9 +5915,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #if defined(WIN32) && defined(SOL_IP)
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -6004,6 +5928,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -6043,9 +5969,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
 #ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
@@ -6059,6 +5982,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
     traffic_direction: INBOUND
     listener_filters:
     - name: "test.listener.original_dst"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestFilter
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -6123,16 +6048,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      // Using Struct instead of a custom per-filter empty config proto
-      // This is only allowed in tests.
-      return std::make_unique<Envoy::ProtobufWkt::Struct>();
+      return std::make_unique<
+          test::extensions::listener_managers::listener_manager::OriginalDstTestIPv6Filter>();
     }
 
     std::string name() const override { return "test.listener.original_dstipv6"; }
   };
 
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 
@@ -6144,6 +6066,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       name: foo
     listener_filters:
     - name: "test.listener.original_dstipv6"
+      typed_config:
+        "@type": type.googleapis.com/test.extensions.listener_managers.listener_manager.OriginalDstTestIPv6Filter
   )EOF",
                                                        Network::Address::IpVersion::v6);
 
@@ -7044,7 +6968,7 @@ per_connection_buffer_limit_bytes: 10
   // removal.
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*worker_, addListener(_, _, _, _));
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion();
@@ -7260,10 +7184,10 @@ filter_chains:
 
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 }
 
@@ -7322,7 +7246,7 @@ filter_chains:
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -7617,12 +7541,13 @@ filter_chains:
 
   // Stop the active listener listener_foo_update1.
   std::function<void()> stop_completion;
-  EXPECT_CALL(*worker_, stopListener(_, _))
-      .WillOnce(Invoke(
-          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
-            ASSERT_TRUE(completion != nullptr);
-            stop_completion = std::move(completion);
-          }));
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
+                                          const Network::ExtraShutdownListenerOptions&,
+                                          std::function<void()> completion) -> void {
+        ASSERT_TRUE(completion != nullptr);
+        stop_completion = std::move(completion);
+      }));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
 
@@ -7721,12 +7646,13 @@ filter_chains:
 
   // Stop the active listener listener_foo_update1.
   std::function<void()> stop_completion;
-  EXPECT_CALL(*worker_, stopListener(_, _))
-      .WillOnce(Invoke(
-          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
-            ASSERT_TRUE(completion != nullptr);
-            stop_completion = std::move(completion);
-          }));
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
+                                          const Network::ExtraShutdownListenerOptions&,
+                                          std::function<void()> completion) -> void {
+        ASSERT_TRUE(completion != nullptr);
+        stop_completion = std::move(completion);
+      }));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
 

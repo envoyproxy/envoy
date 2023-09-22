@@ -13,6 +13,7 @@ import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/core/v3/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -551,6 +552,10 @@ message Cluster {
     // The port to override for the original dst address. This port
     // will take precedence over filter state and header override ports
     google.protobuf.UInt32Value upstream_port_override = 3 [(validate.rules).uint32 = {lte: 65535}];
+
+    // The dynamic metadata key to override destination address.
+    // First the request metadata is considered, then the connection one.
+    type.metadata.v3.MetadataKey metadata_key = 4;
   }
 
   // Common configuration for all load balancer implementations.
@@ -719,7 +724,7 @@ message Cluster {
     google.protobuf.DoubleValue per_upstream_preconnect_ratio = 1
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
 
-    // Indicates how many many streams (rounded up) can be anticipated across a cluster for each
+    // Indicates how many streams (rounded up) can be anticipated across a cluster for each
     // stream, useful for low QPS services. This is currently supported for a subset of
     // deterministic non-hash-based load-balancing algorithms (weighted round robin, random).
     // Unlike ``per_upstream_preconnect_ratio`` this preconnects across the upstream instances in a

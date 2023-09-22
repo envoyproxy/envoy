@@ -19,6 +19,7 @@ Extensions
   endpoint/endpoint
   filter/filter
   grpc_credential/grpc_credential
+  health_check_event_sinks/health_check_event_sinks
   health_checker/health_checker
   http/early_header_mutation
   http/custom_response

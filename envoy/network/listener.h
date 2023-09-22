@@ -25,6 +25,9 @@
 namespace Envoy {
 namespace Network {
 
+// Set this to the maximum value which effectively accepts all connections.
+constexpr uint32_t DefaultMaxConnectionsToAcceptPerSocketEvent = UINT32_MAX;
+
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
 
@@ -241,6 +244,11 @@ public:
   virtual uint32_t tcpBacklogSize() const PURE;
 
   /**
+   * @return the maximum number of connections that will be accepted for a given socket event.
+   */
+  virtual uint32_t maxConnectionsToAcceptPerSocketEvent() const PURE;
+
+  /**
    * @return init manager of the listener.
    */
   virtual Init::Manager& initManager() PURE;
@@ -273,6 +281,13 @@ public:
    * Called when a new connection is rejected.
    */
   virtual void onReject(RejectCause cause) PURE;
+
+  /**
+   * Called when the listener has finished accepting connections per socket
+   * event.
+   * @param connections_accepted number of connections accepted.
+   */
+  virtual void recordConnectionsAcceptedOnSocketEvent(uint32_t connections_accepted) PURE;
 };
 
 /**

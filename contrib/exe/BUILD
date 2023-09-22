@@ -37,6 +37,7 @@ envoy_cc_test(
     env = {
         "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_contrib_configs.tar",
         "DISABLE_TEST_MERGE": "true",
+        "GODEBUG": "cgocheck=0",
     },
     deps = [
         "//test/config_test:example_configs_test_lib",

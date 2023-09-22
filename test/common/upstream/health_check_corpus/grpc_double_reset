@@ -15,7 +15,6 @@ health_check_config {
     service_name: "service"
     authority: "wwnvoyproxy.io"
   }
-  event_log_path: "200"
 }
 actions {
   respond {

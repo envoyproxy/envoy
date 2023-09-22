@@ -300,6 +300,10 @@ public:
     absl::MutexLock lock(&lock_);
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
+      if (connection_.detectedCloseType() == Network::DetectedCloseType::RemoteReset ||
+          connection_.detectedCloseType() == Network::DetectedCloseType::LocalReset) {
+        rst_disconnected_ = true;
+      }
       disconnected_ = true;
     }
   }
@@ -319,6 +323,11 @@ public:
                               // is acquired via the base connection reference. Fix this to
                               // remove the reference.
     return !disconnected_;
+  }
+
+  bool rstDisconnected() {
+    lock_.AssertReaderHeld();
+    return rst_disconnected_;
   }
 
   // This provides direct access to the underlying connection, but only to const methods.
@@ -383,6 +392,7 @@ private:
   absl::Mutex lock_;
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
+  bool rst_disconnected_ ABSL_GUARDED_BY(lock_){};
 };
 
 using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
@@ -402,12 +412,20 @@ public:
   testing::AssertionResult close(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
+  testing::AssertionResult close(Network::ConnectionCloseType close_type,
+                                 std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
   testing::AssertionResult
   readDisable(bool disable, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForDisconnect(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForRstDisconnect(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -728,10 +746,11 @@ public:
   // Network::FilterChainFactory
   bool
   createNetworkFilterChain(Network::Connection& connection,
-                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
+                           const Filter::NetworkFilterFactoriesList& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager& listener) override;
 
   void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
   void setDisableAllAndDoNotEnable(bool value) { disable_and_do_not_enable_ = value; }
@@ -766,6 +785,8 @@ public:
   absl::Mutex& lock() { return lock_; }
 
 protected:
+  const FakeUpstreamConfig& config() const { return config_; }
+
   Stats::IsolatedStoreImpl stats_store_;
   const Http::CodecType http_type_;
 
@@ -879,6 +900,9 @@ private:
     }
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+      return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+    }
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return false; }
 

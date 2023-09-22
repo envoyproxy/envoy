@@ -32,6 +32,7 @@ envoy_cc_library(
         ":filter_interface",
         ":message_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:tracer_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -183,6 +184,7 @@ envoy_cc_library(
     name = "header_formatter_interface",
     hdrs = ["header_formatter.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/config:typed_config_interface",
     ],
 )

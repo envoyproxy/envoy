@@ -43,6 +43,7 @@ enum AccessLogType {
   UpstreamPoolReady = 7;
   UpstreamPeriodic = 8;
   UpstreamEnd = 9;
+  DownstreamTunnelSuccessfullyEstablished = 10;
 }
 
 message TCPAccessLogEntry {

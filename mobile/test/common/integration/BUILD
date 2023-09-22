@@ -21,6 +21,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":base_client_integration_test_lib",
+        "//test/common/mocks/common:common_mocks",
     ],
 )
 
@@ -72,9 +73,11 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "sds_integration_test",
-    srcs = [
-        "sds_integration_test.cc",
-    ],
+    # The test relies on the Google gRPC library.
+    srcs = envoy_select_google_grpc(
+        ["sds_integration_test.cc"],
+        "@envoy",
+    ),
     data = [
         "@envoy//test/config/integration/certs",
     ],
@@ -108,7 +111,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        ":test_engine_builder_lib",
+        "//library/cc:engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
@@ -164,18 +167,4 @@ envoy_cc_test_library(
         ["@envoy//source/common/signal:sigaction_lib"],
         "@envoy",
     ),
-)
-
-envoy_cc_test_library(
-    name = "test_engine_builder_lib",
-    srcs = [
-        "test_engine_builder.cc",
-    ],
-    hdrs = [
-        "test_engine_builder.h",
-    ],
-    repository = "@envoy",
-    deps = [
-        "//library/cc:engine_builder_lib",
-    ],
 )

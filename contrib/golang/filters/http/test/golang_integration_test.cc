@@ -34,6 +34,8 @@ public:
     const auto& fields = filter_it->second.fields();
     std::string val = fields.at("foo").string_value();
     EXPECT_EQ(val, "bar");
+    EXPECT_TRUE(
+        decoder_callbacks_->streamInfo().filterState()->hasDataWithName("go_state_test_key"));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -150,12 +152,23 @@ typed_config:
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
               "test-route-name");
           hcm.mutable_route_config()->mutable_virtual_hosts(0)->set_domains(0, domain);
+
+          auto* virtual_cluster =
+              hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_virtual_clusters();
+          virtual_cluster->set_name("test_vcluster");
+          auto* headers = virtual_cluster->add_headers();
+          // use test_vcluster if presents
+          headers->set_name("existed-header");
+          headers->set_present_match(true);
+
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)
               ->mutable_route()
               ->set_cluster("cluster_0");
         });
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
     initialize();
   }
 
@@ -221,6 +234,46 @@ typed_config:
     initializeBasicFilter(so_id, "test.com");
   }
 
+  void initializePropertyConfig(const std::string& lib_id, const std::string& lib_path,
+                                const std::string& plugin_name) {
+    const auto yaml_fmt = R"EOF(
+name: golang
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+  library_id: %s
+  library_path: %s
+  plugin_name: %s
+  plugin_config:
+    "@type": type.googleapis.com/xds.type.v3.TypedStruct
+)EOF";
+
+    auto yaml_string = absl::StrFormat(yaml_fmt, lib_id, lib_path, plugin_name);
+    config_helper_.prependFilter(yaml_string);
+    config_helper_.skipPortUsageValidation();
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_match()
+              ->set_prefix("/property");
+
+          // setting route name for testing
+          hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
+              "test-route-name");
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("cluster_0");
+        });
+
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  }
+
   void testBasic(std::string path) {
     initializeBasicFilter(BASIC, "test.com");
 
@@ -236,9 +289,17 @@ typed_config:
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     codec_client_->sendData(request_encoder, "helloworld", false);
-    codec_client_->sendData(request_encoder, "", true);
+    codec_client_->sendData(request_encoder, "", false);
+
+    Http::TestRequestTrailerMapImpl request_trailers{
+        {"x-test-trailer-0", "foo"}, {"existed-trailer", "foo"}, {"x-test-trailer-1", "foo"}};
+    codec_client_->sendTrailers(request_encoder, request_trailers);
 
     waitForNextUpstreamRequest();
+
+    EXPECT_EQ("go_state_test_value",
+              getHeader(upstream_request_->headers(), "go-state-test-header-key"));
+
     // original header: x-test-header-0
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-test-header-0"));
 
@@ -246,8 +307,7 @@ typed_config:
     EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "test-x-set-header-0"));
 
     // check header exists which removed in golang side: x-test-header-1
-    EXPECT_EQ(true,
-              upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+    EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
     // check header value which set in golang: req-downstream-local-address
     EXPECT_TRUE(
@@ -276,6 +336,24 @@ typed_config:
     // only match the prefix since data buffer may be combined into a single.
     EXPECT_EQ(expected, upstream_request_->body().toString());
 
+    // check trailer value which is appended in golang: existed-trailer
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("existed-trailer"));
+    EXPECT_EQ(2, entries.size());
+    EXPECT_EQ("foo", entries[0]->value().getStringView());
+    EXPECT_EQ("bar", entries[1]->value().getStringView());
+
+    // check trailer value which set in golang: x-test-trailer-0
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
+
+    EXPECT_TRUE(
+        upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-1")).empty());
+
+    // check trailer value which add in golang: x-test-trailer-2
+    entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-2"));
+
+    EXPECT_EQ("bar", entries[0]->value().getStringView());
+
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"x-test-header-0", "foo"},
@@ -297,7 +375,7 @@ typed_config:
     EXPECT_EQ("foo", getHeader(response->headers(), "test-x-set-header-0"));
 
     // check resp header exists which removed in golang side: x-test-header-1
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
 
     // check header value which is appended in golang: existed-header
     entries = response->headers().get(Http::LowerCaseString("existed-header"));
@@ -321,11 +399,10 @@ typed_config:
     EXPECT_EQ("HTTP/1.1", getHeader(response->headers(), "rsp-protocol"));
 
     // check filter chain name in encode phase, exists.
-    EXPECT_EQ(false,
-              response->headers().get(Http::LowerCaseString("rsp-filter-chain-name")).empty());
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("rsp-filter-chain-name")).empty());
 
     // check response code in encode phase, not exists.
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("rsp-response-code")).empty());
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("rsp-response-code")).empty());
 
     // check response code details in encode phase
     EXPECT_EQ("via_upstream", getHeader(response->headers(), "rsp-response-code-details"));
@@ -341,11 +418,14 @@ typed_config:
     // check response attempt count in encode phase
     EXPECT_EQ("1", getHeader(response->headers(), "rsp-attempt-count"));
 
+    // check virtual cluster name
+    EXPECT_EQ("test_vcluster", getHeader(response->headers(), "rsp-virtual-cluster-name"));
+
     // verify response status
     EXPECT_EQ("200", getHeader(response->headers(), "rsp-status"));
 
     // verify protocol
-    EXPECT_EQ(true, response->headers().get(Http::LowerCaseString("test-protocol")).empty());
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("test-protocol")).empty());
 
     // verify scheme
     EXPECT_EQ("http", getHeader(response->headers(), "test-scheme"));
@@ -359,8 +439,41 @@ typed_config:
     // verify host
     EXPECT_EQ("test.com", getHeader(response->headers(), "test-host"));
 
+    // verify log level
+    EXPECT_EQ("error", getHeader(response->headers(), "test-log-level"));
+
     // upper("goodbye")
     EXPECT_EQ("GOODBYE", response->body());
+
+    cleanup();
+  }
+
+  void testMetric(std::string path) {
+    initializeBasicFilter(METRIC);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+
+    waitForNextUpstreamRequest();
+
+    EXPECT_EQ("2", getHeader(upstream_request_->headers(), "go-metric-counter-test-header-key"));
+
+    EXPECT_EQ("3", getHeader(upstream_request_->headers(), "go-metric-gauge-test-header-key"));
+
+    EXPECT_EQ("3",
+              getHeader(upstream_request_->headers(), "go-metric-counter-record-test-header-key"));
+
+    EXPECT_EQ("1",
+              getHeader(upstream_request_->headers(), "go-metric-gauge-record-test-header-key"));
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
 
     cleanup();
   }
@@ -431,6 +544,12 @@ typed_config:
     // forbidden from go in %s\r\n
     auto body = StringUtil::toUpper(absl::StrFormat("forbidden from go in %s\r\n", phase));
     EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+
+    // verify phase
+    EXPECT_EQ(phase, getHeader(response->headers(), "test-phase"));
+
+    // verify content-type
+    EXPECT_EQ("text/html", getHeader(response->headers(), "content-type"));
 
     cleanup();
   }
@@ -547,6 +666,9 @@ typed_config:
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
   const std::string ROUTECONFIG{"routeconfig"};
+  const std::string PROPERTY{"property"};
+  const std::string ACCESSLOG{"access_log"};
+  const std::string METRIC{"metric"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -615,6 +737,165 @@ TEST_P(GolangIntegrationTest, Passthrough) {
 
   cleanup();
 }
+
+TEST_P(GolangIntegrationTest, PluginNotFound) {
+  initializeConfig(ECHO, genSoPath(ECHO), PASSTHROUGH);
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, Property) {
+  initializePropertyConfig(PROPERTY, genSoPath(PROPERTY), PROPERTY);
+  initialize();
+  registerTestServerPorts({"http"});
+
+  auto path = "/property?a=1";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},  {":path", path},  {":scheme", "http"},     {":authority", "test.com"},
+      {"User-Agent", "ua"}, {"Referer", "r"}, {"X-Request-Id", "xri"},
+  };
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(request_encoder, "helloworld", true);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data("goodbye");
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, AccessLog) {
+  initializeBasicFilter(ACCESSLOG, "test.com");
+
+  auto path = "/test";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", path},
+      {":scheme", "http"},
+      {":authority", "test.com"},
+  };
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(request_encoder, "helloworld", true);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "206"},
+  };
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("good");
+  upstream_request_->encodeData(response_data1, false);
+  Buffer::OwnedImpl response_data2("bye");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("206", getHeader(upstream_request_->headers(), "respCode"));
+  EXPECT_EQ("7", getHeader(upstream_request_->headers(), "respSize"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsyncly"));
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, AccessLogDownstreamStart) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_access_log_options()->set_flush_access_log_on_new_request(true);
+      });
+  initializeBasicFilter(ACCESSLOG, "test.com");
+
+  auto path = "/test";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},        {":path", path},  {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r"},
+  };
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_TRUE(response->complete());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers2{
+      {":method", "POST"},        {":path", path},   {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r2"},
+  };
+
+  response = sendRequestAndWaitForResponse(request_headers2, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("r;r2", getHeader(upstream_request_->headers(), "referers"));
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, AccessLogDownstreamPeriodic) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_access_log_options()->mutable_access_log_flush_interval()->set_nanos(
+            100000000); // 0.1 seconds
+      });
+  initializeBasicFilter(ACCESSLOG, "test.com");
+
+  auto path = "/test?periodic=1";
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},        {":path", path},  {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r"},
+  };
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_TRUE(response->complete());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("r", getHeader(upstream_request_->headers(), "referers"));
+
+  cleanup();
+}
+
+// Mertic API testing
+TEST_P(GolangIntegrationTest, Metric) { testMetric("/test"); }
+
+// Metric API testing in async mode.
+TEST_P(GolangIntegrationTest, AsyncMetric) { testMetric("/test?async=1"); }
 
 // Basic API testing, i.e. add/remove/set Headers & data rewrite.
 TEST_P(GolangIntegrationTest, Basic) { testBasic("/test"); }

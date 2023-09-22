@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/grpc/codec.h"
@@ -60,8 +61,6 @@ public:
 
   virtual void initialize(bool buffer_body_for_retry);
 
-  void sendMessage(const Protobuf::Message& request, bool end_stream);
-
   // Http::AsyncClient::StreamCallbacks
   void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
@@ -78,6 +77,7 @@ public:
   }
 
   bool hasResetStream() const { return http_reset_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
 
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);

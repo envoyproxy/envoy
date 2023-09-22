@@ -57,3 +57,103 @@ index 1721fb3..3873b3a 100644
  endif()
  
  # ==============================================================================
+diff --git a/include/opentracing/config.h b/include/opentracing/config.h
+new file mode 100755
+index 0000000..cae3e61
+--- /dev/null
++++ b/include/opentracing/config.h
+@@ -0,0 +1,3 @@
++#pragma once
++
++#define OPENTRACING_BUILD_DYNAMIC_LOADING
+diff --git a/include/opentracing/version.h b/include/opentracing/version.h
+new file mode 100755
+index 0000000..25b9945
+--- /dev/null
++++ b/include/opentracing/version.h
+@@ -0,0 +1,14 @@
++#ifndef OPENTRACING_VERSION_H
++#define OPENTRACING_VERSION_H
++
++#define OPENTRACING_VERSION "1.5.1"
++#define OPENTRACING_ABI_VERSION "2"
++
++// clang-format off
++#define BEGIN_OPENTRACING_ABI_NAMESPACE \
++  inline namespace v2 {
++#define END_OPENTRACING_ABI_NAMESPACE \
++  }  // namespace v2
++// clang-format on
++
++#endif // OPENTRACING_VERSION_H
+diff --git a/BUILD.bazel b/BUILD.bazel
+index c57dc9f..587bf0e 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -1,10 +1,7 @@
+ cc_library(
+     name = "opentracing",
+     srcs = glob(["src/**/*.cpp"], exclude=["src/dynamic_load_unsupported.cpp", "src/dynamic_load_windows.cpp"]),
+-    hdrs = glob(["include/opentracing/**/*.h"]) + [
+-        ":include/opentracing/config.h",
+-        ":include/opentracing/version.h",
+-    ],
++    hdrs = glob(["include/opentracing/**/*.h"]),
+     strip_include_prefix = "include",
+     visibility = ["//visibility:public"],
+     deps = [
+@@ -15,27 +12,3 @@ cc_library(
+       "-ldl",
+     ],
+ )
+-
+-genrule(
+-    name = "generate_version_h",
+-    srcs = glob([
+-        "*",
+-        "cmake/*",
+-        "src/**/*.cpp",
+-    ]),
+-    outs = [
+-      "include/opentracing/config.h",
+-      "include/opentracing/version.h"
+-    ],
+-    cmd = """
+-    TEMP_DIR=$$(mktemp -d)
+-    CONFIG_H_OUT=$${PWD}/$(location :include/opentracing/config.h)
+-    VERSION_H_OUT=$${PWD}/$(location :include/opentracing/version.h)
+-    OPENTRACING_ROOT=$$(dirname $${PWD}/$(location :CMakeLists.txt))
+-    cd $$TEMP_DIR
+-    cmake -DBUILD_TESTING=OFF -DBUILD_MOCKTRACER=OFF -L $$OPENTRACING_ROOT
+-    mv include/opentracing/config.h $$CONFIG_H_OUT
+-    mv include/opentracing/version.h $$VERSION_H_OUT
+-    rm -rf $$TEMP_DIR
+-    """,
+-)
+diff --git a/3rd_party/include/opentracing/variant/variant.hpp b/3rd_party/include/opentracing/variant/variant.hpp
+--- a/3rd_party/include/opentracing/variant/variant.hpp	2023-07-11 17:17:48.563874883 +0000
++++ b/3rd_party/include/opentracing/variant/variant.hpp	2023-07-11 17:45:38.558235212 +0000
+@@ -167,7 +167,11 @@
+ template <typename F, typename V, typename Enable = void>
+ struct result_of_unary_visit
+ {
++#if __cplusplus >= 202002L
++    using type = typename std::invoke_result<F, V&>::type;
++#else
+     using type = typename std::result_of<F(V&)>::type;
++#endif
+ };
+ 
+ template <typename F, typename V>
+@@ -179,7 +183,11 @@
+ template <typename F, typename V, typename Enable = void>
+ struct result_of_binary_visit
+ {
++#if __cplusplus >= 202002L
++    using type = typename std::invoke_result<F, V&, V&>::type;
++#else
+     using type = typename std::result_of<F(V&, V&)>::type;
++#endif
+ };
+ 
+ template <typename F, typename V>

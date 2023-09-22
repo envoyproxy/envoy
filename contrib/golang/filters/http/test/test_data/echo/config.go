@@ -2,16 +2,16 @@ package main
 
 import (
 	xds "github.com/cncf/xds/go/xds/type/v3"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
 )
 
 const Name = "echo"
 
 func init() {
-	http.RegisterHttpFilterConfigFactory(Name, ConfigFactory)
-	http.RegisterHttpFilterConfigParser(&parser{})
+	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, &parser{})
 }
 
 type config struct {
@@ -22,7 +22,7 @@ type config struct {
 type parser struct {
 }
 
-func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
+func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
 		return nil, err

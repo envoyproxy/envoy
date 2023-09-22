@@ -37,3 +37,9 @@ message ExtensionWithMatcher {
   config.core.v3.TypedExtensionConfig extension_config = 2
       [(validate.rules).message = {required: true}];
 }
+
+// Extra settings on a per virtualhost/route/weighted-cluster level.
+message ExtensionWithMatcherPerRoute {
+  // Matcher override.
+  xds.type.matcher.v3.Matcher xds_matcher = 1;
+}

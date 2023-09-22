@@ -7,6 +7,7 @@
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
@@ -200,7 +201,7 @@ public:
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(
             Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
-    ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
+    ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, address())
@@ -213,7 +214,7 @@ public:
 
   void setup(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
              bool has_cluster = true, bool expect_gro = true) {
-    config_ = std::make_shared<UdpProxyFilterConfig>(factory_context_, config);
+    config_ = std::make_shared<UdpProxyFilterConfigImpl>(factory_context_, config);
     EXPECT_CALL(factory_context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -748,15 +749,27 @@ matcher:
   // Add a cluster that we don't care about.
   NiceMock<Upstream::MockThreadLocalCluster> other_thread_local_cluster;
   other_thread_local_cluster.cluster_.info_->name_ = "other_cluster";
-  cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster);
+  {
+    Upstream::ThreadLocalClusterCommand command =
+        [&other_thread_local_cluster]() -> Upstream::ThreadLocalCluster& {
+      return other_thread_local_cluster;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster.info()->name(),
+                                                    command);
+  }
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_no_route_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   // Now add the cluster we care about.
-  cluster_update_callbacks_->onClusterAddOrUpdate(
-      factory_context_.cluster_manager_.thread_local_cluster_);
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return factory_context_.cluster_manager_.thread_local_cluster_;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(
+        factory_context_.cluster_manager_.thread_local_cluster_.info()->name(), command);
+  }
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -917,11 +930,33 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
 
   InSequence s;
 
   ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
+}
+
+TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndSessionFilters) {
+  auto config = R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(readConfig(config)), EnvoyException,
+      "Only one of use_per_packet_load_balancing or session_filters can be used.");
 }
 
 // Verify that on second data packet sent from the client, another upstream host is selected.
@@ -1142,7 +1177,7 @@ TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
 
   InSequence s;
 
@@ -1199,7 +1234,7 @@ matcher:
 // Make sure exit when use the use_original_src_ip but platform does not support ip
 // transparent option.
 TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent()).WillOnce(Return(false));
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_)).WillOnce(Return(false));
 
   InSequence s;
 

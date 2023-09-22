@@ -25,9 +25,9 @@ public:
   MockSubscriptionCallbacks();
   ~MockSubscriptionCallbacks() override;
 
-  MOCK_METHOD(void, onConfigUpdate,
+  MOCK_METHOD(absl::Status, onConfigUpdate,
               (const std::vector<DecodedResourceRef>& resources, const std::string& version_info));
-  MOCK_METHOD(void, onConfigUpdate,
+  MOCK_METHOD(absl::Status, onConfigUpdate,
               (const std::vector<DecodedResourceRef>& added_resources,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                const std::string& system_version_info));
@@ -129,6 +129,8 @@ public:
                const absl::flat_hash_set<std::string>& add_these_names));
 
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
+
+  MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
 };
 
 class MockGrpcStreamCallbacks
@@ -192,6 +194,18 @@ public:
               (UpdateNotificationCb callback), (const));
 
   Common::CallbackManager<absl::string_view> update_cb_handler_;
+};
+
+template <class FactoryCallback>
+class TestExtensionConfigProvider : public Config::ExtensionConfigProvider<FactoryCallback> {
+public:
+  TestExtensionConfigProvider(FactoryCallback cb) : cb_(cb) {}
+  const std::string& name() override { return name_; }
+  OptRef<FactoryCallback> config() override { return {cb_}; }
+
+private:
+  const std::string name_ = "mock_config_provider";
+  FactoryCallback cb_;
 };
 
 } // namespace Config

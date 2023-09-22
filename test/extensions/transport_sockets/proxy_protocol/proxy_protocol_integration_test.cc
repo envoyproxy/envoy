@@ -3,6 +3,8 @@
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
@@ -24,10 +26,10 @@ public:
   }
 
   void setup(envoy::config::core::v3::ProxyProtocolConfig_Version version, bool health_checks,
-             std::string inner_socket) {
+             bool inner_tls) {
     version_ = version;
     health_checks_ = health_checks;
-    inner_socket_ = inner_socket;
+    inner_tls_ = inner_tls;
   }
 
   void initialize() override {
@@ -36,7 +38,15 @@ public:
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
       envoy::config::core::v3::TransportSocket inner_socket;
-      inner_socket.set_name(inner_socket_);
+      if (inner_tls_) {
+        envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls;
+        inner_socket.set_name("tls");
+        inner_socket.mutable_typed_config()->PackFrom(tls);
+      } else {
+        envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+        inner_socket.set_name("raw");
+        inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+      }
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
@@ -70,7 +80,7 @@ public:
 private:
   envoy::config::core::v3::ProxyProtocolConfig_Version version_;
   bool health_checks_;
-  std::string inner_socket_;
+  bool inner_tls_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTcpIntegrationTest,
@@ -79,8 +89,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTcpIntegrationTest,
 
 // Test sending proxy protocol v1
 TEST_P(ProxyProtocolTcpIntegrationTest, TestV1ProxyProtocol) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, false);
   initialize();
 
   auto listener_port = lookupPort("listener_0");
@@ -113,8 +122,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV1ProxyProtocolMultipleConnections) 
     return;
   }
 
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, false);
   initialize();
   auto listener_port = lookupPort("listener_0");
 
@@ -140,7 +148,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV1ProxyProtocolMultipleConnections) 
 
 // Test header is sent unencrypted using a TLS inner socket
 TEST_P(ProxyProtocolTcpIntegrationTest, TestTLSSocket) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, "envoy.transport_sockets.tls");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, true);
   initialize();
 
   auto listener_port = lookupPort("listener_0");
@@ -163,8 +171,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestTLSSocket) {
 
 // Test sending proxy protocol health check
 TEST_P(ProxyProtocolTcpIntegrationTest, TestProxyProtocolHealthCheck) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true, false);
   FakeRawConnectionPtr fake_upstream_health_connection;
   on_server_init_function_ = [&](void) -> void {
     std::string observed_data;
@@ -187,8 +194,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestProxyProtocolHealthCheck) {
 
 // Test sending proxy protocol v2
 TEST_P(ProxyProtocolTcpIntegrationTest, TestV2ProxyProtocol) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V2, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V2, false, false);
   initialize();
 
   auto listener_port = lookupPort("listener_0");
@@ -202,9 +208,9 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV2ProxyProtocol) {
     // - signature
     // - version and command type, address family and protocol, length of addresses
     // - src address, dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x11\x00\x0c\
-                         \x7f\x00\x00\x01\x7f\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x0c, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
     EXPECT_EQ(static_cast<uint8_t>(observed_data[26]), listener_port >> 8);
     EXPECT_EQ(static_cast<uint8_t>(observed_data[27]), listener_port & 0xFF);
@@ -214,10 +220,11 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV2ProxyProtocol) {
     // - version and command type, address family and protocol, length of addresses
     // - src address
     // - dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x21\x00\x24\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
     EXPECT_EQ(static_cast<uint8_t>(observed_data[50]), listener_port >> 8);
     EXPECT_EQ(static_cast<uint8_t>(observed_data[51]), listener_port & 0xFF);
@@ -246,11 +253,9 @@ public:
     fake_upstreams_.clear();
   }
 
-  void setup(envoy::config::core::v3::ProxyProtocolConfig_Version version, bool health_checks,
-             std::string inner_socket) {
+  void setup(envoy::config::core::v3::ProxyProtocolConfig_Version version, bool health_checks) {
     version_ = version;
     health_checks_ = health_checks;
-    inner_socket_ = inner_socket;
   }
 
   void initialize() override {
@@ -259,7 +264,9 @@ public:
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
       envoy::config::core::v3::TransportSocket inner_socket;
-      inner_socket.set_name(inner_socket_);
+      envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+      inner_socket.set_name("raw");
+      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
@@ -289,7 +296,6 @@ public:
 private:
   envoy::config::core::v3::ProxyProtocolConfig_Version version_;
   bool health_checks_;
-  std::string inner_socket_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolHttpIntegrationTest,
@@ -298,8 +304,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolHttpIntegrationTest,
 
 // Test sending proxy protocol over http
 TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocol) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false);
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("http"));
@@ -344,8 +349,7 @@ TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocolMultipleConnections)
     return;
   }
 
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false);
   initialize();
   auto listener_port = lookupPort("http");
   auto tcp_client = makeTcpConnection(listener_port);
@@ -375,8 +379,7 @@ TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocolMultipleConnections)
 
 // Test sending proxy protocol http health check
 TEST_P(ProxyProtocolHttpIntegrationTest, TestProxyProtocolHealthCheck) {
-  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true,
-        "envoy.transport_sockets.raw_buffer");
+  setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true);
   FakeRawConnectionPtr fake_upstream_health_connection;
   on_server_init_function_ = [&](void) -> void {
     std::string observed_data;
@@ -443,7 +446,9 @@ public:
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
       envoy::config::core::v3::TransportSocket inner_socket;
-      inner_socket.set_name("envoy.transport_sockets.raw_buffer");
+      envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+      inner_socket.set_name("raw");
+      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
 
       envoy::config::core::v3::ProxyProtocolConfig proxy_protocol;
       proxy_protocol.set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
@@ -504,9 +509,9 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs)
     // - signature
     // - version and command type, address family and protocol, length of addresses
     // - src address, dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x11\x00\x16\
-                         \x7f\x00\x00\x01\x7f\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x11, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
 
     // Only tlv: 0x06, 0x00, 0x02, 0x11, 0x12 is sent to upstream.
@@ -534,10 +539,11 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs)
     // - version and command type, address family and protocol, length of addresses
     // - src address
     // - dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x21\x00\x2E\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
 
     // Only tlv: 0x06, 0x00, 0x02, 0x09, 0x0A is sent to upstream.
@@ -557,7 +563,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ;
+
   std::string observed_data;
   if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
     // 2 TLVs are included:
@@ -575,9 +581,9 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
     // - signature
     // - version and command type, address family and protocol, length of addresses
     // - src address, dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x11\x00\x16\
-                         \x7f\x00\x00\x01\x7f\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x16, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
 
     // Only tlv: 0x06, 0x00, 0x02, 0x11, 0x12 is sent to upstream.
@@ -610,10 +616,11 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
     // - version and command type, address family and protocol, length of addresses
     // - src address
     // - dest address
-    auto header_start = "\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a\
-                         \x21\x21\x00\x2E\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01";
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
     EXPECT_THAT(observed_data, testing::StartsWith(header_start));
 
     // Only tlv: 0x06, 0x00, 0x02, 0x09, 0x0A is sent to upstream.

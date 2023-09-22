@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.validate.h"
 

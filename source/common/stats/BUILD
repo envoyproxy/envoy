@@ -37,6 +37,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "deferred_creation",
+    hdrs = ["deferred_creation.h"],
+    deps = [
+        "//envoy/stats:stats_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "histogram_lib",
     srcs = ["histogram_impl.cc"],
     hdrs = ["histogram_impl.h"],

@@ -98,6 +98,8 @@ function initHook() {
   statusDiv.className = 'error-status-line';
   activeStatsPreElement = document.createElement('pre');
   activeStatsPreElement.id = 'active-content-pre';
+
+/*
   const table = document.createElement('table');
   table.classList.add('histogram-body', 'histogram-column');
   activeStatsHistogramsDiv = document.createElement('div');
@@ -131,6 +133,12 @@ function initHook() {
     control.addEventListener('change', updateParams);
     control.addEventListener('blur', onSubmit);
   }
+  */
+
+  activeStatsHistogramsDiv = document.createElement('div');
+  document.body.appendChild(statusDiv);
+  document.body.appendChild(activeStatsPreElement);
+  document.body.appendChild(activeStatsHistogramsDiv);
   loadStats();
 }
 
@@ -232,17 +240,21 @@ function setTimer() {
  * Initiates an Ajax request for the stats JSON based on the stats parameters.
  */
 async function loadStats() {
-  clearTimer();
-
-  const makeQueryParam = (name) => name + '=' + encodeURIComponent(currentValues[name]);
+  const makeQueryParam = (name) => name + '=' + encodeURIComponent(
+      document.getElementById(paramIdPrefix + name).value);
   const params = ['filter', 'type'];
   const href = window.location.href;
 
   // Compute the fetch URL prefix based on the current URL, so that the admin
   // site can be hosted underneath a site-specific URL structure.
+/*
   const statsPos = href.indexOf('/stats/html-active');
   if (statsPos == -1) {
     statusDiv.textContent = 'Cannot find /stats/html-active in ' + href;
+*/
+  const statsPos = href.indexOf('/stats?');
+  if (statsPos == -1) {
+    statusDiv.textContent = 'Cannot find /stats? in ' + href;
     return;
   }
   const prefix = href.substring(0, statsPos);
@@ -378,6 +390,7 @@ function renderStats(histogramDiv, data) {
     }
     sortedStats.push(statRecord);
   }
+  renderHistograms(activeStatsHistogramsDiv, data);
 
   // Sorts all the stats. This is inefficient; we should just pick the top N
   // based on field "active-max-display-count" and sort those. The best

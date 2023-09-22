@@ -128,7 +128,7 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   auto sampled_tracestate_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_STATE);
   EXPECT_EQ(sampled_tracestate_entry.size(), 1);
   EXPECT_EQ(sampled_tracestate_entry[0]->value().getStringView(), "test=foo");
-  const std::string request_yaml = R"(
+  constexpr absl::string_view request_yaml = R"(
 resource_spans:
   resource:
     attributes:
@@ -370,7 +370,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributes) {
   span->setTag("first_tag_name", "first_tag_new_value");
 
   // Note the placeholders for the bytes - cleaner to manually set after.
-  const std::string request_yaml = R"(
+  constexpr absl::string_view request_yaml = R"(
 resource_spans:
   resource:
     attributes:
@@ -476,7 +476,7 @@ TEST_F(OpenTelemetryDriverTest, ExportSpanWithCustomServiceName) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
-  const std::string request_yaml = R"(
+  constexpr absl::string_view request_yaml = R"(
 resource_spans:
   resource:
     attributes:

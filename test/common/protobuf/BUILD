@@ -63,6 +63,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "proto_descriptor_test",
+    srcs = ["proto_descriptor_test.cc"],
+    deps = [
+        "//bazel/cc_proto_descriptor_library:create_dynamic_message",
+        "//bazel/cc_proto_descriptor_library:text_format_transcoder",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto_descriptor",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "value_util_fuzz_test",
     srcs = ["value_util_fuzz_test.cc"],

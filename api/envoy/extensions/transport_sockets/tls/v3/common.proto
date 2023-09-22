@@ -178,6 +178,11 @@ message PrivateKeyProvider {
   oneof config_type {
     google.protobuf.Any typed_config = 3 [(udpa.annotations.sensitive) = true];
   }
+
+  // If the private key provider isn't available (eg. the required hardware capability doesn't existed),
+  // Envoy will fallback to the BoringSSL default implementation when the `fallback` is true.
+  // The default value is `false`.
+  bool fallback = 4;
 }
 
 // [#next-free-field: 9]
@@ -505,6 +510,11 @@ message CertificateValidationContext {
   // from that chain. This default behavior can be altered by setting
   // :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>` to
   // true.
+  //
+  // If ``crl`` is a filesystem path, a watch will be added to the parent
+  // directory for any file moves to support rotation. This currently only
+  // applies to dynamic secrets, when the ``CertificateValidationContext`` is
+  // delivered via SDS.
   config.core.v3.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certificates.

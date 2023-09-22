@@ -1,10 +1,11 @@
+#pragma once
+
 #include "library/cc/bridge_utility.h"
 #include "library/cc/direct_response_testing.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/main_interface.h"
-#include "library/common/network/apple_platform_cert_verifier.h"
 #include "library/common/stats/utility.h"
 
 // This file exists in order to expose headers for Envoy's C++ libraries
@@ -38,7 +39,7 @@ inline void raw_header_map_set(Platform::RawHeaderMap& map, std::string key,
 
 // Smart pointers aren't currently supported by Swift / C++ interop, so we "erase"
 // it into a `BootstrapPtr` / `intptr_t`, which we can import from Swift.
-inline BootstrapPtr generateBootstrapPtr(Platform::EngineBuilder builder) {
+inline BootstrapPtr generateBootstrapPtr(Platform::EngineBuilder& builder) {
   return reinterpret_cast<BootstrapPtr>(builder.generateBootstrap().release());
 }
 

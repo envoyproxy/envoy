@@ -19,6 +19,10 @@ export GOPROXY="${go_proxy:-}"
 
 if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
+  # Container networking is unreliable in the most recently built images, pin Windows to a known
+  # good container. This can create a mismatch between the host environment, and the toolchain
+  # environment.
+  ENVOY_BUILD_SHA=41c5a05d708972d703661b702a63ef5060125c33
   # TODO(sunjayBhatia): Currently ENVOY_DOCKER_OPTIONS is ignored on Windows because
   # CI sets it to a Linux-specific value. Undo this once https://github.com/envoyproxy/envoy/issues/13272
   # is resolved.
@@ -60,14 +64,23 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
-          && rm -rf /usr/bin/cmake \
-          && cmake &> /dev/null || echo 'No cmake here!' \
           && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
+fi
+
+if [[ -n "$ENVOY_DOCKER_PLATFORM" ]]; then
+    echo "Setting Docker platform: ${ENVOY_DOCKER_PLATFORM}"
+    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    ENVOY_DOCKER_OPTIONS+=(--platform "$ENVOY_DOCKER_PLATFORM")
 fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
 # images').
-[[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
+if [[ -z "${IMAGE_ID}" ]]; then
+    IMAGE_ID="${ENVOY_BUILD_SHA}"
+    if ! is_windows && [[ -n "$ENVOY_BUILD_CONTAINER_SHA" ]]; then
+        IMAGE_ID="${ENVOY_BUILD_SHA}@sha256:${ENVOY_BUILD_CONTAINER_SHA}"
+    fi
+fi
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR="${DEFAULT_ENVOY_DOCKER_BUILD_DIR}"
 # Replace backslash with forward slash for Windows style paths
 ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR//\\//}"
@@ -106,7 +119,6 @@ docker run --rm \
        "${VOLUMES[@]}" \
        -e AZP_BRANCH \
        -e AZP_COMMIT_SHA \
-       -e AZP_TARGET_BRANCH \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
@@ -116,31 +128,40 @@ docker run --rm \
        -e BAZEL_EXTRA_TEST_OPTIONS \
        -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
+       -e BAZEL_STARTUP_EXTRA_OPTIONS \
+       -e CI_TARGET_BRANCH \
+       -e DOCKERHUB_USERNAME \
+       -e DOCKERHUB_PASSWORD \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
        -e BAZEL_NO_CACHE_TEST_RESULTS \
        -e BAZEL_REMOTE_INSTANCE \
-       -e BAZEL_REMOTE_INSTANCE_BRANCH \
        -e GOOGLE_BES_PROJECT_ID \
        -e GCP_SERVICE_ACCOUNT_KEY \
        -e NUM_CPUS \
+       -e ENVOY_BRANCH \
        -e ENVOY_RBE \
        -e ENVOY_BUILD_IMAGE \
        -e ENVOY_SRCDIR \
        -e ENVOY_BUILD_TARGET \
        -e ENVOY_BUILD_DEBUG_INFORMATION \
        -e ENVOY_BUILD_FILTER_EXAMPLE \
+       -e ENVOY_COMMIT \
+       -e ENVOY_HEAD_REF \
+       -e ENVOY_PUBLISH_DRY_RUN \
+       -e ENVOY_REPO \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
+       -e GITHUB_REF_NAME \
+       -e GITHUB_REF_TYPE \
        -e GITHUB_TOKEN \
+       -e GITHUB_APP_ID \
+       -e GITHUB_INSTALL_ID \
+       -e NETLIFY_TRIGGER_URL \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \
-       -e SLACK_TOKEN \
-       -e BUILD_URI\
-       -e REPO_URI \
        -e SYSTEM_STAGEDISPLAYNAME \
        -e SYSTEM_JOBDISPLAYNAME \
-       -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        "${ENVOY_BUILD_IMAGE}" \
        "${START_COMMAND[@]}"

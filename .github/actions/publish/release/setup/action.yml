@@ -1,0 +1,26 @@
+inputs:
+  ref:
+    type: string
+    required: true
+  bucket:
+    type: string
+    required: true
+
+runs:
+  using: composite
+  steps:
+  - id: url
+    run: |
+        echo "base=https://storage.googleapis.com/${{ inputs.bucket }}/${REF:0:7}/release" \
+            >> "$GITHUB_OUTPUT"
+    env:
+      REF: ${{ inputs.ref }}
+    shell: bash
+  - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.0.10
+    id: fetch
+    with:
+      url: "${{ steps.url.outputs.base }}/release.signed.tar.zst"
+  - run: |
+      mkdir -p ${{ runner.temp }}/release.signed
+      mv ${{ steps.fetch.outputs.path }} ${{ runner.temp }}/release.signed
+    shell: bash

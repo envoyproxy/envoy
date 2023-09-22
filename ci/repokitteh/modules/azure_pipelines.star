@@ -31,10 +31,12 @@ def _get_azp_link(check_id):
     return "https://dev.azure.com/{organization}/{project}/_build/results?buildId={buildId}&view=results".format(organization = _azp_organization, project = project, buildId = build_id)
 
 def _retry(config, comment_id, command):
-    msgs = "Retrying Azure Pipelines:\n"
+    if len(command.parts) > 1 and command.parts[1] == "mobile":
+        return
     check_ids, checks = _get_azp_checks()
 
     retried_checks = []
+    reaction = "confused"
     for check_id in check_ids:
         subchecks = [c for c in checks if c["external_id"] == check_id]
         if len(subchecks) == 0:
@@ -50,20 +52,15 @@ def _retry(config, comment_id, command):
             if check["status"] == "in_progress":
                 has_running = True
 
-        if not has_failure:
-            msgs += "Check {} didn't fail.\n".format(name_with_link)
-        else:
-            if has_running:
-                msgs += "Check {} isn't fully completed, but will still attempt retrying.\n".format(name_with_link)
+        if has_failure:
             _, build_id, project = check_id.split("|")
             _retry_azp(project, build_id, config["token"])
             retried_checks.append(name_with_link)
 
-    if len(retried_checks) == 0:
-        react(comment_id, msgs)
-    else:
-        react(comment_id, None)
-        msgs += "Retried failed jobs in: {}".format(", ".join(retried_checks))
-        github.issue_create_comment(msgs)
+    if len(retried_checks) != 0:
+        reaction = "+1"
+
+    github.issue_create_comment_reaction(comment_id, reaction)
+
 
 handlers.command(name = "retry-azp", func = _retry)

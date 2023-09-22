@@ -3,7 +3,7 @@
 External Processing
 ===================
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor``.
-* :ref:`Http filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`
 
 The external processing filter connects an external service, called an "external processor,"
 to the filter chain. The processing service itself implements a gRPC interface that allows
@@ -31,7 +31,7 @@ be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.e
 Statistics
 ----------
 This filter outputs statistics in the
-*http.<stat_prefix>.ext_proc.* namespace. The :ref:`stat prefix
+``http.<stat_prefix>.ext_proc.`` namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.
 

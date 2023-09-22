@@ -4,6 +4,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -39,13 +40,15 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
   init_manager.add(init_target_);
 }
 
-void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                const std::string& system_version_info) {
+absl::Status
+LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                           const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                           const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_rds_sds;
   if (cm_.adsMux()) {
     const std::vector<std::string> paused_xds_types{
         Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
+        Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
         Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
     maybe_resume_rds_sds = cm_.adsMux()->pause(paused_xds_types);
   }
@@ -75,7 +78,12 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
         // applied.
         throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
       }
-      if (listener_manager_.addOrUpdateListener(listener, resource.get().version(), true)) {
+      absl::StatusOr<bool> update_or_error =
+          listener_manager_.addOrUpdateListener(listener, resource.get().version(), true);
+      if (!update_or_error.status().ok()) {
+        throw EnvoyException(std::string(update_or_error.status().message()));
+      }
+      if (update_or_error.value()) {
         ENVOY_LOG(info, "lds: add/update listener '{}'", listener.name());
         any_applied = true;
       } else {
@@ -100,10 +108,11 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   if (!message.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating listener(s) {}", message));
   }
+  return absl::OkStatus();
 }
 
-void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                const std::string& version_info) {
+absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                        const std::string& version_info) {
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
   absl::node_hash_set<std::string> listeners_to_remove;
@@ -120,7 +129,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   for (const auto& listener : listeners_to_remove) {
     *to_remove_repeated.Add() = listener;
   }
-  onConfigUpdate(resources, to_remove_repeated, version_info);
+  return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
 void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

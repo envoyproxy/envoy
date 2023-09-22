@@ -81,6 +81,11 @@ public:
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   NiceMock<MockPrioritySet> priority_set_;
+
+  // Just use this as parameters of create() method but thread aware load balancer will not use it.
+  NiceMock<MockPrioritySet> worker_priority_set_;
+  LoadBalancerParams lb_params_{worker_priority_set_, {}};
+
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
@@ -104,14 +109,14 @@ INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::test
 // Given no hosts, expect chooseHost to return null.
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();
-  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr));
 
-  EXPECT_EQ(nullptr, lb_->factory()->create()->peekAnotherHost(nullptr));
-  EXPECT_FALSE(lb_->factory()->create()->lifetimeCallbacks().has_value());
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->peekAnotherHost(nullptr));
+  EXPECT_FALSE(lb_->factory()->create(lb_params_)->lifetimeCallbacks().has_value());
   std::vector<uint8_t> hash_key;
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_FALSE(lb_->factory()
-                   ->create()
+                   ->create(lb_params_)
                    ->selectExistingConnection(nullptr, *mock_host, hash_key)
                    .has_value());
 }
@@ -135,7 +140,7 @@ TEST_P(RingHashLoadBalancerTest, LbDestructedBeforeFactory) {
   auto factory = lb_->factory();
   lb_.reset();
 
-  EXPECT_NE(nullptr, factory->create());
+  EXPECT_NE(nullptr, factory->create(lb_params_));
 }
 
 // Given minimum_ring_size > maximum_ring_size, expect an exception.
@@ -184,7 +189,7 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
   // :94  | 15516499411664133160
   // :90  | 16117243373044804889
 
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
@@ -209,7 +214,7 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
 
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
-  lb = lb_->factory()->create();
+  lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
@@ -230,19 +235,19 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   EXPECT_EQ(12, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(12, lb_->stats().max_hashes_per_host_.value());
 
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 
   // Add a healthy host at P=0 and it will be chosen.
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
-  lb = lb_->factory()->create();
+  lb = lb_->factory()->create(lb_params_);
   EXPECT_EQ(host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 
   // Remove the healthy host and ensure we fail back over to the failover_host_set_
   host_set_.healthy_hosts_ = {};
   host_set_.runCallbacks({}, {});
-  lb = lb_->factory()->create();
+  lb = lb_->factory()->create(lb_params_);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 
   // Set up so P=0 gets 70% of the load, and P=1 gets 30%.
@@ -250,7 +255,7 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
                       makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
   host_set_.runCallbacks({}, {});
-  lb = lb_->factory()->create();
+  lb = lb_->factory()->create(lb_params_);
   EXPECT_CALL(random_, random()).WillOnce(Return(69));
   EXPECT_EQ(host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
   EXPECT_CALL(random_, random()).WillOnce(Return(71));
@@ -290,7 +295,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
   // ring hash: host=127.0.0.1:80 hash=15427156902705414897
   // ring hash: host=127.0.0.1:85 hash=16375050414328759093
   // ring hash: host=127.0.0.1:80 hash=17613279263364193813
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
@@ -356,7 +361,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
   // 91 | 14338313586354474791
   // 94 | 15364271037087512980
 
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
@@ -378,7 +383,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
 
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
-  lb = lb_->factory()->create();
+  lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
@@ -428,7 +433,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
   // 91 | 14338313586354474791
   // 94 | 15364271037087512980
 
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
@@ -450,7 +455,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
 
   hostSet().healthy_hosts_.clear();
   hostSet().runCallbacks({}, {});
-  lb = lb_->factory()->create();
+  lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
@@ -496,7 +501,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithRetryHostPredicate) {
   // :94  | 15516499411664133160
   // :90  | 16117243373044804889
 
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   {
     // Proof that we know which host will be selected.
     TestLoadBalancerContext context(0);
@@ -547,7 +552,7 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   // :80  | 13838424394637650569
   // :81  | 16064866803292627174
 
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(&context));
@@ -566,7 +571,7 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   // :82  | 12882406409176325258
   // :81  | 16064866803292627174
 
-  lb = lb_->factory()->create();
+  lb = lb_->factory()->create(lb_params_);
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(&context));
@@ -590,7 +595,7 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
   EXPECT_EQ(6, lb_->stats().size_.value());
   EXPECT_EQ(1, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(3, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // :90 should appear once, :91 should appear twice and :92 should appear three times.
   absl::node_hash_map<uint64_t, uint32_t> expected{
@@ -617,7 +622,7 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
   EXPECT_EQ(6144, lb_->stats().size_.value());
   EXPECT_EQ(1024, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(3072, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // Generate 6000 hashes around the ring and populate a histogram of which hosts they mapped to...
   uint32_t counts[3] = {0};
@@ -634,8 +639,13 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
 
 // Given locality weights all 0, expect the same behavior as if no hosts were provided at all.
 TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime())};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ =
       makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}});
@@ -644,16 +654,25 @@ TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
   hostSet().runCallbacks({}, {});
 
   init(true);
-  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr));
 }
 
 // Given localities with weights 1, 2, 3 and 0, and a ring size of exactly 6, expect the correct
 // number of hashes for each host.
 TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime())};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+  envoy::config::core::v3::Locality zone_d;
+  zone_d.set_zone("D");
+
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_c),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_d)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
@@ -669,7 +688,7 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   EXPECT_EQ(6, lb_->stats().size_.value());
   EXPECT_EQ(1, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(3, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // :90 should appear once, :91 should appear twice, :92 should appear three times,
   // and :93 shouldn't appear at all.
@@ -685,10 +704,19 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
 // Given localities with weights 1, 2, 3 and 0, and a sufficiently large ring, expect that requests
 // will distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime())};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_c.set_zone("C");
+  envoy::config::core::v3::Locality zone_d;
+  zone_d.set_zone("D");
+
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_c),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_d)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
@@ -702,7 +730,7 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   EXPECT_EQ(6144, lb_->stats().size_.value());
   EXPECT_EQ(1024, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(3072, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // Generate 6000 hashes around the ring and populate a histogram of which hosts they mapped to...
   uint32_t counts[4] = {0};
@@ -720,12 +748,17 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
 
 // Given both host weights and locality weights, expect the correct number of hashes for each host.
 TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), 2)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_a, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_b, 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
@@ -741,7 +774,7 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
   EXPECT_EQ(9, lb_->stats().size_.value());
   EXPECT_EQ(1, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(4, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // :90 should appear once, :91 and :92 should each appear two times, and :93 should appear four
   // times, to get the correct overall proportions.
@@ -758,12 +791,17 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
 // Given both host weights and locality weights, and a sufficiently large ring, expect that requests
 // will distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), 2)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_a, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_b, 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
@@ -777,7 +815,7 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
   EXPECT_EQ(9216, lb_->stats().size_.value());
   EXPECT_EQ(1024, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(4096, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // Generate 9000 hashes around the ring and populate a histogram of which hosts they mapped to...
   uint32_t counts[4] = {0};
@@ -810,7 +848,7 @@ TEST_P(RingHashLoadBalancerTest, SmallFractionalScale) {
   EXPECT_EQ(2, lb_->stats().size_.value());
   EXPECT_EQ(0, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(1, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // Generate some reasonable number of hashes around the ring and populate a histogram of which
   // hosts they mapped to. Here we don't care about the distribution (because the scale is
@@ -850,7 +888,7 @@ TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
   EXPECT_EQ(1023, lb_->stats().size_.value());
   EXPECT_EQ(511, lb_->stats().min_hashes_per_host_.value());
   EXPECT_EQ(512, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // Generate 1023 hashes around the ring and populate a histogram of which hosts they mapped to...
   uint32_t counts[2] = {0};
@@ -867,10 +905,16 @@ TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
 // Given extremely lopsided locality weights, and a ring that isn't large enough to fit all hosts,
 // expect that the correct proportion of hosts will be present in the ring.
 TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
   hostSet().hosts_.clear();
   HostVector heavy_but_sparse, light_but_dense;
   for (uint32_t i = 0; i < 1024; ++i) {
-    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime()));
+    auto host_locality = i == 0 ? zone_a : zone_b;
+    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime(), host_locality));
     hostSet().hosts_.push_back(host);
     (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }
@@ -889,7 +933,7 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
   // Host :0, from the heavy-but-sparse locality, should have 1016 out of the 1024 entries on the
   // ring, which gives us the right ratio of 127/128.
   EXPECT_EQ(1016, lb_->stats().max_hashes_per_host_.value());
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
   // Every 128th host in the light-but-dense locality should have an entry on the ring, for a total
   // of 8 entries. This gives us the right ratio of 1/128.

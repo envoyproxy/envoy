@@ -572,7 +572,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
           testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
           ReturnRef(*active_listener2)));
 
-  auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
+  auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
   auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
 
@@ -654,7 +654,7 @@ TEST_F(ActiveTcpListenerTest, Rebalance) {
         EXPECT_EQ(address, *normal_address);
         return Network::BalancedConnectionHandlerOptRef(*active_listener2);
       }));
-  auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
+  auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
   auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
 

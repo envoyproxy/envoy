@@ -1,12 +1,12 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_enable_http_datagrams",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -348,6 +348,7 @@ envoy_cc_library(
     deps = [
         ":quic_io_handle_wrapper_lib",
         ":quic_network_connection_lib",
+        "//source/common/network:generic_listener_filter_impl_base_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
     ],
@@ -506,8 +507,8 @@ envoy_cc_library(
         "//bazel:boringssl_fips": [],
         "//bazel:boringssl_disabled": [],
         "//conditions:default": [
-            ":server_codec_lib",
             ":quic_transport_socket_factory_lib",
+            ":server_codec_lib",
             "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
             "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",
         ],

@@ -115,6 +115,11 @@ public:
    * elements in a list value defined in endpoint metadata.
    */
   virtual bool listAsAny() const PURE;
+
+  /*
+   * @return bool whether redundant key/value pairs is allowed in the request metadata.
+   */
+  virtual bool allowRedundantKeys() const PURE;
 };
 
 } // namespace Upstream

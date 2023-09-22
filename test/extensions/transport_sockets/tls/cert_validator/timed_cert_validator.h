@@ -1,3 +1,5 @@
+#pragma once
+
 #include <openssl/ssl.h>
 
 #include <chrono>
@@ -20,13 +22,6 @@ public:
       : DefaultCertValidator(config, stats, time_source),
         validation_time_out_ms_(validation_time_out_ms), expected_host_name_(expected_host_name) {}
 
-  int doSynchronousVerifyCertChain(
-      X509_STORE_CTX* /*store_ctx*/, Ssl::SslExtendedSocketInfo* /*ssl_extended_info*/,
-      X509& /*leaf_cert*/,
-      const Network::TransportSocketOptions* /*transport_socket_options*/) override {
-    PANIC("unimplemented");
-  }
-
   ValidationResults
   doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
@@ -35,6 +30,9 @@ public:
                     absl::string_view host_name) override;
 
   bool validationPending() const { return validation_timer_->enabled(); }
+  void setExpectedLocalAddress(absl::string_view expected_local_address) {
+    expected_local_address_ = expected_local_address;
+  }
 
 private:
   Event::TimerPtr validation_timer_;
@@ -42,6 +40,7 @@ private:
   Ssl::ValidateResultCallbackPtr callback_;
   std::vector<std::string> cert_chain_in_str_;
   absl::optional<std::string> expected_host_name_;
+  absl::optional<std::string> expected_local_address_;
 };
 
 class TimedCertValidatorFactory : public CertValidatorFactory {

@@ -888,7 +888,6 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
   }
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.no_extension_lookup_by_name", false);
 
   // Register and config this factory to control upstream QUIC handshakes.
   QuicFailHandshakeCryptoServerStreamFactory crypto_stream_factory;
@@ -897,8 +896,9 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   crypto_stream_factory.setFailHandshake(false);
 
   envoy::config::listener::v3::QuicProtocolOptions options;
-  options.mutable_crypto_stream_config()->set_name(
-      "envoy.quic.crypto_stream.server.fail_handshake");
+  auto* crypto_stream_config = options.mutable_crypto_stream_config();
+  crypto_stream_config->set_name("envoy.quic.crypto_stream.server.fail_handshake");
+  crypto_stream_config->mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
   mergeOptions(options);
 
   initialize();

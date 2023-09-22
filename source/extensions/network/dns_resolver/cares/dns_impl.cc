@@ -146,11 +146,14 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
   if (status != ARES_SUCCESS) {
     parent_.chargeGetAddrInfoErrorStats(status, timeouts);
-  }
 
-  if (status != ARES_SUCCESS && !isResponseWithNoRecords(status)) {
-    ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
-                    "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+    if (!isResponseWithNoRecords(status)) {
+      ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
+                      "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+    } else {
+      ENVOY_LOG_EVENT(debug, "cares_resolution_no_records", "dns resolution without records for {}",
+                      dns_name_);
+    }
   }
 
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
@@ -201,6 +204,13 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
       bool can_process_v6 =
           (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
 
+      int min_ttl = INT_MAX; // [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181)
+      // Loop through CNAME and get min_ttl
+      for (const ares_addrinfo_cname* cname = addrinfo->cnames; cname != nullptr;
+           cname = cname->next) {
+        min_ttl = std::min(min_ttl, cname->ttl);
+      }
+
       for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
         if (ai->ai_family == AF_INET && can_process_v4) {
           sockaddr_in address;
@@ -211,7 +221,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
           pending_response_.address_list_.emplace_back(
               DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
-                          std::chrono::seconds(ai->ai_ttl)));
+                          std::chrono::seconds(std::min(min_ttl, ai->ai_ttl))));
         } else if (ai->ai_family == AF_INET6 && can_process_v6) {
           sockaddr_in6 address;
           memset(&address, 0, sizeof(address));
@@ -220,7 +230,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
           address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
           pending_response_.address_list_.emplace_back(
               DnsResponse(std::make_shared<const Address::Ipv6Instance>(address),
-                          std::chrono::seconds(ai->ai_ttl)));
+                          std::chrono::seconds(std::min(min_ttl, ai->ai_ttl))));
         }
       }
     }
@@ -284,6 +294,7 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
     TRY_NEEDS_AUDIT {
       callback_(pending_response_.status_, std::move(pending_response_.address_list_));
     }
+    END_TRY
     catch (const EnvoyException& e) {
       ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
       dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });

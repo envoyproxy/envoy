@@ -106,13 +106,15 @@ public:
   // Network::FilterChainFactory
   bool
   createNetworkFilterChain(Network::Connection& connection,
-                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
+                           const Filter::NetworkFilterFactoriesList& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
                                     Network::UdpReadFilterCallbacks&) override {}
+  bool createQuicListenerFilterChain(Network::QuicListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager, bool) const override;
+  bool createFilterChain(Http::FilterChainManager& manager, bool,
+                         const Http::FilterChainOptions&) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                 Http::FilterChainManager&) const override {
     return false;
@@ -124,6 +126,7 @@ public:
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override { return false; }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return null_access_log_flush_interval_;
   }
@@ -155,6 +158,7 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;
   }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override { return scope_key_builder_; }
   const std::string& serverName() const override { return Http::DefaultServerString::get(); }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -272,7 +276,7 @@ private:
     Rds::ConfigConstSharedPtr config() const override { return config_; }
     const absl::optional<ConfigInfo>& configInfo() const override { return config_info_; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-    void onConfigUpdate() override {}
+    absl::Status onConfigUpdate() override { return absl::OkStatus(); }
     Router::ConfigConstSharedPtr configCast() const override { return config_; }
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
@@ -302,6 +306,16 @@ private:
 
     Router::ScopedConfigConstSharedPtr config_;
     TimeSource& time_source_;
+  };
+
+  /**
+   * Implementation of ScopeKeyBuilder that returns a null scope key.
+   */
+  struct NullScopeKeyBuilder : public Router::ScopeKeyBuilder {
+    NullScopeKeyBuilder() = default;
+    ~NullScopeKeyBuilder() override = default;
+
+    Router::ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const override { return nullptr; };
   };
 
   /**
@@ -415,6 +429,9 @@ private:
       return empty_access_logs_;
     }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+      return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+    }
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
@@ -447,7 +464,7 @@ private:
       return std::chrono::milliseconds::zero();
     }
 
-    const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
+    const Filter::NetworkFilterFactoriesList& networkFilterFactories() const override {
       return empty_network_filter_factory_;
     }
 
@@ -455,7 +472,7 @@ private:
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
-    const std::vector<Network::FilterFactoryCb> empty_network_filter_factory_;
+    const Filter::NetworkFilterFactoriesList empty_network_filter_factory_;
   };
 
   Server::Instance& server_;
@@ -472,6 +489,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  NullScopeKeyBuilder scope_key_builder_;
   Server::ClustersHandler clusters_handler_;
   Server::ConfigDumpHandler config_dump_handler_;
   Server::InitDumpHandler init_dump_handler_;

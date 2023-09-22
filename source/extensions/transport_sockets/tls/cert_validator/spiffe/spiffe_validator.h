@@ -41,9 +41,6 @@ public:
   // Tls::CertValidator
   void addClientValidationContext(SSL_CTX* context, bool require_client_cert) override;
 
-  int doSynchronousVerifyCertChain(
-      X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
-      const Network::TransportSocketOptions* transport_socket_options) override;
   ValidationResults
   doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,

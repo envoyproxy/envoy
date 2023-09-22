@@ -37,6 +37,8 @@ public:
     ConnectionReset,
     // Network is unreachable due to network settings.
     NetworkUnreachable,
+    // Invalid arguments passed in.
+    InvalidArgument,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };

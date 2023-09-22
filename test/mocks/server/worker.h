@@ -41,7 +41,9 @@ public:
   MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
-              (Network::ListenerConfig & listener, std::function<void()> completion));
+              (Network::ListenerConfig & listener,
+               const Network::ExtraShutdownListenerOptions& options,
+               std::function<void()> completion));
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));

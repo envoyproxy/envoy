@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <memory>
+#include <vector>
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -20,6 +22,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
+#include "test/mocks/common.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -109,6 +112,50 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_TRUE(snapshot.textReadouts().empty());
   }));
   InstanceUtil::flushMetricsToSinks(sinks, mock_store, time_system);
+}
+
+TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
+  InSequence s;
+
+  Stats::TestUtil::TestStore store;
+  Event::SimulatedTimeSystem time_system;
+  Stats::Counter& c = store.counter("hello");
+  c.inc();
+  store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
+  store.gauge("again", Stats::Gauge::ImportMode::Uninitialized).set(10);
+
+  std::list<Stats::SinkPtr> sinks;
+  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  // Make sure that counters have been latched even if there are no sinks.
+  EXPECT_EQ(1UL, c.value());
+  EXPECT_EQ(0, c.latch());
+
+  Stats::MockSink* sink = new StrictMock<Stats::MockSink>();
+  sinks.emplace_back(sink);
+  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+    ASSERT_EQ(snapshot.counters().size(), 1);
+    EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
+    EXPECT_EQ(snapshot.counters()[0].delta_, 1);
+
+    ASSERT_EQ(snapshot.gauges().size(), 2);
+    auto world_it = std::find_if(snapshot.gauges().begin(), snapshot.gauges().end(),
+                                 [](const std::reference_wrapper<const Stats::Gauge>& gauge) {
+                                   return gauge.get().name().compare("world") == 0;
+                                 });
+    ASSERT_TRUE(world_it != snapshot.gauges().end());
+    EXPECT_EQ(world_it->get().value(), 5);
+
+    auto again_it = std::find_if(snapshot.gauges().begin(), snapshot.gauges().end(),
+                                 [](const std::reference_wrapper<const Stats::Gauge>& gauge) {
+                                   return gauge.get().name().compare("again") == 0;
+                                 });
+    ASSERT_TRUE(again_it != snapshot.gauges().end());
+    EXPECT_EQ(again_it->get().value(), 10);
+
+    ASSERT_EQ(snapshot.textReadouts().size(), 0);
+  }));
+  c.inc();
+  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
 }
 
 class RunHelperTest : public testing::Test {
@@ -439,9 +486,6 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -789,9 +833,6 @@ TEST_P(ServerStatsTest, FlushStats) {
 }
 
 TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
   auto server_thread =
@@ -818,9 +859,6 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
 }
 
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -1549,7 +1587,7 @@ public:
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster&) override {}
+  void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override {}
   void onClusterRemoval(const std::string&) override {}
 
 private:
@@ -1579,9 +1617,6 @@ public:
 // lifecycle callback is also used to ensure that the cluster update callback is freed during
 // Server::Instance's destruction. See issue #9292 for more details.
 TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   CallbacksStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -1622,6 +1657,54 @@ TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
+  EXPECT_CALL(options_, logFormatSet()).WillRepeatedly(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log.yaml"), EnvoyException,
+      "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagv) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flagv.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flag_.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats");
+}
+
+TEST_P(ServerInstanceImplTest, TextApplicationLog) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/text_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
 }
 
 } // namespace

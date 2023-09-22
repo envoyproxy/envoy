@@ -89,6 +89,7 @@ public:
   MOCK_METHOD(void, onDecodingSuccess, (ResponsePtr response, ExtendedOptions options));
   MOCK_METHOD(void, onDecodingFailure, ());
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
+  MOCK_METHOD(OptRef<Network::Connection>, connection, ());
   MOCK_METHOD(void, onConnectionClose, (Network::ConnectionEvent event));
 };
 
@@ -115,6 +116,7 @@ public:
   MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(absl::optional<ExtendedOptions>, requestOptions, (), (const));
   MOCK_METHOD(absl::optional<ExtendedOptions>, responseOptions, (), (const));
+  MOCK_METHOD(const Network::Connection*, connection, (), (const));
 };
 
 class MockUpstreamManager : public UpstreamManager {

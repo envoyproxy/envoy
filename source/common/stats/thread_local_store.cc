@@ -172,11 +172,7 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
   forEachGauge([&ret](std::size_t size) { ret.reserve(size); },
-               [&ret](Gauge& gauge) {
-                 if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
-                   ret.emplace_back(GaugeSharedPtr(&gauge));
-                 }
-               });
+               [&ret](Gauge& gauge) { ret.emplace_back(GaugeSharedPtr(&gauge)); });
   return ret;
 }
 
@@ -585,7 +581,8 @@ void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, u
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Gauge::ImportMode import_mode) {
-  if (parent_.rejectsAll()) {
+  // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
+  if (parent_.rejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
     return parent_.null_gauge_;
   }
 
@@ -594,7 +591,12 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
-  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
+  StatsMatcher::FastResult fast_reject_result;
+  if (import_mode != Gauge::ImportMode::HiddenAccumulate) {
+    fast_reject_result = parent_.fastRejects(final_stat_name);
+  } else {
+    fast_reject_result = StatsMatcher::FastResult::Matches;
+  }
   if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_gauge_;
   }
@@ -906,6 +908,8 @@ bool ParentHistogramImpl::used() const {
   return merged_;
 }
 
+bool ParentHistogramImpl::hidden() const { return false; }
+
 void ParentHistogramImpl::merge() {
   Thread::ReleasableLockGuard lock(merge_lock_);
   if (merged_ || usedLockHeld()) {
@@ -938,7 +942,7 @@ std::string ParentHistogramImpl::quantileSummary() const {
     }
     return absl::StrJoin(summary, " ");
   } else {
-    return std::string("No recorded values");
+    return {"No recorded values"};
   }
 }
 
@@ -954,55 +958,21 @@ std::string ParentHistogramImpl::bucketSummary() const {
     }
     return absl::StrJoin(bucket_summary, " ");
   } else {
-    return std::string("No recorded values");
+    return {"No recorded values"};
   }
 }
 
 std::vector<Stats::ParentHistogram::Bucket>
-ParentHistogramImpl::detailedTotalBuckets(uint32_t max_buckets) const {
-  return detailedlBucketsHelper(max_buckets, *cumulative_histogram_);
-}
-
-std::vector<Stats::ParentHistogram::Bucket>
-ParentHistogramImpl::detailedIntervalBuckets(uint32_t max_buckets) const {
-  return detailedlBucketsHelper(max_buckets, *interval_histogram_);
-}
-
-std::vector<Stats::ParentHistogram::Bucket>
-ParentHistogramImpl::detailedlBucketsHelper(uint32_t max_buckets, const histogram_t& histogram) {
-  const uint32_t num_src_buckets = hist_num_buckets(&histogram);
-  if (max_buckets == 0) {
-    max_buckets = num_src_buckets;
-  }
-  const uint32_t num_buckets = std::min(max_buckets, num_src_buckets);
-  uint32_t num_src_buckets_per_bucket = 1;
-  uint32_t remainder = 0;
-  if (num_src_buckets > num_buckets) {
-    num_src_buckets_per_bucket = num_src_buckets / num_buckets;
-    remainder = num_src_buckets - num_buckets * num_src_buckets_per_bucket;
-    ASSERT(remainder < num_buckets);
-  }
-
+ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) {
+  const uint32_t num_buckets = hist_num_buckets(&histogram);
   std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
-  uint32_t src = 0;
-  for (uint32_t dest = 0; dest < num_buckets; ++dest) {
-    ParentHistogram::Bucket& bucket = buckets[dest];
-    uint32_t merges = num_src_buckets_per_bucket;
-    if (remainder > 0) {
-      ++merges;
-      --remainder;
-    }
-    for (uint32_t i = 0; i < merges; ++i, ++src) {
-      ASSERT(src < num_src_buckets);
-      double value;
-      uint64_t count;
-      /*int ret = */ hist_bucket_idx(&histogram, src, &value, &count);
-      bucket.count_ += count;
-      bucket.value_ += value;
-    }
-    bucket.value_ /= merges;
+  hist_bucket_t hist_bucket;
+  for (uint32_t i = 0; i < num_buckets; ++i) {
+    ParentHistogram::Bucket& bucket = buckets[i];
+    hist_bucket_idx_bucket(&histogram, i, &hist_bucket, &bucket.count_);
+    bucket.lower_bound_ = hist_bucket_to_double(hist_bucket);
+    bucket.width_ = hist_bucket_to_double_bin_width(hist_bucket);
   }
-  ASSERT(src == num_src_buckets);
   return buckets;
 }
 
@@ -1120,6 +1090,20 @@ void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& s
         sinked_histograms_.insert(histogram);
       }
     }
+  }
+}
+
+void ThreadLocalStoreImpl::extractAndAppendTags(StatName name, StatNamePool& pool,
+                                                StatNameTagVector& stat_tags) {
+  extractAndAppendTags(symbolTable().toString(name), pool, stat_tags);
+}
+
+void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                                                StatNameTagVector& stat_tags) {
+  TagVector tags;
+  tagProducer().produceTags(name, tags);
+  for (const auto& tag : tags) {
+    stat_tags.emplace_back(pool.add(tag.name_), pool.add(tag.value_));
   }
 }
 

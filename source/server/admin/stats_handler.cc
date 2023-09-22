@@ -171,6 +171,7 @@ Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_hea
   return Http::Code::OK;
 }
 
+#if 0
 Admin::UrlHandler StatsHandler::statsHandler(const std::string& prefix, bool active_html) {
   Admin::ParamDescriptor usedonly{
       Admin::ParamDescriptor::Type::Boolean, "usedonly",
@@ -179,11 +180,28 @@ Admin::UrlHandler StatsHandler::statsHandler(const std::string& prefix, bool act
                                 "Regular expression (Google re2) for filtering stats"};
   Admin::ParamDescriptor format{
       Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}};
+#else
+Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
+  Admin::ParamDescriptor usedonly{
+      Admin::ParamDescriptor::Type::Boolean, "usedonly",
+      "Only include stats that have been written by system since restart"};
+  Admin::ParamDescriptor histogram_buckets{Admin::ParamDescriptor::Type::Enum,
+                                           "histogram_buckets",
+                                           "Histogram bucket display mode",
+                                           {"cumulative", "disjoint", "detailed", "none"}};
+  Admin::ParamDescriptor format{Admin::ParamDescriptor::Type::Enum,
+                                "format",
+                                "Format to use",
+                                {"html", "active-html", "text", "json"}};
+  Admin::ParamDescriptor filter{Admin::ParamDescriptor::Type::String, "filter",
+                                "Regular expression (Google re2) for filtering stats"};
+#endif
   Admin::ParamDescriptor type{Admin::ParamDescriptor::Type::Enum,
                               "type",
                               "Stat types to include.",
                               {StatLabels::All, StatLabels::Counters, StatLabels::Histograms,
                                StatLabels::Gauges, StatLabels::TextReadouts}};
+#if 0
   Admin::ParamDescriptor histogram_buckets{Admin::ParamDescriptor::Type::Enum,
                                            "histogram_buckets",
                                            "Histogram bucket display mode",
@@ -198,6 +216,15 @@ Admin::UrlHandler StatsHandler::statsHandler(const std::string& prefix, bool act
     params.push_back(filter);
     params.push_back(format);
     params.push_back(type);
+#else
+
+  Admin::ParamDescriptorVec params{usedonly, filter};
+  if (!active_mode) {
+    params.push_back(format);
+  }
+  params.push_back(type);
+  if (!active_mode) {
+#endif
     params.push_back(histogram_buckets);
   }
 

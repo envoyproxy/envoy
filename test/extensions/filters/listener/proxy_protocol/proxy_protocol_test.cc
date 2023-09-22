@@ -115,6 +115,9 @@ public:
     return empty_access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+  }
   Init::Manager& initManager() override { return *init_manager_; }
   bool ignoreGlobalConnLimit() const override { return false; }
 
@@ -151,7 +154,7 @@ public:
       read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([&](Network::Connection& connection,
-                               const std::vector<Network::FilterFactoryCb>&) -> bool {
+                               const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
             connection.addReadFilter(read_filter_);
@@ -855,6 +858,13 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1066,6 +1076,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
   connect(false);
   write(buffer, 17);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1168,6 +1185,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
       }));
   connect(false);
   write(buffer, 10);
@@ -1919,6 +1943,13 @@ TEST_P(ProxyProtocolTest, DrainError) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
 
   connect(false);
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -2001,6 +2032,9 @@ public:
     return empty_access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+  }
   Init::Manager& initManager() override { return *init_manager_; }
   bool ignoreGlobalConnLimit() const override { return false; }
 
@@ -2015,7 +2049,7 @@ public:
     read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
     EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
         .WillOnce(Invoke([&](Network::Connection& connection,
-                             const std::vector<Network::FilterFactoryCb>&) -> bool {
+                             const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);
           connection.addReadFilter(read_filter_);

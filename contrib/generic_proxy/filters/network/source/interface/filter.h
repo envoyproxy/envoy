@@ -75,6 +75,11 @@ public:
    * @return absl::optional<ExtendedOptions> the extended options from upstream response.
    */
   virtual absl::optional<ExtendedOptions> responseOptions() const PURE;
+
+  /**
+   * @return const Network::Connection* downstream connection.
+   */
+  virtual const Network::Connection* connection() const PURE;
 };
 
 class UpstreamBindingCallback {

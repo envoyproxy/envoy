@@ -1,10 +1,10 @@
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data")
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
-load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_binary")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data")
 
 licenses(["notice"])  # Apache 2
 
@@ -107,11 +107,11 @@ genrule(
         --build_file=$(location //tools/type_whisperer:api_build_file) \
         --protoprinted=$(location //tools/protoprint:protoprinted) \
     """,
-    exec_tools = [
+    tools = [
         ":format_api",
         ":xformed",
-        "//tools/type_whisperer:api_build_file",
         "//tools/protoprint:protoprinted",
+        "//tools/type_whisperer:api_build_file",
     ],
 )
 

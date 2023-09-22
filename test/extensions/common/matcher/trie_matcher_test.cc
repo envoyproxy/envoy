@@ -135,6 +135,45 @@ matcher_tree:
   }
 }
 
+TEST_F(TrieMatcherTest, TestInvalidMatcher) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.FloatValue
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+      - ranges:
+        - address_prefix: 192.101.0.0
+          prefix_len: 10
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: bar
+  )EOF";
+  loadConfig(yaml);
+  auto input_factory = ::Envoy::Matcher::TestDataInputFloatFactory(3.14);
+  auto match_tree = factory_.create(matcher_);
+  std::string error_message = absl::StrCat("Unsupported data input type: float, currently only "
+                                           "string type is supported in trie matcher");
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
+}
+
 TEST_F(TrieMatcherTest, TestMatcherOnNoMatch) {
   const std::string yaml = R"EOF(
 matcher_tree:

@@ -135,6 +135,8 @@ struct ResponseCodeDetailValues {
   const std::string InvalidEnvoyRequestHeaders = "request_headers_failed_strict_check";
   // The request was rejected due to a missing Path or :path header field.
   const std::string MissingPath = "missing_path_rejected";
+  // The request was rejected due to an invalid Path or :path header field.
+  const std::string InvalidPath = "invalid_path";
   // The request was rejected due to using an absolute path on a route not supporting them.
   const std::string AbsolutePath = "absolute_path_rejected";
   // The request was rejected because path normalization was configured on and failed, probably due
@@ -229,6 +231,8 @@ struct LocalCloseReasonValues {
       "closing_upstream_tcp_connection_due_to_downstream_remote_close";
   const std::string ClosingUpstreamTcpDueToDownstreamLocalClose =
       "closing_upstream_tcp_connection_due_to_downstream_local_close";
+  const std::string ClosingUpstreamTcpDueToDownstreamResetClose =
+      "closing_upstream_tcp_connection_due_to_downstream_reset_close";
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
 };
@@ -375,20 +379,77 @@ private:
 
 // Measure the number of bytes sent and received for a stream.
 struct BytesMeter {
+  BytesMeter() = default;
   uint64_t wireBytesSent() const { return wire_bytes_sent_; }
   uint64_t wireBytesReceived() const { return wire_bytes_received_; }
   uint64_t headerBytesSent() const { return header_bytes_sent_; }
   uint64_t headerBytesReceived() const { return header_bytes_received_; }
+
   void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
   void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+
+  struct BytesSnapshot {
+    SystemTime snapshot_time;
+    uint64_t header_bytes_sent{};
+    uint64_t header_bytes_received{};
+    uint64_t wire_bytes_sent{};
+    uint64_t wire_bytes_received{};
+  };
+  void takeDownstreamPeriodicLoggingSnapshot(const SystemTime& snapshot_time) {
+    downstream_periodic_logging_bytes_snapshot_ = std::make_unique<BytesSnapshot>();
+
+    downstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
+    downstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    downstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
+  }
+  void takeUpstreamPeriodicLoggingSnapshot(const SystemTime& snapshot_time) {
+    upstream_periodic_logging_bytes_snapshot_ = std::make_unique<BytesSnapshot>();
+
+    upstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
+    upstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    upstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
+  }
+  const BytesSnapshot* bytesAtLastDownstreamPeriodicLog() const {
+    return downstream_periodic_logging_bytes_snapshot_.get();
+  }
+  const BytesSnapshot* bytesAtLastUpstreamPeriodicLog() const {
+    return upstream_periodic_logging_bytes_snapshot_.get();
+  }
+  // Adds the bytes from `existing` to `this`.
+  // Additionally, captures the snapshots on `existing` and adds them to `this`.
+  void captureExistingBytesMeter(BytesMeter& existing) {
+    // Add bytes accumulated on `this` to the pre-existing periodic bytes collectors.
+    if (existing.downstream_periodic_logging_bytes_snapshot_) {
+      downstream_periodic_logging_bytes_snapshot_ =
+          std::move(existing.downstream_periodic_logging_bytes_snapshot_);
+      existing.downstream_periodic_logging_bytes_snapshot_ = nullptr;
+    }
+    if (existing.upstream_periodic_logging_bytes_snapshot_) {
+      upstream_periodic_logging_bytes_snapshot_ =
+          std::move(existing.upstream_periodic_logging_bytes_snapshot_);
+      existing.upstream_periodic_logging_bytes_snapshot_ = nullptr;
+    }
+
+    // Accumulate existing bytes.
+    header_bytes_sent_ += existing.header_bytes_sent_;
+    header_bytes_received_ += existing.header_bytes_received_;
+    wire_bytes_sent_ += existing.wire_bytes_sent_;
+    wire_bytes_received_ += existing.wire_bytes_received_;
+  }
 
 private:
   uint64_t header_bytes_sent_{};
   uint64_t header_bytes_received_{};
   uint64_t wire_bytes_sent_{};
   uint64_t wire_bytes_received_{};
+  std::unique_ptr<BytesSnapshot> downstream_periodic_logging_bytes_snapshot_;
+  std::unique_ptr<BytesSnapshot> upstream_periodic_logging_bytes_snapshot_;
 };
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
@@ -551,12 +612,8 @@ public:
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
-   * @param std::string name denotes the name of the route.
-   */
-  virtual void setRouteName(absl::string_view name) PURE;
-
-  /**
-   * @return std::string& the name of the route.
+   * @return std::string& the name of the route. The name is get from the route() and it is
+   *         empty if there is no route.
    */
   virtual const std::string& getRouteName() const PURE;
 
@@ -579,6 +636,26 @@ public:
    * @return the number of body bytes received by the stream.
    */
   virtual uint64_t bytesReceived() const PURE;
+
+  /**
+   * @param bytes_retransmitted denotes number of bytes to add to total retransmitted bytes.
+   */
+  virtual void addBytesRetransmitted(uint64_t bytes_retransmitted) PURE;
+
+  /**
+   * @return the number of bytes retransmitted by the stream.
+   */
+  virtual uint64_t bytesRetransmitted() const PURE;
+
+  /**
+   * @param packets_retransmitted denotes number of packets to add to total retransmitted packets.
+   */
+  virtual void addPacketsRetransmitted(uint64_t packets_retransmitted) PURE;
+
+  /**
+   * @return the number of packets retransmitted by the stream.
+   */
+  virtual uint64_t packetsRetransmitted() const PURE;
 
   /**
    * @return the protocol of the request.
@@ -763,16 +840,6 @@ public:
   virtual Tracing::Reason traceReason() const PURE;
 
   /**
-   * @param filter_chain_name Network filter chain name of the downstream connection.
-   */
-  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
-
-  /**
-   * @return Network filter chain name of the downstream connection.
-   */
-  virtual const std::string& filterChainName() const PURE;
-
-  /**
    * @param attempt_count, the number of times the request was attempted upstream.
    */
   virtual void setAttemptCount(uint32_t attempt_count) PURE;
@@ -831,6 +898,20 @@ public:
    * @param failure_reason the downstream transport failure reason.
    */
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * Checked by streams after finishing serving the request.
+   * @return bool true if the connection should be drained once this stream has
+   * finished sending and receiving.
+   */
+  virtual bool shouldDrainConnectionUponCompletion() const PURE;
+
+  /**
+   * Called if the connection decides to drain itself after serving this request.
+   * @param should_drain true to close the connection once this stream has
+   * finished sending and receiving.
+   */
+  virtual void setShouldDrainConnectionUponCompletion(bool should_drain) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

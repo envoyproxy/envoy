@@ -320,6 +320,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       added_via_api_(added_via_api), workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      max_connections_to_accept_per_socket_event_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
+                                          Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -354,8 +357,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       transport_factory_context_(
           std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
               parent_.server_.serverFactoryContext(), parent_.server_.sslContextManager(),
-              listenerScope(), parent_.server_.clusterManager(), parent_.server_.stats(),
-              validation_visitor_)),
+              listenerScope(), parent_.server_.clusterManager(), validation_visitor_)),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
@@ -447,6 +449,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      max_connections_to_accept_per_socket_event_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
+                                          Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -576,17 +581,18 @@ void ListenerImpl::buildInternalListener() {
   }
 }
 
-void ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+bool ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                                 uint32_t concurrency) {
   if (socket_type_ != Network::Socket::Type::Datagram) {
-    return;
+    return false;
   }
   auto iter = udp_listener_config_->listener_worker_routers_.find(address.asString());
   if (iter != udp_listener_config_->listener_worker_routers_.end()) {
-    return;
+    return false;
   }
   udp_listener_config_->listener_worker_routers_.emplace(
       address.asString(), std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency));
+  return true;
 }
 
 void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
@@ -699,10 +705,17 @@ void ListenerImpl::buildListenSocketOptions(
 void ListenerImpl::createListenerFilterFactories() {
   if (!config_.listener_filters().empty()) {
     switch (socket_type_) {
-    case Network::Socket::Type::Datagram:
-      udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
-          config_.listener_filters(), *listener_factory_context_);
+    case Network::Socket::Type::Datagram: {
+      if (udp_listener_config_->listener_factory_->isTransportConnectionless()) {
+        udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
+            config_.listener_filters(), *listener_factory_context_);
+      } else {
+        // This is a QUIC listener.
+        quic_listener_filter_factories_ = parent_.factory_->createQuicListenerFilterFactoryList(
+            config_.listener_filters(), *listener_factory_context_);
+      }
       break;
+    }
     case Network::Socket::Type::Stream:
       listener_filter_factories_ = parent_.factory_->createListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
@@ -940,9 +953,15 @@ bool PerListenerFactoryContextImpl::isQuicListener() const {
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
 bool ListenerImpl::createNetworkFilterChain(
-    Network::Connection& connection,
-    const std::vector<Network::FilterFactoryCb>& filter_factories) {
-  return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+    Network::Connection& connection, const Filter::NetworkFilterFactoriesList& filter_factories) {
+  if (!Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories)) {
+    ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                     "Close socket and stop the iteration onAccept.");
+    missing_listener_config_stats_.network_extension_config_missing_.inc();
+    return false;
+  }
+
+  return true;
 }
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
@@ -960,6 +979,17 @@ void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManage
                                                 Network::UdpReadFilterCallbacks& callbacks) {
   Configuration::FilterChainUtility::buildUdpFilterChain(manager, callbacks,
                                                          udp_listener_filter_factories_);
+}
+
+bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterManager& manager) {
+  if (Configuration::FilterChainUtility::buildQuicFilterChain(manager,
+                                                              quic_listener_filter_factories_)) {
+    return true;
+  }
+  ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                   "Close socket and stop the iteration onAccept.");
+  missing_listener_config_stats_.extension_config_missing_.inc();
+  return false;
 }
 
 void ListenerImpl::debugLog(const std::string& message) {
@@ -993,8 +1023,11 @@ Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
   buildConnectionBalancer(*socket_factory->localAddress());
-  buildUdpListenerWorkerRouter(*socket_factory->localAddress(),
-                               parent_.server_.options().concurrency());
+  if (buildUdpListenerWorkerRouter(*socket_factory->localAddress(),
+                                   parent_.server_.options().concurrency())) {
+    parent_.server_.hotRestart().registerUdpForwardingListener(socket_factory->localAddress(),
+                                                               udp_listener_config_);
+  }
   socket_factories_.emplace_back(std::move(socket_factory));
 }
 
@@ -1133,8 +1166,7 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   // Skip the duplicate address check if this is the case of a listener update with new socket
   // options.
-  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG) &&
-      (name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
+  if ((name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
     return false;
   }
 

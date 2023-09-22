@@ -213,6 +213,7 @@ void CheckRequestUtils::createHttpCheck(
 
   if (include_tls_session) {
     if (cb->connection()->ssl() != nullptr) {
+      attrs->mutable_tls_session();
       if (!cb->connection()->ssl()->sni().empty()) {
         const std::string server_name(cb->connection()->ssl()->sni());
         attrs->mutable_tls_session()->set_sni(server_name);

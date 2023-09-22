@@ -13,6 +13,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/filter_factory.h"
+#include "envoy/http/hash_policy.h"
 #include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
@@ -21,6 +22,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/access_log/access_log_impl.h"
@@ -40,7 +42,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
-#include "source/common/upstream/upstream_http_factory_context_impl.h"
+#include "source/common/upstream/upstream_factory_context_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -230,55 +232,18 @@ public:
 
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
-               const envoy::extensions::filters::http::router::v3::Router& config)
-      : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                     context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-                     PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span(), config.suppress_envoy_headers(),
-                     config.respect_expected_rq_timeout(),
-                     config.suppress_grpc_request_failure_code_stats(),
-                     config.has_upstream_log_options()
-                         ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
-                         : false,
-                     config.strict_check_headers(), context.api().timeSource(),
-                     context.httpContext(), context.routerContext()) {
-    for (const auto& upstream_log : config.upstream_log()) {
-      upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
-    }
+               const envoy::extensions::filters::http::router::v3::Router& config);
 
-    if (config.has_upstream_log_options() &&
-        config.upstream_log_options().has_upstream_log_flush_interval()) {
-      upstream_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-          config.upstream_log_options().upstream_log_flush_interval()));
-    }
-
-    if (config.upstream_http_filters_size() > 0) {
-      auto& server_factory_ctx = context.getServerFactoryContext();
-      const Http::FilterChainUtility::FiltersList& upstream_http_filters =
-          config.upstream_http_filters();
-      std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
-          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-              server_factory_ctx);
-      std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
-      upstream_ctx_ = std::make_unique<Upstream::UpstreamHttpFactoryContextImpl>(
-          server_factory_ctx, context.initManager(), context.scope());
-      Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
-                              Server::Configuration::UpstreamHttpFilterConfigFactory>
-          helper(*filter_config_provider_manager, server_factory_ctx, *upstream_ctx_, prefix);
-      helper.processFilters(upstream_http_filters, "router upstream http", "router upstream http",
-                            upstream_http_filter_factories_);
-    }
-  }
-
-  bool createFilterChain(Http::FilterChainManager& manager,
-                         bool only_create_if_configured = false) const override {
+  bool createFilterChain(
+      Http::FilterChainManager& manager, bool only_create_if_configured = false,
+      const Http::FilterChainOptions& options = Http::EmptyFilterChainOptions{}) const override {
     // Currently there is no default filter chain, so only_create_if_configured true doesn't make
     // sense.
     ASSERT(!only_create_if_configured);
     if (upstream_http_filter_factories_.empty()) {
       return false;
     }
-    Http::FilterChainUtility::createFilterChainForFactories(manager,
+    Http::FilterChainUtility::createFilterChainForFactories(manager, options,
                                                             upstream_http_filter_factories_);
     return true;
   }
@@ -316,7 +281,7 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
-  std::unique_ptr<Server::Configuration::UpstreamHttpFactoryContext> upstream_ctx_;
+  std::unique_ptr<Server::Configuration::UpstreamFactoryContext> upstream_ctx_;
   Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
 
 private:
@@ -380,10 +345,9 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(FilterConfig& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
-        downstream_1xx_headers_encoded_(false), downstream_response_started_(false),
-        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false),
-        streaming_shadows_(
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {}
+        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
+        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
+                                               "envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -409,8 +373,9 @@ public:
         return hash_policy->generateHash(
             callbacks_->streamInfo().downstreamAddressProvider().remoteAddress().get(),
             *downstream_headers_,
-            [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
-              return addDownstreamSetCookie(key, path, max_age);
+            [this](const std::string& key, const std::string& path, std::chrono::seconds max_age,
+                   Http::CookieAttributeRefVector attributes) {
+              return addDownstreamSetCookie(key, path, max_age, attributes);
             },
             callbacks_->streamInfo().filterState());
       }
@@ -444,6 +409,9 @@ public:
   }
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection().ptr();
+  }
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &callbacks_->streamInfo();
   }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
@@ -501,7 +469,8 @@ public:
    * @return std::string the value of the new cookie
    */
   std::string addDownstreamSetCookie(const std::string& key, const std::string& path,
-                                     std::chrono::seconds max_age) {
+                                     std::chrono::seconds max_age,
+                                     Http::CookieAttributeRefVector attributes) {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
     // Since the downstream port is part of the hashed value, multiple HTTP1
@@ -514,7 +483,7 @@ public:
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
-        Http::Utility::makeSetCookieValue(key, cookie_value, path, max_age, true));
+        Http::Utility::makeSetCookieValue(key, cookie_value, path, max_age, true, attributes));
     return cookie_value;
   }
 
@@ -558,7 +527,7 @@ public:
   const FilterStats& stats() { return stats_; }
 
 protected:
-  void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
+  void setRetryShadowBufferLimit(uint32_t retry_shadow_buffer_limit) {
     ASSERT(retry_shadow_buffer_limit_ > retry_shadow_buffer_limit);
     retry_shadow_buffer_limit_ = retry_shadow_buffer_limit;
   }
@@ -637,7 +606,7 @@ private:
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
-  const VirtualCluster* request_vcluster_;
+  const VirtualCluster* request_vcluster_{};
   RouteStatsContextOptRef route_stats_context_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
@@ -672,7 +641,6 @@ private:
   FilterUtility::HedgingParams hedging_params_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
-  bool downstream_1xx_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;

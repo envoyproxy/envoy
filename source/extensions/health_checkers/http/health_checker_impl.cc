@@ -63,7 +63,6 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
-      receive_bytes_(PayloadMatcher::loadProtoBytes(config.http_health_check().receive())),
       method_(getMethod(config.http_health_check().method())),
       response_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.http_health_check(), response_buffer_size, kDefaultMaxBytesInBuffer)),
@@ -75,6 +74,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
       random_generator_(random) {
+  auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.http_health_check().receive());
+  THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
+  receive_bytes_ = bytes_or_error.value();
   if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }

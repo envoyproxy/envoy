@@ -15,6 +15,7 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
@@ -85,6 +86,12 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
+  if (bootstrap_.has_application_log_config()) {
+    THROW_IF_NOT_OK(
+        Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
+    THROW_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
+  }
+
   // Inject regex engine to singleton.
   Regex::EnginePtr regex_engine = createRegexEngine(
       bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
@@ -109,12 +116,7 @@ void ValidationInstance::initialize(const Options& options,
                           .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
-  Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
-  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.remove_runtime_singleton", true)) {
-    runtime_ = std::move(runtime_ptr);
-  } else {
-    runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
-  }
+  runtime_ = component_factory.createRuntime(*this, initial_config);
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());

@@ -72,6 +72,55 @@ TEST_F(RouteEntryImplTest, RouteMetadata) {
       Config::Metadata::metadataValue(&route_->metadata(), "mock_filter", "key_0").string_value());
 };
 
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
+struct Baz : public Envoy::Config::TypedMetadata::Object {
+  Baz(std::string n) : name(n) {}
+  std::string name;
+};
+class BazFactory : public RouteTypedMetadataFactory {
+public:
+  std::string name() const override { return "baz"; }
+  // Returns nullptr (conversion failure) if d is empty.
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const override {
+    if (d.fields().find("name") != d.fields().end()) {
+      return std::make_unique<Baz>(d.fields().at("name").string_value());
+    }
+    throw EnvoyException("Cannot create a Baz when metadata is empty.");
+  }
+
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Any&) const override {
+    return nullptr;
+  }
+};
+
+/**
+ * Test the method that get filter metadata from the route entry.
+ */
+TEST_F(RouteEntryImplTest, RouteTypedMetadata) {
+  BazFactory baz_factory;
+  Registry::InjectFactory<RouteTypedMetadataFactory> registered_factory(baz_factory);
+
+  const std::string yaml_config = R"EOF(
+    cluster: cluster_0
+    metadata:
+      filter_metadata:
+        foo:
+          key_0: value_0
+        baz:
+          name: baz_name
+  )EOF";
+  initialize(yaml_config);
+
+  // Only get valid value when type and name are matched.
+  EXPECT_EQ("baz_name", route_->typedMetadata().get<Baz>(baz_factory.name())->name);
+
+  EXPECT_EQ(nullptr, route_->typedMetadata().get<Foo>(baz_factory.name()));
+  EXPECT_EQ(nullptr, route_->typedMetadata().get<Baz>("foo"));
+  EXPECT_EQ(nullptr, route_->typedMetadata().get<Foo>("foo"));
+};
+
 /**
  * Test the method that get route level per filter config from the route entry. This test also
  * verifies that the proto per filter config can be loaded correctly.

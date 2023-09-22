@@ -6,6 +6,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -62,6 +63,9 @@ public:
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
+    return flush_log_on_tunnel_successfully_established_;
+  }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return access_log_flush_interval_;
   }
@@ -103,6 +107,12 @@ public:
       return &scoped_route_config_provider_;
     }
     return nullptr;
+  }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    if (use_srds_) {
+      return scope_key_builder_;
+    }
+    return {};
   }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
@@ -192,11 +202,16 @@ public:
   void expectUhvTrailerCheck(HeaderValidator::ValidationResult validation_result,
                              HeaderValidator::TransformationResult transformation_result,
                              bool expect_response = true);
+  // This method sets-up expectation that UHV will be called and provides real default UHV to
+  // validate headers.
+  void expectCheckWithDefaultUhv();
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   NiceMock<Router::MockScopedRouteConfigProvider> scoped_route_config_provider_;
+  Router::MockScopeKeyBuilder scope_key_builder_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -204,6 +219,7 @@ public:
   std::string access_log_path_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   bool flush_access_log_on_new_request_ = false;
+  bool flush_log_on_tunnel_successfully_established_ = false;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   MockServerConnection* codec_;
@@ -278,6 +294,10 @@ public:
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   NiceMock<MockHeaderValidatorFactory> header_validator_factory_;
   NiceMock<MockHeaderValidatorStats> header_validator_stats_;
+  envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      header_validator_config_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
 };
 
 class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,

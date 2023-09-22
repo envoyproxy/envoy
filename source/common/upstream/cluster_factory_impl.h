@@ -104,7 +104,7 @@ public:
   /**
    * Static method to get the registered cluster factory and create an instance of cluster.
    */
-  static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  static absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
          Server::Configuration::ServerFactoryContext& server_context, ClusterManager& cm,
          LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
@@ -118,7 +118,7 @@ public:
                     ClusterFactoryContext& context);
 
   // Upstream::ClusterFactory
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
          ClusterFactoryContext& context) override;
   std::string name() const override { return name_; }
@@ -128,9 +128,9 @@ protected:
 
 private:
   /**
-   * Create an instance of ClusterImplBase.
+   * Create an instance of ClusterImplBase or return failure.
    */
-  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) PURE;
   const std::string name_;
@@ -153,7 +153,7 @@ protected:
   ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
@@ -165,7 +165,7 @@ private:
                                    context);
   }
 
-  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
                           const ConfigProto& proto_config, ClusterFactoryContext& context) PURE;
 };

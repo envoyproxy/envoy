@@ -46,7 +46,7 @@ if [[ "${AZP_BRANCH}" =~ ^refs/pull ]]; then
     BAZEL_BUILD_OPTIONS+=("--action_env=BUILD_DOCS_SHA")
 fi
 
-if [[ -n "${AZP_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
+if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
     export SPHINX_RUNNER_ARGS="-v warn"
     BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
 fi

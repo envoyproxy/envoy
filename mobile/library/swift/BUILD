@@ -44,7 +44,6 @@ swift_library(
         "StreamClientImpl.swift",
         "StreamIntel.swift",
         "StreamPrototype.swift",
-        "TestEngineBuilder.swift",
         "Trailers.swift",
         "extensions/UserDefaults+KeyValueStore.swift",
         "filters/AsyncRequestFilter.swift",

@@ -168,13 +168,24 @@ public:
    */
   virtual std::string bucketSummary() const PURE;
 
+  // Holds detailed value and counts for a histogram bucket.
   struct Bucket {
-    double value_{0};
+    double lower_bound_{0}; // Bound of bucket that's closest to zero.
+    double width_{0};
     uint64_t count_{0};
   };
 
-  virtual std::vector<Bucket> detailedTotalBuckets(uint32_t max_buckets = 0) const PURE;
-  virtual std::vector<Bucket> detailedIntervalBuckets(uint32_t max_buckets = 0) const PURE;
+  /**
+   * @return a vector of histogram buckets collected since binary start or reset.
+   */
+  virtual std::vector<Bucket> detailedTotalBuckets() const PURE;
+
+  /**
+   * @return bucket data collected since the most recent stat sink. Note that
+   *         the number of interval buckets is likely to be much smaller than
+   *         the number of detailed buckets.
+   */
+  virtual std::vector<Bucket> detailedIntervalBuckets() const PURE;
 };
 
 using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;

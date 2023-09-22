@@ -161,14 +161,18 @@ On the upstream side all http2 statistics are rooted at ``cluster.<name>.http2.`
    :widths: 1, 1, 2
 
    ``dropped_headers_with_underscores``, Counter, Total number of dropped headers with names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
+   ``goaway_sent``, Counter, Total number ``GOAWAY`` frames that have been submitted to the codec to send.
    ``header_overflow``, Counter, Total number of connections reset due to the headers being larger than the :ref:`configured value <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`.
    ``headers_cb_no_stream``, Counter, Total number of errors where a header callback is called without an associated stream. This tracks an unexpected occurrence due to an as yet undiagnosed bug
    ``inbound_empty_frames_flood``, Counter, Total number of connections terminated for exceeding the limit on consecutive inbound frames with an empty payload and no end stream flag. The limit is configured by setting the :ref:`max_consecutive_inbound_frames_with_empty_payload config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_consecutive_inbound_frames_with_empty_payload>`.
    ``inbound_priority_frames_flood``, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type PRIORITY. The limit is configured by setting the :ref:`max_inbound_priority_frames_per_stream config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_inbound_priority_frames_per_stream>`.
    ``inbound_window_update_frames_flood``, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type WINDOW_UPDATE. The limit is configured by setting the :ref:`max_inbound_window_updateframes_per_data_frame_sent config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_inbound_window_update_frames_per_data_frame_sent>`.
+   ``keepalive_timeout``, Counter, Total number of connections closed due to :ref:`keepalive timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
    ``metadata_empty_frames``, Counter, Total number of metadata frames that were received and contained empty maps.
-   ``outbound_flood``, Counter, Total number of connections terminated for exceeding the limit on outbound frames of all types. The limit is configured by setting the :ref:`max_outbound_frames config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_outbound_frames>`.
+   ``outbound_control_frames_active``, Gauge, "Total outbound control frames that are active."
    ``outbound_control_flood``, Counter, "Total number of connections terminated for exceeding the limit on outbound frames of types PING, SETTINGS and RST_STREAM. The limit is configured by setting the :ref:`max_outbound_control_frames config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_outbound_control_frames>`."
+   ``outbound_frames_active``, Gauge, "Total outbound frames that are active."
+   ``outbound_flood``, Counter, Total number of connections terminated for exceeding the limit on outbound frames of all types. The limit is configured by setting the :ref:`max_outbound_frames config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_outbound_frames>`.
    ``requests_rejected_with_underscores_in_headers``, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
    ``rx_messaging_error``, Counter, Total number of invalid received frames that violated `section 8 <https://tools.ietf.org/html/rfc7540#section-8>`_ of the HTTP/2 spec. This will result in a ``tx_reset``
    ``rx_reset``, Counter, Total number of reset stream frames received by Envoy
@@ -176,7 +180,6 @@ On the upstream side all http2 statistics are rooted at ``cluster.<name>.http2.`
    ``trailers``, Counter, Total number of trailers seen on requests coming from downstream
    ``tx_flush_timeout``, Counter, Total number of :ref:`stream idle timeouts <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
    ``tx_reset``, Counter, Total number of reset stream frames transmitted by Envoy
-   ``keepalive_timeout``, Counter, Total number of connections closed due to :ref:`keepalive timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
    ``streams_active``, Gauge, Active streams as observed by the codec
    ``pending_send_bytes``, Gauge, Currently buffered body data in bytes waiting to be written when stream/connection window is opened.
    ``deferred_stream_close``, Gauge, Number of HTTP/2 streams where the stream has been closed but processing of the stream close has been deferred due to network backup. This is expected to be incremented when a downstream stream is backed up and the corresponding upstream stream has received end stream but we defer processing of the upstream stream close due to downstream backup. This is decremented as we finally delete the stream when either the deferred close stream has its buffered data drained or receives a reset.

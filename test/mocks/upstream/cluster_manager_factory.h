@@ -40,7 +40,8 @@ public:
                Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState& state,
                absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout));
 
-  MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>), clusterFromProto,
+  MOCK_METHOD((absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>),
+              clusterFromProto,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 

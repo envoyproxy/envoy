@@ -4,6 +4,7 @@ package envoy.config.accesslog.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
+import "envoy/data/accesslog/v3/accesslog.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -43,7 +44,7 @@ message AccessLog {
   }
 }
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message AccessLogFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.AccessLogFilter";
@@ -87,6 +88,9 @@ message AccessLogFilter {
 
     // Metadata Filter
     MetadataFilter metadata_filter = 12;
+
+    // Log Type Filter
+    LogTypeFilter log_type_filter = 13;
   }
 }
 
@@ -308,6 +312,17 @@ message MetadataFilter {
   // Default result if the key does not exist in dynamic metadata: if unset or
   // true, then log; if false, then don't log.
   google.protobuf.BoolValue match_if_key_not_found = 2;
+}
+
+// Filters based on access log type.
+message LogTypeFilter {
+  // Logs only records which their type is one of the types defined in this field.
+  repeated data.accesslog.v3.AccessLogType types = 1
+      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+
+  // If this field is set to true, the filter will instead block all records
+  // with a access log type in types field, and allow all other records.
+  bool exclude = 2;
 }
 
 // Extension filter is statically registered at runtime.

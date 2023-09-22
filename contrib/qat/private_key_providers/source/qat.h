@@ -93,8 +93,11 @@ public:
   static int connectionIndex();
   static int contextIndex();
 
+  bool checkQatDevice();
+
 private:
   LibQatCryptoSharedPtr libqat_{};
+  bool qat_is_supported_{true};
 };
 
 /**

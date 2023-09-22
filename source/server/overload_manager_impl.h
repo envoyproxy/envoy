@@ -106,7 +106,7 @@ public:
     size_t index() const { return index_; }
 
     // Support use as a map key.
-    bool operator==(const Symbol other) { return other.index_ == index_; }
+    bool operator==(const Symbol& other) const { return other.index_ == index_; }
 
     // Support absl::Hash.
     template <typename H>

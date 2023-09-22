@@ -2,6 +2,7 @@ services:
 
   client-ws:
     build:
+      context: .
       dockerfile: ../shared/websocket/Dockerfile
       target: websocket-client
     network_mode: host
@@ -11,6 +12,7 @@ services:
 
   proxy-ws:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: ./envoy-ws.yaml
@@ -19,6 +21,7 @@ services:
 
   proxy-wss-wss:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: ./envoy-wss.yaml
@@ -27,6 +30,7 @@ services:
 
   proxy-wss-passthrough:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: ./envoy-wss-passthrough.yaml
@@ -35,12 +39,14 @@ services:
 
   service-ws:
     build:
+      context: .
       dockerfile: ../shared/websocket/Dockerfile
     hostname: service-ws
     command: -E ws-listen:0.0.0.0:80 literalreply:'[ws] HELO'
 
   service-wss:
     build:
+      context: .
       dockerfile: ../shared/websocket/Dockerfile
     hostname: service-wss
     command: wss-listen:0.0.0.0:443 literalreply:"[wss] HELO" --pkcs12-der /certs/output.pkcs12

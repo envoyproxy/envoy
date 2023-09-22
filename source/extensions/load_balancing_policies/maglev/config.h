@@ -13,12 +13,14 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace Maglev {
 
-class Factory : public Upstream::TypedLoadBalancerFactoryBase<
-                    envoy::extensions::load_balancing_policies::maglev::v3::Maglev> {
+using MaglevLbProto = envoy::extensions::load_balancing_policies::maglev::v3::Maglev;
+
+class Factory : public Upstream::TypedLoadBalancerFactoryBase<MaglevLbProto> {
 public:
   Factory() : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.maglev") {}
 
-  Upstream::ThreadAwareLoadBalancerPtr create(const Upstream::ClusterInfo& cluster_info,
+  Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                              const Upstream::ClusterInfo& cluster_info,
                                               const Upstream::PrioritySet& priority_set,
                                               Runtime::Loader& runtime,
                                               Random::RandomGenerator& random,

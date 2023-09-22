@@ -1,5 +1,5 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cmake", "envoy_package")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -15,6 +15,15 @@ configure_make(
         "nocompdb",
         "skip_on_windows",
     ],
+)
+
+envoy_cc_library(
+    name = "liburing_linux",
+    srcs = [],
+    deps = select({
+        "//bazel:linux": [":liburing"],
+        "//conditions:default": [],
+    }),
 )
 
 # autotools packages are unusable on Windows as-is
@@ -55,7 +64,7 @@ cc_library(
 configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
-    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
+    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
     lib_source = "@edenhill_librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
@@ -198,7 +207,8 @@ envoy_cmake(
     lib_source = "@com_github_google_libsxg//:all",
     out_static_libs = ["libsxg.a"],
     tags = ["skip_on_windows"],
-    deps = ["@boringssl//:ssl"],
+    # Use boringssl alias to select fips vs non-fips version.
+    deps = ["//bazel:boringssl"],
 )
 
 envoy_cmake(

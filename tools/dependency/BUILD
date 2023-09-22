@@ -1,8 +1,8 @@
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
-load("@base_pip3//:requirements.bzl", "requirement")
-load("@envoy_repo//:path.bzl", "PATH")
 
 licenses(["notice"])  # Apache 2
 
@@ -67,7 +67,7 @@ genrule(
         --download_cves $@ \
         --repository_locations=$(location //bazel:all_repository_locations)
     """,
-    exec_tools = [
+    tools = [
         ":cve_download",
         "//bazel:all_repository_locations",
     ],

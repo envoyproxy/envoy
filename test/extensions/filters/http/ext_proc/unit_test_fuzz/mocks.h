@@ -20,6 +20,7 @@ public:
   MOCK_METHOD(void, send,
               (envoy::service::ext_proc::v3::ProcessingRequest && request, bool end_stream));
   MOCK_METHOD(bool, close, ());
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
 };
 
 class MockClient : public ExternalProcessing::ExternalProcessorClient {
@@ -29,7 +30,7 @@ public:
 
   MOCK_METHOD(ExternalProcessing::ExternalProcessorStreamPtr, start,
               (ExternalProcessing::ExternalProcessorCallbacks & callbacks,
-               const envoy::config::core::v3::GrpcService& grpc_service,
+               const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                const StreamInfo::StreamInfo& stream_info));
 };
 

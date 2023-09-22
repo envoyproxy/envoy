@@ -39,6 +39,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(TcpHealthCheckerFactory);
+
 /**
  * TCP health checker implementation.
  */
@@ -101,7 +103,7 @@ private:
   }
 
   const PayloadMatcher::MatchSegments send_bytes_;
-  const PayloadMatcher::MatchSegments receive_bytes_;
+  PayloadMatcher::MatchSegments receive_bytes_;
 };
 
 } // namespace Upstream

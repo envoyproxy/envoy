@@ -9,8 +9,6 @@ import "envoy/type/v3/http_status.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -19,7 +17,6 @@ option java_outer_classname = "ExternalProcessorProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3;ext_procv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: External processing service]
 
@@ -170,6 +167,10 @@ message ProcessingResponse {
   // for the duration of this particular request/response only. Servers
   // may use this to intelligently control how requests are processed
   // based on the headers and other metadata that they see.
+  // This field is ignored by Envoy when the ext_proc filter config
+  // :ref:`allow_mode_override
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
+  // is set to false.
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 
   // When ext_proc server receives a request message, in case it needs more
@@ -195,6 +196,12 @@ message ProcessingResponse {
 message HttpHeaders {
   // The HTTP request headers. All header keys will be
   // lower-cased, because HTTP header keys are case-insensitive.
+  // The ``headers`` encoding is based on the runtime guard
+  // envoy_reloadable_features_send_header_raw_value setting.
+  // When it is true, the header value is encoded in the
+  // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
+  // When it is false, the header value is encoded in the
+  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap headers = 1;
 
   // [#not-implemented-hide:]
@@ -219,6 +226,12 @@ message HttpBody {
 
 // This message contains the trailers.
 message HttpTrailers {
+  // The ``trailers`` encoding is based on the runtime guard
+  // envoy_reloadable_features_send_header_raw_value setting.
+  // When it is true, the header value is encoded in the
+  // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
+  // When it is false, the header value is encoded in the
+  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap trailers = 1;
 }
 
@@ -275,19 +288,28 @@ message CommonResponse {
 
   // Replace the body of the last message sent to the remote server on this
   // stream. If responding to an HttpBody request, simply replace or clear
-  // the body chunk that was sent with that request. Body mutations only take
-  // effect in response to ``body`` messages and are ignored otherwise.
+  // the body chunk that was sent with that request. Body mutations may take
+  // effect in response either to ``header`` or ``body`` messages. When it is
+  // in response to ``header`` messages, it only take effect if the
+  // :ref:`status <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.status>`
+  // is set to CONTINUE_AND_REPLACE.
   BodyMutation body_mutation = 3;
 
   // [#not-implemented-hide:]
   // Add new trailers to the message. This may be used when responding to either a
   // HttpHeaders or HttpBody message, but only if this message is returned
   // along with the CONTINUE_AND_REPLACE status.
+  // The ``trailers`` encoding is based on the runtime guard
+  // envoy_reloadable_features_send_header_raw_value setting.
+  // When it is true, the header value is encoded in the
+  // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
+  // When it is false, the header value is encoded in the
+  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap trailers = 4;
 
-  // Clear the route cache for the current request.
-  // This is necessary if the remote server
-  // modified headers that are used to calculate the route.
+  // Clear the route cache for the current client request. This is necessary
+  // if the remote server modified headers that are used to calculate the route.
+  // This field is ignored in the response direction.
   bool clear_route_cache = 5;
 }
 
@@ -330,6 +352,12 @@ message HeaderMutation {
   // Add or replace HTTP headers. Attempts to set the value of
   // any ``x-envoy`` header, and attempts to set the ``:method``,
   // ``:authority``, ``:scheme``, or ``host`` headers will be ignored.
+  // The ``set_headers`` encoding is based on the runtime guard
+  // envoy_reloadable_features_send_header_raw_value setting.
+  // When it is true, the header value is encoded in the
+  // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
+  // When it is false, the header value is encoded in the
+  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   repeated config.core.v3.HeaderValueOption set_headers = 1;
 
   // Remove these HTTP headers. Attempts to remove system headers --

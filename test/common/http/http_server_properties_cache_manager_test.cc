@@ -100,14 +100,6 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithCanonicalEntry) {
   EXPECT_TRUE(cache->findAlternatives(origin).has_value());
 }
 
-TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
-  EXPECT_CALL(context_.options_, concurrency()).WillOnce(Return(5));
-  options1_.mutable_key_value_store_config();
-  initialize();
-  EXPECT_THROW_WITH_REGEX(manager_->getCache(options1_, dispatcher_), EnvoyException,
-                          "options has key value store but Envoy has concurrency = 5");
-}
-
 TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForDifferentOptions) {
   initialize();
   HttpServerPropertiesCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
@@ -120,9 +112,9 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForConflictingOptions) {
   initialize();
   HttpServerPropertiesCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
   options2_.set_name(options1_.name());
-  EXPECT_THROW_WITH_REGEX(
-      manager_->getCache(options2_, dispatcher_), EnvoyException,
-      "options specified alternate protocols cache 'name1' with different settings.*");
+  EXPECT_ENVOY_BUG(manager_->getCache(options2_, dispatcher_),
+                   "options specified alternate protocols cache 'name1' with different settings "
+                   "first 'name: \"name1\"");
 }
 
 } // namespace

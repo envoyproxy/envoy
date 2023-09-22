@@ -1,5 +1,5 @@
-load("//bazel:android_debug_info.bzl", "android_debug_info")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines", "envoy_package")
+load("//bazel:android_debug_info.bzl", "android_debug_info")
 
 licenses(["notice"])  # Apache 2
 

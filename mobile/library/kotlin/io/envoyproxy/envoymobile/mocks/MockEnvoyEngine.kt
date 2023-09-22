@@ -23,9 +23,10 @@ internal class MockEnvoyEngine : EnvoyEngine {
 
   override fun startStream(
     callbacks: EnvoyHTTPCallbacks?,
-    explicitFlowControl: Boolean
+    explicitFlowControl: Boolean,
+    minDeliverySize: Long
   ): EnvoyHTTPStream {
-    return MockEnvoyHTTPStream(callbacks!!, explicitFlowControl)
+    return MockEnvoyHTTPStream(callbacks!!, explicitFlowControl, minDeliverySize)
   }
 
   override fun terminate() = Unit
@@ -43,4 +44,6 @@ internal class MockEnvoyEngine : EnvoyEngine {
   override fun setPreferredNetwork(network: EnvoyNetworkType) = Unit
 
   override fun setProxySettings(host: String, port: Int) = Unit
+
+  override fun setLogLevel(level: EnvoyEngine.LogLevel) = Unit
 }

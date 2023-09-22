@@ -26,7 +26,7 @@ getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& conte
   return context.singletonManager().getTyped<GrpcAccessLoggerCacheImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_access_logger_cache), [&context] {
         return std::make_shared<GrpcAccessLoggerCacheImpl>(
-            context.clusterManager().grpcAsyncClientManager(), context.scope(),
+            context.clusterManager().grpcAsyncClientManager(), context.serverScope(),
             context.threadLocal(), context.localInfo());
       });
 }

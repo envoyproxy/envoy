@@ -18,7 +18,7 @@ struct TestEngineHandle {
     Platform::EngineBuilder builder;
     auto bootstrap = builder.generateBootstrap();
     std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
-    run_engine(handle_, yaml.c_str(), level.c_str(), "");
+    run_engine(handle_, yaml.c_str(), level.c_str());
   }
 
   envoy_status_t terminate() { return terminate_engine(handle_, /* release */ false); }
@@ -58,7 +58,7 @@ TEST_F(EngineTest, EarlyExit) {
   ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
-  start_stream(handle, 0, {}, false);
+  start_stream(handle, 0, {}, false, 0);
 
   engine_.reset();
 }

@@ -23,6 +23,24 @@ envoy_proto_library(
 )
 
 envoy_proto_library(
+    name = "apikeys_proto",
+    srcs = [":apikeys.proto"],
+)
+
+envoy_proto_descriptor(
+    name = "apikeys_proto_descriptor",
+    srcs = [
+        "apikeys.proto",
+    ],
+    out = "apikeys.descriptor",
+    external_deps = [
+        "api_httpbody_protos",
+        "http_api_protos",
+        "well_known_protos",
+    ],
+)
+
+envoy_proto_library(
     name = "bookstore_proto",
     srcs = [":bookstore.proto"],
 )

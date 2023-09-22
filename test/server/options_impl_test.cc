@@ -113,6 +113,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ(2, options->componentLogLevels().size());
   EXPECT_EQ("[%v]", options->logFormat());
+  EXPECT_TRUE(options->logFormatSet());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ(true, options->enableFineGrainLogging());
   EXPECT_EQ("cluster", options->serviceClusterName());
@@ -209,6 +210,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(Server::DrainStrategy::Immediate, options->drainStrategy());
   EXPECT_EQ(spdlog::level::trace, options->logLevel());
   EXPECT_EQ("%L %n %v", options->logFormat());
+  EXPECT_TRUE(options->logFormatSet());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ(std::chrono::seconds(43), options->parentShutdownTime());
   EXPECT_EQ(44, options->restartEpoch());
@@ -528,18 +530,21 @@ TEST_F(OptionsImplTest, SetCpusetOnly) {
 TEST_F(OptionsImplTest, LogFormatDefault) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
   EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
+  EXPECT_FALSE(options->logFormatSet());
 }
 
 TEST_F(OptionsImplTest, LogFormatOverride) {
   std::unique_ptr<OptionsImpl> options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
   EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
+  EXPECT_TRUE(options->logFormatSet());
 }
 
 TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {
   std::unique_ptr<OptionsImpl> options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
   EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
+  EXPECT_TRUE(options->logFormatSet());
 }
 
 // Test that --base-id and --restart-epoch with non-default values are accepted.

@@ -56,12 +56,11 @@ public:
     Network::ConnectionSocket::OptionsSharedPtr options =
         std::make_shared<Network::Socket::Options>();
     options->push_back(socket_option_);
-    ON_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddress(_, _))
-        .WillByDefault(Invoke([](const Network::Address::InstanceConstSharedPtr&,
-                                 const Network::ConnectionSocket::OptionsSharedPtr& socket_options)
-                                  -> Upstream::UpstreamLocalAddress {
-          return Upstream::UpstreamLocalAddress({nullptr, socket_options});
-        }));
+    ON_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
+        .WillByDefault(Invoke(
+            [](const Network::Address::InstanceConstSharedPtr&) -> Upstream::UpstreamLocalAddress {
+              return Upstream::UpstreamLocalAddress({nullptr, nullptr});
+            }));
     Network::TransportSocketOptionsConstSharedPtr transport_options;
     pool_ = allocateConnPool(
         dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
@@ -122,6 +121,9 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
 }
 
 TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
+  testing::NiceMock<Stats::MockStore> mock_store;
+  ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(*mock_store.rootScope()));
+
   MockQuicClientTransportSocketFactory factory{
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
       context_};
@@ -144,7 +146,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
-  EXPECT_CALL(context_.store_.counter_, inc());
+  EXPECT_CALL(mock_store.counter_, inc());
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(pool->newStream(decoder, callbacks,
                             {/*can_send_early_data_=*/false,
@@ -160,16 +162,14 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   mockHost().cluster_.cluster_socket_options_ = std::make_shared<Network::Socket::Options>();
   std::shared_ptr<Network::MockSocketOption> cluster_socket_option{new Network::MockSocketOption()};
   mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
-  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddress(_, _))
-      .WillOnce(Invoke([&](const Network::Address::InstanceConstSharedPtr&,
-                           const Network::ConnectionSocket::OptionsSharedPtr& socket_options)
-                           -> Upstream::UpstreamLocalAddress {
-        Network::ConnectionSocket::OptionsSharedPtr options =
-            std::make_shared<Network::ConnectionSocket::Options>();
-        Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
-        Network::Socket::appendOptions(options, socket_options);
-        return Upstream::UpstreamLocalAddress({nullptr, options});
-      }));
+  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
+      .WillOnce(Invoke(
+          [&](const Network::Address::InstanceConstSharedPtr&) -> Upstream::UpstreamLocalAddress {
+            Network::ConnectionSocket::OptionsSharedPtr options =
+                std::make_shared<Network::ConnectionSocket::Options>();
+            Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
+            return Upstream::UpstreamLocalAddress({nullptr, options});
+          }));
   EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
   EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);

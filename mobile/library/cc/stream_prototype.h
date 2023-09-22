@@ -20,7 +20,7 @@ class StreamPrototype {
 public:
   StreamPrototype(EngineSharedPtr engine);
 
-  StreamSharedPtr start(bool explicit_flow_control = false);
+  StreamSharedPtr start(bool explicit_flow_control = false, uint64_t min_delivery_size = 0);
 
   StreamPrototype& setOnHeaders(OnHeadersCallback closure);
   StreamPrototype& setOnData(OnDataCallback closure);

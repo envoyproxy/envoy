@@ -29,6 +29,7 @@ envoy_cc_test(
     srcs = ["golang_filter_test.cc"],
     data = [
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
+        "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
@@ -42,7 +43,6 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:logging_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -52,9 +52,12 @@ envoy_cc_test(
     name = "golang_integration_test",
     srcs = ["golang_integration_test.cc"],
     data = [
+        "//contrib/golang/filters/http/test/test_data/access_log:filter.so",
         "//contrib/golang/filters/http/test/test_data/basic:filter.so",
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",
+        "//contrib/golang/filters/http/test/test_data/metric:filter.so",
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
+        "//contrib/golang/filters/http/test/test_data/property:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},

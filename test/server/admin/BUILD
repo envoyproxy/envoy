@@ -147,6 +147,7 @@ envoy_cc_benchmark_binary(
         "//source/common/http:header_map_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:admin_lib",
+        "//test/common/stats:real_thread_test_base",
     ],
 )
 
@@ -168,6 +169,8 @@ envoy_cc_test(
     name = "prometheus_stats_test",
     srcs = envoy_select_admin_functionality(["prometheus_stats_test.cc"]),
     deps = [
+        "//source/common/stats:tag_producer_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:prometheus_stats_lib",
         "//test/test_common:utility_lib",
     ],
@@ -218,6 +221,7 @@ envoy_cc_test(
     deps = [
         ":admin_instance_lib",
         "//test/integration/filters:test_listener_filter_lib",
+        "//test/integration/filters:test_network_filter_lib",
     ],
 )
 

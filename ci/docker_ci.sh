@@ -172,7 +172,7 @@ build_args() {
     fi
 
     if [[ "${build_type}" == *-debug ]]; then
-        printf ' --build-arg ENVOY_BINARY_SUFFIX='
+        printf ' --build-arg ENVOY_BINARY_PREFIX=dbg/'
     fi
 }
 

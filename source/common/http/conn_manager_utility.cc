@@ -29,7 +29,7 @@ namespace Http {
 namespace {
 
 absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
-  if (HeaderUtility::schemeIsValid(forwarded_proto)) {
+  if (Utility::schemeIsValid(forwarded_proto)) {
     return forwarded_proto;
   }
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
@@ -67,7 +67,7 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
@@ -206,6 +206,9 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   if (!request_headers.Scheme()) {
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
+  }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lowercase_scheme")) {
+    request_headers.setScheme(absl::AsciiStrToLower(request_headers.getSchemeValue()));
   }
 
   // At this point we can determine whether this is an internal or external request. The
@@ -564,11 +567,7 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
       return NormalizePathAction::Reject;
     }
     // Check runtime override and throw away fragment from URI path
-    // TODO(yanavlasov): remove this override after deprecation period.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled")) {
-      request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
-    }
+    request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;

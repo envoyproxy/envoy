@@ -164,6 +164,16 @@ envoy_entry_point(
     script = "envoy.project",
 )
 
+envoy_entry_point(
+    name = "trigger",
+    args = [
+        "trigger",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)
+
 ''')
 
 _envoy_repo = repository_rule(
@@ -181,6 +191,9 @@ def envoy_repo():
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
+    external_http_archive("com_google_protoconverter")
+    external_http_archive("com_google_protofieldextraction")
+    external_http_archive("ocp")
     native.bind(
         name = "path_matcher",
         actual = "@grpc_httpjson_transcoding//src:path_matcher",
@@ -241,6 +254,7 @@ def envoy_dependencies(skip_targets = []):
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_github_axboe_liburing()
+    _com_github_bazel_buildtools()
     _com_github_c_ares_c_ares()
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
@@ -298,6 +312,8 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("proxy_wasm_rust_sdk")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
+    _utf8_range()
+    _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
@@ -372,7 +388,14 @@ def _com_github_axboe_liburing():
     )
     native.bind(
         name = "uring",
-        actual = "@envoy//bazel/foreign_cc:liburing",
+        actual = "@envoy//bazel/foreign_cc:liburing_linux",
+    )
+
+def _com_github_bazel_buildtools():
+    # TODO(phlax): Add binary download
+    #  cf: https://github.com/bazelbuild/buildtools/issues/367
+    external_http_archive(
+        name = "com_github_bazelbuild_buildtools",
     )
 
 def _com_github_c_ares_c_ares():
@@ -473,6 +496,12 @@ def _com_github_unicode_org_icu():
 def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
+        # Patch removes from CMakeLists.txt instructions to
+        # to create dynamic *.so library target. Linker fails when linking
+        # with boringssl_fips library. Envoy uses only static library
+        # anyways, so created dynamic library would not be used anyways.
+        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-skip-dynamic-lib.patch"],
+        patch_args = ["-p1"],
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -878,7 +907,7 @@ def _com_google_protobuf():
     # https://github.com/google/protobuf/blob/v3.6.1/util/python/BUILD#L6-L9
     native.bind(
         name = "python_headers",
-        actual = "@com_google_protobuf//util/python:python_headers",
+        actual = "//bazel:python_headers",
     )
 
 def _io_opencensus_cpp():
@@ -1068,6 +1097,11 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
+        name = "upb_collections_lib",
+        actual = "@upb//:collections",
+    )
+
+    native.bind(
         name = "upb_lib_descriptor",
         actual = "@upb//:descriptor_upb_proto",
     )
@@ -1106,7 +1140,11 @@ def _re2():
     )
 
 def _upb():
-    external_http_archive(name = "upb")
+    external_http_archive(
+        name = "upb",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:upb.patch"],
+    )
 
     native.bind(
         name = "upb_lib",
@@ -1251,11 +1289,9 @@ filegroup(
     srcs = glob([
         "dlb/libdlb/**",
     ]),
-    visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
+    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
 )
 """,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():
@@ -1294,6 +1330,10 @@ filegroup(
     external_http_archive(
         name = "edenhill_librdkafka",
         build_file_content = BUILD_ALL_CONTENT,
+        # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
+        # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
+        patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "librdkafka",
@@ -1317,9 +1357,15 @@ filegroup(
 def _com_github_fdio_vpp_vcl():
     external_http_archive(
         name = "com_github_fdio_vpp_vcl",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
+
+def _utf8_range():
+    external_http_archive("utf8_range")
+
+def _rules_ruby():
+    external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
     external_http_archive("rules_foreign_cc")

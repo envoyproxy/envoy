@@ -284,14 +284,10 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
 
-  static constexpr absl::string_view empty_header_validator_config = R"EOF(
-    name: envoy.http.header_validators.envoy_default
-    typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
-)EOF";
-
-  cluster->header_validator_factory_ =
-      IntegrationUtil::makeHeaderValidationFactory(empty_header_validator_config);
+  if (!disable_client_header_validation_) {
+    cluster->header_validator_factory_ = IntegrationUtil::makeHeaderValidationFactory(
+        ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig());
+  }
 
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
@@ -339,6 +335,9 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
   // lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
+  // Allow extension lookup by name in the integration tests.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
+                                    "false");
 }
 
 void HttpIntegrationTest::useAccessLog(
@@ -378,8 +377,15 @@ void HttpIntegrationTest::initialize() {
   // Config Google QUIC flow control window.
   quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
       Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
-  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
+  // Adjust timeouts.
+  quic::QuicTime::Delta connect_timeout =
+      quic::QuicTime::Delta::FromSeconds(5 * TSAN_TIMEOUT_FACTOR);
+  quic_connection_persistent_info->quic_config_.set_max_time_before_crypto_handshake(
+      connect_timeout);
+  quic_connection_persistent_info->quic_config_.set_max_idle_time_before_crypto_handshake(
+      connect_timeout);
 
+  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -1289,6 +1295,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size,
                                                   uint32_t max_count,
                                                   std::chrono::milliseconds timeout) {
+  autonomous_upstream_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   // `size` parameter dictates the size of each header that will be added to the request and `count`
   // parameter is the number of headers to be added. The actual request byte size will exceed `size`
@@ -1317,6 +1324,10 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(
+          std::make_unique<Http::TestResponseHeaderMapImpl>(default_response_headers_));
+
   if (size >= max_size || count > max_count) {
     // header size includes keys too, so expect rejection when equal
     auto encoder_decoder = codec_client_->startRequest(big_headers);
@@ -1331,8 +1342,9 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
       codec_client_->close();
     }
   } else {
-    auto response =
-        sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0, 0, timeout);
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(big_headers);
+    RELEASE_ASSERT(response->waitForEndStream(timeout),
+                   fmt::format("unexpected timeout after ", timeout.count(), " ms"));
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }

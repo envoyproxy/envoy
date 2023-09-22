@@ -41,6 +41,8 @@ public:
 
   virtual const std::shared_ptr<icu::LocaleMatcher>& localeMatcher() const PURE;
 
+  virtual bool clearRouteCache() const PURE;
+
   virtual LanguageStats& stats() PURE;
 };
 
@@ -51,11 +53,14 @@ class LanguageFilterConfigImpl : public LanguageFilterConfig {
 public:
   LanguageFilterConfigImpl(const std::shared_ptr<icu::Locale> default_locale,
                            const std::shared_ptr<icu::LocaleMatcher> locale_matcher,
-                           const std::string& stats_prefix, Stats::Scope& scope);
+                           const bool clear_route_cache, const std::string& stats_prefix,
+                           Stats::Scope& scope);
 
   const std::shared_ptr<icu::Locale>& defaultLocale() const override;
 
   const std::shared_ptr<icu::LocaleMatcher>& localeMatcher() const override;
+
+  bool clearRouteCache() const override;
 
   LanguageStats& stats() override;
 
@@ -63,6 +68,8 @@ private:
   const std::shared_ptr<icu::Locale> default_locale_;
 
   const std::shared_ptr<icu::LocaleMatcher> locale_matcher_;
+
+  const bool clear_route_cache_;
 
   LanguageStats stats_;
 };

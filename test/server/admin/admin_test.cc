@@ -72,7 +72,7 @@ TEST_P(AdminInstanceTest, AdminAddress) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS("info", "admin address:",
                       admin_address_out_path.startHttpListener(
@@ -88,7 +88,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "critical", "cannot open admin address output file " + bad_path + " for writing.",
@@ -176,6 +176,7 @@ TEST_P(AdminInstanceTest, Help) {
   /stats/html-active: print server stats
       filter: Regular expression (Google re2) for filtering stats
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, none)
   /stats/prometheus: print server stats in prometheus format
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
@@ -326,7 +327,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.routeConfigProvider().config();
   peer.routeConfigProvider().configInfo();
   peer.routeConfigProvider().lastUpdated();
-  peer.routeConfigProvider().onConfigUpdate();
+  ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
 
   peer.scopedRouteConfigProvider().lastUpdated();
   peer.scopedRouteConfigProvider().getConfigProto();

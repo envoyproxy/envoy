@@ -35,5 +35,6 @@ filegroup(
         "active_stats.js",
         "admin.css",
         "admin_head_start.html",
+        "histograms.js",
     ],
 )

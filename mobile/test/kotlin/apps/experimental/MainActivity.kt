@@ -12,7 +12,6 @@ import androidx.recyclerview.widget.RecyclerView
 import io.envoyproxy.envoymobile.android.SharedPreferencesStore
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.CompressionAlgorithm
-import io.envoyproxy.envoymobile.EngineBuilderAdminUtil.enableAdminInterface
 import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.LogLevel
@@ -57,14 +56,12 @@ class MainActivity : Activity() {
       .addPlatformFilter(::DemoFilter)
       .addPlatformFilter(::BufferDemoFilter)
       .addPlatformFilter(::AsyncDemoFilter)
-      .enableAdminInterface()
       .enableDNSCache(true)
       // required by DNS cache
       .addKeyValueStore("reserved.platform_store", SharedPreferencesStore(preferences))
       .enableInterfaceBinding(true)
       .enableSocketTagging(true)
       .enableProxying(true)
-      .enableSkipDNSLookupForProxiedRequests(true)
       // TODO: uncomment once platform cert validation is fixed.
       // .enablePlatformCertificatesValidation(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
