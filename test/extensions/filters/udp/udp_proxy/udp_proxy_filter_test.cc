@@ -43,7 +43,7 @@ class TestUdpProxyFilter : public UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
 
-  MOCK_METHOD(Network::SocketPtr, createSocket, (const Upstream::HostConstSharedPtr& host));
+  MOCK_METHOD(Network::SocketPtr, createUdpSocket, (const Upstream::HostConstSharedPtr& host));
 };
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
@@ -240,7 +240,7 @@ public:
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
-    EXPECT_CALL(*filter_, createSocket(_))
+    EXPECT_CALL(*filter_, createUdpSocket(_))
         .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
     EXPECT_CALL(
         *new_session.socket_->io_handle_,
