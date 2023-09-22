@@ -46,11 +46,11 @@ fi
 if [[ "${BUILD_TYPE}" == "html" ]] || [[ -n "${DOCS_BUILD_HTML}" ]]; then
     BUILD_HTML=1
     BUILD_HTML_TARGET="//docs:html"
-    BUILD_HTML_TARBALL="bazel-bin/docs/html.tar.gz"
+    BUILD_HTML_TARBALL="bazel-bin/docs/html.tar.zst"
     if [[ -n "${CI_BRANCH}" ]] || [[ -n "${DOCS_BUILD_RELEASE}" ]]; then
         # CI build - use git sha
         BUILD_HTML_TARGET="//docs:html_release"
-        BUILD_HTML_TARBALL="bazel-bin/docs/html_release.tar.gz"
+        BUILD_HTML_TARBALL="bazel-bin/docs/html_release.tar.zst"
     fi
 fi
 if [[ "${BUILD_TYPE}" == "rst" ]] || [[ -n "${DOCS_BUILD_RST}" ]]; then
@@ -69,10 +69,17 @@ fi
 rm -rf "${DOCS_OUTPUT_DIR}"
 mkdir -p "${DOCS_OUTPUT_DIR}"
 
+BUILD_HTML_TARBALL="$(realpath "${BUILD_HTML_TARBALL}")"
+
 # Save html/rst to output directory
 if [[ -n "${BUILD_HTML}" ]]; then
-    tar -xzf "$BUILD_HTML_TARBALL" -C "$DOCS_OUTPUT_DIR"
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
+        "${BAZEL_BUILD_OPTIONS[@]}" \
+        //tools/zstd \
+        -- --stdout \
+           -d "$BUILD_HTML_TARBALL" | tar --warning=no-timestamp -xf - -C "$DOCS_OUTPUT_DIR"
 fi
+
 if [[ -n "${BUILD_RST}" ]]; then
-    cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+    cp bazel-bin/docs/rst.tar.zst "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.zst
 fi

@@ -232,7 +232,9 @@ pkg_tar(
 pkg_tar(
     name = "rst",
     srcs = [":rst_files"],
-    extension = "tar.gz",
+    compressor = "//tools/zstd",
+    compressor_args = "-T0",
+    extension = "tar.zst",
     deps = [
         ":api_rst",
         ":empty_protos_rst",
@@ -245,7 +247,7 @@ pkg_tar(
 # TODO(phlax): Add `envoy_sphinx` rule to encapsulate these and above targets
 genrule(
     name = "html_release",
-    outs = ["html_release.tar.gz"],
+    outs = ["html_release.tar.zst"],
     cmd = """
     . $(location //bazel:volatile_env) \
     && $(location //tools/docs:sphinx_runner) \
@@ -270,7 +272,7 @@ genrule(
 # No git stamping, speeds up local dev switching branches
 genrule(
     name = "html",
-    outs = ["html.tar.gz"],
+    outs = ["html.tar.zst"],
     cmd = """
     $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
