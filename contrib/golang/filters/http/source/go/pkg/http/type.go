@@ -332,7 +332,10 @@ type httpBuffer struct {
 var _ api.BufferInstance = (*httpBuffer)(nil)
 
 func (b *httpBuffer) Write(p []byte) (n int, err error) {
-	return b.WriteString(string(p))
+	cAPI.HttpSetBytesBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, p, api.AppendBuffer)
+	n = len(p)
+	b.length += uint64(n)
+	return n, nil
 }
 
 func (b *httpBuffer) WriteString(s string) (n int, err error) {
@@ -411,7 +414,7 @@ func (b *httpBuffer) Append(data []byte) error {
 }
 
 func (b *httpBuffer) Prepend(data []byte) error {
-	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(data), api.PrependBuffer)
+	cAPI.HttpSetBytesBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, data, api.PrependBuffer)
 	b.length += uint64(len(data))
 	return nil
 }
@@ -428,7 +431,7 @@ func (b *httpBuffer) PrependString(s string) error {
 }
 
 func (b *httpBuffer) Set(data []byte) error {
-	cAPI.HttpSetBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, string(data), api.SetBuffer)
+	cAPI.HttpSetBytesBufferHelper(unsafe.Pointer(b.request.req), b.envoyBufferInstance, data, api.SetBuffer)
 	b.length = uint64(len(data))
 	return nil
 }
