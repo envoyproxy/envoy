@@ -53,10 +53,6 @@ let statusDiv = null;
 const paramIdPrefix = 'param-1-stats-';
 
 let postRenderTestHook = null;
-let currentValues = null;
-let initialValues = null;
-let reloadTimer = null;
-let controls = null;
 
 /**
  * To make testing easier, provide a hook for tests to set, to enable tests
@@ -71,165 +67,23 @@ function setRenderTestHook(hook) { // eslint-disable-line no-unused-vars
   postRenderTestHook = hook;
 }
 
-function getParamValues() {
-  let values = {};
-  for (key of Object.keys(controls)) {
-    values[key] = controls[key].value;
-  }
-  return values;
-/*
-  return {
-    filter: paramValue('filter'),
-    type: paramValue('type'),
-    max_display_count: loadSettingOrUseDefault('active-max-display-count', 50),
-    update_interval_sec: loadSettingOrUseDefault('active-update-interval', 5)
-  };
-*/
-}
-
 /**
  * Hook that's run on DOMContentLoaded to create the HTML elements (just one
  * PRE right now) and kick off the periodic JSON updates.
  */
 function initHook() {
   statusDiv = appendNewElement(document.body, 'div', 'error-status-line');
-  activeStatsPreElement = appendNewElement(document.body, 'pre');
-  activeStatsPreElement.id = 'active-content-pre';
-  //const table = document.createElement('table');
-  //table.classList.add('histogram-body', 'histogram-column');
+  activeStatsPreElement = appendNewElement(document.body, 'pre', null, 'active-content-pre');
   activeStatsHistogramsDiv = appendNewElement(document.body, 'div');
-
-  controls = {
-    filter: document.getElementById(paramIdPrefix + 'filter'),
-    type: document.getElementById(paramIdPrefix + 'type'),
-    max_display_count: document.getElementById('active-max-display-count'),
-    update_interval_sec: document.getElementById('active-update-interval')
-  };
-  initialValues = currentValues = {
-    filter: '',
-    type: 'All',
-    max_display_count: '50',
-    update_interval_sec: '5',
-  };
-  setControls();
-
-  // The type widget activates immediately on any change, recording history.
-  controls['type'].addEventListener('change', onSubmit);
-
-  // The three text controls reset the auto-refresh timer when there's a change,
-  // and auto-submit on form submit, which gets run when user hits Return when
-  // focus in a text widget. They also auto-submit when the focus shifts out
-  // of them.
-  for (name of ['filter', 'max_display_count', 'update_interval_sec']) {
-    const control = controls[name];
-    control.addEventListener('change', updateParams);
-    control.addEventListener('blur', onSubmit);
-  }
-
   loadStats();
-}
-
-// Called when anyone edits a type-in field. This doesn't re-execute the stats
-// query from the incremental edit immediately, but it resets the timer. If
-// the timer expires before the user hits return then it auto-confirms the
-// new setting.
-function updateParams() {
-  clearTimer();
-  setTimer();
-}
-
-function allValuesEqual(a, b) {
-  if (a == b) {
-    return true;
-  } else if (a == null || b == null) {
-    return false;
-  }
-
-  const a_keys = Object.keys(a);
-  const b_keys = Object.keys(b);
-  if (a_keys.length != b_keys.length) {
-    return false;
-  }
-  for (key of a_keys) {
-    if (!b.hasOwnProperty(key)) {
-      return false;
-    }
-    const a_value = a[key];
-    const b_value = b[key];
-    const a_type = typeof a_value;
-    if (a_type != typeof b_value) {
-      return false;
-    }
-    if (a_type == 'object') {
-      if (!allValuesEqual(a_value, b_value)) {
-        return false;
-      }
-    } else if (a_value != b_value) {
-      return false;
-    }
-  }
-  return true;
-}
-
-// Called when user hits return in any type-in field, or when someone changes the Type field.
-function onSubmit() {
-  saveState();
-  loadStats();
-  return false;
-}
-
-function saveState() {
-  const newValues = getParamValues();
-  if (allValuesEqual(newValues, currentValues)) {
-    return;
-  }
-  currentValues = newValues;
-  history.pushState(currentValues, null,
-                    'html-active?filter=' + encodeURIComponent(currentValues.filter) +
-                    '&type=' + encodeURIComponent(currentValues.type));
-}
-
-function setControls() {
-  // Set the widgets to the new values.
-  for (key of Object.keys(controls)) {
-    console.log('setting control ' + key + ' to ' + currentValues[key]);
-    controls[key].value = currentValues[key];
-  }
-}
-
-// Called when someone presses the back/forward button.
-function navigateHook(event) {
-  if (event.state) {
-    currentValues = event.state;
-  } else {
-    currentValues = initialValues;
-  }
-
-  setControls();
-  loadStats();
-}
-
-function clearTimer() {
-  if (reloadTimer != null) {
-    window.clearTimeout(reloadTimer);
-    reloadTimer = null;
-  }
-}
-
-function setTimer() {
-  reloadTimer = window.setTimeout(() => {
-    reloadTimer = null;
-    loadStats();
-  }, 1000*loadSettingOrUseDefault('active-update-interval', 5));
 }
 
 /**
  * Initiates an Ajax request for the stats JSON based on the stats parameters.
  */
 async function loadStats() {
-  clearTimer();
-
-  const makeQueryParam = (name) => name + '=' + encodeURIComponent(currentValues[name]);
+  const makeQueryParam = (name) => name + '=' + encodeURIComponent(
+      document.getElementById(paramIdPrefix + name).value);
   const params = ['filter', 'type'];
   const href = window.location.href;
 
@@ -252,10 +106,8 @@ async function loadStats() {
     statusDiv.textContent = 'Error fetching ' + url + ': ' + e;
   }
 
-  // Update stats with a minimum of 5 second interval between completing the
-  // previous update and the start of the new one. So if it takes 1 second
-  // to refresh the stats we'll do it every 6 seconds, by default.
-  setTimer();
+  // Update stats every 5 seconds by default.
+  window.setTimeout(loadStats, 1000*loadSettingOrUseDefault('active-update-interval', 5));
 }
 
 /**
@@ -394,4 +246,3 @@ function renderStats(data) {
 
 // We don't want to trigger any DOM manipulations until the DOM is fully loaded.
 addEventListener('DOMContentLoaded', initHook);
-addEventListener('popstate', navigateHook);

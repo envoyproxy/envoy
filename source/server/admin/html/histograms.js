@@ -235,12 +235,16 @@ function leavePopup() {
  * @param {!Element} parent the parent element.
  * @param {string} type the HTML element type, e.g. 'div'.
  * @param {?string} className optional CSS class name.
+ * @param {?string} id optional id.
  * @return {!Element} the new element.
  */
 function appendNewElement(parent, type, className) {
   const element = document.createElement(type);
   if (className) {
     element.className = className;
+  }
+  if (id) {
+    element.id = id;
   }
   parent.appendChild(element);
   return element;
