@@ -93,7 +93,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig uhv_config;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("default_envoy_uhv_for admin");
+  config.set_name("default_universal_header_validator_for_admin");
   config.mutable_typed_config()->PackFrom(uhv_config);
 
   auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(config);
