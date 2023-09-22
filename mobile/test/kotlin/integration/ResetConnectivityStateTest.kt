@@ -12,9 +12,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
-private val apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-private val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+private const val TEST_RESPONSE_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 
 // This test doesn't do what it advertises (https://github.com/envoyproxy/envoy/issues/25180)
 class ResetConnectivityStateTest {
@@ -28,7 +26,7 @@ class ResetConnectivityStateTest {
     val headersExpectation = CountDownLatch(2)
 
     val engine = EngineBuilder(Standard())
-      .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
+      .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
       .build()
     val client = engine.streamClient()
 

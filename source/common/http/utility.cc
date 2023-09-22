@@ -32,6 +32,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
@@ -607,6 +608,15 @@ void Utility::QueryParamsMulti::add(absl::string_view key, absl::string_view val
 
 void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_view value) {
   this->data_[key] = std::vector<std::string>{std::string(value)};
+}
+
+absl::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
+  auto it = this->data_.find(key);
+  if (it == this->data_.end()) {
+    return std::nullopt;
+  }
+
+  return absl::optional<std::string>{it->second.at(0)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {

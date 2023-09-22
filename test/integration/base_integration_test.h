@@ -242,7 +242,7 @@ public:
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      if (metadata.size() != 0) {
+      if (!metadata.empty()) {
         envoy::service::discovery::v3::Resource resource;
         resource.mutable_resource()->PackFrom(message);
         resource.set_name(intResourceName(message));

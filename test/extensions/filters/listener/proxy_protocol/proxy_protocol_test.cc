@@ -99,12 +99,8 @@ public:
   uint64_t listenerTag() const override { return 1; }
   ResourceLimit& openConnections() override { return open_connections_; }
   const std::string& name() const override { return name_; }
-  Network::UdpListenerConfigOptRef udpListenerConfig() override {
-    return Network::UdpListenerConfigOptRef();
-  }
-  Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return Network::InternalListenerConfigOptRef();
-  }
+  Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -2016,12 +2012,8 @@ public:
   Stats::Scope& listenerScope() override { return *stats_store_.rootScope(); }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  Network::UdpListenerConfigOptRef udpListenerConfig() override {
-    return Network::UdpListenerConfigOptRef();
-  }
-  Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return Network::InternalListenerConfigOptRef();
-  }
+  Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }

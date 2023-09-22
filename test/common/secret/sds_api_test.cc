@@ -805,9 +805,8 @@ TEST_F(SdsApiTest, EmptyResource) {
   init_manager_.add(*sds_api.initTarget());
 
   initialize();
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate({}, "").ok()), EnvoyException,
-      "Missing SDS resources for abc.com in onConfigUpdate()");
+  EXPECT_EQ(subscription_factory_.callbacks_->onConfigUpdate({}, "").message(),
+            "Missing SDS resources for abc.com in onConfigUpdate()");
 }
 
 // Validate that SdsApi throws exception if multiple secrets are passed to onConfigUpdate().
@@ -834,10 +833,13 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   const auto decoded_resources = TestUtility::decodeResources({typed_secret, typed_secret});
 
   initialize();
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(
-          subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException, "Unexpected SDS secrets length: 2");
+  EXPECT_EQ(
+      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+      "Unexpected SDS secrets length: 2");
+  Protobuf::RepeatedPtrField<std::string> unused;
+  EXPECT_EQ(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, unused, "")
+                .message(),
+            "Unexpected SDS secrets length: 2");
 }
 
 // Validate that SdsApi throws exception if secret name passed to onConfigUpdate()
@@ -865,10 +867,9 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
   initialize();
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(
-          subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException, "Unexpected SDS secret (expecting abc.com): wrong.name.com");
+  EXPECT_EQ(
+      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+      "Unexpected SDS secret (expecting abc.com): wrong.name.com");
 }
 
 } // namespace

@@ -118,3 +118,37 @@ void JavaArrayOfByteToString(JNIEnv* env, jbyteArray jbytes, std::string* out);
 
 std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray array,
                                                       std::string& cluster_out);
+
+// Helper functions for JNI's `Call<Type>Method` with proper exception handling in order to satisfy
+// -Xcheck:jni.
+// See
+// https://docs.oracle.com/en/java/javase/11/docs/specs/jni/functions.html#calling-instance-methods
+#define DECLARE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                   \
+  JNI_TYPE call##JAVA_TYPE##Method(JNIEnv* env, jobject object, jmethodID method_id, ...);
+
+void callVoidMethod(JNIEnv* env, jobject object, jmethodID method_id, ...);
+DECLARE_CALL_METHOD(Byte, jbyte)
+DECLARE_CALL_METHOD(Char, jchar)
+DECLARE_CALL_METHOD(Short, jshort)
+DECLARE_CALL_METHOD(Int, jint)
+DECLARE_CALL_METHOD(Long, jlong)
+DECLARE_CALL_METHOD(Double, jdouble)
+DECLARE_CALL_METHOD(Boolean, jboolean)
+DECLARE_CALL_METHOD(Object, jobject)
+
+// Helper functions for JNI's `CallStatic<Type>Method` with proper exception handling in order to
+// satisfy -Xcheck:jni.
+// See
+// https://docs.oracle.com/en/java/javase/11/docs/specs/jni/functions.html#calling-static-methods
+#define DECLARE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                            \
+  JNI_TYPE callStatic##JAVA_TYPE##Method(JNIEnv* env, jclass clazz, jmethodID method_id, ...);
+
+void callStaticVoidMethod(JNIEnv* env, jclass clazz, jmethodID method_id, ...);
+DECLARE_CALL_STATIC_METHOD(Byte, jbyte)
+DECLARE_CALL_STATIC_METHOD(Char, jchar)
+DECLARE_CALL_STATIC_METHOD(Short, jshort)
+DECLARE_CALL_STATIC_METHOD(Int, jint)
+DECLARE_CALL_STATIC_METHOD(Long, jlong)
+DECLARE_CALL_STATIC_METHOD(Double, jdouble)
+DECLARE_CALL_STATIC_METHOD(Boolean, jboolean)
+DECLARE_CALL_STATIC_METHOD(Object, jobject)

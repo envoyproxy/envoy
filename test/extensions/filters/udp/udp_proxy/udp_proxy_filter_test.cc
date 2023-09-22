@@ -53,8 +53,8 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 }
 
 Api::IoCallUint64Result makeError(int sys_errno) {
-  return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
-                                                    Network::IoSocketError::deleteIoError));
+  return {0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
+                             Network::IoSocketError::deleteIoError)};
 }
 
 class UdpProxyFilterBase : public testing::Test {
