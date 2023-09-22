@@ -239,7 +239,19 @@ void HostUtility::forEachHostCounter(
 void HostUtility::forEachHostGauge(
     const ClusterManager& cluster_manager,
     const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& cb) {
-  forEachMetric(cluster_manager, cb, [](Host& host) { return host.gauges(); });
+  // This is held as a reference in the returned vector of gauges. It lives here so that it's
+  // lifetime is longer than `forEachMetric`.
+  Stats::PrimitiveGauge healthy_gauge;
+
+  forEachMetric(cluster_manager, cb, [&](Host& host) {
+    // std::pair<absl::string_view, Stats::PrimitiveGaugeReference>
+    auto gauges = host.gauges();
+
+    // Add synthentic "healthy" gauge.
+    healthy_gauge.set((host.coarseHealth() == Host::Health::Healthy) ? 1 : 0);
+    gauges.emplace_back(absl::string_view("healthy"), healthy_gauge);
+    return gauges;
+  });
 }
 
 } // namespace Upstream
