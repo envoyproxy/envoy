@@ -203,17 +203,15 @@ void CheckRequestUtils::createHttpCheck(
   // *cb->connection(), callbacks->streamInfo() and callbacks->decodingBuffer() are not qualified as
   // const.
   auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
-  if (cb->connection().has_value()) {
-    setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
-                       include_peer_certificate);
-    setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
-                       include_peer_certificate);
-  }
+  setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
+                     include_peer_certificate);
+  setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
+                     include_peer_certificate);
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
                         request_header_matchers);
 
-  if (include_tls_session && cb->connection().has_value()) {
+  if (include_tls_session) {
     if (cb->connection()->ssl() != nullptr) {
       attrs->mutable_tls_session();
       if (!cb->connection()->ssl()->sni().empty()) {
@@ -242,7 +240,6 @@ void CheckRequestUtils::createTcpCheck(
                      include_peer_certificate);
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
-
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
 }
 
