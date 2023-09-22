@@ -966,37 +966,32 @@ getTypedLbConfigFromLegacyProto(const envoy::config::cluster::v3::Cluster& confi
 
   switch (config.lb_policy()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::config::cluster::v3::Cluster::ROUND_ROBIN: {
+  case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.round_robin");
     lb_config = std::make_unique<LegacyTypedRoundRobinLbConfig>(config);
     break;
-  }
-  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST: {
+  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.least_request");
     lb_config = std::make_unique<LegacyTypedLeastRequestLbConfig>(config);
     break;
-  }
-  case envoy::config::cluster::v3::Cluster::RANDOM: {
+  case envoy::config::cluster::v3::Cluster::RANDOM:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.random");
     lb_config = std::make_unique<LegacyTypedRandomLbConfig>();
     break;
-  }
-  case envoy::config::cluster::v3::Cluster::RING_HASH: {
+  case envoy::config::cluster::v3::Cluster::RING_HASH:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.ring_hash");
     lb_config = std::make_unique<LegacyTypedRingHashLbConfig>(config);
     break;
-  }
-  case envoy::config::cluster::v3::Cluster::MAGLEV: {
+  case envoy::config::cluster::v3::Cluster::MAGLEV:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.maglev");
     lb_config = std::make_unique<LegacyTypedMaglevLbConfig>(config);
     break;
-  }
-  case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED: {
+  case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
     if (config.has_lb_subset_config()) {
       throw EnvoyException(
           fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
@@ -1006,11 +1001,9 @@ getTypedLbConfigFromLegacyProto(const envoy::config::cluster::v3::Cluster& confi
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.cluster_provided");
     break;
-  }
-  case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
+  case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG:
     PANIC("Should not reach here");
     break;
-  }
   }
 
   if (config.has_lb_subset_config()) {
