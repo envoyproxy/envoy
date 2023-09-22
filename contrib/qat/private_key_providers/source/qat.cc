@@ -374,9 +374,7 @@ static void decryptCb(void* callback_tag, CpaStatus status, void* data, CpaFlatB
 }
 } // namespace
 
-QatContext::QatContext(QatHandle& handle)
-    : handle_(handle), last_status_(CPA_STATUS_RETRY), decrypted_data_length_(0), read_fd_(-1),
-      write_fd_(-1) {}
+QatContext::QatContext(QatHandle& handle) : handle_(handle) {}
 
 QatContext::~QatContext() {
   if (read_fd_ >= 0) {

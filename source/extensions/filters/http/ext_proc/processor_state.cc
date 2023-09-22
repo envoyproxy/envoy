@@ -136,9 +136,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           // flag of decodeData() can be determined by whether the trailers are received.
           // Also, bufferedData() is not nullptr means decodeData() is called, even though
           // the data can be an empty chunk.
-          filter_.sendBodyChunk(*this, *bufferedData(),
-                                ProcessorState::CallbackState::BufferedBodyCallback,
-                                !trailers_available_);
+          auto req = filter_.setupBodyChunk(*this, *bufferedData(), !trailers_available_);
+          filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
           clearWatermark();
           return absl::OkStatus();
         }
@@ -157,9 +156,10 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           modifyBufferedData(
               [&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
           ENVOY_LOG(debug, "Sending first chunk using buffered data ({})", buffered_chunk.length());
-          filter_.sendBodyChunk(*this, buffered_chunk,
-                                ProcessorState::CallbackState::StreamedBodyCallback, false);
-          enqueueStreamingChunk(buffered_chunk, false, true);
+          // Need to first enqueue the data into the chunk queue before sending.
+          auto req = filter_.setupBodyChunk(*this, buffered_chunk, false);
+          enqueueStreamingChunk(buffered_chunk, false);
+          filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
         }
         if (queueBelowLowLimit()) {
           clearWatermark();
@@ -174,7 +174,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           Buffer::OwnedImpl buffered_chunk;
           modifyBufferedData(
               [&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
-          enqueueStreamingChunk(buffered_chunk, false, true);
+          enqueueStreamingChunk(buffered_chunk, false);
         }
         if (queueOverHighLimit()) {
           // We reached the limit so send what we have. This is different from the buffered
@@ -185,8 +185,9 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
               debug,
               "Sending {} bytes of data end_stream {} in buffered partial mode before end stream",
               chunkQueue().receivedData().length(), all_data.end_stream);
-          filter_.sendBodyChunk(*this, chunkQueue().receivedData(),
-                                ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
+          auto req = filter_.setupBodyChunk(*this, chunkQueue().receivedData(), false);
+          filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedPartialBodyCallback,
+                                req);
         } else {
           // Let data continue to flow, but don't resume yet -- we would like to hold
           // the headers while we buffer the body up to the limit.
@@ -219,7 +220,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   const auto& common_response = response.response();
   if (callback_state_ == CallbackState::BufferedBodyCallback ||
       callback_state_ == CallbackState::StreamedBodyCallback ||
-      callback_state_ == CallbackState::StreamedBodyCallbackFinishing ||
       callback_state_ == CallbackState::BufferedPartialBodyCallback) {
     ENVOY_LOG(debug, "Processing body response");
     if (callback_state_ == CallbackState::BufferedBodyCallback) {
@@ -251,30 +251,20 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       clearWatermark();
       onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
-    } else if (callback_state_ == CallbackState::StreamedBodyCallback ||
-               callback_state_ == CallbackState::StreamedBodyCallbackFinishing) {
-      bool delivered_one = false;
+    } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
       Buffer::OwnedImpl chunk_data;
-      while (auto queued_chunk = dequeueStreamingChunk(delivered_one, chunk_data)) {
-        // Loop through queue in case some of it is chunks that were never
-        // delivered because the processing mode changed.
-        auto chunk = std::move(*queued_chunk);
-        if (chunk->delivered) {
-          if (common_response.has_body_mutation()) {
-            ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
-            MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
-          }
-          delivered_one = true;
-          // After we have delivered one chunk, don't process anything
-          // more from the queue unless it was never sent to the server.
-        }
-        should_continue = chunk->end_stream;
-        if (chunk_data.length() > 0) {
-          ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
-          injectDataToFilterChain(chunk_data, chunk->end_stream);
-        }
-        chunk_data.drain(chunk_data.length());
+      auto chunk = dequeueStreamingChunk(chunk_data);
+      ENVOY_BUG(chunk, "Bad streamed body callback state");
+      if (common_response.has_body_mutation()) {
+        ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
+        MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
       }
+      should_continue = chunk->end_stream;
+      if (chunk_data.length() > 0) {
+        ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
+        injectDataToFilterChain(chunk_data, chunk->end_stream);
+      }
+
       if (queueBelowLowLimit()) {
         clearWatermark();
       }
@@ -286,9 +276,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
       Buffer::OwnedImpl chunk_data;
-      auto queued_chunk = dequeueStreamingChunk(false, chunk_data);
-      ENVOY_BUG(queued_chunk, "Bad partial body callback state");
-      auto chunk = std::move(*queued_chunk);
+      auto chunk = dequeueStreamingChunk(chunk_data);
+      ENVOY_BUG(chunk, "Bad partial body callback state");
       if (common_response.has_header_mutation()) {
         if (headers_ != nullptr) {
           ENVOY_LOG(debug, "Applying header mutations to buffered body message");
@@ -321,15 +310,11 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       partial_body_processed_ = true;
 
       // If anything else is left on the queue, inject it too
-      Buffer::OwnedImpl leftover_data;
-      while (auto leftover_chunk = dequeueStreamingChunk(false, leftover_data)) {
-        auto chunk = std::move(*leftover_chunk);
-        if (leftover_data.length() > 0) {
-          ENVOY_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
-                    leftover_data.length());
-          injectDataToFilterChain(leftover_data, chunk->end_stream);
-        }
-        leftover_data.drain(leftover_data.length());
+      if (chunkQueue().receivedData().length() > 0) {
+        const auto& all_data = consolidateStreamedChunks();
+        ENVOY_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
+                  chunkQueue().receivedData().length());
+        injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
       }
     } else {
       // Fake a grpc error when processor state and received message type doesn't match, beware this
@@ -374,9 +359,8 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
   return absl::FailedPreconditionError("spurious message");
 }
 
-void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream,
-                                           bool delivered) {
-  chunk_queue_.push(data, end_stream, delivered);
+void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream) {
+  chunk_queue_.push(data, end_stream);
   if (queueOverHighLimit()) {
     requestWatermark();
   }
@@ -384,26 +368,16 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 
 void ProcessorState::clearAsyncState() {
   onFinishProcessorCall(Grpc::Status::Aborted);
-  Buffer::OwnedImpl chunk_data;
-  while (auto queued_chunk = dequeueStreamingChunk(false, chunk_data)) {
-    auto chunk = std::move(*queued_chunk);
-    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk_data.length());
-    injectDataToFilterChain(chunk_data, chunk->end_stream);
-    chunk_data.drain(chunk_data.length());
+  if (chunkQueue().receivedData().length() > 0) {
+    const auto& all_data = consolidateStreamedChunks();
+    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunkQueue().receivedData().length());
+    injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
   }
   clearWatermark();
   continueIfNecessary();
 }
 
-void ProcessorState::setBodyMode(ProcessingMode_BodySendMode body_mode) {
-  body_mode_ = body_mode;
-  if (callback_state_ == CallbackState::StreamedBodyCallback &&
-      body_mode != ProcessingMode::STREAMED) {
-    // Special handling for when the processing mode is changed while
-    // streaming.
-    callback_state_ = CallbackState::StreamedBodyCallbackFinishing;
-  }
-}
+void ProcessorState::setBodyMode(ProcessingMode_BodySendMode body_mode) { body_mode_ = body_mode; }
 
 void ProcessorState::continueIfNecessary() {
   if (paused_) {
@@ -480,12 +454,11 @@ void EncodingProcessorState::clearWatermark() {
   }
 }
 
-void ChunkQueue::push(Buffer::Instance& data, bool end_stream, bool delivered) {
+void ChunkQueue::push(Buffer::Instance& data, bool end_stream) {
   // Adding the chunk into the queue.
   auto next_chunk = std::make_unique<QueuedChunk>();
   next_chunk->length = data.length();
   next_chunk->end_stream = end_stream;
-  next_chunk->delivered = delivered;
   queue_.push_back(std::move(next_chunk));
   bytes_enqueued_ += data.length();
 
@@ -493,13 +466,11 @@ void ChunkQueue::push(Buffer::Instance& data, bool end_stream, bool delivered) {
   received_data_.move(data);
 }
 
-absl::optional<QueuedChunkPtr> ChunkQueue::pop(bool undelivered_only, Buffer::OwnedImpl& out_data) {
+QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
   if (queue_.empty()) {
-    return absl::nullopt;
+    return nullptr;
   }
-  if (undelivered_only && queue_.front()->delivered) {
-    return absl::nullopt;
-  }
+
   QueuedChunkPtr chunk = std::move(queue_.front());
   queue_.pop_front();
   bytes_enqueued_ -= chunk->length;
@@ -518,7 +489,6 @@ const QueuedChunk& ChunkQueue::consolidate() {
     queue_.push_front(std::move(new_chunk));
   }
   auto& chunk = *(queue_.front());
-  chunk.delivered = true;
   return chunk;
 }
 

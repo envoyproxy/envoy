@@ -22,13 +22,11 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
-private const val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
-private const val matcherTrailerName = "test-trailer"
-private const val matcherTrailerValue = "test.code"
+private const val TEST_RESPONSE_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val MATCHER_TRAILER_NAME = "test-trailer"
+private const val MATCHER_TRAILER_VALUE = "test.code"
 
-class SendTrailersTest {
+class ReceiveTrailersTest {
 
   init {
     JniLibrary.loadTestLibrary()
@@ -79,8 +77,7 @@ class SendTrailersTest {
         name = "test_platform_filter",
         factory = { ErrorValidationFilter(trailersReceived) }
     )
-      .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
-      .setOnEngineRunning { }
+      .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
       .build()
 
     val client = engine.streamClient()
@@ -96,7 +93,7 @@ class SendTrailersTest {
 
     val body = ByteBuffer.wrap("match_me".toByteArray(Charsets.UTF_8))
     val requestTrailers = RequestTrailersBuilder()
-      .add(matcherTrailerName, matcherTrailerValue)
+      .add(MATCHER_TRAILER_NAME, MATCHER_TRAILER_VALUE)
       .build()
 
     var responseStatus: Int? = null

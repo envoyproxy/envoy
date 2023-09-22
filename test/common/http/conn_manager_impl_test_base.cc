@@ -115,7 +115,7 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
         .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
                           this](FilterChainManager& manager) -> bool {
           bool applied_filters = false;
-          if (log_handler_.get()) {
+          if (log_handler_) {
             auto factory = createLogHandlerFactoryCb(log_handler_);
             manager.applyFilterFactoryCb({}, factory);
             applied_filters = true;

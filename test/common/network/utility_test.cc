@@ -683,9 +683,7 @@ TEST(PortRangeListTest, Errors) {
   }
 }
 
-static Address::Ipv4Instance makeFromPort(uint32_t port) {
-  return Address::Ipv4Instance("0.0.0.0", port);
-}
+static Address::Ipv4Instance makeFromPort(uint32_t port) { return {"0.0.0.0", port}; }
 
 TEST(PortRangeListTest, Normal) {
   {

@@ -3,6 +3,7 @@ load(
     "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -101,14 +102,19 @@ envoy_benchmark_test(
     tags = ["fails_on_windows"],
 )
 
+envoy_cc_test_library(
+    name = "compressor_integration_tests_lib",
+    hdrs = ["compressor_integration_tests.h"],
+)
+
 envoy_cc_test(
     name = "compressor_integration_tests",
     size = "large",
     srcs = [
         "compressor_integration_tests.cc",
-        "compressor_integration_tests.h",
     ],
     deps = [
+        ":compressor_integration_tests_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/compression/gzip/compressor:config",
