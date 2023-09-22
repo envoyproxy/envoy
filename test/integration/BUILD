@@ -1,3 +1,4 @@
+load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -7,6 +8,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_py_test",
     "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
     "envoy_select_enable_yaml",
@@ -350,6 +352,29 @@ envoy_cc_test_binary(
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/load_balancing_policies/ring_hash:config",
+    ],
+)
+
+envoy_py_test(
+    name = "hotrestart_handoff_test",
+    size = "medium",
+    srcs = select({
+        "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
+        "//conditions:default": ["hotrestart_handoff_test.py"],
+    }),
+    data = [":hotrestart_main"],
+    main = select({
+        "//bazel:disable_hot_restart_or_admin": "null_test.py",
+        "//conditions:default": "hotrestart_handoff_test.py",
+    }),
+    # Hot restart does not apply on Windows.
+    # py_test doesn't do coverage.
+    tags = [
+        "nocoverage",
+        "skip_on_windows",
+    ],
+    deps = [
+        requirement("aiohttp"),
     ],
 )
 
