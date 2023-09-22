@@ -199,6 +199,13 @@ int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaDownstreamRemoteAddress(lua_State* state) {
+  const std::string& remote_address =
+      stream_info_.downstreamAddressProvider().remoteAddress()->asString();
+  lua_pushlstring(state, remote_address.data(), remote_address.size());
+  return 1;
+}
+
 int StreamInfoWrapper::luaRequestedServerName(lua_State* state) {
   absl::string_view requested_serve_name =
       stream_info_.downstreamAddressProvider().requestedServerName();

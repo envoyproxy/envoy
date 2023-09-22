@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
 
-void TestPrivateKeyConnection::delayed_op() {
+void TestPrivateKeyConnection::delayedOp() {
   const std::chrono::milliseconds timeout_0ms{0};
 
   timer_ = dispatcher_.createTimer([this]() -> void {
@@ -84,7 +84,7 @@ static ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size
 
   ops->output_.assign(out, out + out_len_unsigned);
   // Tell SSL socket that the operation is ready to be called again.
-  ops->delayed_op();
+  ops->delayedOp();
 
   return ssl_private_key_retry;
 }
@@ -160,7 +160,7 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
   }
 
   ops->output_.assign(out, out + *out_len);
-  ops->delayed_op();
+  ops->delayedOp();
 
   return ssl_private_key_retry;
 }
@@ -197,7 +197,7 @@ static ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t* out, siz
   }
 
   ops->output_.assign(out, out + *out_len);
-  ops->delayed_op();
+  ops->delayedOp();
 
   return ssl_private_key_retry;
 }

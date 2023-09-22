@@ -286,7 +286,7 @@ private:
   const std::string new_link_;
   const std::string target1_;
   const std::string target2_;
-  bool use_target1_;
+  bool use_target1_{true};
 };
 
 } // namespace Envoy
