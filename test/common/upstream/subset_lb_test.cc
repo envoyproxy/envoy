@@ -2515,6 +2515,8 @@ TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
   TestUtility::loadFromYaml(yaml, subset_proto_config);
 
   actual_subset_info_ = std::make_unique<ProdLoadBalancerSubsetInfoImpl>(subset_proto_config);
+  // Always be true for the ProdLoadBalancerSubsetInfoImpl.
+  EXPECT_TRUE(actual_subset_info_->isEnabled());
 
   // Add hosts initial hosts.
   init({{"tcp://127.0.0.1:80", {{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-0"}, {"D", "D-V-0"}}},

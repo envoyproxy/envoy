@@ -76,6 +76,7 @@ public:
           // If legacy API is used, set the LB policy by the old way.
           if (legacy_api) {
             cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster::MAGLEV);
+            cluster_0->mutable_maglev_lb_config();
             return;
           }
 

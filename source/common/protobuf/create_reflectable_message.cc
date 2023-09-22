@@ -319,6 +319,9 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
               kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_http_original_ip_detection_xff_v3_xff::
           kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_load_balancing_policies_cluster_provided_v3_cluster_provided::
+              kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_load_balancing_policies_common_v3_common::
           kFileDescriptorInfo,
       protobuf::reflection::
