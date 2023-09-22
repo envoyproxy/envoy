@@ -12,8 +12,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-QueryMessageInfo::QueryMessageInfo(const QueryMessage& query)
-    : request_id_{query.requestId()}, max_time_{0} {
+QueryMessageInfo::QueryMessageInfo(const QueryMessage& query) : request_id_{query.requestId()} {
   // First see if this is a command, if so we are done.
   const Bson::Document* command = parseCommand(query);
   if (command) {

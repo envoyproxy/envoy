@@ -19,7 +19,7 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "http_subscription_test_harness",
-    srcs = ["http_subscription_test_harness.h"],
+    hdrs = ["http_subscription_test_harness.h"],
     deps = [
         "//envoy/http:async_client_interface",
         "//source/common/common:utility_lib",

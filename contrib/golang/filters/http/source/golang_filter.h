@@ -225,6 +225,7 @@ public:
   CAPIStatus setHeader(absl::string_view key, absl::string_view value, headerAction act);
   CAPIStatus removeHeader(absl::string_view key);
   CAPIStatus copyBuffer(Buffer::Instance* buffer, char* data);
+  CAPIStatus drainBuffer(Buffer::Instance* buffer, uint64_t length);
   CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                              bufferAction action);
   CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
@@ -254,6 +255,8 @@ private:
   bool doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   bool doTrailer(ProcessorState& state, Http::HeaderMap& trailers);
   bool doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers);
+
+  void initRequest(ProcessorState& state);
 
   uint64_t getMergedConfigId(ProcessorState& state);
 

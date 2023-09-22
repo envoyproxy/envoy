@@ -319,8 +319,8 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
           ProcessingResponse resp;
           if (req.has_request_body()) {
             received_count++;
-            if (received_count == 2) {
-              // After two body chunks, change the processing mode. Since the body
+            if (received_count == 1) {
+              // After first body chunk, change the processing mode. Since the body
               // is pipelined, we might still get body chunks, however. This test can't
               // validate this, but at least we can ensure that this doesn't blow up the
               // protocol.
@@ -330,7 +330,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
             resp.mutable_request_body();
           } else if (req.has_response_headers()) {
             // Should not see response headers until we changed the processing mode.
-            EXPECT_GE(received_count, 2);
+            EXPECT_GE(received_count, 1);
             resp.mutable_response_headers();
           } else {
             FAIL() << "unexpected stream message";

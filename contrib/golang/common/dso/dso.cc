@@ -93,9 +93,9 @@ GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1
   return envoy_go_filter_on_http_data_(p0, p1, p2, p3);
 }
 
-void HttpFilterDsoImpl::envoyGoFilterOnHttpLog(httpRequest* p0) {
+void HttpFilterDsoImpl::envoyGoFilterOnHttpLog(httpRequest* p0, int p1) {
   ASSERT(envoy_go_filter_on_http_log_ != nullptr);
-  envoy_go_filter_on_http_log_(p0);
+  envoy_go_filter_on_http_log_(p0, GoUint64(p1));
 }
 
 void HttpFilterDsoImpl::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
@@ -196,13 +196,15 @@ GoUint64 NetworkFilterDsoImpl::envoyGoFilterOnDownstreamWrite(void* w, GoUint64 
   return envoy_go_filter_on_downstream_write_(w, data_size, data_ptr, slice_num, end_of_stream);
 }
 
-void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamConnectionReady(void* w, GoUint64 connID) {
+void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamConnectionReady(
+    void* w, GoUint64 connID) { // NOLINT(readability-identifier-naming)
   ASSERT(envoy_go_filter_on_upstream_connection_ready_ != nullptr);
   envoy_go_filter_on_upstream_connection_ready_(w, connID);
 }
 
-void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamConnectionFailure(void* w, GoInt reason,
-                                                                    GoUint64 connID) {
+void NetworkFilterDsoImpl::envoyGoFilterOnUpstreamConnectionFailure(
+    void* w, GoInt reason,
+    GoUint64 connID) { // NOLINT(readability-identifier-naming)
   ASSERT(envoy_go_filter_on_upstream_connection_failure_ != nullptr);
   envoy_go_filter_on_upstream_connection_failure_(w, reason, connID);
 }

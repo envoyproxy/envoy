@@ -1,7 +1,7 @@
-load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
-load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 
 licenses(["notice"])  # Apache 2
 
@@ -33,11 +33,11 @@ py_binary(
 
 # The upstream lib is maintained here:
 #
-#    https://github.com/envoyproxy/pytooling/tree/main/envoy.docs.sphinx_runner
+#    https://github.com/envoyproxy/toolshed/tree/main/envoy.docs.sphinx_runner
 #
-# Please submit issues/PRs to the pytooling repo:
+# Please submit issues/PRs to the toolshed repo:
 #
-#    https://github.com/envoyproxy/pytooling
+#    https://github.com/envoyproxy/toolshed
 
 envoy_entry_point(
     name = "sphinx_runner",

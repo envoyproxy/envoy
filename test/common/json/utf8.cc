@@ -30,7 +30,7 @@ UnicodeSizePair decode(const uint8_t* bytes, uint32_t size) {
     unicode = bytes[0] & ~Utf8::Mask2Byte;
     unicode = (unicode << Utf8::Shift) | (bytes[1] & ~Utf8::ContinueMask);
     if (unicode < 0x80) {
-      return UnicodeSizePair(0, 0);
+      return {0, 0};
     }
     consumed = 2;
   } else if (size >= 3 && (bytes[0] & Utf8::Mask3Byte) == Utf8::Pattern3Byte &&
@@ -40,7 +40,7 @@ UnicodeSizePair decode(const uint8_t* bytes, uint32_t size) {
     unicode = (unicode << Utf8::Shift) | (bytes[1] & ~Utf8::ContinueMask);
     unicode = (unicode << Utf8::Shift) | (bytes[2] & ~Utf8::ContinueMask);
     if (unicode < 0x800) { // 3-byte starts at 0x800
-      return UnicodeSizePair(0, 0);
+      return {0, 0};
     }
     consumed = 3;
   } else if (size >= 4 && (bytes[0] & Utf8::Mask4Byte) == Utf8::Pattern4Byte &&
@@ -59,11 +59,11 @@ UnicodeSizePair decode(const uint8_t* bytes, uint32_t size) {
     // But the current RFC3629 section 3 limits UTF-8 encoding through code
     // point 0x10FFFF, to match the limits of UTF-16.
     if (unicode < 0x10000 || unicode > 0x10ffff) {
-      return UnicodeSizePair(0, 0);
+      return {0, 0};
     }
     consumed = 4;
   }
-  return UnicodeSizePair(unicode, consumed);
+  return {unicode, consumed};
 }
 
 } // namespace Utf8

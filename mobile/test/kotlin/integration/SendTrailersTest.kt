@@ -13,10 +13,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
-private const val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
-private const val matcherTrailerName = "test-trailer"
-private const val matcherTrailerValue = "test.code"
+private const val TEST_RESPONSE_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val ASSERTION_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+private const val MATCHER_TRAILER_NAME = "test-trailer"
+private const val MATCHER_TRAILER_VALUE = "test.code"
 
 class SendTrailersTest {
 
@@ -29,10 +29,9 @@ class SendTrailersTest {
 
     val expectation = CountDownLatch(1)
     val engine = EngineBuilder(Standard())
-      .addNativeFilter("envoy.filters.http.assertion", "{'@type': $assertionFilterType, match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}")
+      .addNativeFilter("envoy.filters.http.assertion", "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}")
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":65000}")
-      .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
-      .setOnEngineRunning { }
+      .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
       .build()
 
     val client = engine.streamClient()
@@ -47,7 +46,7 @@ class SendTrailersTest {
 
     val body = ByteBuffer.wrap("match_me".toByteArray(Charsets.UTF_8))
     val requestTrailers = RequestTrailersBuilder()
-      .add(matcherTrailerName, matcherTrailerValue)
+      .add(MATCHER_TRAILER_NAME, MATCHER_TRAILER_VALUE)
       .build()
 
     var responseStatus: Int? = null

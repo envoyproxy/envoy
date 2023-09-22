@@ -239,7 +239,7 @@ public:
     if (data_.empty()) {
       return {};
     }
-    return std::string(reinterpret_cast<const char*>(data()), size());
+    return {reinterpret_cast<const char*>(data()), size()};
   }
 
   uint32_t payloadSize() const;

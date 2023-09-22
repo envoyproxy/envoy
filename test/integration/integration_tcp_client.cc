@@ -74,6 +74,10 @@ IntegrationTcpClient::IntegrationTcpClient(
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
+void IntegrationTcpClient::close(Network::ConnectionCloseType close_type) {
+  connection_->close(close_type);
+}
+
 void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match) {
   auto found = payload_reader_->data().find(data);
   if (found == 0 || (!exact_match && found != std::string::npos)) {
