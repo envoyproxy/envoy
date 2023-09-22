@@ -412,7 +412,7 @@ private:
     // HTTP connection manager configuration, then the entire connection is closed.
     bool validateTrailers();
 
-    std::weak_ptr<bool> stillAlive() { return std::weak_ptr<bool>(still_alive_); }
+    std::weak_ptr<bool> stillAlive() { return {still_alive_}; }
 
     ConnectionManagerImpl& connection_manager_;
     OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;

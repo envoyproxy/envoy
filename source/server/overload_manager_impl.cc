@@ -355,9 +355,9 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          const envoy::config::overload::v3::OverloadManager& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Api::Api& api, const Server::Options& options)
-    : started_(false), dispatcher_(dispatcher), time_source_(api.timeSource()),
-      tls_(slot_allocator), refresh_interval_(std::chrono::milliseconds(
-                                PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
+    : dispatcher_(dispatcher), time_source_(api.timeSource()), tls_(slot_allocator),
+      refresh_interval_(
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
       refresh_interval_delays_(makeHistogram(stats_scope, "refresh_interval_delay",
                                              Stats::Histogram::Unit::Milliseconds)),
       proactive_resources_(
@@ -644,7 +644,7 @@ void OverloadManagerImpl::flushResourceUpdates() {
 
 OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
                                         OverloadManagerImpl& manager, Stats::Scope& stats_scope)
-    : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false),
+    : name_(name), monitor_(std::move(monitor)), manager_(manager),
       pressure_gauge_(
           makeGauge(stats_scope, name, "pressure", Stats::Gauge::ImportMode::NeverImport)),
       failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),

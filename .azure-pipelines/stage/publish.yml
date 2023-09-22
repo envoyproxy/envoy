@@ -120,32 +120,24 @@ jobs:
           echo "disk space at beginning of Docker build:"
           df -h
         displayName: "Check disk space before Docker build"
+      # TODO(phlax): switch docker <> docker-upload as main task
       - bash: |
           set -e
-
-          mkdir -p linux/amd64 linux/arm64
-
-          # x64
-          cp -a $(Build.StagingDirectory)/release/x64/bin/release.tar.zst linux/amd64/release.tar.zst
-          cp -a $(Build.StagingDirectory)/release/x64/bin/schema_validator_tool linux/amd64/schema_validator_tool
-
-          # arm64
-          cp -a $(Build.StagingDirectory)/release/arm64/bin/release.tar.zst linux/arm64/release.tar.zst
-          cp -a $(Build.StagingDirectory)/release/arm64/bin/schema_validator_tool linux/arm64/schema_validator_tool
-
-          # Debug what files appear to have been downloaded
-          find linux -type f -name "*" | xargs ls -l
-
-          ci/docker_ci.sh
+          mkdir -p $(Build.StagingDirectory)/envoy
+          rm -rf $(Build.StagingDirectory)/envoy/*
+          mv $(Build.StagingDirectory)/release/* $(Build.StagingDirectory)/envoy
+          ./ci/run_envoy_docker.sh 'ci/do_ci.sh docker'
         displayName: Build Docker images
         timeoutInMinutes: ${{ parameters.timeoutDockerPublish }}
         workingDirectory: $(Build.SourcesDirectory)
         env:
-          AZP_BRANCH: $(Build.SourceBranch)
-          AZP_SHA1: $(Build.SourceVersion)
+          CI_BRANCH: $(Build.SourceBranch)
+          CI_SHA1: $(Build.SourceVersion)
           DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
           DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
           DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          ENVOY_DOCKER_IN_DOCKER: 1
 
 - job: package_x64
   displayName: Linux debs (x64)
@@ -237,7 +229,7 @@ jobs:
       publishEnvoy: false
       publishTestResults: false
       env:
-        AZP_BRANCH: $(Build.SourceBranch)
+        CI_BRANCH: $(Build.SourceBranch)
       stepsPost:
 
       - script: |

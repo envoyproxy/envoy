@@ -9,7 +9,8 @@ using ::testing::ReturnRef;
 
 MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
-      grpc_context_(store_.symbolTable()), router_context_(store_.symbolTable()) {
+      http_context_(store_.symbolTable()), grpc_context_(store_.symbolTable()),
+      router_context_(store_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));

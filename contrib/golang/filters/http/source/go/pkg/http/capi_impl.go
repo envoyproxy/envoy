@@ -193,6 +193,11 @@ func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) {
+	res := C.envoyGoFilterHttpDrainBuffer(r, C.ulonglong(bufferPtr), C.uint64_t(length))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
 	sHeader := (*reflect.StringHeader)(unsafe.Pointer(&value))
 	var act C.bufferAction

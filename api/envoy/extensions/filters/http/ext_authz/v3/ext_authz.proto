@@ -78,6 +78,7 @@ message ExtAuthz {
   // 3. At least one ``authorization response header`` is added to the client request, or is used for
   // altering another client request header.
   //
+  // It is an error to set this field when the filter is configured on an upstream filter chain.
   bool clear_route_cache = 6;
 
   // Sets the HTTP status that is returned to the client when the authorization server returns an error
@@ -135,6 +136,8 @@ message ExtAuthz {
   //
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
+  //
+  // It is an error to set this field when the filter is configured on an upstream filter chain.
   bool include_peer_certificate = 10;
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
@@ -184,6 +187,8 @@ message ExtAuthz {
   //
   // When this field is true, Envoy will include the SNI name used for TLSClientHello, if available, in the
   // :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
+  //
+  // It is an error to set this field when the filter is configured on an upstream filter chain.
   bool include_tls_session = 18;
 }
 

@@ -107,7 +107,7 @@ ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) { provider_ =
 
 std::string ExtProcFuzzHelper::consumeRepeatedString() {
   const uint32_t str_len = provider_->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
-  return std::string(str_len, 'b');
+  return {static_cast<char>(str_len), 'b'};
 }
 
 // Since FuzzedDataProvider requires enums to define a kMaxValue, we cannot
@@ -147,7 +147,7 @@ void ExtProcFuzzHelper::logRequest(const ProcessingRequest* req) {
 grpc::Status ExtProcFuzzHelper::randomGrpcStatusWithMessage() {
   const grpc::StatusCode code = randomGrpcStatusCode();
   ENVOY_LOG_MISC(trace, "Closing stream with StatusCode {}", code);
-  return grpc::Status(code, consumeRepeatedString());
+  return {code, consumeRepeatedString()};
 }
 
 // TODO(ikepolinsky): implement this function

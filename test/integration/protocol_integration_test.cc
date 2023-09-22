@@ -4032,10 +4032,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidateUpstreamHeaders) {
 }
 
 TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
-  if (use_universal_header_validator_) {
-    // UHV does not support this case so far.
-    return;
-  }
   if (upstreamProtocol() != Http::CodecType::HTTP1) {
     autonomous_allow_incomplete_streams_ = true;
     autonomous_upstream_ = true;
