@@ -65,9 +65,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   trace_context.setByReferenceKey(kTraceParent, traceparent_header_value);
   // Also set the tracestate.
   std::string trace_state;
-  if (parent_tracer_.sampler()) {
-    trace_state = parent_tracer_.sampler()->modifyTraceState(span_id_hex, span_.trace_state());
-  } 
+  // if (parent_tracer_.sampler()) {
+  //   trace_state = parent_tracer_.sampler()->modifyTraceState(span_id_hex, span_.trace_state());
+  // } 
   if (trace_state.empty()) {
     trace_state = span_.trace_state();
   }
@@ -174,13 +174,18 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
     absl::StatusOr<SpanContext> span_context = absl::InvalidArgumentError("no parent span");
     auto sampling_result = sampler_->shouldSample(
         span_context, operation_name, new_span.getTraceIdAsHex(), new_span.spankind(), {}, {});
-    new_span.setSampled(sampling_result.isSampled());
+    new_span.setSampled(sampling_result.isSampled());        
+    auto modified_trace_state = sampler()->modifyTraceState(new_span.spanId(), sampling_result.trace_state);
+    if (!modified_trace_state.empty()) {
+      sampling_result.trace_state = modified_trace_state;
+    }
+
     if (sampling_result.attributes) {
       for (auto const& attribute : *sampling_result.attributes) {
         new_span.setTag(attribute.first, attribute.second);
-        new_span.setTracestate(sampling_result.trace_state);
       }
     }
+    new_span.setTracestate(sampling_result.trace_state);
   }
   return std::make_unique<Span>(new_span);
 }
@@ -208,6 +213,11 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
     absl::StatusOr<SpanContext> span_context = previous_span_context;
     auto sampling_result = sampler_->shouldSample(
         span_context, operation_name, new_span.getTraceIdAsHex(), new_span.spankind(), {}, {});
+    auto modified_trace_state = sampler()->modifyTraceState(new_span.spanId(), sampling_result.trace_state);
+    if (!modified_trace_state.empty()) {
+      sampling_result.trace_state = modified_trace_state;
+    }
+
     if (sampling_result.attributes) {
       for (auto const& attribute : *sampling_result.attributes) {
         new_span.setTag(attribute.first, attribute.second);
