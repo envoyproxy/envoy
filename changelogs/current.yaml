@@ -1,7 +1,6 @@
-date: Pending
+date: September 22, 2023
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: jwt
   change: |
     Changed behavior of the jwt extraction, passing entire token for validation, instead cut him in the non-Base64 character.
@@ -40,7 +39,6 @@ behavior_changes:
     Previously, zone-aware routing would not route fairly in this case.
     To revert the entire change, set the runtime flag ``envoy.reloadable_features.locality_routing_use_new_routing_logic``
     to false to get the old behavior and well-tested codepaths, undoing both changes.
-
 - area: UHV
   change: |
     Introduced runtime flag ``envoy.reloadable_features.enable_universal_header_validator`` for toggling Universal Header Validator
@@ -49,7 +47,6 @@ behavior_changes:
     See https://github.com/envoyproxy/envoy/issues/10646 for more information about UHV.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: ext_authz
   change: |
     removing any query parameter in the presence of repeated query parameter keys no longer drops the repeats.
@@ -97,7 +94,6 @@ minor_behavior_changes:
     must be greater than 0. A config that sets this value to 0 will be rejected.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: connection limit
   change: |
     fixed a use-after-free bug in the connection limit filter.
@@ -153,7 +149,6 @@ bug_fixes:
     Fixed a bug where redis key with % in the key is failing with a validation error.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: listener
   change: |
     Removed ``envoy.reloadable_features.enable_update_listener_socket_options`` runtime flag and legacy code paths.
@@ -285,7 +280,6 @@ new_features:
   change: |
     added the support to detect and send TCP RST for raw buffer socket based connections. This is currently supported on Linux only.
     It can be disabled by the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
-
 - area: upstream
   change: |
     Added the ability to specify a custom upstream local address selector using
