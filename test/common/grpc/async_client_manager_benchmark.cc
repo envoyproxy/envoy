@@ -46,7 +46,8 @@ void testGetOrCreateAsyncClientWithConfig(::benchmark::State& state) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
           async_client_man_test.async_client_manager_.getOrCreateRawAsyncClient(
@@ -62,7 +63,8 @@ void testGetOrCreateAsyncClientWithHashConfig(::benchmark::State& state) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   GrpcServiceConfigWithHashKey config_with_hash_key_a = GrpcServiceConfigWithHashKey(grpc_service);
 
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
           async_client_man_test.async_client_manager_.getOrCreateRawAsyncClientWithHashKey(

@@ -100,7 +100,8 @@ public:
 static void bmMakeRequests(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandLookUpSpeedTest context;
 
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.makeRequests();
   }
 }

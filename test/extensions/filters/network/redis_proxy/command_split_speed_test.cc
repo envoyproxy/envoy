@@ -92,7 +92,8 @@ static void bmSplitCompositeArray(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
   Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
       context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.createLocalCompositeArray(request);
   }
 }
@@ -102,7 +103,8 @@ static void bmSplitCopy(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
   Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
       context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.copy(request);
   }
 }
@@ -112,7 +114,8 @@ static void bmSplitCreateShared(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
   Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
       context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.createShared(request);
   }
   state.counters["use_count"] = request.use_count();
@@ -123,7 +126,8 @@ static void bmSplitCreateVariant(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
   Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
       context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.createVariant(request);
   }
   state.counters["use_count"] = request.use_count();

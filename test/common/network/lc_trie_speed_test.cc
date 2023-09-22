@@ -58,7 +58,8 @@ static void lcTrieConstruct(benchmark::State& state) {
   CidrInputs inputs;
 
   std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(inputs.tag_data_);
   }
   benchmark::DoNotOptimize(trie);
@@ -70,7 +71,8 @@ static void lcTrieConstructNested(benchmark::State& state) {
   CidrInputs inputs;
 
   std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(
         inputs.tag_data_nested_prefixes_);
   }
@@ -83,7 +85,8 @@ static void lcTrieConstructMinimal(benchmark::State& state) {
   CidrInputs inputs;
 
   std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(inputs.tag_data_minimal_);
   }
@@ -100,7 +103,8 @@ static void lcTrieLookup(benchmark::State& state) {
 
   static size_t i = 0;
   size_t output_tags = 0;
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     i++;
     i %= address_inputs.addresses_.size();
     output_tags += lc_trie->getData(address_inputs.addresses_[i]).size();
@@ -119,7 +123,8 @@ static void lcTrieLookupWithNestedPrefixes(benchmark::State& state) {
 
   static size_t i = 0;
   size_t output_tags = 0;
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     i++;
     i %= address_inputs.addresses_.size();
     output_tags += lc_trie_nested_prefixes->getData(address_inputs.addresses_[i]).size();
@@ -137,7 +142,8 @@ static void lcTrieLookupMinimal(benchmark::State& state) {
 
   static size_t i = 0;
   size_t output_tags = 0;
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     i++;
     i %= address_inputs.addresses_.size();
     output_tags += lc_trie_minimal->getData(address_inputs.addresses_[i]).size();
