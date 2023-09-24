@@ -796,7 +796,7 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 2);
 }
 
-// Strean info test.
+// Stream info test.
 TEST_P(UdpProxyIntegrationTest, StreamInfo) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
