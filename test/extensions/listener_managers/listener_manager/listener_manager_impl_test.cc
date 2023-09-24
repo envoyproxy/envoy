@@ -6103,10 +6103,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
   EXPECT_CALL(os_sys_calls_, ioctl(_, _, _, _, _, _, _))
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
 #endif
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
-      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), overload_state, false);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
