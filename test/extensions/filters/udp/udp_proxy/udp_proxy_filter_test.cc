@@ -420,7 +420,9 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
-      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%";
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
+      "%DOWNSTREAM_REMOTE_ADDRESS% "
+      "%DOWNSTREAM_LOCAL_ADDRESS%";
 
   const std::string proxy_access_log_format =
       "%DYNAMIC_METADATA(udp.proxy.proxy:bytes_received)% "
@@ -470,7 +472,7 @@ upstream_socket_config:
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
   EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
-  EXPECT_EQ(output_.back(), "17 3 17 3");
+  EXPECT_EQ(output_.back(), "17 3 17 3 10.0.0.1:1000 10.0.0.2:80");
 }
 
 // Route with source IP.
