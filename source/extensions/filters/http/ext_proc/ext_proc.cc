@@ -663,14 +663,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // We won't be sending anything more to the stream after we
       // receive this message.
       ENVOY_LOG(debug, "Sending immediate response");
-      // TODO(tyxia) For immediate response case here and below, logging is needed because
-      // `onFinishProcessorCalls` is called after `closeStream` below.
-      // Investigate to see if we can switch the order of those two so that the logging here can be
-      // avoided.
-      logGrpcStreamInfo();
       processing_complete_ = true;
-      closeStream();
       onFinishProcessorCalls(Grpc::Status::Ok);
+      closeStream();
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
     }
@@ -703,9 +698,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
-    logGrpcStreamInfo();
-    closeStream();
     onFinishProcessorCalls(processing_status.raw_code());
+    closeStream();
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
@@ -728,10 +722,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
-    closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
     onFinishProcessorCalls(status);
+    closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
