@@ -809,7 +809,7 @@ TEST_P(UdpProxyIntegrationTest, StreamInfo) {
         text_format_source:
           inline_string: "DOWNSTREAM_LOCAL_ADDRESS=%DOWNSTREAM_LOCAL_ADDRESS%\n"
 )EOF",
-                                                    access_log_filename);
+      access_log_filename);
 
   setup(1, absl::nullopt, "", access_log_config, 0.01);
   const uint32_t port = lookupPort("listener_0");
