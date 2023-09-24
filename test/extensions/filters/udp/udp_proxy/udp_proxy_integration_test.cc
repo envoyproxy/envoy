@@ -1,7 +1,6 @@
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
@@ -64,9 +63,7 @@ public:
         registration_(factory_), session_filter_registration_(session_filter_factory_) {}
 
   void setup(uint32_t upstream_count, absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
-             const std::string& session_filters_config = "",
-             const std::string& access_log_config = "",
-             absl::optional<double> idle_timeout = absl::nullopt) {
+             const std::string& session_filters_config = "") {
     FakeUpstreamConfig::UdpConfig config;
     config.max_rx_datagram_size_ = max_rx_datagram_size;
     setUdpFakeUpstream(config);
@@ -107,14 +104,6 @@ public:
           });
     }
 
-    std::string idle_timeout_config = "";
-    if (idle_timeout.has_value()) {
-      max_datagram_config = fmt::format(R"EOF(
-  idle_timeout: {}s
-)EOF",
-                                        idle_timeout.value());
-    }
-
     config_helper_.addListenerFilter(R"EOF(
 name: udp_proxy
 typed_config:
@@ -127,8 +116,7 @@ typed_config:
         typed_config:
           '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
           cluster: cluster_0
-)EOF" + max_datagram_config + session_filters_config +
-                                     access_log_config + idle_timeout_config);
+)EOF" + max_datagram_config + session_filters_config);
 
     BaseIntegrationTest::initialize();
   }
@@ -793,32 +781,6 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   EXPECT_EQ("response2", response_datagram.buffer_->toString());
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 4);
   test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 2);
-}
-
-// Stream info test.
-TEST_P(UdpProxyIntegrationTest, StreamInfo) {
-  const std::string access_log_filename =
-      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-  const std::string access_log_config = fmt::format(
-      R"EOF(
-  access_log:
-    typed_config:
-      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-      path: {}
-      log_format:
-        text_format_source:
-          inline_string: "DOWNSTREAM_LOCAL_PORT=%DOWNSTREAM_LOCAL_PORT%\n"
-)EOF",
-      access_log_filename);
-
-  setup(1, absl::nullopt, "", access_log_config, 0.01);
-  const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
-  requestResponseWithListenerAddress(*listener_address);
-
-  EXPECT_THAT(waitForAccessLog(access_log_filename),
-              testing::HasSubstr(fmt::format("DOWNSTREAM_LOCAL_PORT={}", port)));
 }
 
 } // namespace
