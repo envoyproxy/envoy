@@ -63,11 +63,10 @@ public:
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()),
         registration_(factory_), session_filter_registration_(session_filter_factory_) {}
 
-  void setup(uint32_t upstream_count,
-             absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
-             const std::string& session_filters_config = "", 
+  void setup(uint32_t upstream_count, absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
+             const std::string& session_filters_config = "",
              const std::string& access_log_config = "",
-             absl::optional<uint64_t> idle_timeout = absl::nullopt) {
+             absl::optional<double> idle_timeout = absl::nullopt) {
     FakeUpstreamConfig::UdpConfig config;
     config.max_rx_datagram_size_ = max_rx_datagram_size;
     setUdpFakeUpstream(config);
@@ -128,7 +127,7 @@ typed_config:
         typed_config:
           '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
           cluster: cluster_0
-)EOF" + max_datagram_config + session_filters_config + 
+)EOF" + max_datagram_config + session_filters_config +
                                      access_log_config + idle_timeout_config);
 
     BaseIntegrationTest::initialize();
@@ -809,10 +808,10 @@ TEST_P(UdpProxyIntegrationTest, StreamInfo) {
       log_format:
         text_format_source:
           inline_string: "DOWNSTREAM_LOCAL_ADDRESS=%DOWNSTREAM_LOCAL_ADDRESS%\n"
-)EOF", 
+)EOF",
                                                     access_log_filename);
 
-  setup(1, absl::nullopt, "", access_log_config, 1);
+  setup(1, absl::nullopt, "", access_log_config, 0.01);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
