@@ -814,7 +814,7 @@ TEST_P(UdpProxyIntegrationTest, StreamInfo) {
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address);
 
-  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(fmt::format("DOWNSTREAM_LOCAL_ADDRESS=127.0.0.1::{}", port)));
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(fmt::format("DOWNSTREAM_LOCAL_ADDRESS=127.0.0.1:{}", port)));
 }
 
 } // namespace
