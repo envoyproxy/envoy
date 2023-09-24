@@ -5,11 +5,11 @@
 #include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
-
 #include "source/common/common/macros.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_protos.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 
@@ -120,7 +120,9 @@ public:
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
     p.set_forward_bearer_token(forward_bearer_token);
-    p.set_use_refresh_token(use_refresh_token);
+
+    auto* useRefreshToken = p.mutable_use_refresh_token();
+    useRefreshToken->set_value(use_refresh_token);
     p.set_auth_type(auth_type);
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
