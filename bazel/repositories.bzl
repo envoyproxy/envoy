@@ -260,6 +260,7 @@ def envoy_dependencies(skip_targets = []):
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
+    _toolshed()
     _com_github_axboe_liburing()
     _com_github_bazel_buildtools()
     _com_github_c_ares_c_ares()
@@ -361,6 +362,11 @@ def envoy_dependencies(skip_targets = []):
     native.bind(
         name = "bazel_runfiles",
         actual = "@bazel_tools//tools/cpp/runfiles",
+    )
+
+def _toolshed():
+    external_http_archive(
+        name = "envoy_toolshed",
     )
 
 def _boringssl():
