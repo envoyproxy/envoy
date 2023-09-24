@@ -1,10 +1,10 @@
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
@@ -63,8 +63,10 @@ public:
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()),
         registration_(factory_), session_filter_registration_(session_filter_factory_) {}
 
-  void setup(uint32_t upstream_count, absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
-             const std::string& session_filters_config = "", const std::string& access_log_config = "",
+  void setup(uint32_t upstream_count,
+             absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
+             const std::string& session_filters_config = "", 
+             const std::string& access_log_config = "",
              absl::optional<uint64_t> idle_timeout = absl::nullopt) {
     FakeUpstreamConfig::UdpConfig config;
     config.max_rx_datagram_size_ = max_rx_datagram_size;
@@ -126,7 +128,8 @@ typed_config:
         typed_config:
           '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
           cluster: cluster_0
-)EOF" + max_datagram_config + session_filters_config + access_log_config + idle_timeout_config);
+)EOF" + max_datagram_config + session_filters_config + 
+                                     access_log_config + idle_timeout_config);
 
     BaseIntegrationTest::initialize();
   }
@@ -806,7 +809,8 @@ TEST_P(UdpProxyIntegrationTest, StreamInfo) {
       log_format:
         text_format_source:
           inline_string: "DOWNSTREAM_LOCAL_ADDRESS=%DOWNSTREAM_LOCAL_ADDRESS%\n"
-)EOF", access_log_filename);
+)EOF", 
+                                                    access_log_filename);
 
   setup(1, absl::nullopt, "", access_log_config, 1);
   const uint32_t port = lookupPort("listener_0");
@@ -814,7 +818,8 @@ TEST_P(UdpProxyIntegrationTest, StreamInfo) {
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address);
 
-  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(fmt::format("DOWNSTREAM_LOCAL_ADDRESS=127.0.0.1:{}", port)));
+  EXPECT_THAT(waitForAccessLog(access_log_filename),
+              testing::HasSubstr(fmt::format("DOWNSTREAM_LOCAL_ADDRESS=127.0.0.1:{}", port)));
 }
 
 } // namespace
