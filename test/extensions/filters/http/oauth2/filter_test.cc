@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
+
 #include "source/common/common/macros.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
