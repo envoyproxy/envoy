@@ -154,6 +154,11 @@ public:
   ~ServerFactoryContext() override = default;
 
   /**
+   * @return the server-wide http context.
+   */
+  virtual Http::Context& httpContext() PURE;
+
+  /**
    * @return the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
@@ -321,11 +326,11 @@ public:
 using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFactoryContext;
 
 /**
- * FactoryContext for upstream HTTP filters.
+ * FactoryContext for upstream filters.
  */
-class UpstreamHttpFactoryContext {
+class UpstreamFactoryContext {
 public:
-  virtual ~UpstreamHttpFactoryContext() = default;
+  virtual ~UpstreamFactoryContext() = default;
 
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.

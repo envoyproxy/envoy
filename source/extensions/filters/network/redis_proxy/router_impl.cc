@@ -78,7 +78,8 @@ PrefixRoutes::PrefixRoutes(
   }
 }
 
-RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
+RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key,
+                                          const StreamInfo::StreamInfo& stream_info) {
   PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy = absl::AsciiStrToLower(key);
@@ -96,34 +97,38 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
     key.erase(0, value->prefix().length());
   }
   if (!value->keyFormatter().empty()) {
-    formatKey(key, value->keyFormatter());
+    formatKey(key, value->keyFormatter(), stream_info);
   }
   return value;
 }
 
-void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter) {
+void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter,
+                             const StreamInfo::StreamInfo& stream_info) {
   // If key_formatter defines %KEY% command, then do a direct string replacement.
-  // TODO(deveshkandpal24121990) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter
+  // TODO(deveshkandpal24121990) - Possibly define a RedisKeyFormatter as a SubstitutionFormatter.
+  // There is a possibility that key might have a '%' character in it, which will be incorrectly
+  // processed by SubstitutionFormatter. To avoid that, replace the '%KEY%' command with
+  // '~REPLACED_KEY~` place holder. After SubstitutionFormatter is done, replace the
+  // '~REPLACED_KEY~' with the actual key.
   if (redis_key_formatter.find(redis_key_formatter_command_) != std::string::npos) {
-    redis_key_formatter =
-        absl::StrReplaceAll(redis_key_formatter, {{redis_key_formatter_command_, key}});
+    redis_key_formatter = absl::StrReplaceAll(
+        redis_key_formatter, {{redis_key_formatter_command_, redis_key_to_be_replaced_}});
   }
   auto providers = Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
   std::string formatted_key;
   for (Formatter::FormatterProviderPtr& provider : providers) {
-    auto provider_formatted_key = provider->formatValue(
-        *Http::StaticEmptyHeaders::get().request_headers,
-        *Http::StaticEmptyHeaders::get().response_headers,
-        *Http::StaticEmptyHeaders::get().response_trailers, callbacks_->connection().streamInfo(),
-        absl::string_view(), AccessLog::AccessLogType::NotSet);
-
+    auto provider_formatted_key = provider->formatValueWithContext({}, stream_info);
     if (provider_formatted_key.has_string_value()) {
       formatted_key = formatted_key + provider_formatted_key.string_value();
     }
   }
+  if (formatted_key.find(redis_key_to_be_replaced_) != std::string::npos) {
+    formatted_key = absl::StrReplaceAll(formatted_key, {{redis_key_to_be_replaced_, key}});
+  }
   if (!formatted_key.empty()) {
     key = formatted_key;
   }
+  ENVOY_LOG(trace, "formatted key is {}", key);
 }
 
 } // namespace RedisProxy

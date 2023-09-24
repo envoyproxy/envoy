@@ -40,6 +40,9 @@ public class EnvoyConfiguration {
   public final Integer dnsCacheSaveIntervalSeconds;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
+  public final String http3ConnectionOptions;
+  public final String http3ClientConnectionOptions;
+  public final Map<String, String> quicHints;
   public final Boolean enableGzipDecompression;
   public final Boolean enableBrotliDecompression;
   public final Boolean enableSocketTagging;
@@ -64,6 +67,8 @@ public class EnvoyConfiguration {
   public final Integer rtdsTimeoutSeconds;
   public final String xdsAddress;
   public final Integer xdsPort;
+  public final String xdsAuthHeader;
+  public final String xdsAuthToken;
   public final String xdsJwtToken;
   public final Integer xdsJwtTokenLifetime;
   public final String xdsRootCerts;
@@ -103,6 +108,11 @@ public class EnvoyConfiguration {
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
    *     HTTP/3 (QUIC).
+   * @param http3ConnectionOptions                        connection options to be used in HTTP/3.
+   * @param http3ClientConnectionOptions                  client connection options to be used in
+   *     HTTP/3.
+   * @param quicHints                                     A list of host port pairs that's known
+   *     to speak QUIC.
    * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
    *     compression.
@@ -134,6 +144,11 @@ public class EnvoyConfiguration {
    * @param rtdsTimeoutSeconds                            the timeout for RTDS fetches.
    * @param xdsAddress                                    the address for the xDS management server.
    * @param xdsPort                                       the port for the xDS server.
+   * @param xdsAuthHeader                                 the HTTP header to use for sending the
+   *                                                      authentication token to the xDS server.
+   * @param xdsAuthToken                                  the token to send as the authentication
+   *                                                      header value to authenticate with the
+   *                                                      xDS server.
    * @param xdsJwtToken                                   the JWT token to use for authenticating
    *                                                      with the xDS server.
    * @param xdsTokenLifetime                              the lifetime of the JWT token.
@@ -156,11 +171,12 @@ public class EnvoyConfiguration {
       int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds,
       int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
       int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
-      boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enableSocketTagging, boolean enableInterfaceBinding,
-      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
-      int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
-      int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      String http3ConnectionOptions, String http3ClientConnectionOptions,
+      Map<String, Integer> quicHints, boolean enableGzipDecompression,
+      boolean enableBrotliDecompression, boolean enableSocketTagging,
+      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost, int statsFlushSeconds,
+      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
       TrustChainVerification trustChainVerification,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
@@ -168,9 +184,10 @@ public class EnvoyConfiguration {
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Map<String, Boolean> runtimeGuards, boolean enablePlatformCertificatesValidation,
       String rtdsResourceName, Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
-      String xdsJwtToken, Integer xdsJwtTokenLifetime, String xdsRootCerts, String xdsSni,
-      String nodeId, String nodeRegion, String nodeZone, String nodeSubZone,
-      String cdsResourcesLocator, Integer cdsTimeoutSeconds, boolean enableCds) {
+      String xdsAuthHeader, String xdsAuthToken, String xdsJwtToken, Integer xdsJwtTokenLifetime,
+      String xdsRootCerts, String xdsSni, String nodeId, String nodeRegion, String nodeZone,
+      String nodeSubZone, String cdsResourcesLocator, Integer cdsTimeoutSeconds,
+      boolean enableCds) {
     JniLibrary.load();
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -184,6 +201,12 @@ public class EnvoyConfiguration {
     this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
+    this.http3ConnectionOptions = http3ConnectionOptions;
+    this.http3ClientConnectionOptions = http3ClientConnectionOptions;
+    this.quicHints = new HashMap<>();
+    for (Map.Entry<String, Integer> hostAndPort : quicHints.entrySet()) {
+      this.quicHints.put(hostAndPort.getKey(), String.valueOf(hostAndPort.getValue()));
+    }
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
     this.enableSocketTagging = enableSocketTagging;
@@ -224,6 +247,8 @@ public class EnvoyConfiguration {
     this.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
     this.xdsAddress = xdsAddress;
     this.xdsPort = xdsPort;
+    this.xdsAuthHeader = xdsAuthHeader;
+    this.xdsAuthToken = xdsAuthToken;
     this.xdsJwtToken = xdsJwtToken;
     this.xdsJwtTokenLifetime = xdsJwtTokenLifetime;
     this.xdsRootCerts = xdsRootCerts;
@@ -247,19 +272,21 @@ public class EnvoyConfiguration {
     byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
     byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
     byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
+    byte[][] quic_hints = JniBridgeUtility.mapToJniBytes(quicHints);
 
     return JniLibrary.createBootstrap(
         grpcStatsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve,
         enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        enableGzipDecompression, enableBrotliDecompression, enableSocketTagging,
-        enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
-        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
-        enforceTrustChainVerification, filter_chain, stats_sinks,
-        enablePlatformCertificatesValidation, runtime_guards, rtdsResourceName, rtdsTimeoutSeconds,
-        xdsAddress, xdsPort, xdsJwtToken, xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId,
-        nodeRegion, nodeZone, nodeSubZone, cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
+        http3ConnectionOptions, http3ClientConnectionOptions, quic_hints, enableGzipDecompression,
+        enableBrotliDecompression, enableSocketTagging, enableInterfaceBinding,
+        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
+        maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filter_chain,
+        stats_sinks, enablePlatformCertificatesValidation, runtime_guards, rtdsResourceName,
+        rtdsTimeoutSeconds, xdsAddress, xdsPort, xdsAuthHeader, xdsAuthToken, xdsJwtToken,
+        xdsJwtTokenLifetime, xdsRootCerts, xdsSni, nodeId, nodeRegion, nodeZone, nodeSubZone,
+        cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

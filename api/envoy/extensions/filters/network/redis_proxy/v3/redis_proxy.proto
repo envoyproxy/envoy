@@ -230,7 +230,7 @@ message RedisProxy {
   // from client reconnection storm.
   message ConnectionRateLimit {
     // Reconnection rate per sec. Rate limiting is implemented with TokenBucket.
-    uint32 connection_rate_limit_per_sec = 1;
+    uint32 connection_rate_limit_per_sec = 1 [(validate.rules).uint32 = {gt: 0}];
   }
 
   reserved 2;

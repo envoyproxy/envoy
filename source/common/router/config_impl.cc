@@ -82,38 +82,32 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
 
   RouteEntryImplBaseConstSharedPtr route;
   switch (route_config.match().path_specifier_case()) {
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
     route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                    factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
     route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                  factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
     route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                   factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
     route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                     factory_context, validator);
     break;
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
     route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
-  }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
     route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
-  }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // throw the error below.
-  }
   }
   if (!route) {
     throw EnvoyException("Invalid route config");
@@ -141,7 +135,10 @@ public:
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
                                           absl::string_view type_url) override {
     static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name());
+        createReflectableMessage(
+            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
+            ->GetDescriptor()
+            ->full_name());
     if (type_url == request_header_input_name) {
       return absl::OkStatus();
     }
@@ -597,8 +594,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
-    weighted_clusters_config_ = std::make_unique<WeightedClustersConfig>(
-        weighted_clusters, total_weight, route.route().weighted_clusters().header_name());
+    weighted_clusters_config_ =
+        std::make_unique<WeightedClustersConfig>(std::move(weighted_clusters), total_weight,
+                                                 route.route().weighted_clusters().header_name());
 
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
@@ -649,9 +647,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     if (!success) {
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
-    if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect ||
+    if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                               Http::Headers::get().MethodValues.Connect) ||
         (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-         upgrade_config.upgrade_type() == Http::Headers::get().UpgradeValues.ConnectUdp)) {
+         absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                                Http::Headers::get().UpgradeValues.ConnectUdp))) {
       connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
     } else if (upgrade_config.has_connect_config()) {
       throw EnvoyException(absl::StrCat("Non-CONNECT upgrade type ", upgrade_config.upgrade_type(),
@@ -787,8 +787,8 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
     return false;
   }
   if (!config_query_parameters_.empty()) {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.getPathValue());
+    auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
     if (!matches) {
       return false;
@@ -2170,8 +2170,8 @@ PerFilterConfigs::PerFilterConfigs(
   const bool ignore_optional_option_from_hcm_for_route_config(Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config"));
 
-  absl::string_view filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetDescriptor()->full_name();
+  std::string filter_config_type =
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;

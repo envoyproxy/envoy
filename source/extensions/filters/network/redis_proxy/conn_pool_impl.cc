@@ -92,14 +92,17 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
-      is_redis_cluster_(false), client_factory_(parent->client_factory_), config_(parent->config_),
+      client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
       refresh_manager_(parent->refresh_manager_) {
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
-    onClusterAddOrUpdateNonVirtual(*cluster);
+    Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+      return *cluster;
+    };
+    onClusterAddOrUpdateNonVirtual(cluster->info()->name(), command);
   }
 }
 
@@ -116,8 +119,8 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
-    Upstream::ThreadLocalCluster& cluster) {
-  if (cluster.info()->name() != cluster_name_) {
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+  if (cluster_name != cluster_name_) {
     return;
   }
   // Ensure the filter is not deleted in the main thread during this method.
@@ -132,6 +135,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   }
 
   ASSERT(cluster_ == nullptr);
+  auto& cluster = get_cluster();
   cluster_ = &cluster;
   // Update username and password when cluster updates.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);

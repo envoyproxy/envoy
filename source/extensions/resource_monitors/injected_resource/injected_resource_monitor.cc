@@ -15,7 +15,7 @@ InjectedResourceMonitor::InjectedResourceMonitor(
     const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
         config,
     Server::Configuration::ResourceMonitorFactoryContext& context)
-    : filename_(config.filename()), file_changed_(true),
+    : filename_(config.filename()),
       watcher_(context.mainThreadDispatcher().createFilesystemWatcher()), api_(context.api()) {
   watcher_->addWatch(filename_, Filesystem::Watcher::Events::MovedTo,
                      [this](uint32_t) { onFileChanged(); });

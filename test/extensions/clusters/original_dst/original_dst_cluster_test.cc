@@ -37,7 +37,6 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
-namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -69,18 +68,26 @@ public:
 
 class OriginalDstClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  // cleanup timer must be created before the cluster (in setup()), so that we can set expectations
-  // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will
-  // take care of destructing it!
-  OriginalDstClusterTest() : cleanup_timer_(new Event::MockTimer(&server_context_.dispatcher_)) {}
+  OriginalDstClusterTest() = default;
 
-  void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV3Yaml(yaml)); }
+  void setupFromYaml(const std::string& yaml, bool expect_success = true) {
+    if (expect_success) {
+      cleanup_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+      EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+    }
+    setup(parseClusterFromV3Yaml(yaml));
+  }
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    cluster_ = std::make_shared<OriginalDstCluster>(cluster_config, factory_context);
+
+    OriginalDstClusterFactory factory;
+    auto status_or_pair = factory.createClusterImpl(cluster_config, factory_context);
+    THROW_IF_STATUS_NOT_OK(status_or_pair, throw);
+
+    cluster_ = std::dynamic_pointer_cast<OriginalDstCluster>(status_or_pair.value().first);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -112,6 +119,7 @@ public:
   bool init_complete_{false};
 };
 
+namespace {
 TEST(OriginalDstClusterConfigTest, GoodConfig) {
   const std::string yaml = R"EOF(
     name: name
@@ -142,7 +150,7 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
                 port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
                             "ORIGINAL_DST clusters must have no load assignment configured");
 }
 
@@ -157,7 +165,6 @@ TEST_F(OriginalDstClusterTest, CleanupInterval) {
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(*cleanup_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -174,7 +181,6 @@ TEST_F(OriginalDstClusterTest, NoContext) {
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -236,7 +242,6 @@ TEST_F(OriginalDstClusterTest, AddressCollision) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   // Host gets the local address of the downstream connection.
@@ -313,7 +318,6 @@ TEST_F(OriginalDstClusterTest, HostInUse) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   // Host gets the local address of the downstream connection.
@@ -363,7 +367,6 @@ TEST_F(OriginalDstClusterTest, CollisionHostInUse) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   // Host gets the local address of the downstream connection.
@@ -421,7 +424,6 @@ TEST_F(OriginalDstClusterTest, Membership) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -514,7 +516,6 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -602,7 +603,6 @@ TEST_F(OriginalDstClusterTest, Connection) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -646,7 +646,6 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   PrioritySetImpl second;
@@ -702,7 +701,6 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -780,7 +778,6 @@ TEST_F(OriginalDstClusterTest, UseHttpAuthorityHeader) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   OriginalDstCluster::LoadBalancer lb(handle_);
@@ -812,7 +809,7 @@ TEST_F(OriginalDstClusterTest, BadConfigWithHttpHeaderNameAndClearedUseHttpHeade
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      setupFromYaml(yaml), EnvoyException,
+      setupFromYaml(yaml, false), EnvoyException,
       "ORIGINAL_DST cluster: invalid config http_header_name=:authority and use_http_header is "
       "false. Set use_http_header to true if http_header_name is desired.");
 }
@@ -826,7 +823,6 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -895,7 +891,6 @@ TEST_F(OriginalDstClusterTest, UseMetadataKeyWithRequest) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   OriginalDstCluster::LoadBalancer lb(handle_);
@@ -946,7 +941,6 @@ TEST_F(OriginalDstClusterTest, UseMetadataKeyNoRequest) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   OriginalDstCluster::LoadBalancer lb(handle_);
@@ -988,7 +982,6 @@ TEST_F(OriginalDstClusterTest, UseMetadataKeyInvalidValue) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   OriginalDstCluster::LoadBalancer lb(handle_);
@@ -1026,7 +1019,6 @@ TEST_F(OriginalDstClusterTest, UseMetadataKeyListValue) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   OriginalDstCluster::LoadBalancer lb(handle_);
@@ -1065,7 +1057,6 @@ TEST_F(OriginalDstClusterTest, UseFilterState) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   OriginalDstCluster::LoadBalancer lb(handle_);
@@ -1074,8 +1065,8 @@ TEST_F(OriginalDstClusterTest, UseFilterState) {
   // Filter state takes priority over header override.
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState()->setData(
-      Network::DestinationAddress::key(),
-      std::make_shared<Network::DestinationAddress>(
+      Upstream::OriginalDstClusterFilterStateKey,
+      std::make_shared<Network::AddressObject>(
           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
       StreamInfo::FilterState::StateType::ReadOnly);
   TestLoadBalancerContext lb_context1(&connection, Http::Headers::get().EnvoyOriginalDstHost.get(),
@@ -1102,7 +1093,6 @@ TEST_F(OriginalDstClusterTest, UsePortOverride) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   OriginalDstCluster::LoadBalancer lb(handle_);
@@ -1135,7 +1125,6 @@ TEST_F(OriginalDstClusterTest, UseFilterStateWithPortOverride) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   OriginalDstCluster::LoadBalancer lb(handle_);
@@ -1144,8 +1133,8 @@ TEST_F(OriginalDstClusterTest, UseFilterStateWithPortOverride) {
   // Filter state takes priority over header override.
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState()->setData(
-      Network::DestinationAddress::key(),
-      std::make_shared<Network::DestinationAddress>(
+      Upstream::OriginalDstClusterFilterStateKey,
+      std::make_shared<Network::AddressObject>(
           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
       StreamInfo::FilterState::StateType::ReadOnly);
   TestLoadBalancerContext lb_context1(&connection, Http::Headers::get().EnvoyOriginalDstHost.get(),
@@ -1160,6 +1149,23 @@ TEST_F(OriginalDstClusterTest, UseFilterStateWithPortOverride) {
   ASSERT_NE(host1, nullptr);
   // Port override takes priority over filter state, so 6666->443
   EXPECT_EQ("10.10.11.11:443", host1->address()->asString());
+}
+
+TEST(DestinationAddress, ObjectFactory) {
+  const std::string name = "envoy.network.transport_socket.original_dst_address";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string address = "10.0.0.10:8080";
+  auto object = factory->createFromBytes(address);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(address, object->serializeAsString());
+  auto mirror = factory->reflect(object.get());
+  ASSERT_NE(nullptr, mirror);
+  EXPECT_THAT(mirror->getField("ip"), testing::VariantWith<absl::string_view>("10.0.0.10"));
+  EXPECT_THAT(mirror->getField("port"), testing::VariantWith<int64_t>(8080));
+  EXPECT_EQ(nullptr, factory->createFromBytes("foo"));
 }
 
 } // namespace

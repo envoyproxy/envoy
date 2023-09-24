@@ -78,6 +78,7 @@
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                       enableHttp3:(BOOL)enableHttp3
+                                        quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                           enableGzipDecompression:(BOOL)enableGzipDecompression
                         enableBrotliDecompression:(BOOL)enableBrotliDecompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -113,6 +114,8 @@
                                       nodeSubZone:(nullable NSString *)nodeSubZone
                                  xdsServerAddress:(nullable NSString *)xdsServerAddress
                                     xdsServerPort:(UInt32)xdsServerPort
+                                    xdsAuthHeader:(nullable NSString *)xdsAuthHeader
+                                     xdsAuthToken:(nullable NSString *)xdsAuthToken
                                       xdsJwtToken:(nullable NSString *)xdsJwtToken
                        xdsJwtTokenLifetimeSeconds:(UInt32)xdsJwtTokenLifetimeSeconds
                                   xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
@@ -138,6 +141,7 @@
   self.enableDNSCache = enableDNSCache;
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.enableHttp3 = enableHttp3;
+  self.quicHints = quicHints;
   self.enableGzipDecompression = enableGzipDecompression;
   self.enableBrotliDecompression = enableBrotliDecompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
@@ -166,6 +170,8 @@
   self.nodeSubZone = nodeSubZone;
   self.xdsServerAddress = xdsServerAddress;
   self.xdsServerPort = xdsServerPort;
+  self.xdsAuthHeader = xdsAuthHeader;
+  self.xdsAuthToken = xdsAuthToken;
   self.xdsJwtToken = xdsJwtToken;
   self.xdsJwtTokenLifetimeSeconds = xdsJwtTokenLifetimeSeconds;
   self.xdsSslRootCerts = xdsSslRootCerts;
@@ -196,6 +202,9 @@
 
 #ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(self.enableHttp3);
+  for (NSString *host in self.quicHints) {
+    builder.addQuicHint([host toCXXString], [[self.quicHints objectForKey:host] intValue]);
+  }
 #endif
 
   builder.enableGzipDecompression(self.enableGzipDecompression);
@@ -262,6 +271,10 @@
 #ifdef ENVOY_GOOGLE_GRPC
   if (self.xdsServerAddress != nil) {
     Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
+    if (self.xdsAuthHeader != nil) {
+      xdsBuilder.setAuthenticationToken([self.xdsAuthHeader toCXXString],
+                                        [self.xdsAuthToken toCXXString]);
+    }
     if (self.xdsJwtToken != nil) {
       xdsBuilder.setJwtAuthenticationToken([self.xdsJwtToken toCXXString],
                                            self.xdsJwtTokenLifetimeSeconds);

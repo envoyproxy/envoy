@@ -60,8 +60,8 @@ TEST_F(UpstreamConnTest, ConnectUpstream) {
   initialize();
 
   const auto* dst_addr =
-      upConn_->requestStreamInfo()->filterState().getDataReadOnly<Network::DestinationAddress>(
-          Network::DestinationAddress::key());
+      upConn_->requestStreamInfo()->filterState().getDataReadOnly<Network::AddressObject>(
+          "envoy.network.transport_socket.original_dst_address");
   EXPECT_EQ(dst_addr->address()->asString(), addr_);
 
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
@@ -112,7 +112,7 @@ TEST_F(UpstreamConnTest, WriteAndClose) {
   EXPECT_CALL(upstream_connection_, write(_, false));
   upConn_->write(someData, false);
 
-  EXPECT_CALL(upstream_connection_, close(_));
+  EXPECT_CALL(upstream_connection_, close(_, "go_upstream_close"));
   EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamEvent(_, _));
   upConn_->close(Network::ConnectionCloseType::NoFlush);
   upConn_->onEvent(Network::ConnectionEvent::RemoteClose);

@@ -23,7 +23,7 @@ jobs:
   steps:
   - task: Cache@2
     inputs:
-      key: '"windows.release" | $(cacheKeyBazelFiles)'
+      key: '"windows.release" | $(cacheKeyBazel)'
       path: $(Build.StagingDirectory)/repository_cache
     continueOnError: true
   - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
@@ -32,9 +32,7 @@ jobs:
       CI_TARGET: "windows"
       ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
       ENVOY_RBE: "true"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
-      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --config=remote-msvc-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
       GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
 
   - task: PublishTestResults@2
@@ -86,24 +84,19 @@ jobs:
       ci/docker_ci.sh
     workingDirectory: $(Build.SourcesDirectory)
     env:
-      AZP_BRANCH: $(Build.SourceBranch)
-      AZP_SHA1: $(Build.SourceVersion)
+      CI_BRANCH: $(Build.SourceBranch)
+      CI_SHA1: $(Build.SourceVersion)
       DOCKERHUB_USERNAME: $(DockerUsername)
       DOCKERHUB_PASSWORD: $(DockerPassword)
       WINDOWS_BUILD_TYPE: $(windowsBuildType)
       WINDOWS_IMAGE_BASE: $(windowsImageBase)
       WINDOWS_IMAGE_TAG: $(windowsImageTag)
-  - task: PublishBuildArtifacts@1
-    inputs:
-      pathtoPublish: "$(Build.StagingDirectory)/build_images"
-      artifactName: docker_windows
-    timeoutInMinutes: 10
-    condition: not(canceled())
 
 - job: released
   displayName: Complete
   dependsOn: ["release", "docker"]
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:

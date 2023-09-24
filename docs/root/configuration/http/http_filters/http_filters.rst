@@ -14,6 +14,7 @@ HTTP filters
   buffer_filter
   cache_filter
   cdn_loop_filter
+  checksum_filter
   compressor_filter
   composite_filter
   connect_grpc_bridge_filter
@@ -40,6 +41,7 @@ HTTP filters
   health_check_filter
   header_to_metadata_filter
   ip_tagging_filter
+  json_to_metadata_filter
   jwt_authn_filter
   kill_request_filter
   language_filter

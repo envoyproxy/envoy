@@ -46,34 +46,41 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_authz
   // service. If metadata key is set in both the connection and request metadata then the value
   // will be the request metadata value.
-  const auto& connection_metadata =
-      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
+  const auto& connection = decoder_callbacks_->connection();
   const auto& request_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
     if (const auto metadata_it = request_metadata.find(context_key);
         metadata_it != request_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = connection_metadata.find(context_key);
-               metadata_it != connection_metadata.end()) {
-      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (connection.has_value()) {
+      const auto& connection_metadata =
+          connection->streamInfo().dynamicMetadata().filter_metadata();
+      const auto metadata_it =
+          connection->streamInfo().dynamicMetadata().filter_metadata().find(context_key);
+      if (metadata_it != connection_metadata.end()) {
+        (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+      }
     }
   }
 
   // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
   // ext_authz service. If metadata key is set in both the connection and request metadata then
   // the value will be the request metadata value.
-  const auto& connection_typed_metadata =
-      decoder_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
   const auto& request_typed_metadata =
       decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
   for (const auto& context_key : config_->typedMetadataContextNamespaces()) {
     if (const auto metadata_it = request_typed_metadata.find(context_key);
         metadata_it != request_typed_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
-    } else if (const auto metadata_it = connection_typed_metadata.find(context_key);
-               metadata_it != connection_typed_metadata.end()) {
-      (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (connection.has_value()) {
+      const auto& connection_typed_metadata =
+          connection->streamInfo().dynamicMetadata().typed_filter_metadata();
+      const auto metadata_it = connection_typed_metadata.find(context_key);
+      if (metadata_it != connection_typed_metadata.end()) {
+        (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] =
+            metadata_it->second;
+      }
     }
   }
 
@@ -156,7 +163,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
   }
-
   return Http::FilterDataStatus::Continue;
 }
 
@@ -254,12 +260,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   switch (response->status) {
   case CheckStatus::OK: {
     // Any changes to request headers or query parameters can affect how the request is going to be
-    // routed. If we are changing the headers we also need to clear the route
-    // cache.
+    // routed. If we are changing the headers we also need to clear the route cache.
+    //
+    // clearRouteCache() should only be true if decoder_callbacks_->downstreamCallbacks() is also
+    // true, i.e. the filter is a downstream filter.
     if (config_->clearRouteCache() &&
         (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
          !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||
-         !response->query_parameters_to_remove.empty())) {
+         !response->query_parameters_to_remove.empty()) &&
+        decoder_callbacks_->downstreamCallbacks()) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
@@ -318,36 +327,36 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       response_headers_to_set_ = std::move(response->response_headers_to_set);
     }
 
-    absl::optional<Http::Utility::QueryParams> modified_query_parameters;
+    absl::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
     if (!response->query_parameters_to_set.empty()) {
-      modified_query_parameters =
-          Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+      modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
+          request_headers_->Path()->value().getStringView());
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
       for (const auto& [key, value] : response->query_parameters_to_set) {
         ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
-        (*modified_query_parameters)[key] = value;
+        modified_query_parameters->overwrite(key, value);
       }
     }
 
     if (!response->query_parameters_to_remove.empty()) {
       if (!modified_query_parameters) {
-        modified_query_parameters =
-            Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+        modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
+            request_headers_->Path()->value().getStringView());
       }
       ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
                        *decoder_callbacks_);
       for (const auto& key : response->query_parameters_to_remove) {
         ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
-        (*modified_query_parameters).erase(key);
+        modified_query_parameters->remove(key);
       }
     }
 
     // We modified the query parameters in some way, so regenerate the `path` header and set it
     // here.
     if (modified_query_parameters) {
-      const auto new_path = Http::Utility::replaceQueryString(request_headers_->Path()->value(),
-                                                              modified_query_parameters.value());
+      const auto new_path =
+          modified_query_parameters->replaceQueryString(request_headers_->Path()->value());
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter modified query parameter(s), using new path for request: {}",
           *decoder_callbacks_, new_path);

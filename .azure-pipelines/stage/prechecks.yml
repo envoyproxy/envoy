@@ -48,12 +48,14 @@ jobs:
         CI_TARGET: "format"
       protobuf:
         CI_TARGET: "check_and_fix_proto_format"
-      publishing:
-        CI_TARGET: docs
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        publishing:
+          CI_TARGET: docs
   steps:
   - template: ../bazel.yml
     parameters:
       ciTarget: $(CI_TARGET)
+      cacheName: $(CI_TARGET)
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
@@ -121,9 +123,7 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
@@ -153,9 +153,7 @@ jobs:
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
           GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
@@ -163,7 +161,8 @@ jobs:
 - job: prechecked
   displayName: Prechecked
   dependsOn: ["prechecks"]
-  pool: x64-nano
+  pool:
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:

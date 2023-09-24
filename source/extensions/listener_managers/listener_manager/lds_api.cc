@@ -40,9 +40,10 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
   init_manager.add(init_target_);
 }
 
-void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                const std::string& system_version_info) {
+absl::Status
+LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                           const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                           const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_rds_sds;
   if (cm_.adsMux()) {
     const std::vector<std::string> paused_xds_types{
@@ -67,20 +68,32 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   ListenerManager::FailureStates failure_state;
   absl::node_hash_set<std::string> listener_names;
   std::string message;
+
   for (const auto& resource : added_resources) {
     envoy::config::listener::v3::Listener listener;
+
+    auto onError = [&](std::string error_message) {
+      failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
+      auto& state = failure_state.back();
+      state->set_details(error_message);
+      state->mutable_failed_configuration()->PackFrom(resource.get().resource());
+      absl::StrAppend(&message, listener.name(), ": ", error_message, "\n");
+    };
+
     TRY_ASSERT_MAIN_THREAD {
       listener =
           dynamic_cast<const envoy::config::listener::v3::Listener&>(resource.get().resource());
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully
         // applied.
-        throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
+        onError(fmt::format("duplicate listener {} found", listener.name()));
+        continue;
       }
       absl::StatusOr<bool> update_or_error =
           listener_manager_.addOrUpdateListener(listener, resource.get().version(), true);
       if (!update_or_error.status().ok()) {
-        throw EnvoyException(std::string(update_or_error.status().message()));
+        onError(std::string(update_or_error.status().message()));
+        continue;
       }
       if (update_or_error.value()) {
         ENVOY_LOG(info, "lds: add/update listener '{}'", listener.name());
@@ -91,11 +104,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
     }
     END_TRY
     catch (const EnvoyException& e) {
-      failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
-      auto& state = failure_state.back();
-      state->set_details(e.what());
-      state->mutable_failed_configuration()->PackFrom(resource.get().resource());
-      absl::StrAppend(&message, listener.name(), ": ", e.what(), "\n");
+      onError(e.what());
     }
   }
   listener_manager_.endListenerUpdate(std::move(failure_state));
@@ -105,12 +114,13 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   }
   init_target_.ready();
   if (!message.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}", message));
+    return absl::InvalidArgumentError(fmt::format("Error adding/updating listener(s) {}", message));
   }
+  return absl::OkStatus();
 }
 
-void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                const std::string& version_info) {
+absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                        const std::string& version_info) {
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
   absl::node_hash_set<std::string> listeners_to_remove;
@@ -127,7 +137,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   for (const auto& listener : listeners_to_remove) {
     *to_remove_repeated.Add() = listener;
   }
-  onConfigUpdate(resources, to_remove_repeated, version_info);
+  return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
 void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

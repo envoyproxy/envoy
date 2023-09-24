@@ -57,6 +57,29 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
 }
 
+// Basic CDS/EDS update that warms and makes active a single cluster.
+TEST_P(AdsIntegrationTest, BasicClusterInitialWarmingWithResourceWrapper) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1",
+      {{"test", ProtobufWkt::Any()}});
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1", {{"test", ProtobufWkt::Any()}});
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
+}
+
 // Tests that the Envoy xDS client can handle updates to a subset of the subscribed resources from
 // an xDS server without removing the resources not included in the DiscoveryResponse from the xDS
 // server.
@@ -620,6 +643,78 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"cluster_0"}, {}, {}));
+}
+
+// Validate that an update to a Cluster that doesn't receive updated ClusterLoadAssignment
+// uses the previous (cached) cluster load assignment.
+TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
+  // TODO(adisuissa): this test should be kept after the runtime guard is deprecated
+  // (only the runtime guard should be removed).
+  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
+  initialize();
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");
+  // Set a small EDS subscription expiration.
+  cluster.mutable_eds_cluster_config()
+      ->mutable_eds_config()
+      ->mutable_initial_fetch_timeout()
+      ->set_nanos(100 * 1000 * 1000);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {cluster}, {cluster}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"cluster_0"}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                      {"route_config_0"}, {"route_config_0"}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+                                      {"route_config_0"}, {}, {}));
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+
+  // Update a cluster's field (connect_timeout) so the cluster in Envoy will be explicitly updated.
+  cluster.mutable_connect_timeout()->set_seconds(7);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {cluster}, {cluster}, {}, "2");
+  // Inconsistent SotW and delta behaviors for warming, see
+  // https://github.com/envoyproxy/envoy/issues/11477#issuecomment-657855029.
+  // TODO (dmitri-d) this should be remove when legacy mux implementations have been removed.
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                        {"cluster_0"}, {}, {}));
+  }
+
+  // Avoid sending an EDS update, and wait for EDS update timeout (that results in
+  // a cluster update without resources).
+  test_server_->waitForCounterGe("cluster.cluster_0.init_fetch_timeout", 1);
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    // Expect another EDS request after the previous one wasn't answered and timed out.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                        {"cluster_0"}, {}, {}));
+  }
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}, {}, {}));
+
+  // Envoy uses the cached resource.
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.assignment_use_cached")->value());
+  // A single message should be successfully sent to the upstream.
+  makeSingleRequest();
 }
 
 // Validate that the request with duplicate clusters in the initial request during server init is
@@ -1217,8 +1312,6 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
-                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1272,8 +1365,6 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
-                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1473,8 +1564,6 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
-                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1748,8 +1837,7 @@ INSTANTIATE_TEST_SUITE_P(
                      // There should be no variation across clients.
                      testing::Values(Grpc::ClientType::EnvoyGrpc),
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw,
-                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta),
-                     testing::Values(OldDssOrNewDss::Old, OldDssOrNewDss::New)));
+                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
   initialize();

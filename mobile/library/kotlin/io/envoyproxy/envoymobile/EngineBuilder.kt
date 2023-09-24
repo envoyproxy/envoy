@@ -43,6 +43,8 @@ open class XdsBuilder (
     private const val DEFAULT_XDS_TIMEOUT_IN_SECONDS: Int = 5
   }
 
+  internal var authHeader: String? = null
+  internal var authToken: String? = null
   internal var jwtToken: String? = null
   internal var jwtTokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
   internal var sslRootCerts: String? = null
@@ -52,6 +54,24 @@ open class XdsBuilder (
   internal var enableCds: Boolean = false
   internal var cdsResourcesLocator: String? = null
   internal var cdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
+
+  /**
+   * Sets the authentication HTTP header and token value for authenticating with the xDS
+   * management server.
+   *
+   * @param header The HTTP authentication header.
+   * @param token The authentication token to be sent in the header.
+   *
+   * @return this builder.
+   */
+  fun setAuthenticationToken(
+    header: String,
+    token: String
+  ): XdsBuilder {
+    this.authHeader = header
+    this.authToken = token
+    return this
+  }
 
   /**
    * Sets JWT as the authentication method to the xDS management server, using the given token.
@@ -180,6 +200,9 @@ open class EngineBuilder(
   private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
+  private var http3ConnectionOptions = ""
+  private var http3ClientConnectionOptions = ""
+  private var quicHints = mutableMapOf<String, Int>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -688,6 +711,19 @@ open class EngineBuilder(
   }
 
   /**
+   * Add a host port pair that's known to speak QUIC.
+   *
+   * @param host the host's name.
+   * @param port the port number.
+   *
+   * @return This builder.
+   */
+   fun addQuicHint(host: String, port: Int): EngineBuilder {
+    this.quicHints.put(host, port)
+    return this
+   }
+
+  /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
    * @return A new instance of Envoy.
@@ -707,6 +743,9 @@ open class EngineBuilder(
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      http3ConnectionOptions,
+      http3ClientConnectionOptions,
+      quicHints,
       enableGzipDecompression,
       enableBrotliDecompression,
       enableSocketTagging,
@@ -731,6 +770,8 @@ open class EngineBuilder(
       xdsBuilder?.rtdsTimeoutInSeconds ?: 0,
       xdsBuilder?.xdsServerAddress,
       xdsBuilder?.xdsServerPort ?: 0,
+      xdsBuilder?.authHeader,
+      xdsBuilder?.authToken,
       xdsBuilder?.jwtToken,
       xdsBuilder?.jwtTokenLifetimeInSeconds ?: 0,
       xdsBuilder?.sslRootCerts,

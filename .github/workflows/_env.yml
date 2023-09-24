@@ -12,13 +12,13 @@ on:
         default: envoyproxy/envoy-build-ubuntu
       build_image_sha:
         type: string
-        default: 50337314a150ed12447c87c1622eac6f611a069888722fb9a426e21ed161cc26
+        default: 8d3763e19d5b71fdc95666d75073ce4581e566ce28ca09106607b6a3ef7ba902
       build_image_mobile_sha:
         type: string
-        default: ca26ff05bd3f3a09468242faaf38ae48315e57f0a87c102352162f95ac620e6f
+        default: 0f51a1015964355092d9204acdacdd727474d1af189bc256dd5a28e6126f9c95
       build_image_tag:
         type: string
-        default: 41c5a05d708972d703661b702a63ef5060125c33
+        default: 94e5d873c145ae86f205117e76276161c9af4806
 
       check_mobile_run:
         type: boolean
@@ -42,6 +42,8 @@ on:
         default:
 
     outputs:
+      debug:
+        value: false
       agent_ubuntu:
         value: ubuntu-22.04
       build_image_ubuntu:
@@ -131,7 +133,7 @@ jobs:
       version_dev: ${{ steps.env.outputs.version_dev }}
       version_patch: ${{ steps.env.outputs.version_patch }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       name: Checkout Envoy repository
       with:
         fetch-depth: ${{ ! inputs.check_mobile_run && 1 || 0 }}

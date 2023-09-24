@@ -30,6 +30,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+CIO
 DFP
 DOM
 GiB
@@ -1398,6 +1399,7 @@ versa
 versioned
 vhost
 viewable
+viewport
 vip
 virtualhost
 virtualize
@@ -1456,3 +1458,4 @@ SSLKEYLOGFILE
 DLB
 PCIE
 EDNS
+CNAME

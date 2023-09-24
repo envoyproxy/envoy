@@ -483,8 +483,18 @@ public:
     ENVOY_TAGGED_CONN_LOG(info, tags, connection_, "fake message");
   }
 
+  void logTaggedMessageWithConnectionWithInlineTags() {
+    ENVOY_TAGGED_CONN_LOG(info, (std::map<std::string, std::string>{{"key_inline", "val"}}),
+                          connection_, "fake message");
+  }
+
   void logTaggedMessageWithStream(std::map<std::string, std::string>& tags) {
     ENVOY_TAGGED_STREAM_LOG(info, tags, stream_, "fake message");
+  }
+
+  void logTaggedMessageWithStreamWithInlineTags() {
+    ENVOY_TAGGED_STREAM_LOG(info, (std::map<std::string, std::string>{{"key_inline", "val"}}),
+                            stream_, "fake message");
   }
 
 private:
@@ -536,6 +546,10 @@ TEST(TaggedLogTest, TestTaggedConnLog) {
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"105\"] fake message"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(
+            msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"key_inline\":\"val\"] fake message"));
       }));
 
   std::map<std::string, std::string> empty_tags;
@@ -546,6 +560,7 @@ TEST(TaggedLogTest, TestTaggedConnLog) {
   object.logTaggedMessageWithConnection(empty_tags);
   object.logTaggedMessageWithConnection(tags);
   object.logTaggedMessageWithConnection(tags_with_conn_id);
+  object.logTaggedMessageWithConnectionWithInlineTags();
 }
 
 TEST(TaggedLogTest, TestConnLog) {
@@ -629,6 +644,12 @@ TEST(TaggedLogTest, TestTaggedStreamLog) {
       .WillOnce(Invoke([](auto msg, auto&) {
         EXPECT_THAT(
             msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"405\"] fake message"));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_THAT(
+            msg, HasSubstr(
+                     "[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\",\"key_inline\":\"val\"] "
+                     "fake message"));
       }));
 
   std::map<std::string, std::string> empty_tags;
@@ -639,6 +660,7 @@ TEST(TaggedLogTest, TestTaggedStreamLog) {
   object.logTaggedMessageWithStream(empty_tags);
   object.logTaggedMessageWithStream(tags);
   object.logTaggedMessageWithStream(tags_with_stream_id);
+  object.logTaggedMessageWithStreamWithInlineTags();
 }
 
 TEST(TaggedLogTest, TestStreamLog) {
@@ -718,6 +740,13 @@ TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
+        EXPECT_THAT(msg, HasSubstr("\"key_inline\":\"val\""));
+        EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }));
 
   std::map<std::string, std::string> empty_tags;
@@ -726,6 +755,7 @@ TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
   ClassForTaggedLog object;
   object.logTaggedMessageWithConnection(empty_tags);
   object.logTaggedMessageWithConnection(tags);
+  object.logTaggedMessageWithConnectionWithInlineTags();
 }
 
 TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
@@ -781,6 +811,14 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
+      }))
+      .WillOnce(Invoke([](auto msg, auto&) {
+        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
+        EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
+        EXPECT_THAT(msg, HasSubstr("\"key_inline\":\"val\""));
+        EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
+        EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }));
 
   std::map<std::string, std::string> empty_tags;
@@ -789,6 +827,7 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
   ClassForTaggedLog object;
   object.logTaggedMessageWithStream(empty_tags);
   object.logTaggedMessageWithStream(tags);
+  object.logTaggedMessageWithStreamWithInlineTags();
 }
 
 TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {

@@ -153,7 +153,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resource_name_lib",
     hdrs = ["resource_name.h"],
-    deps = ["//source/common/common:assert_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/protobuf",
+    ],
 )
 
 envoy_cc_library(

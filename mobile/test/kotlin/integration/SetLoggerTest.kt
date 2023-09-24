@@ -35,7 +35,6 @@ class SetLoggerTest {
           logEventLatch.countDown()
         }
       }
-      .setOnEngineRunning {}
       .build()
 
     countDownLatch.await(30, TimeUnit.SECONDS)

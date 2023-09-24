@@ -33,8 +33,13 @@ FilterConfig::FilterConfig(
       tokens_per_fill_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1)),
       descriptors_(config.descriptors()),
       rate_limit_per_connection_(config.local_rate_limit_per_downstream_connection()),
+      always_consume_default_token_bucket_(
+          config.has_always_consume_default_token_bucket()
+              ? config.always_consume_default_token_bucket().value()
+              : true),
       rate_limiter_(new Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
-          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_)),
+          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_,
+          always_consume_default_token_bucket_)),
       local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()
@@ -208,7 +213,8 @@ const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConne
   if (typed_state == nullptr) {
     auto limiter = std::make_shared<PerConnectionRateLimiter>(
         config->fillInterval(), config->maxTokens(), config->tokensPerFill(),
-        decoder_callbacks_->dispatcher(), config->descriptors());
+        decoder_callbacks_->dispatcher(), config->descriptors(),
+        config->consumeDefaultTokenBucket());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::StateType::ReadOnly,

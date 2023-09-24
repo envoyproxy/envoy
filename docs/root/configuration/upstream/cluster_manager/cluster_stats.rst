@@ -28,6 +28,17 @@ upstreams and control plane xDS clusters.
   active_clusters, Gauge, Number of currently active (warmed) clusters
   warming_clusters, Gauge, Number of currently warming (not active) clusters
 
+
+In addition to the cluster manager stats, there are per worker thread local
+cluster manager statistics tree rooted at
+*thread_local_cluster_manager.<worker_id>.* with the following statistics.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  clusters_inflated, Gauge, Number of clusters the worker has initialized. If using cluster deferral this number should be <= (cluster_added - clusters_removed).
+
 .. _config_cluster_stats:
 
 Every cluster has a statistics tree rooted at *cluster.<name>.* with the following statistics:
@@ -309,7 +320,7 @@ the following statistics:
   lb_zone_routing_sampled, Counter, Sending some requests to the same zone
   lb_zone_routing_cross_zone, Counter, Zone aware routing mode but have to send cross zone
   lb_local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
-  lb_zone_number_differs, Counter, Number of zones in local and upstream cluster different
+  lb_zone_number_differs, Counter, No zone aware routing because the feature flag is disabled and the number of zones in local and upstream cluster is different
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
   original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
 

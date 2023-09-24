@@ -7,6 +7,7 @@
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
@@ -42,7 +43,7 @@ class TestUdpProxyFilter : public UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
 
-  MOCK_METHOD(Network::SocketPtr, createSocket, (const Upstream::HostConstSharedPtr& host));
+  MOCK_METHOD(Network::SocketPtr, createUdpSocket, (const Upstream::HostConstSharedPtr& host));
 };
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
@@ -52,8 +53,8 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 }
 
 Api::IoCallUint64Result makeError(int sys_errno) {
-  return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
-                                                    Network::IoSocketError::deleteIoError));
+  return {0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
+                             Network::IoSocketError::deleteIoError)};
 }
 
 class UdpProxyFilterBase : public testing::Test {
@@ -213,7 +214,7 @@ public:
 
   void setup(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
              bool has_cluster = true, bool expect_gro = true) {
-    config_ = std::make_shared<UdpProxyFilterConfig>(factory_context_, config);
+    config_ = std::make_shared<UdpProxyFilterConfigImpl>(factory_context_, config);
     EXPECT_CALL(factory_context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -239,7 +240,7 @@ public:
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
-    EXPECT_CALL(*filter_, createSocket(_))
+    EXPECT_CALL(*filter_, createUdpSocket(_))
         .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
     EXPECT_CALL(
         *new_session.socket_->io_handle_,
@@ -748,15 +749,27 @@ matcher:
   // Add a cluster that we don't care about.
   NiceMock<Upstream::MockThreadLocalCluster> other_thread_local_cluster;
   other_thread_local_cluster.cluster_.info_->name_ = "other_cluster";
-  cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster);
+  {
+    Upstream::ThreadLocalClusterCommand command =
+        [&other_thread_local_cluster]() -> Upstream::ThreadLocalCluster& {
+      return other_thread_local_cluster;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster.info()->name(),
+                                                    command);
+  }
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_no_route_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   // Now add the cluster we care about.
-  cluster_update_callbacks_->onClusterAddOrUpdate(
-      factory_context_.cluster_manager_.thread_local_cluster_);
+  {
+    Upstream::ThreadLocalClusterCommand command = [this]() -> Upstream::ThreadLocalCluster& {
+      return factory_context_.cluster_manager_.thread_local_cluster_;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(
+        factory_context_.cluster_manager_.thread_local_cluster_.info()->name(), command);
+  }
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -922,6 +935,28 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
   InSequence s;
 
   ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
+}
+
+TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndSessionFilters) {
+  auto config = R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(readConfig(config)), EnvoyException,
+      "Only one of use_per_packet_load_balancing or session_filters can be used.");
 }
 
 // Verify that on second data packet sent from the client, another upstream host is selected.

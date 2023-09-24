@@ -59,13 +59,32 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "deferred_cluster_initialization_test",
+    srcs = ["deferred_cluster_initialization_test.cc"],
+    external_deps = [
+        "abseil_base",
+    ],
+    deps = [
+        ":test_cluster_manager",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "cluster_manager_impl_test",
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
-    args = [
-        # Force creation of c-ares DnsResolverImpl when running test on macOS.
-        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
-    ],
     external_deps = [
         "abseil_optional",
     ],
@@ -254,6 +273,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -521,6 +541,7 @@ envoy_cc_test(
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         ":utility_lib",
+        ":test_local_address_selector",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -530,11 +551,13 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
@@ -758,5 +781,47 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/upstream:scheduler_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "default_local_address_selector_test",
+    size = "small",
+    srcs = ["default_local_address_selector_test.cc"],
+    deps = [
+        "//envoy/common:base_includes",
+        "//envoy/network:socket_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:default_local_address_selector_factory",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "local_address_selector_integration_test",
+    size = "large",
+    srcs = ["local_address_selector_integration_test.cc"],
+    deps = [
+        "test_local_address_selector",
+        "//test/integration:http_integration_lib",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_local_address_selector",
+    hdrs = [
+        "test_local_address_selector.h",
+    ],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
     ],
 )
