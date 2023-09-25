@@ -28,6 +28,7 @@ TEST(DelegatingRoute, DelegatingRouteTest) {
   TEST_METHOD(tracingConfig);
   TEST_METHOD(metadata);
   TEST_METHOD(typedMetadata);
+  TEST_METHOD(routeName);
 
   std::string name;
   TEST_METHOD(mostSpecificPerFilterConfig, name);
@@ -86,7 +87,6 @@ TEST(DelegatingRouteEntry, DelegatingRouteEntryTest) {
   TEST_METHOD(includeAttemptCountInResponse);
   TEST_METHOD(upgradeMap);
   TEST_METHOD(connectConfig);
-  TEST_METHOD(routeName);
   TEST_METHOD(earlyDataPolicy);
   TEST_METHOD(routeStatsContext);
 }

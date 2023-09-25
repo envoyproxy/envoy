@@ -99,9 +99,11 @@ void AutonomousStream::sendResponse() {
 AutonomousHttpConnection::AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,
                                                    SharedConnectionWrapper& shared_connection,
                                                    Http::CodecType type,
+                                                   uint32_t max_request_headers_kb,
+                                                   uint32_t max_request_headers_count,
                                                    AutonomousUpstream& upstream)
     : FakeHttpConnection(autonomous_upstream, shared_connection, type, upstream.timeSystem(),
-                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+                         max_request_headers_kb, max_request_headers_count,
                          envoy::config::core::v3::HttpProtocolOptions::ALLOW),
       upstream_(upstream) {}
 
@@ -122,8 +124,9 @@ AutonomousUpstream::~AutonomousUpstream() {
 bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connection,
                                                   const Filter::NetworkFilterFactoriesList&) {
   shared_connections_.emplace_back(new SharedConnectionWrapper(connection));
-  AutonomousHttpConnectionPtr http_connection(
-      new AutonomousHttpConnection(*this, *shared_connections_.back(), http_type_, *this));
+  AutonomousHttpConnectionPtr http_connection(new AutonomousHttpConnection(
+      *this, *shared_connections_.back(), http_type_, config().max_request_headers_kb_,
+      config().max_request_headers_count_, *this));
   http_connection->initialize();
   http_connections_.push_back(std::move(http_connection));
   return true;
@@ -133,6 +136,10 @@ bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManage
 
 void AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
                                                       Network::UdpReadFilterCallbacks&) {}
+
+bool AutonomousUpstream::createQuicListenerFilterChain(Network::QuicListenerFilterManager&) {
+  return true;
+}
 
 void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
   Thread::LockGuard lock(headers_lock_);

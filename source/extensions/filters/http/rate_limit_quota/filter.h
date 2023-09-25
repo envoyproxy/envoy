@@ -44,7 +44,7 @@ enum class RateLimitStatus {
 
 class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public RateLimitQuotaCallbacks,
-                             public Logger::Loggable<Logger::Id::filter> {
+                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
@@ -55,7 +55,7 @@ public:
     createMatcher();
   }
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;

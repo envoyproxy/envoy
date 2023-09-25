@@ -38,7 +38,6 @@ public:
 
   void expectBasicHttp() {
     EXPECT_CALL(callbacks_, connection())
-        .Times(2)
         .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -201,6 +200,37 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_TRUE(request_.attributes().request().has_time());
 }
 
+// Certain connection-specific attributes cannot be included when there is no connection, even if
+// include_peer_certificate or include_tls_session are true.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithNoConnection) {
+  const uint64_t size = 0;
+  envoy::service::auth::v3::CheckRequest request_;
+
+  Http::TestRequestHeaderMapImpl request_headers{{Headers::get().EnvoyAuthPartialBody.get(), "1"}};
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(std::nullopt));
+  EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
+  EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+  EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
+
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), request_, size,
+      /*pack_as_bytes=*/false, /*include_peer_certificate=*/true,
+      /*include_tls_session=*/true, Protobuf::Map<std::string, std::string>(), nullptr);
+
+  ASSERT_EQ(size, request_.attributes().request().http().body().size());
+  EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_EQ(request_.attributes().request().http().headers().end(),
+            request_.attributes().request().http().headers().find(
+                Headers::get().EnvoyAuthPartialBody.get()));
+  EXPECT_EQ(0, request_.attributes().source().principal().size());
+  EXPECT_EQ(0, request_.attributes().destination().principal().size());
+  EXPECT_EQ(0, request_.attributes().source().service().size());
+  EXPECT_EQ(0, request_.attributes().source().certificate().size());
+}
+
 // Verify that check request merges the duplicate headers.
 TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
   const uint64_t size = 0;
@@ -351,7 +381,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
                                                  {":path", "/bar"}};
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(callbacks_, connection())
-      .Times(2)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -430,7 +459,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(5)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -454,7 +482,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(4)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);

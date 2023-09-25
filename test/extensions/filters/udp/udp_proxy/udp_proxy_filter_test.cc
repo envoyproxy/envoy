@@ -7,6 +7,7 @@
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
@@ -213,7 +214,7 @@ public:
 
   void setup(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
              bool has_cluster = true, bool expect_gro = true) {
-    config_ = std::make_shared<UdpProxyFilterConfig>(factory_context_, config);
+    config_ = std::make_shared<UdpProxyFilterConfigImpl>(factory_context_, config);
     EXPECT_CALL(factory_context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -934,6 +935,28 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
   InSequence s;
 
   ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
+}
+
+TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndSessionFilters) {
+  auto config = R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(readConfig(config)), EnvoyException,
+      "Only one of use_per_packet_load_balancing or session_filters can be used.");
 }
 
 // Verify that on second data packet sent from the client, another upstream host is selected.

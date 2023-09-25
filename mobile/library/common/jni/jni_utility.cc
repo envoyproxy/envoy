@@ -53,7 +53,7 @@ int unbox_integer(JNIEnv* env, jobject boxedInteger) {
   jclass jcls_Integer = env->FindClass("java/lang/Integer");
   jmethodID jmid_intValue = env->GetMethodID(jcls_Integer, "intValue", "()I");
   env->DeleteLocalRef(jcls_Integer);
-  return env->CallIntMethod(boxedInteger, jmid_intValue);
+  return callIntMethod(env, boxedInteger, jmid_intValue);
 }
 
 envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data) {
@@ -140,7 +140,7 @@ jobject native_map_to_map(JNIEnv* env, envoy_map map) {
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     auto key = native_data_to_string(env, map.entries[i].key);
     auto value = native_data_to_string(env, map.entries[i].value);
-    env->CallObjectMethod(j_hashMap, jmid_hashMapPut, key, value);
+    callObjectMethod(env, j_hashMap, jmid_hashMapPut, key, value);
     env->DeleteLocalRef(key);
     env->DeleteLocalRef(value);
   }
@@ -158,7 +158,7 @@ envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
     jmethodID jmid_array = env->GetMethodID(jcls_ByteBuffer, "array", "()[B");
-    jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
+    jbyteArray array = static_cast<jbyteArray>(callObjectMethod(env, j_data, jmid_array));
     env->DeleteLocalRef(jcls_ByteBuffer);
 
     envoy_data native_data = array_to_native_data(env, array);
@@ -179,7 +179,7 @@ envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data, size_t data_length
     // are supported. We will crash here if this is an invalid buffer, but guards may be
     // implemented in the JVM layer.
     jmethodID jmid_array = env->GetMethodID(jcls_ByteBuffer, "array", "()[B");
-    jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
+    jbyteArray array = static_cast<jbyteArray>(callObjectMethod(env, j_data, jmid_array));
     env->DeleteLocalRef(jcls_ByteBuffer);
 
     envoy_data native_data = array_to_native_data(env, array, data_length);
@@ -370,7 +370,7 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
 
   JavaArrayOfByteToString(env, static_cast<jbyteArray>(env->GetObjectArrayElement(array, 0)),
                           &cluster_name_out);
-  for (int i = 1; i < len; i += 3) {
+  for (size_t i = 1; i < len; i += 3) {
     std::string name;
     std::string type_as_string;
     std::string value;
@@ -384,3 +384,55 @@ std::vector<MatcherData> javaObjectArrayToMatcherData(JNIEnv* env, jobjectArray 
   }
   return ret;
 }
+
+#define DEFINE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                    \
+  JNI_TYPE call##JAVA_TYPE##Method(JNIEnv* env, jobject object, jmethodID method_id, ...) {        \
+    va_list args;                                                                                  \
+    va_start(args, method_id);                                                                     \
+    JNI_TYPE result = env->Call##JAVA_TYPE##MethodV(object, method_id, args);                      \
+    va_end(args);                                                                                  \
+    Envoy::JNI::Exception::checkAndClear();                                                        \
+    return result;                                                                                 \
+  }
+
+void callVoidMethod(JNIEnv* env, jobject object, jmethodID method_id, ...) {
+  va_list args;
+  va_start(args, method_id);
+  env->CallVoidMethodV(object, method_id, args);
+  va_end(args);
+  Envoy::JNI::Exception::checkAndClear();
+}
+
+DEFINE_CALL_METHOD(Char, jchar)
+DEFINE_CALL_METHOD(Short, jshort)
+DEFINE_CALL_METHOD(Int, jint)
+DEFINE_CALL_METHOD(Long, jlong)
+DEFINE_CALL_METHOD(Double, jdouble)
+DEFINE_CALL_METHOD(Boolean, jboolean)
+DEFINE_CALL_METHOD(Object, jobject)
+
+#define DEFINE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                             \
+  JNI_TYPE callStatic##JAVA_TYPE##Method(JNIEnv* env, jclass clazz, jmethodID method_id, ...) {    \
+    va_list args;                                                                                  \
+    va_start(args, method_id);                                                                     \
+    JNI_TYPE result = env->CallStatic##JAVA_TYPE##MethodV(clazz, method_id, args);                 \
+    va_end(args);                                                                                  \
+    Envoy::JNI::Exception::checkAndClear();                                                        \
+    return result;                                                                                 \
+  }
+
+void callStaticVoidMethod(JNIEnv* env, jclass clazz, jmethodID method_id, ...) {
+  va_list args;
+  va_start(args, method_id);
+  env->CallStaticVoidMethodV(clazz, method_id, args);
+  va_end(args);
+  Envoy::JNI::Exception::checkAndClear();
+}
+
+DEFINE_CALL_STATIC_METHOD(Char, jchar)
+DEFINE_CALL_STATIC_METHOD(Short, jshort)
+DEFINE_CALL_STATIC_METHOD(Int, jint)
+DEFINE_CALL_STATIC_METHOD(Long, jlong)
+DEFINE_CALL_STATIC_METHOD(Double, jdouble)
+DEFINE_CALL_STATIC_METHOD(Boolean, jboolean)
+DEFINE_CALL_STATIC_METHOD(Object, jobject)

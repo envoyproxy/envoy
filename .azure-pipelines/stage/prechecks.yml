@@ -54,6 +54,7 @@ jobs:
   - template: ../bazel.yml
     parameters:
       ciTarget: $(CI_TARGET)
+      cacheName: $(CI_TARGET)
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false

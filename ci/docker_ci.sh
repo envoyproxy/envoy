@@ -14,22 +14,23 @@ set -e
 # DOCKERHUB_PASSWORD=mypassword
 #
 ## Set these to simulate types of CI run
-# AZP_SHA1=MOCKSHA
-# AZP_BRANCH=refs/heads/main
-# AZP_BRANCH=refs/heads/release/v1.43
-# AZP_BRANCH=refs/tags/v1.77.3
+# CI_SHA1=MOCKSHA
+# CI_BRANCH=refs/heads/main
+# CI_BRANCH=refs/heads/release/v1.43
+# CI_BRANCH=refs/tags/v1.77.3
 ##
 
 # Workaround for https://github.com/envoyproxy/envoy/issues/26634
 DOCKER_BUILD_TIMEOUT="${DOCKER_BUILD_TIMEOUT:-400}"
 
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/arm64,linux/amd64}"
 
 function is_windows() {
     [[ -n "$DOCKER_FAKE_WIN" ]]  || [[ "$(uname -s)" == *NT* ]]
 }
 
 if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
-    AZP_SHA1="${AZP_SHA1:-MOCKSHA}"
+    CI_SHA1="${CI_SHA1:-MOCKSHA}"
 
     if is_windows; then
         WINDOWS_IMAGE_BASE="${WINDOWS_IMAGE_BASE:-mcr.microsoft.com/windows/fakecore}"
@@ -50,7 +51,7 @@ fi
 if [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
     # Dev version
     IMAGE_POSTFIX="-dev"
-    IMAGE_NAME="${AZP_SHA1}"
+    IMAGE_NAME="${CI_SHA1}"
 else
     # Non-dev version
     IMAGE_POSTFIX=""
@@ -58,12 +59,14 @@ else
 fi
 
 # Only push images for main builds, and non-dev release branch builds
-if [[ -n "$DOCKERHUB_USERNAME" ]] && [[ -n "$DOCKERHUB_PASSWORD" ]]; then
-    if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
+if [[ -n "$DOCKER_LOAD_IMAGES" ]]; then
+    LOAD_IMAGES=1
+elif [[ -n "$DOCKERHUB_USERNAME" ]] && [[ -n "$DOCKERHUB_PASSWORD" ]]; then
+    if [[ "${CI_BRANCH}" == "${MAIN_BRANCH}" ]]; then
         echo "Pushing images for main."
         PUSH_IMAGES_TO_REGISTRY=1
-    elif [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && ! [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
-        echo "Pushing images for release branch ${AZP_BRANCH}."
+    elif [[ "${CI_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && ! [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
+        echo "Pushing images for release branch ${CI_BRANCH}."
         PUSH_IMAGES_TO_REGISTRY=1
     else
         echo 'Ignoring non-release branch for docker push.'
@@ -72,7 +75,7 @@ else
     echo 'No credentials for docker push.'
 fi
 
-ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIRECTORY:-.}/build_images}"
+ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_DIR:-.}/build_images}"
 # This prefix is altered for the private security images on setec builds.
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
@@ -84,7 +87,7 @@ config_env() {
     echo ">> BUILDX: install"
     echo "> docker run --rm --privileged tonistiigi/binfmt --install all"
     echo "> docker buildx rm multi-builder 2> /dev/null || :"
-    echo "> docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64"
+    echo "> docker buildx create --use --name multi-builder --platform ${DOCKER_PLATFORM}"
 
     if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
         return
@@ -95,7 +98,7 @@ config_env() {
 
     # Remove older build instance
     docker buildx rm multi-builder 2> /dev/null || :
-    docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
+    docker buildx create --use --name multi-builder --platform "${DOCKER_PLATFORM}"
 }
 
 if is_windows; then
@@ -152,7 +155,7 @@ build_platforms() {
     elif [[ "${build_type}" == *-google-vrp ]]; then
         echo -n "linux/amd64"
     else
-        echo -n "linux/arm64,linux/amd64"
+        echo -n "$DOCKER_PLATFORM"
     fi
 }
 
@@ -210,7 +213,10 @@ build_and_maybe_push_image () {
         args+=(
             "--sbom=false"
             "--provenance=false")
-        if [[ "${image_type}" =~ debug ]]; then
+        if [[ -n "$LOAD_IMAGES" ]]; then
+            action="BUILD+LOAD"
+            args+=("--load")
+        elif [[ "${image_type}" =~ debug ]]; then
             # For linux if its the debug image then push immediately for release branches,
             # otherwise just test the build
             if [[ -n "$PUSH_IMAGES_TO_REGISTRY" ]]; then
@@ -341,7 +347,7 @@ tag_variants () {
 
     # Only push latest on main/dev builds.
     if [[ "$ENVOY_VERSION" =~ $DEV_VERSION_REGEX ]]; then
-        if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
+        if [[ "${CI_BRANCH}" == "${MAIN_BRANCH}" ]]; then
             variant_type="latest"
         fi
     else

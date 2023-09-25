@@ -71,39 +71,9 @@
 namespace Envoy {
 namespace Upstream {
 
-/**
- * An implementation of UpstreamLocalAddressSelector.
- */
-class UpstreamLocalAddressSelectorImpl : public UpstreamLocalAddressSelector {
-public:
-  UpstreamLocalAddressSelectorImpl(
-      const envoy::config::cluster::v3::Cluster& config,
-      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config);
-
-  // UpstreamLocalAddressSelector
-  UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address,
-      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const override;
-
-private:
-  const Network::ConnectionSocket::OptionsSharedPtr
-  buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                         const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
-  const Network::ConnectionSocket::OptionsSharedPtr
-  buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                            const envoy::config::core::v3::BindConfig bind_config);
-  void parseBindConfig(const std::string cluster_name,
-                       const envoy::config::core::v3::BindConfig& bind_config,
-                       const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
-                       const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
-  Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
-      const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
-      const Network::ConnectionSocket::OptionsSharedPtr& options) const;
-
-  Network::ConnectionSocket::OptionsSharedPtr base_socket_options_;
-  Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
-  std::vector<UpstreamLocalAddress> upstream_local_addresses_;
-};
+using UpstreamNetworkFilterConfigProviderManager =
+    Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
+                                        Server::Configuration::UpstreamFactoryContext>;
 
 /**
  * Class for LBPolicies
@@ -972,7 +942,7 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  std::shared_ptr<UpstreamLocalAddressSelector> getUpstreamLocalAddressSelector() const override {
+  UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override {
@@ -1050,6 +1020,10 @@ protected:
   getRetryBudgetParams(const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds);
 
 private:
+  std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+  createSingletonUpstreamNetworkFilterConfigProviderManager(
+      Server::Configuration::ServerFactoryContext& context);
+
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name, Stats::Scope& stats_scope,
@@ -1101,7 +1075,7 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
+  UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
   const std::unique_ptr<const LBPolicyConfig> lb_policy_config_;
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   std::unique_ptr<LoadBalancerSubsetInfoImpl> lb_subset_;
@@ -1112,15 +1086,16 @@ private:
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
       common_lb_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
-  // TODO(ohadvano): http_filter_config_provider_manager_ should be maintained in the ClusterManager
-  // object as a singleton. This is currently not possible due to circular dependency (filter config
-  // provider manager depends on the ClusterManager object).
-  // The circular dependency can be resolved when the following issue is resolved:
-  // https://github.com/envoyproxy/envoy/issues/26653.
+  // TODO(ohadvano): http_filter_config_provider_manager_ and
+  // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as a
+  // singleton. This is currently not possible due to circular dependency (filter config provider
+  // manager depends on the ClusterManager object). The circular dependency can be resolved when the
+  // following issue is resolved: https://github.com/envoyproxy/envoy/issues/26653.
   std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
+  std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+      network_filter_config_provider_manager_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   Filter::NetworkFilterFactoriesList filter_factories_;
-  Filter::UpstreamNetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
@@ -1257,6 +1232,8 @@ protected:
       const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
 
 private:
+  static const absl::string_view DoNotValidateAlpnRuntimeKey;
+
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 

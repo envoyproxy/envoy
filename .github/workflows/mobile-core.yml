@@ -33,7 +33,7 @@ jobs:
     container:
       image: ${{ needs.env.outputs.build_image_ubuntu }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Ensure no listener leaks
       run: rm source/extensions/listener_managers/listener_manager/listener_manager_impl.h
     - name: Add safe directory

@@ -423,6 +423,10 @@ public:
     return &read_callbacks_->connection();
   }
 
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &read_callbacks_->connection().streamInfo();
+  }
+
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return transport_socket_options_;
   }

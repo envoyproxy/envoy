@@ -32,6 +32,7 @@ package http
 */
 import "C"
 import (
+	"errors"
 	"reflect"
 	"runtime"
 	"strings"
@@ -57,25 +58,50 @@ const (
 	ValueUpstreamRemoteAddress   = 10
 	ValueUpstreamClusterName     = 11
 	ValueVirtualClusterName      = 12
+
+	// NOTE: this is a trade-off value.
+	// When the number of header is less this value, we could use the slice on the stack,
+	// otherwise, we have to allocate a new slice on the heap,
+	// and the slice on the stack will be wasted.
+	// So, we choose a value that many requests' number of header is less than this value.
+	// But also, it should not be too large, otherwise it might be waste stack memory.
+	maxStackAllocedHeaderSize = 16
+	maxStackAllocedSliceLen   = maxStackAllocedHeaderSize * 2
 )
 
 type httpCApiImpl struct{}
 
-// Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
+// When the status means unexpected stage when invoke C API,
 // panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
-	case C.CAPIOK:
-		return
-	case C.CAPIFilterIsGone:
-		panic(errRequestFinished)
-	case C.CAPIFilterIsDestroy:
-		panic(errFilterDestroyed)
-	case C.CAPINotInGo:
-		panic(errNotInGo)
-	case C.CAPIInvalidPhase:
-		panic(errInvalidPhase)
+	case C.CAPIFilterIsGone,
+		C.CAPIFilterIsDestroy,
+		C.CAPINotInGo,
+		C.CAPIInvalidPhase:
+		panic(capiStatusToStr(status))
 	}
+}
+
+func capiStatusToStr(status C.CAPIStatus) string {
+	switch status {
+	case C.CAPIFilterIsGone:
+		return errRequestFinished
+	case C.CAPIFilterIsDestroy:
+		return errFilterDestroyed
+	case C.CAPINotInGo:
+		return errNotInGo
+	case C.CAPIInvalidPhase:
+		return errInvalidPhase
+	case C.CAPIValueNotFound:
+		return errValueNotFound
+	case C.CAPIInternalFailure:
+		return errInternalFailure
+	case C.CAPISerializationFailure:
+		return errSerializationFailure
+	}
+
+	return "unknown status"
 }
 
 func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
@@ -106,10 +132,16 @@ func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *strin
 }
 
 func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
-	// TODO: use a memory pool for better performance,
-	// since these go strings in strs, will be copied into the following map.
-	strs := make([]string, num*2)
-	// but, this buffer can not be reused safely,
+	var strs []string
+	if num <= maxStackAllocedHeaderSize {
+		// NOTE: only const length slice may be allocated on stack.
+		strs = make([]string, maxStackAllocedSliceLen)
+	} else {
+		// TODO: maybe we could use a memory pool for better performance,
+		// since these go strings in strs, will be copied into the following map.
+		strs = make([]string, num*2)
+	}
+	// NOTE: this buffer can not be reused safely,
 	// since strings may refer to this buffer as string data, and string is const in go.
 	// we have to make sure the all strings is not using before reusing,
 	// but strings may be alive beyond the request life.
@@ -161,6 +193,11 @@ func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) {
+	res := C.envoyGoFilterHttpDrainBuffer(r, C.ulonglong(bufferPtr), C.uint64_t(length))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
 	sHeader := (*reflect.StringHeader)(unsafe.Pointer(&value))
 	var act C.bufferAction
@@ -177,11 +214,19 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 }
 
 func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
-	// TODO: use a memory pool for better performance,
-	// but, should be very careful, since string is const in go,
-	// and we have to make sure the strings is not using before reusing,
-	// strings may be alive beyond the request life.
-	strs := make([]string, num*2)
+	var strs []string
+	if num <= maxStackAllocedHeaderSize {
+		// NOTE: only const length slice may be allocated on stack.
+		strs = make([]string, maxStackAllocedSliceLen)
+	} else {
+		// TODO: maybe we could use a memory pool for better performance,
+		// since these go strings in strs, will be copied into the following map.
+		strs = make([]string, num*2)
+	}
+	// NOTE: this buffer can not be reused safely,
+	// since strings may refer to this buffer as string data, and string is const in go.
+	// we have to make sure the all strings is not using before reusing,
+	// but strings may be alive beyond the request life.
 	buf := make([]byte, bytes)
 	sHeader := (*reflect.SliceHeader)(unsafe.Pointer(&strs))
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
@@ -322,6 +367,31 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 	}
 
 	return strings.Clone(value)
+}
+
+func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (string, error) {
+	r := (*httpRequest)(rr)
+	var value string
+	var rc int
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.sema.Add(1)
+	res := C.envoyGoFilterHttpGetStringProperty(unsafe.Pointer(r.req), unsafe.Pointer(&key),
+		unsafe.Pointer(&value), (*C.int)(unsafe.Pointer(&rc)))
+	if res == C.CAPIYield {
+		atomic.AddInt32(&r.waitingOnEnvoy, 1)
+		r.sema.Wait()
+		res = C.CAPIStatus(rc)
+	} else {
+		r.sema.Done()
+		handleCApiStatus(res)
+	}
+
+	if res == C.CAPIOK {
+		return strings.Clone(value), nil
+	}
+
+	return "", errors.New(capiStatusToStr(res))
 }
 
 func (c *httpCApiImpl) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {

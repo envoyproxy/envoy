@@ -88,11 +88,13 @@ OpenTelemetryFormatter::FormatBuilder::toFormatStringValue(const std::string& st
   ASSERT(!providers.empty());
   ::opentelemetry::proto::common::v1::AnyValue output;
   std::vector<std::string> bits(providers.size());
+
+  const Formatter::HttpFormatterContext formatter_context{
+      &request_headers, &response_headers, &response_trailers, local_reply_body, access_log_type};
+
   std::transform(providers.begin(), providers.end(), bits.begin(),
                  [&](const Formatter::FormatterProviderPtr& provider) {
-                   return provider
-                       ->format(request_headers, response_headers, response_trailers, stream_info,
-                                local_reply_body, access_log_type)
+                   return provider->formatWithContext(formatter_context, stream_info)
                        .value_or(DefaultUnspecifiedValueString);
                  });
   output.set_string_value(absl::StrJoin(bits, ""));

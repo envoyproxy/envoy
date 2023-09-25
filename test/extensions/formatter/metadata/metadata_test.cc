@@ -46,6 +46,9 @@ public:
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::string body_;
 
+  Envoy::Formatter::HttpFormatterContext formatter_context_{&request_headers_, &response_headers_,
+                                                            &response_trailers_, body_};
+
   envoy::config::core::v3::SubstitutionFormatString config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<envoy::config::core::v3::Metadata> metadata_;
@@ -70,9 +73,8 @@ TEST_F(MetadataFormatterTest, DynamicMetadata) {
   EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(*metadata_));
 
-  EXPECT_EQ("test_value", getTestMetadataFormatter("DYNAMIC")->format(
-                              request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+  EXPECT_EQ("test_value", getTestMetadataFormatter("DYNAMIC")->formatWithContext(formatter_context_,
+                                                                                 stream_info_));
 }
 
 // Extensive testing of Cluster Metadata formatter is in
@@ -86,9 +88,8 @@ TEST_F(MetadataFormatterTest, ClusterMetadata) {
   EXPECT_CALL(**cluster, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
   EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::ReturnPointee(cluster));
 
-  EXPECT_EQ("test_value", getTestMetadataFormatter("CLUSTER")->format(
-                              request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+  EXPECT_EQ("test_value", getTestMetadataFormatter("CLUSTER")->formatWithContext(formatter_context_,
+                                                                                 stream_info_));
 }
 
 // Extensive testing of UpstreamHost Metadata formatter is in
@@ -107,8 +108,7 @@ TEST_F(MetadataFormatterTest, UpstreamHostMetadata) {
   EXPECT_CALL(*mock_host_description, metadata()).WillRepeatedly(testing::Return(metadata_));
 
   EXPECT_EQ("test_value", getTestMetadataFormatter("UPSTREAM_HOST")
-                              ->format(request_headers_, response_headers_, response_trailers_,
-                                       stream_info_, body_, AccessLog::AccessLogType::NotSet));
+                              ->formatWithContext(formatter_context_, stream_info_));
 }
 
 // Test that METADATA(ROUTE accesses stream_info's Route.
@@ -117,18 +117,16 @@ TEST_F(MetadataFormatterTest, RouteMetadata) {
   EXPECT_CALL(*route, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
   EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
 
-  EXPECT_EQ("test_value", getTestMetadataFormatter("ROUTE")->format(
-                              request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_, AccessLog::AccessLogType::NotSet));
+  EXPECT_EQ("test_value",
+            getTestMetadataFormatter("ROUTE")->formatWithContext(formatter_context_, stream_info_));
 }
 
 // Make sure that code handles nullptr returned for stream_info::route().
 TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
   EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(nullptr));
 
-  EXPECT_EQ("-", getTestMetadataFormatter("ROUTE")->format(request_headers_, response_headers_,
-                                                           response_trailers_, stream_info_, body_,
-                                                           AccessLog::AccessLogType::NotSet));
+  EXPECT_EQ("-",
+            getTestMetadataFormatter("ROUTE")->formatWithContext(formatter_context_, stream_info_));
 }
 
 } // namespace Formatter

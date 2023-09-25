@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/access_log/access_log_config.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/config/typed_config.h"
@@ -13,6 +14,8 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/matchers.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
 #include "source/common/grpc/status.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -305,6 +308,48 @@ public:
    */
   static InstanceSharedPtr fromProto(const envoy::config::accesslog::v3::AccessLog& config,
                                      Server::Configuration::CommonFactoryContext& context);
+
+  /**
+   * Template method to create an access log filter from proto configuration for non-HTTP access
+   * loggers.
+   */
+  template <class Context>
+  static FilterBasePtr<Context>
+  accessLogFilterFromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
+                           Server::Configuration::CommonFactoryContext& context) {
+    if (!config.has_extension_filter()) {
+      ExceptionUtil::throwEnvoyException(
+          "Access log filter: only extension filter is supported by non-HTTP access loggers.");
+    }
+
+    auto& factory = Config::Utility::getAndCheckFactory<ExtensionFilterFactoryBase<Context>>(
+        config.extension_filter());
+    auto typed_filter_config = Config::Utility::translateToFactoryConfig(
+        config.extension_filter(), context.messageValidationVisitor(), factory);
+
+    return factory.createFilter(*typed_filter_config, context);
+  }
+
+  /**
+   * Template method to create an access logger instance from proto configuration for non-HTTP
+   * access loggers.
+   */
+  template <class Context>
+  static InstanceBaseSharedPtr<Context>
+  accessLoggerFromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                        Server::Configuration::CommonFactoryContext& context) {
+    FilterBasePtr<Context> filter;
+    if (config.has_filter()) {
+      filter = accessLogFilterFromProto<Context>(config.filter(), context);
+    }
+
+    auto& factory =
+        Config::Utility::getAndCheckFactory<AccessLogInstanceFactoryBase<Context>>(config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        config, context.messageValidationVisitor(), factory);
+
+    return factory.createAccessLogInstance(*message, std::move(filter), context);
+  }
 };
 
 } // namespace AccessLog

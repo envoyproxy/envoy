@@ -58,10 +58,13 @@ public:
 
 private:
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
-                      const std::string&) override {}
-  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
+  absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
+                              const std::string&) override {
+    return absl::OkStatus();
+  }
+  absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
+                              const Protobuf::RepeatedPtrField<std::string>&,
+                              const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 

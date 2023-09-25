@@ -64,6 +64,50 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 
 } // namespace
 
+FilterConfig::FilterConfig(Stats::StatName stat_prefix,
+                           Server::Configuration::FactoryContext& context,
+                           ShadowWriterPtr&& shadow_writer,
+                           const envoy::extensions::filters::http::router::v3::Router& config)
+    : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
+                   context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
+                   PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
+                   config.start_child_span(), config.suppress_envoy_headers(),
+                   config.respect_expected_rq_timeout(),
+                   config.suppress_grpc_request_failure_code_stats(),
+                   config.has_upstream_log_options()
+                       ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
+                       : false,
+                   config.strict_check_headers(), context.api().timeSource(), context.httpContext(),
+                   context.routerContext()) {
+  for (const auto& upstream_log : config.upstream_log()) {
+    upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
+  }
+
+  if (config.has_upstream_log_options() &&
+      config.upstream_log_options().has_upstream_log_flush_interval()) {
+    upstream_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        config.upstream_log_options().upstream_log_flush_interval()));
+  }
+
+  if (config.upstream_http_filters_size() > 0) {
+    auto& server_factory_ctx = context.getServerFactoryContext();
+    const Http::FilterChainUtility::FiltersList& upstream_http_filters =
+        config.upstream_http_filters();
+    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+            server_factory_ctx);
+    std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+    upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
+        server_factory_ctx, context.initManager(), context.scope());
+    Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
+                            Server::Configuration::UpstreamHttpFilterConfigFactory>
+        helper(*filter_config_provider_manager, server_factory_ctx, context.clusterManager(),
+               *upstream_ctx_, prefix);
+    THROW_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
+                                          "router upstream http", upstream_http_filter_factories_));
+  }
+}
+
 // Express percentage as [0, TimeoutPrecisionFactor] because stats do not accept floating point
 // values, and getting multiple significant figures on the histogram would be nice.
 uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds response_time,
@@ -418,7 +462,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (direct_response != nullptr) {
     stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers, !config_.suppress_envoy_headers_);
-    callbacks_->streamInfo().setRouteName(direct_response->routeName());
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
@@ -446,7 +489,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // limits, apply the new cap.
   retry_shadow_buffer_limit_ =
       std::min(retry_shadow_buffer_limit_, route_entry_->retryShadowBufferLimit());
-  callbacks_->streamInfo().setRouteName(route_entry_->routeName());
   if (debug_config && debug_config->append_cluster_) {
     // The cluster name will be appended to any local or upstream responses from this point.
     modify_headers = [this, debug_config](Http::ResponseHeaderMap& headers) {
@@ -1815,8 +1857,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     return false;
   }
 
-  const auto& route_name = route->directResponseEntry() ? route->directResponseEntry()->routeName()
-                                                        : route->routeEntry()->routeName();
+  const auto& route_name = route->routeName();
   for (const auto& predicate : policy.predicates()) {
     if (!predicate->acceptTargetRoute(*filter_state, route_name, !scheme_is_http,
                                       !target_is_http)) {

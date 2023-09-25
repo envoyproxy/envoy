@@ -3,11 +3,6 @@
 Matching API
 ============
 
-.. attention::
-
-   The matching API is alpha and is currently under active development.
-   Capabilities will be expanded over time and the configuration structures are likely to change.
-
 Envoy makes use of a :ref:`matching API <envoy_v3_api_msg_config.common.matcher.v3.Matcher>`
 to allow the various subsystems to express actions that should be performed based on incoming data.
 

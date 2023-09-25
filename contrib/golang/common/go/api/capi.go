@@ -33,6 +33,7 @@ type HttpCAPI interface {
 	HttpRemoveHeader(r unsafe.Pointer, key *string)
 
 	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
+	HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64)
 	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
 
 	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
@@ -53,6 +54,8 @@ type HttpCAPI interface {
 
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	HttpGetStringFilterState(r unsafe.Pointer, key string) string
+
+	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
 
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
 	HttpIncrementMetric(c unsafe.Pointer, metricId uint32, offset int64)

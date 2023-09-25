@@ -1,3 +1,4 @@
+load("@com_github_rules_proto_grpc//cpp:defs.bzl", "cpp_grpc_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
@@ -38,6 +39,7 @@ envoy_cc_extension(
         "abseil_node_hash_set",
     ],
     deps = [
+        ":alts_channel_pool",
         ":tsi_handshaker",
         ":tsi_socket",
         "//envoy/registry",
@@ -70,6 +72,7 @@ envoy_cc_library(
         "tsi_handshaker.h",
     ],
     deps = [
+        ":alts_tsi_handshaker",
         ":grpc_tsi_wrapper",
         "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
@@ -107,5 +110,53 @@ envoy_cc_library(
     deps = [
         "//envoy/network:io_handle_interface",
         "//envoy/network:transport_socket_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "alts_channel_pool",
+    srcs = ["alts_channel_pool.cc"],
+    hdrs = ["alts_channel_pool.h"],
+    external_deps = [
+        "grpc",
+    ],
+    deps = [
+        "@com_google_absl//absl/random",
+    ],
+)
+
+cpp_grpc_library(
+    name = "handshaker_cc_grpc",
+    protos = ["@com_github_grpc_grpc//src/proto/grpc/gcp:alts_handshaker_proto"],
+)
+
+envoy_cc_library(
+    name = "alts_proxy",
+    srcs = ["alts_proxy.cc"],
+    hdrs = ["alts_proxy.h"],
+    external_deps = [
+        "abseil_memory",
+        "abseil_status",
+        "abseil_statusor",
+        "grpc",
+    ],
+    deps = [
+        ":handshaker_cc_grpc",
+    ],
+)
+
+envoy_cc_library(
+    name = "alts_tsi_handshaker",
+    srcs = ["alts_tsi_handshaker.cc"],
+    hdrs = ["alts_tsi_handshaker.h"],
+    external_deps = [
+        "abseil_memory",
+        "abseil_status",
+        "grpc",
+    ],
+    deps = [
+        ":alts_proxy",
+        ":handshaker_cc_grpc",
+        ":tsi_frame_protector",
     ],
 )
