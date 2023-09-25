@@ -158,4 +158,3 @@ AltsTsiHandshaker::GetHandshakeResult(const grpc::gcp::HandshakerResult& result,
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy
-

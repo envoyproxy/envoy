@@ -52,9 +52,9 @@ public:
  */
 class TsiHandshaker final : public Event::DeferredDeletable {
 public:
- explicit TsiHandshaker(std::unique_ptr<AltsTsiHandshaker> handshaker,
+  explicit TsiHandshaker(std::unique_ptr<AltsTsiHandshaker> handshaker,
                          Event::Dispatcher& dispatcher);
- ~TsiHandshaker() override;
+  ~TsiHandshaker() override;
 
   /**
    * Conduct next step of handshake, see
@@ -63,7 +63,7 @@ public:
    * TsiHandshakerCallbacks::onNextDone is called.
    * @param received the buffer received from peer.
    */
- absl::Status next(Buffer::Instance& received);
+  absl::Status next(Buffer::Instance& received);
 
   /**
    * Set handshaker callbacks. This must be called before calling next.

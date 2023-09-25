@@ -160,4 +160,3 @@ envoy_cc_library(
         ":tsi_frame_protector",
     ],
 )
-

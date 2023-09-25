@@ -63,7 +63,7 @@ TransportSocketFactoryPtr createTransportSocketFactoryHelper(
   // A reference to this is held in the factory closure to keep the singleton
   // instance alive.
   auto alts_shared_state =
-  factory_ctxt.serverFactoryContext().singletonManager().getTyped<AltsSharedState>(
+      factory_ctxt.serverFactoryContext().singletonManager().getTyped<AltsSharedState>(
           SINGLETON_MANAGER_REGISTERED_NAME(alts_shared_state), [handshaker_service_address] {
             return std::make_shared<AltsSharedState>(handshaker_service_address);
           });

@@ -180,7 +180,7 @@ protected:
       server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
     }
     if (handshaker_server_thread_) {
-      handshaker_server_->Shutdown(std::chrono::system_clock::now());
+      handshaker_server_->Shutdown(std::chrono::system_clock::now()); // NO_CHECK_FORMAT(real_time)
       handshaker_server_thread_->join();
     }
   }
