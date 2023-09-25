@@ -78,6 +78,11 @@ uint32_t ActiveStream::maxPathTagLength() const {
   return connection_manager_tracing_config_->maxPathTagLength();
 }
 
+bool ActiveStream::spawnUpstreamSpan() const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->spawnUpstreamSpan();
+}
+
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
   return parent_.downstreamConnection().dispatcher();
 }
