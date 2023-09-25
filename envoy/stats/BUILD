@@ -16,7 +16,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "tag_interface",
-    hdrs = ["tag.h"]
+    hdrs = ["tag.h"],
 )
 
 # TODO(jmarantz): atomize the build rules to match the include files.
