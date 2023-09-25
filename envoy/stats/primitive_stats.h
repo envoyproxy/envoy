@@ -64,11 +64,19 @@ using PrimitiveGaugeReference = std::reference_wrapper<PrimitiveGauge>;
 
 class PrimitiveMetricMetadata {
 public:
-  // Mirror some of the API for Stats::Metric for use in templates
-  const Stats::TagVector& tags() const { return tags_; }
+  // Mirror some of the API for Stats::Metric for use in templates that
+  // accept either Counter/Gauge or PrimitiveCounterSnapshot/PrimitiveGaugeSnapshot.
   const std::string& tagExtractedName() const { return tag_extracted_name_; }
   const std::string& name() const { return name_; }
+  const Stats::TagVector& tags() const { return tags_; }
 
+  void setName(std::string&& name) { name_ = std::move(name); }
+  void setTagExtractedName(std::string&& tag_extracted_name) {
+    tag_extracted_name_ = std::move(tag_extracted_name);
+  }
+  void setTags(const Stats::TagVector& tags) { tags_ = tags; }
+
+private:
   std::string name_;
   std::string tag_extracted_name_;
   Stats::TagVector tags_;

@@ -216,10 +216,10 @@ void forEachMetric(const ClusterManager& cluster_manager,
           for (auto& [metric_name, primitive] : get_stats_vector(*host)) {
             StatType metric(primitive.get());
 
-            metric.name_ = absl::StrCat("cluster.", cluster_name, ".endpoint.", metric_name, ".",
-                                        host->address()->asStringView());
-            metric.tag_extracted_name_ = absl::StrCat("cluster.endpoint.", metric_name);
-            metric.tags_ = tags;
+            metric.setName(absl::StrCat("cluster.", cluster_name, ".endpoint.", metric_name, ".",
+                                        host->address()->asStringView()));
+            metric.setTagExtractedName(absl::StrCat("cluster.endpoint.", metric_name));
+            metric.setTags(tags);
 
             cb(std::move(metric));
           }

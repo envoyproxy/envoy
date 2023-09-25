@@ -86,7 +86,7 @@ struct MetricLessThan {
 struct PrimitiveMetricSnapshotLessThan {
   bool operator()(const Stats::PrimitiveMetricMetadata* a,
                   const Stats::PrimitiveMetricMetadata* b) {
-    return a->name_ < b->name_;
+    return a->name() < b->name();
   }
 };
 
@@ -211,10 +211,10 @@ uint64_t outputPrimitiveStatType(
 
   for (const auto& metric : metrics) {
     if (params.re2_filter_ != nullptr &&
-        !re2::RE2::PartialMatch(metric.name_, *params.re2_filter_)) {
+        !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
       continue;
     }
-    groups[metric.tag_extracted_name_].push_back(&metric);
+    groups[metric.tagExtractedName()].push_back(&metric);
   }
 
   auto result = groups.size();
@@ -375,7 +375,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     Upstream::HostUtility::forEachHostCounter(cluster_manager,
                                               [&](Stats::PrimitiveCounterSnapshot&& metric) {
                                                 host_counters.emplace_back(std::move(metric));
-                                                ASSERT(metric.name_.empty());
+                                                ASSERT(metric.name().empty());
                                               });
     metric_name_count += outputPrimitiveStatType<Stats::PrimitiveCounterSnapshot>(
         response, params, host_counters, generateNumericOutput, "counter", custom_namespaces);
@@ -386,7 +386,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     Upstream::HostUtility::forEachHostGauge(cluster_manager,
                                             [&](Stats::PrimitiveGaugeSnapshot&& metric) {
                                               host_gauges.emplace_back(std::move(metric));
-                                              ASSERT(metric.name_.empty());
+                                              ASSERT(metric.name().empty());
                                             });
     metric_name_count += outputPrimitiveStatType(response, params, host_gauges,
                                                  generateNumericOutput, "gauge", custom_namespaces);
