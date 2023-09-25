@@ -13,9 +13,6 @@
 #endif
 
 #include "test/core/tsi/alts/fake_handshaker/fake_handshaker_server.h"
-#include "test/core/tsi/alts/fake_handshaker/handshaker.grpc.pb.h"
-#include "test/core/tsi/alts/fake_handshaker/handshaker.pb.h"
-#include "test/core/tsi/alts/fake_handshaker/transport_security_common.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
