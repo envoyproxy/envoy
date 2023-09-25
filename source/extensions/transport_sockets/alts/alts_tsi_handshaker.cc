@@ -52,24 +52,32 @@ absl::Status AltsTsiHandshaker::Next(void* handshaker, const unsigned char* rece
   if (!has_sent_initial_handshake_message_) {
     has_sent_initial_handshake_message_ = true;
     auto alts_proxy = AltsProxy::Create(handshaker_service_channel_);
-    if (!alts_proxy.ok())
+    if (!alts_proxy.ok()) {
       return alts_proxy.status();
+
+        }
     alts_proxy_ = *std::move(alts_proxy);
     if (is_client_) {
       auto client_start = alts_proxy_->SendStartClientHandshakeReq();
-      if (!client_start.ok())
+      if (!client_start.ok()) {
         return client_start.status();
+
+        }
       response = *std::move(client_start);
     } else {
       auto server_start = alts_proxy_->SendStartServerHandshakeReq(in_bytes);
-      if (!server_start.ok())
+      if (!server_start.ok()) {
         return server_start.status();
+
+        }
       response = *std::move(server_start);
     }
   } else {
     auto next = alts_proxy_->SendNextHandshakeReq(in_bytes);
-    if (!next.ok())
+    if (!next.ok()) {
       return next.status();
+
+        }
     response = *std::move(next);
   }
 
@@ -78,8 +86,10 @@ absl::Status AltsTsiHandshaker::Next(void* handshaker, const unsigned char* rece
   if (response.has_result()) {
     is_handshake_complete_ = true;
     auto result = GetHandshakeResult(response.result(), in_bytes, response.bytes_consumed());
-    if (!result.ok())
+    if (!result.ok()) {
       return result.status();
+
+        }
     handshake_result = *std::move(result);
   }
 
@@ -136,7 +146,7 @@ AltsTsiHandshaker::GetHandshakeResult(const grpc::gcp::HandshakerResult& result,
   grpc_core::ExecCtx exec_ctx;
   tsi_result ok = alts_zero_copy_grpc_protector_create(
       reinterpret_cast<const uint8_t*>(result.key_data().data()), kAltsAes128GcmRekeyKeyLength,
-      /*is_rekey=*/true, is_client_,
+      true, is_client_,
       /*is_integrity_only=*/false, /*enable_extra_copy=*/false, &max_frame_size, &protector);
   if (ok != TSI_OK) {
     return absl::InternalError(absl::StrFormat("Failed to create frame protector: %zu", ok));

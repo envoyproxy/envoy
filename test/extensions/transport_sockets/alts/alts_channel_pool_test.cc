@@ -45,7 +45,7 @@ public:
 
 class AltsChannelPoolTest : public Test {
 protected:
-  void StartFakeHandshakerService() {
+  void startFakeHandshakerService() {
     server_address_ = absl::StrCat("[::1]:", 0);
     testing::internal::Notification notification;
     server_thread_ = std::make_unique<std::thread>([this, &notification]() {
@@ -72,7 +72,7 @@ protected:
     }
   }
 
-  std::string ServerAddress() { return server_address_; }
+  std::string serverAddress() { return server_address_; }
 
 private:
   std::string server_address_;
@@ -81,10 +81,10 @@ private:
 };
 
 TEST_F(AltsChannelPoolTest, SuccessWithDefaultChannels) {
-  StartFakeHandshakerService();
+  startFakeHandshakerService();
 
   // Create a channel pool and check that it has the correct dimensions.
-  auto channel_pool = AltsChannelPool::Create(ServerAddress());
+  auto channel_pool = AltsChannelPool::Create(serverAddress());
   EXPECT_THAT(channel_pool, NotNull());
   EXPECT_THAT(channel_pool->GetChannel(), NotNull());
   EXPECT_EQ(channel_pool->GetChannelPoolSize(), 10);

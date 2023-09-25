@@ -55,7 +55,6 @@ using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NotNull;
 using ::testing::Return;
-using ::testing::Test;
 using ::testing::WithArgs;
 
 constexpr absl::string_view kApplicationData = "application_data";
@@ -68,7 +67,7 @@ constexpr absl::string_view kKeyData = "fake_key_data_needs_to_be_at_least_44_ch
 constexpr absl::string_view kLocalServiceAccount = "local_service_account";
 constexpr absl::string_view kPeerServiceAccount = "peer_service_account";
 
-void PopulateHandshakeResult(HandshakerResult* result) {
+void populateHandshakeResult(HandshakerResult* result) {
   result->mutable_peer_identity()->set_service_account(kPeerServiceAccount);
   result->mutable_peer_rpc_versions();
   result->mutable_local_identity()->set_service_account(kLocalServiceAccount);
@@ -116,7 +115,7 @@ public:
         if (is_assisting_client) {
           response.set_out_frames(kClientFinished);
         }
-        PopulateHandshakeResult(response.mutable_result());
+        populateHandshakeResult(response.mutable_result());
       } else {
         response.mutable_status()->set_code(
             static_cast<int>(grpc::StatusCode::FAILED_PRECONDITION));
@@ -161,13 +160,13 @@ protected:
     server_.handshaker_factory_ = [this](Event::Dispatcher& dispatcher,
                                          const Network::Address::InstanceConstSharedPtr&,
                                          const Network::Address::InstanceConstSharedPtr&) {
-      auto handshaker = AltsTsiHandshaker::CreateForServer(GetChannel());
+      auto handshaker = AltsTsiHandshaker::CreateForServer(getChannel());
       return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
     };
     client_.handshaker_factory_ = [this](Event::Dispatcher& dispatcher,
                                          const Network::Address::InstanceConstSharedPtr&,
                                          const Network::Address::InstanceConstSharedPtr&) {
-      auto handshaker = AltsTsiHandshaker::CreateForClient(GetChannel());
+      auto handshaker = AltsTsiHandshaker::CreateForClient(getChannel());
       return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
     };
   }
@@ -185,7 +184,7 @@ protected:
     }
   }
 
-  void StartFakeHandshakerService(bool allow_unused_bytes = false) {
+  void startFakeHandshakerService(bool allow_unused_bytes = false) {
     handshaker_server_address_ = absl::StrCat("[::1]:", 0);
     absl::Notification notification;
     handshaker_server_thread_ =
@@ -206,7 +205,7 @@ protected:
     notification.WaitForNotification();
   }
 
-  void StartErrorHandshakerService(bool keep_stream_alive) {
+  void startErrorHandshakerService(bool keep_stream_alive) {
     handshaker_server_address_ = absl::StrCat("[::1]:", 0);
     absl::Notification notification;
     handshaker_server_thread_ =
@@ -227,11 +226,11 @@ protected:
     notification.WaitForNotification();
   }
 
-  std::shared_ptr<grpc::Channel> GetChannel() {
+  std::shared_ptr<grpc::Channel> getChannel() {
     return grpc::CreateChannel(handshaker_server_address_, grpc::InsecureChannelCredentials());
   }
 
-  void InitializeSockets(HandshakeValidator server_validator, HandshakeValidator client_validator) {
+  void initializeSockets(HandshakeValidator server_validator, HandshakeValidator client_validator) {
     server_.raw_socket_ = new Network::MockTransportSocket();
     server_.tsi_socket_ =
         std::make_unique<TsiSocket>(server_.handshaker_factory_, server_validator,
@@ -286,18 +285,18 @@ protected:
     })));
   }
 
-  void ExpectIoResult(Network::IoResult expected, Network::IoResult actual,
+  void expectIoResult(Network::IoResult expected, Network::IoResult actual,
                       absl::string_view debug_string) {
     EXPECT_EQ(expected.action_, actual.action_) << debug_string;
     EXPECT_EQ(expected.bytes_processed_, actual.bytes_processed_) << debug_string;
     EXPECT_EQ(expected.end_stream_read_, actual.end_stream_read_) << debug_string;
   }
 
-  void DoHandshakeAndExpectSuccess() {
+  void doHandshakeAndExpectSuccess() {
     // On the client side, get the ClientInit and write it to the server.
     EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
     client_.tsi_socket_->onConnected();
-    ExpectIoResult(client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
+    expectIoResult(client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
                    {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                    "While writing ClientInit.");
     EXPECT_EQ(client_to_server_.toString(), kClientInit);
@@ -306,7 +305,7 @@ protected:
     // ServerFinished to the client.
     EXPECT_CALL(*server_.raw_socket_, doRead(_));
     EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
-    ExpectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
+    expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
                    {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                    "While reading ClientInit.");
     EXPECT_EQ(server_.read_buffer_.length(), 0L);
@@ -317,7 +316,7 @@ protected:
     EXPECT_CALL(*client_.raw_socket_, doRead(_)).Times(2);
     EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
     EXPECT_CALL(client_.callbacks_, raiseEvent(Envoy::Network::ConnectionEvent::Connected));
-    ExpectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+    expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                    client_.tsi_socket_->doRead(client_.read_buffer_),
                    "While reading ServerInit and ServerFinished.");
     EXPECT_EQ(client_.read_buffer_.length(), 0L);
@@ -326,19 +325,19 @@ protected:
     // On the server side, read the ClientFinished.
     EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(2);
     EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
-    ExpectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
+    expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
                    {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                    "While reading ClientFinished.");
     EXPECT_EQ(server_.read_buffer_.toString(), "");
   }
 
-  void ExpectTransferDataFromClientToServer(absl::string_view data) {
+  void expectTransferDataFromClientToServer(absl::string_view data) {
     EXPECT_EQ(server_.read_buffer_.length(), 0);
     EXPECT_EQ(client_.read_buffer_.length(), 0);
     EXPECT_EQ(client_.tsi_socket_->protocol(), "");
     client_.write_buffer_.add(data);
     EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-    ExpectIoResult({Envoy::Network::PostIoAction::KeepOpen, data.size(), false},
+    expectIoResult({Envoy::Network::PostIoAction::KeepOpen, data.size(), false},
                    client_.tsi_socket_->doWrite(client_.write_buffer_, false),
                    "While the client is writing application data.");
     EXPECT_CALL(*server_.raw_socket_, doRead(_))
@@ -348,7 +347,7 @@ protected:
           buffer.move(client_to_server_);
           return result;
         }));
-    ExpectIoResult({Envoy::Network::PostIoAction::KeepOpen, data.size(), true},
+    expectIoResult({Envoy::Network::PostIoAction::KeepOpen, data.size(), true},
                    server_.tsi_socket_->doRead(server_.read_buffer_),
                    "While the server is reading application data.");
     EXPECT_EQ(server_.read_buffer_.toString(), data);
@@ -377,14 +376,14 @@ protected:
 };
 
 TEST_F(TsiSocketTest, DoesNotHaveSsl) {
-  InitializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   EXPECT_EQ(client_.tsi_socket_->ssl(), nullptr);
   EXPECT_FALSE(client_.tsi_socket_->canFlushClose());
   EXPECT_EQ(client_.tsi_socket_->ssl(), nullptr);
 }
 
 TEST_F(TsiSocketTest, EmptyFailureReason) {
-  InitializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   EXPECT_EQ(client_.tsi_socket_->failureReason(), "");
 }
 
@@ -400,7 +399,7 @@ TEST_F(TsiSocketTest, UpstreamHandshakeFactoryFailure) {
   tsi_socket->onConnected();
   // TODO(matthewstevenson88): Investigate whether this should this be close instead of
   // keep open.
-  ExpectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+  expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  tsi_socket->doWrite(client_.write_buffer_, /*end_stream=*/false),
                  "While writing ClientInit.");
 }
@@ -417,37 +416,37 @@ TEST_F(TsiSocketTest, DownstreamHandshakeFactoryFailure) {
   tsi_socket->onConnected();
   // TODO(matthewstevenson88): Investigate whether this should this be close instead of
   // keep open.
-  ExpectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+  expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  tsi_socket->doWrite(client_.write_buffer_, /*end_stream=*/false),
                  "While writing ClientInit.");
 }
 
 TEST_F(TsiSocketTest, HandshakeSuccessAndTransferData) {
-  StartFakeHandshakerService();
-  InitializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
-  DoHandshakeAndExpectSuccess();
-  ExpectTransferDataFromClientToServer(kApplicationData);
+  startFakeHandshakerService();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  doHandshakeAndExpectSuccess();
+  expectTransferDataFromClientToServer(kApplicationData);
 }
 
 TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidation) {
-  StartFakeHandshakerService();
+  startFakeHandshakerService();
   auto validator = [](TsiInfo&, std::string&) { return true; };
-  InitializeSockets(validator, validator);
-  DoHandshakeAndExpectSuccess();
-  ExpectTransferDataFromClientToServer(kApplicationData);
+  initializeSockets(validator, validator);
+  doHandshakeAndExpectSuccess();
+  expectTransferDataFromClientToServer(kApplicationData);
 }
 
 TEST_F(TsiSocketTest, HandshakeSuccessAndFailToUnprotect) {
-  StartFakeHandshakerService();
-  InitializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
-  DoHandshakeAndExpectSuccess();
+  startFakeHandshakerService();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  doHandshakeAndExpectSuccess();
 
   EXPECT_EQ(server_.read_buffer_.length(), 0);
   EXPECT_EQ(client_.read_buffer_.length(), 0);
   EXPECT_EQ(client_.tsi_socket_->protocol(), "");
   client_.write_buffer_.add(kApplicationData);
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  ExpectIoResult({Envoy::Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
+  expectIoResult({Envoy::Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false),
                  "While the client is writing application data.");
   EXPECT_CALL(*server_.raw_socket_, doRead(_))
@@ -459,7 +458,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndFailToUnprotect) {
       }));
   client_to_server_.drain(client_to_server_.length());
   client_to_server_.add("not-an-alts-frame");
-  ExpectIoResult({Envoy::Network::PostIoAction::Close, 0L, true},
+  expectIoResult({Envoy::Network::PostIoAction::Close, 0L, true},
                  server_.tsi_socket_->doRead(server_.read_buffer_),
                  "While the server is reading application data.");
   EXPECT_EQ(server_.read_buffer_.toString(), "");
@@ -468,22 +467,22 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndFailToUnprotect) {
 // TODO(matthewstevenson88): Add test case with unused data.
 
 TEST_F(TsiSocketTest, HandshakeErrorButStreamIsKeptAlive) {
-  StartErrorHandshakerService(/*keep_stream_alive=*/true);
-  InitializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  startErrorHandshakerService(/*keep_stream_alive=*/true);
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   client_.tsi_socket_->onConnected();
   // TODO(matthewstevenson88): Should this be close instead of keep open.
-  ExpectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+  expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
                  "While writing ClientInit.");
   EXPECT_EQ(client_to_server_.toString(), "");
 }
 
 TEST_F(TsiSocketTest, HandshakeErrorButStreamIsNotKeptAlive) {
-  StartErrorHandshakerService(/*keep_stream_alive=*/false);
-  InitializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  startErrorHandshakerService(/*keep_stream_alive=*/false);
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   client_.tsi_socket_->onConnected();
   // TODO(matthewstevenson88): Should this be close instead of keep open.
-  ExpectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+  expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
                  "While writing ClientInit.");
   EXPECT_EQ(client_to_server_.toString(), "");

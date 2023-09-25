@@ -28,24 +28,24 @@ constexpr std::size_t kMinMinorRpcVersion = 1;
 class AltsProxy {
 public:
   static absl::StatusOr<std::unique_ptr<AltsProxy>>
-  Create(std::shared_ptr<grpc::Channel> handshaker_service_channel);
+  create(std::shared_ptr<grpc::Channel> handshaker_service_channel);
 
   ~AltsProxy();
 
   // Sends a StartClientHandshakeReq message to the ALTS handshaker service and
   // returns the response. This API is blocking.
-  absl::StatusOr<grpc::gcp::HandshakerResp> SendStartClientHandshakeReq();
+  absl::StatusOr<grpc::gcp::HandshakerResp> sendStartClientHandshakeReq();
 
   // Sends a StartServerHandshakeReq message to the ALTS handshaker service and
   // returns the response. This API is blocking.
-  absl::StatusOr<grpc::gcp::HandshakerResp> SendStartServerHandshakeReq(absl::string_view in_bytes);
+  absl::StatusOr<grpc::gcp::HandshakerResp> sendStartServerHandshakeReq(absl::string_view in_bytes);
 
   // Sends a NextHandshakeMessageReq message to the ALTS handshaker service and
   // returns the response. This API is blocking.
-  absl::StatusOr<grpc::gcp::HandshakerResp> SendNextHandshakeReq(absl::string_view in_bytes);
+  absl::StatusOr<grpc::gcp::HandshakerResp> sendNextHandshakeReq(absl::string_view in_bytes);
 
 private:
-  static void SetRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions);
+  static void setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions);
 
   AltsProxy(
       std::unique_ptr<grpc::ClientContext> client_context,

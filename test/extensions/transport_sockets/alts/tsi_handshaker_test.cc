@@ -51,7 +51,7 @@ constexpr absl::string_view kKeyData = "fake_key_data_needs_to_be_at_least_44_ch
 constexpr absl::string_view kLocalServiceAccount = "local_service_account";
 constexpr absl::string_view kPeerServiceAccount = "peer_service_account";
 
-void PopulateHandshakeResult(HandshakerResult* result) {
+void populateHandshakeResult(HandshakerResult* result) {
   result->mutable_peer_identity()->set_service_account(kPeerServiceAccount);
   result->mutable_peer_rpc_versions();
   result->mutable_local_identity()->set_service_account(kLocalServiceAccount);
@@ -67,7 +67,7 @@ public:
 
   void onNextDone(NextResultPtr&& result) override { next_result_ = std::move(result); }
 
-  NextResultPtr GetNextResult() { return std::move(next_result_); }
+  NextResultPtr getNextResult() { return std::move(next_result_); }
 
 private:
   NextResultPtr next_result_;
@@ -106,7 +106,7 @@ public:
         if (is_assisting_client) {
           response.set_out_frames(kClientFinished);
         }
-        PopulateHandshakeResult(response.mutable_result());
+        populateHandshakeResult(response.mutable_result());
       } else {
         response.mutable_status()->set_code(
             static_cast<int>(grpc::StatusCode::FAILED_PRECONDITION));
@@ -120,7 +120,7 @@ public:
 
 class AltsTsiHandshakerTest : public Test {
 protected:
-  void StartFakeHandshakerService() {
+  void startFakeHandshakerService() {
     server_address_ = absl::StrCat("[::1]:", 0);
     absl::Notification notification;
     server_thread_ = std::make_unique<std::thread>([this, &notification]() {
@@ -147,7 +147,7 @@ protected:
     }
   }
 
-  std::shared_ptr<grpc::Channel> GetChannel() {
+  std::shared_ptr<grpc::Channel> getChannel() {
     return grpc::CreateChannel(server_address_,
                                grpc::InsecureChannelCredentials()); // NOLINT
   }
@@ -160,8 +160,8 @@ private:
 
 TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
   // Setup.
-  StartFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForClient(GetChannel());
+  startFakeHandshakerService();
+  auto handshaker = AltsTsiHandshaker::CreateForClient(getChannel());
   Event::MockDispatcher dispatcher;
   auto tsi_handshaker = std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
 
@@ -173,7 +173,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
     Buffer::OwnedImpl received_bytes;
     EXPECT_OK(tsi_handshaker->next(received_bytes));
 
-    auto result = capturing_callbacks.GetNextResult();
+    auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
     EXPECT_TRUE(result->status_.ok());
     EXPECT_EQ(result->to_send_->toString(), kClientInit);
@@ -190,7 +190,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
     received_bytes.add(kServerFinished.data(), kServerFinished.size());
     EXPECT_TRUE(tsi_handshaker->next(received_bytes).ok());
 
-    auto result = capturing_callbacks.GetNextResult();
+    auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
     EXPECT_TRUE(result->status_.ok());
     EXPECT_EQ(result->to_send_->toString(), kClientFinished);
@@ -203,8 +203,8 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
 
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   // Setup.
-  StartFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForServer(GetChannel());
+  startFakeHandshakerService();
+  auto handshaker = AltsTsiHandshaker::CreateForServer(getChannel());
   Event::MockDispatcher dispatcher;
   auto tsi_handshaker = std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
 
@@ -217,7 +217,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
     received_bytes.add(kClientInit.data(), kClientInit.size());
     EXPECT_OK(tsi_handshaker->next(received_bytes));
 
-    auto result = capturing_callbacks.GetNextResult();
+    auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
     EXPECT_TRUE(result->status_.ok());
     EXPECT_EQ(result->to_send_->toString(), absl::StrCat(kServerInit, kServerFinished));
@@ -233,7 +233,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
     received_bytes.add(kClientFinished.data(), kClientFinished.size());
     EXPECT_TRUE(tsi_handshaker->next(received_bytes).ok());
 
-    auto result = capturing_callbacks.GetNextResult();
+    auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
     EXPECT_TRUE(result->status_.ok());
     EXPECT_EQ(result->to_send_->toString(), "");

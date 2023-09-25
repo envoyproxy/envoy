@@ -14,13 +14,13 @@ namespace Alts {
 // Manages a pool of gRPC channels to the ALTS handshaker service.
 class AltsChannelPool {
 public:
-  static std::unique_ptr<AltsChannelPool> Create(absl::string_view handshaker_service_address);
+  static std::unique_ptr<AltsChannelPool> create(absl::string_view handshaker_service_address);
 
   // Gets a channel to the ALTS handshaker service. The caller is responsible
   // for checking that the channel is non-null.
-  std::shared_ptr<grpc::Channel> GetChannel() const;
+  std::shared_ptr<grpc::Channel> getChannel() const;
 
-  std::size_t GetChannelPoolSize() const;
+  std::size_t getChannelPoolSize() const;
 
 private:
   explicit AltsChannelPool(const std::vector<std::shared_ptr<grpc::Channel>>& channel_pool);

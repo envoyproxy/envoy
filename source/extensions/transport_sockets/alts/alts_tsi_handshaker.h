@@ -30,19 +30,19 @@ public:
       size_t bytes_to_send_size, std::unique_ptr<AltsHandshakeResult> handshake_result)>;
 
   static std::unique_ptr<AltsTsiHandshaker>
-  CreateForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel);
+  createForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel);
   static std::unique_ptr<AltsTsiHandshaker>
-  CreateForServer(std::shared_ptr<grpc::Channel> handshaker_service_channel);
+  createForServer(std::shared_ptr<grpc::Channel> handshaker_service_channel);
 
   // Get the next ALTS handshake message for the peer.
-  absl::Status Next(void* handshaker, const unsigned char* received_bytes,
+  absl::Status next(void* handshaker, const unsigned char* received_bytes,
                     size_t received_bytes_size, OnNextDone on_next_done);
 
   // Exposed for testing purposes only.
   absl::StatusOr<std::unique_ptr<AltsHandshakeResult>>
-  GetHandshakeResult(const grpc::gcp::HandshakerResult& result, absl::string_view received_bytes,
+  getHandshakeResult(const grpc::gcp::HandshakerResult& result, absl::string_view received_bytes,
                      std::size_t bytes_consumed);
-  static std::size_t ComputeMaxFrameSize(const grpc::gcp::HandshakerResult& result);
+  static std::size_t computeMaxFrameSize(const grpc::gcp::HandshakerResult& result);
 
 private:
   AltsTsiHandshaker(bool is_client, std::shared_ptr<grpc::Channel> handshaker_service_channel);
