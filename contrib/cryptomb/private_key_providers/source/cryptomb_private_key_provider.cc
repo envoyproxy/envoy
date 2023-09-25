@@ -9,6 +9,12 @@
 
 #include "openssl/ssl.h"
 
+extern "C" {
+// NOLINTNEXTLINE(readability-identifier-naming)
+int BN_generate_dsa_nonce(BIGNUM* out, const BIGNUM* range, const BIGNUM* priv,
+                          const unsigned char* message, size_t message_len, BN_CTX* ctx);
+} // extern "C"
+
 namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
@@ -52,8 +58,14 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
   }
   BN_CTX_start(ctx_.get());
   k_ = BN_CTX_get(ctx_.get());
+  int ret = 0;
   do {
-    if (!BN_rand_range(k_, order)) {
+    if (in_len > 0) {
+      ret = BN_generate_dsa_nonce(k_, order, priv_key_, in, in_len, ctx_.get());
+    } else {
+      ret = BN_rand_range(k_, order);
+    }
+    if (!ret) {
       return false;
     }
   } while (BN_is_zero(k_));
