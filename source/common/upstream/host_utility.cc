@@ -247,7 +247,7 @@ void HostUtility::forEachHostGauge(
     // std::pair<absl::string_view, Stats::PrimitiveGaugeReference>
     auto gauges = host.gauges();
 
-    // Add synthentic "healthy" gauge.
+    // Add synthetic "healthy" gauge.
     healthy_gauge.set((host.coarseHealth() == Host::Health::Healthy) ? 1 : 0);
     gauges.emplace_back(absl::string_view("healthy"), healthy_gauge);
     return gauges;
