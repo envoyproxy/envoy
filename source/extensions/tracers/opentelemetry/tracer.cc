@@ -168,7 +168,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   uint64_t trace_id = random_.random();
   new_span.setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
   uint64_t span_id = random_.random();
-  new_span.setId(Hex::uint64ToHex(span_id));
+  new_span.setSpanId(Hex::uint64ToHex(span_id));
 
   if (sampler_) {
     absl::StatusOr<SpanContext> span_context = absl::InvalidArgumentError("no parent span");
@@ -197,12 +197,12 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   Span new_span = Span(config, operation_name, start_time, time_source_, *this);
   new_span.setSampled(previous_span_context.sampled());
   new_span.setTraceId(previous_span_context.traceId());
-  if (!previous_span_context.parentId().empty()) {
-    new_span.setParentId(previous_span_context.parentId());
+  if (!previous_span_context.spanId().empty()) {
+    new_span.setParentId(previous_span_context.spanId());
   }
   // Generate a new identifier for the span id.
   uint64_t span_id = random_.random();
-  new_span.setId(Hex::uint64ToHex(span_id));
+  new_span.setSpanId(Hex::uint64ToHex(span_id));
   // Respect the previous span's sampled flag.
   new_span.setSampled(previous_span_context.sampled());
   if (!previous_span_context.tracestate().empty()) {

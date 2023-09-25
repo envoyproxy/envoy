@@ -14,7 +14,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 /**
- * This class is used to SpanContext extracted from the HTTP traceparent header
+ * This class is used to create a SpanContext extracted from the HTTP traceparent header
  * See https://www.w3.org/TR/trace-context/#traceparent-header.
  */
 class SpanContextExtractor {
