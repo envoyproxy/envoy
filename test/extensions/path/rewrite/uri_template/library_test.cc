@@ -71,6 +71,32 @@ TEST(RewriteTest, BasicUsage) {
   EXPECT_EQ(rewriter->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 }
 
+TEST(RewriteTest, DoubleEqualInWildcard) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.rewrite.uri_template.uri_template_rewriter
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+        path_template_rewrite: "/bar/{country}/{final=**}"
+)EOF";
+
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
+  EXPECT_EQ(rewriter->rewritePath("/bar/en/usa/final==1", "/bar/{country}/{lang}/{final=**}").value(), "/bar/usa/final==1");
+  EXPECT_EQ(rewriter->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
+}
+
+TEST(RewriteTest, DoubleEqual) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.rewrite.uri_template.uri_template_rewriter
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+        path_template_rewrite: "/bar/{country}/{final=**}"
+)EOF";
+
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
+  EXPECT_EQ(rewriter->rewritePath("/bar/en/usa==/final", "/bar/{country}/{lang}/{final=**}").value(), "/bar/usa==/final");
+  EXPECT_EQ(rewriter->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
+}
+
 TEST(RewriteTest, PatternNotMatched) {
   const std::string yaml_string = R"EOF(
       name: envoy.path.rewrite.uri_template.uri_template_rewriter
