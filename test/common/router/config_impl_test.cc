@@ -9419,9 +9419,11 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/one/two/en/gb/ilp==/dGasdA/?key1=test1&key2=test2", "GET");
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/one/two/en/gb/ilp==/dGasdA/?key1=test1&key2=test2", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ("/en/gb/ilp==/dGasdA/?key1=test1&key2=test2", route->currentUrlPathAfterRewrite(headers));
+  EXPECT_EQ("/en/gb/ilp==/dGasdA/?key1=test1&key2=test2",
+            route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/en/gb/ilp==/dGasdA/?key1=test1&key2=test2", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
@@ -9452,14 +9454,14 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/one/two/==na/three", "GET");
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/one/two/==na/three", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ("/==na/three/two", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/==na/three/two", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
-
 
 TEST_F(RouteMatcherTest, PatternMatchRewriteDoubleEqualVariable) {
   const std::string yaml = R"EOF(
@@ -9486,14 +9488,14 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/one/two/=na/three", "GET");
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/one/two/=na/three", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ("/=na/three/two", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/=na/three/two", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
-
 
 TEST_F(RouteMatcherTest, PatternMatchRewriteDoubleEqualInWildcard) {
 
@@ -9521,9 +9523,11 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/one/two/en/gb/ilp/dGasdA==/?key1=test1&key2=test2", "GET");
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/one/two/en/gb/ilp/dGasdA==/?key1=test1&key2=test2", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ("/en/gb/ilp/dGasdA==/?key1=test1&key2=test2", route->currentUrlPathAfterRewrite(headers));
+  EXPECT_EQ("/en/gb/ilp/dGasdA==/?key1=test1&key2=test2",
+            route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/en/gb/ilp/dGasdA==/?key1=test1&key2=test2", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));

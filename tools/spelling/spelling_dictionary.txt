@@ -33,6 +33,7 @@ Bencoded
 CIO
 DFP
 DOM
+Gasd
 GiB
 IPTOS
 Repick
@@ -165,6 +166,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+curr
 eslint
 freeifaddrs
 FUZZER
@@ -176,6 +178,7 @@ dnsresolvers
 endpos
 eps
 fo
+gb
 ghi
 golang
 guarddog
@@ -247,6 +250,7 @@ LF
 LHS
 hls
 iframe
+ilp
 ingressed
 integrations
 iouring
@@ -298,6 +302,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+na
 oghttp
 OID
 OK
@@ -1341,6 +1346,7 @@ transcoder
 transcoding
 transferral
 trds
+tri
 triaged
 trie
 tuple
