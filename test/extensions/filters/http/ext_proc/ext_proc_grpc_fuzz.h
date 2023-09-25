@@ -229,8 +229,9 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
   FuzzedDataProvider downstream_provider(
       reinterpret_cast<const uint8_t*>(input.downstream_data().data()),
       input.downstream_data().size());
-  FuzzedDataProvider ext_proc_provider(
-      reinterpret_cast<const uint8_t*>(input.ext_proc_data().data()), input.ext_proc_data().size());
+  static std::string ext_proc_data = input.ext_proc_data();
+  static FuzzedDataProvider ext_proc_provider(
+      reinterpret_cast<const uint8_t*>(ext_proc_data.data()), ext_proc_data.size());
 
   static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
   static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
