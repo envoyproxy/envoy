@@ -762,8 +762,8 @@ googleapis-common-protos==1.59.1 \
     --hash=sha256:0cbedb6fb68f1c07e18eb4c48256320777707e7d0c55063ae56c15db3224a61e \
     --hash=sha256:b35d530fe825fb4227857bc47ad84c33c809ac96f312e13182bdeaa2abe1178a
     # via google-api-core
-gsutil==5.25 \
-    --hash=sha256:7e4cb7fa9a332c401e4b7f5fef1da3e9ef21e3e4885de6d007b07a11b5d0524a
+gsutil==5.26 \
+    --hash=sha256:cb18b8d2067d9a9e45c99b7614e241c173632eb66b7d3cb007979d6aee7146cf
     # via -r requirements.in
 httplib2==0.20.4 \
     --hash=sha256:58a98e45b4b1a48273073f905d2961666ecf0fbac4250ea5b47aef259eb5c585 \

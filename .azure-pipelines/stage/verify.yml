@@ -22,7 +22,7 @@ jobs:
       itemPattern: "distribution/x64/packages.x64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: verify_distro
       cacheName: verify_distro
@@ -43,7 +43,7 @@ jobs:
       itemPattern: "distribution/arm64/packages.arm64.tar.gz"
       downloadType: single
       targetPath: $(Build.StagingDirectory)
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       managedAgent: false
       ciTarget: verify_distro

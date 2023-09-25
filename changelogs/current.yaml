@@ -283,6 +283,12 @@ new_features:
     added :ref:`dynamic_forward_proxy <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig>`
     UDP session filter that can be used to have dynamic forward proxy UDP flows, when used in conjunction with another session filter
     that sets required filter state values.
+- area: zookeeper
+  change: |
+    added support for emitting per opcode request bytes metrics via :ref:`enable_per_opcode_request_bytes_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>`.
+    added support for emitting per opcode response bytes metrics via :ref:`enable_per_opcode_response_bytes_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>`.
 - area: tls
   change: |
     added fallback :ref:`fallback
@@ -295,7 +301,6 @@ new_features:
   change: |
     added the support to detect and send TCP RST for raw buffer socket based connections. This is currently supported on Linux only.
     It can be disabled by the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
-
 - area: upstream
   change: |
     Added the ability to specify a custom upstream local address selector using
