@@ -9,11 +9,18 @@
 
 #include "test/benchmark/main.h"
 #include "test/common/stats/real_thread_test_base.h"
+#include "test/mocks/upstream/cluster_manager.h"
 
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Server {
+
+// Override the one method used by this test so that using a mock doesn't affect performance.
+class FastMockClusterManager : public testing::StrictMock<Upstream::MockClusterManager> {
+public:
+  ClusterInfoMaps clusters() const override { return ClusterInfoMaps{}; }
+};
 
 class StatsHandlerTest : public Stats::ThreadLocalRealThreadsMixin {
 public:
@@ -81,7 +88,7 @@ public:
   uint64_t handlerStats(const StatsParams& params) {
     Buffer::OwnedImpl data;
     if (params.format_ == StatsFormat::Prometheus) {
-      StatsHandler::prometheusRender(*store_, custom_namespaces_, params, data);
+      StatsHandler::prometheusRender(*store_, custom_namespaces_, cm_, params, data);
       return data.length();
     }
     Admin::RequestPtr request = StatsHandler::makeRequest(*store_, params);
@@ -99,6 +106,7 @@ public:
 
   std::vector<Stats::ScopeSharedPtr> scopes_;
   Envoy::Stats::CustomStatNamespacesImpl custom_namespaces_;
+  FastMockClusterManager cm_;
 };
 
 } // namespace Server

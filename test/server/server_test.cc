@@ -59,6 +59,7 @@ namespace {
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
+  NiceMock<Upstream::MockClusterManager> cm;
   Stats::TestUtil::TestStore store;
   Event::SimulatedTimeSystem time_system;
   Stats::Counter& c = store.counter("hello");
@@ -68,7 +69,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   store.textReadout("text").set("is important");
 
   std::list<Stats::SinkPtr> sinks;
-  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
   // Make sure that counters have been latched even if there are no sinks.
   EXPECT_EQ(1UL, c.value());
   EXPECT_EQ(0, c.latch());
@@ -89,7 +90,7 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.textReadouts()[0].get().value(), "is important");
   }));
   c.inc();
-  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 
   // Histograms don't currently work with the isolated store so test those with a mock store.
   NiceMock<Stats::MockStore> mock_store;
@@ -111,12 +112,13 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.histograms().size(), 1);
     EXPECT_TRUE(snapshot.textReadouts().empty());
   }));
-  InstanceUtil::flushMetricsToSinks(sinks, mock_store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, mock_store, cm, time_system);
 }
 
 TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
   InSequence s;
 
+  NiceMock<Upstream::MockClusterManager> cm;
   Stats::TestUtil::TestStore store;
   Event::SimulatedTimeSystem time_system;
   Stats::Counter& c = store.counter("hello");
@@ -125,7 +127,7 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
   store.gauge("again", Stats::Gauge::ImportMode::Uninitialized).set(10);
 
   std::list<Stats::SinkPtr> sinks;
-  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
   // Make sure that counters have been latched even if there are no sinks.
   EXPECT_EQ(1UL, c.value());
   EXPECT_EQ(0, c.latch());
@@ -155,7 +157,7 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
     ASSERT_EQ(snapshot.textReadouts().size(), 0);
   }));
   c.inc();
-  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
 
 class RunHelperTest : public testing::Test {

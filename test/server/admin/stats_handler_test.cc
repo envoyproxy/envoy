@@ -84,6 +84,7 @@ public:
     EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
     EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
+    EXPECT_CALL(instance, clusterManager()).Times(testing::AtLeast(0));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
     request_headers_.setPath(url);

@@ -148,6 +148,7 @@ envoy_cc_benchmark_binary(
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:admin_lib",
         "//test/common/stats:real_thread_test_base",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
