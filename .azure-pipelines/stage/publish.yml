@@ -104,7 +104,7 @@ jobs:
       artifactName: "release"
       itemPattern: "release/**/bin/*"
       targetPath: $(Build.StagingDirectory)
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: docker-upload
       cacheName: docker-upload
@@ -155,7 +155,7 @@ jobs:
       artifactName: "release"
       itemPattern: "release/x64/bin/*"
       targetPath: $(Build.StagingDirectory)
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: distribution
       cacheName: distribution
@@ -189,7 +189,7 @@ jobs:
       itemPattern: "release/arm64/bin/*"
       targetPath: $(Build.StagingDirectory)
 
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       managedAgent: false
       ciTarget: distribution
@@ -221,7 +221,7 @@ jobs:
   pool:
     vmImage: $(agentUbuntu)
   steps:
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: docs
       cacheName: docs
@@ -310,7 +310,7 @@ jobs:
       artifactName: "distribution"
       itemPattern: "distribution/**/packages.*.tar.gz"
       targetPath: $(Build.StagingDirectory)
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: release.signed
       cacheName: release-signed
@@ -354,7 +354,7 @@ jobs:
   pool:
     vmImage: $(agentUbuntu)
   steps:
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
       ciTarget: verify.trigger
       cacheName: verify-trigger
