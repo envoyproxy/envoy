@@ -116,6 +116,7 @@ void ValidationInstance::initialize(const Options& options,
   thread_local_.registerThread(*dispatcher_, true);
 
   runtime_ = component_factory.createRuntime(*this, initial_config);
+  drain_manager_ = component_factory.createDrainManager(*this);
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
