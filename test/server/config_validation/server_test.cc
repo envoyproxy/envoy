@@ -210,6 +210,8 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 
   ValidationListenerComponentFactory listener_component_factory(server);
   listener_component_factory.getTcpListenerConfigProviderManager();
+
+  EXPECT_NE(server.drainManager(), nullptr);
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
