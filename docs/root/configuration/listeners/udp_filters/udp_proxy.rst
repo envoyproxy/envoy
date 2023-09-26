@@ -74,6 +74,28 @@ remaining datagrams to different clusters according to their source ports.
    :lines: 14-53
    :caption: :download:`udp-proxy-router.yaml <_include/udp-proxy-router.yaml>`
 
+Session filters
+---------------
+
+The UDP proxy is able to apply :ref:`session filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>`.
+These kinds of filters run seprately on each upstream UDP session and support a more granular API that allows running operations only
+at the start of an upstream UDP session, when a UDP datagram is received from the downstream and when a UDP datagram is received from the
+upstream, similar to network filters.
+
+.. note::
+  When using session filters, choosing the upstream host only happens after completing the ``onNewSession()`` iteration for all
+  the filters in the chain. This allows choosing the host based on decisions made in one of the session filters, and prevents the
+  creation of upstream sockets in cases where one of the filters stopped the filter chain.
+  Additionally, since :ref:`per packet load balancing <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing>` require
+  choosing the upstream host for each received datagram, session filters can't be used when this option is enabled.
+
+Envoy has the following builtin UDP session filters.
+
+.. toctree::
+  :maxdepth: 2
+
+  session_filters/http_capsule
+
 Example configuration
 ---------------------
 

@@ -16,6 +16,13 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.opencensus",
 ]
 
+NO_HTTP3_SKIP_TARGETS = [
+    "envoy.quic.crypto_stream.server.quiche",
+    "envoy.quic.deterministic_connection_id_generator",
+    "envoy.quic.crypto_stream.server.quiche",
+    "envoy.quic.proof_source.filter_chain",
+]
+
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
 def _build_all_content(exclude = []):
@@ -253,7 +260,9 @@ def envoy_dependencies(skip_targets = []):
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
+    _toolshed()
     _com_github_axboe_liburing()
+    _com_github_bazel_buildtools()
     _com_github_c_ares_c_ares()
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
@@ -355,6 +364,11 @@ def envoy_dependencies(skip_targets = []):
         actual = "@bazel_tools//tools/cpp/runfiles",
     )
 
+def _toolshed():
+    external_http_archive(
+        name = "envoy_toolshed",
+    )
+
 def _boringssl():
     external_http_archive(
         name = "boringssl",
@@ -387,7 +401,14 @@ def _com_github_axboe_liburing():
     )
     native.bind(
         name = "uring",
-        actual = "@envoy//bazel/foreign_cc:liburing",
+        actual = "@envoy//bazel/foreign_cc:liburing_linux",
+    )
+
+def _com_github_bazel_buildtools():
+    # TODO(phlax): Add binary download
+    #  cf: https://github.com/bazelbuild/buildtools/issues/367
+    external_http_archive(
+        name = "com_github_bazelbuild_buildtools",
     )
 
 def _com_github_c_ares_c_ares():
@@ -1281,7 +1302,7 @@ filegroup(
     srcs = glob([
         "dlb/libdlb/**",
     ]),
-    visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
+    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
 )
 """,
     )

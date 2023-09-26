@@ -1,3 +1,5 @@
+#pragma once
+
 #include "library/cc/bridge_utility.h"
 #include "library/cc/direct_response_testing.h"
 #include "library/cc/engine_builder.h"

@@ -401,6 +401,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
+      disable_stateful_session_resumption_(config.disable_stateful_session_resumption()),
       full_scan_certs_on_sni_mismatch_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, full_scan_certs_on_sni_mismatch,
           !Runtime::runtimeFeatureEnabled(

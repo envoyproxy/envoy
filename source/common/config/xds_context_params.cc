@@ -53,7 +53,7 @@ void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
   UNREFERENCED_PARAMETER(params);
   UNREFERENCED_PARAMETER(metadata);
   UNREFERENCED_PARAMETER(prefix);
-  throw EnvoyException("JSON/YAML support compiled out");
+  IS_ENVOY_BUG("JSON/YAML support compiled out");
 #endif
 }
 

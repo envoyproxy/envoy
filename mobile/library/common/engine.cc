@@ -236,7 +236,7 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
 }
 
 Envoy::Buffer::OwnedImpl Engine::dumpStats() {
-  ASSERT(dispatcher_->isThreadSafe(), "flushStats must be called from the dispatcher's context");
+  ASSERT(dispatcher_->isThreadSafe(), "dumpStats must be called from the dispatcher's context");
 
   Envoy::Buffer::OwnedImpl instance;
   handlerStats(server_->stats(), instance);

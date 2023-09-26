@@ -643,10 +643,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
-  return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
-                               *Http::StaticEmptyHeaders::get().response_headers,
-                               *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                               absl::string_view(), AccessLog::AccessLogType::NotSet);
+  return hostname_fmt_->formatWithContext({}, stream_info);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -753,6 +750,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
       disableIdleTimer();
     }
   }
+
   if (generic_conn_pool_) {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
@@ -797,6 +795,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         establishUpstreamConnection();
       }
     } else {
+      // TODO(botengyao): propagate RST back to downstream connection if RST is received.
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       }

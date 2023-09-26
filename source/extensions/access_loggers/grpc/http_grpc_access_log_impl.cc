@@ -42,7 +42,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
   for (const auto& header : config_->additional_response_trailers_to_log()) {
     response_trailers_to_log_.emplace_back(header);
   }
-  Envoy::Config::Utility::checkTransportVersion(config_->common_config());
+  THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(config_->common_config()));
   tls_slot_->set(
       [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
         return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(

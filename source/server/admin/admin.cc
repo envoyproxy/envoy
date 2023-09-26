@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -82,6 +84,27 @@ std::vector<absl::string_view> prepend(const absl::string_view first,
   strings.insert(strings.begin(), first);
   return strings;
 }
+
+Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
+    [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
+  Http::HeaderValidatorFactoryPtr header_validator_factory;
+#ifdef ENVOY_ENABLE_UHV
+  // Default UHV config matches the admin HTTP validation and normalization config
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig uhv_config;
+
+  ::envoy::config::core::v3::TypedExtensionConfig config;
+  config.set_name("default_universal_header_validator_for_admin");
+  config.mutable_typed_config()->PackFrom(uhv_config);
+
+  auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(config);
+  ENVOY_BUG(factory != nullptr, "Default UHV is not linked into binary.");
+
+  header_validator_factory = factory->createFromProto(config.typed_config(), context);
+  ENVOY_BUG(header_validator_factory != nullptr, "Unable to create default UHV.");
+#endif
+  return header_validator_factory;
+}
+
 } // namespace
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
@@ -228,7 +251,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
       local_reply_(LocalReply::Factory::createDefault()),
-      ignore_global_conn_limit_(ignore_global_conn_limit) {
+      ignore_global_conn_limit_(ignore_global_conn_limit),
+      header_validator_factory_(createHeaderValidatorFactory(server.serverFactoryContext())) {
 #ifndef NDEBUG
   // Verify that no duplicate handlers exist.
   absl::flat_hash_set<absl::string_view> handlers;
@@ -492,6 +516,24 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
     handler->addListener(absl::nullopt, *listener_, server_.runtime());
   }
 }
+
+#ifdef ENVOY_ENABLE_UHV
+::Envoy::Http::HeaderValidatorStats&
+AdminImpl::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) {
+  switch (protocol) {
+  case Http::Protocol::Http10:
+  case Http::Protocol::Http11:
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *server_.stats().rootScope());
+  case Http::Protocol::Http3:
+    IS_ENVOY_BUG("HTTP/3 is not supported for admin UI");
+    // Return H/2 stats object, since we do not have H/3 stats.
+    ABSL_FALLTHROUGH_INTENDED;
+  case Http::Protocol::Http2:
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *server_.stats().rootScope());
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+#endif
 
 } // namespace Server
 } // namespace Envoy

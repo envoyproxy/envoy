@@ -139,9 +139,9 @@ public:
 private:
   std::array<char, 4> file_id_;
   std::array<char, 4> cache_version_id_;
-  uint32_t header_size_;
-  uint32_t trailer_size_;
-  uint64_t body_size_;
+  uint32_t header_size_{0};
+  uint32_t trailer_size_{0};
+  uint64_t body_size_{0};
 };
 
 } // namespace FileSystemHttpCache

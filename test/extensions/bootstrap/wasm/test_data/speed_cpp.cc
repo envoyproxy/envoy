@@ -138,28 +138,28 @@ std::string check_compiler;
 
 void (*test_fn)() = nullptr;
 
-void empty_test() {}
+void emptyTest() {}
 
-void get_current_time_test() {
+void getCurrentTimeTest() {
   uint64_t t;
   if (WasmResult::Ok != proxy_get_current_time_nanoseconds(&t)) {
     logError("bad result from getCurrentTimeNanoseconds");
   }
 }
 
-void small_string_check_compiler_test() {
+void smallStringCheckCompilerTest() {
   check_compiler = "foo";
   check_compiler += "bar";
   check_compiler = "";
 }
 
-void small_string_test() {
+void smallStringTest() {
   std::string s = "foo";
   s += "bar";
   xDoNotRemove = s.size();
 }
 
-void small_string_check_compiler1000_test() {
+void smallStringCheckCompiler1000Test() {
   for (int x = 0; x < 1000; x++) {
     check_compiler = "foo";
     check_compiler += "bar";
@@ -167,7 +167,7 @@ void small_string_check_compiler1000_test() {
   check_compiler = "";
 }
 
-void small_string1000_test() {
+void smallString1000Test() {
   for (int x = 0; x < 1000; x++) {
     std::string s = "foo";
     s += "bar";
@@ -175,14 +175,14 @@ void small_string1000_test() {
   }
 }
 
-void large_string_test() {
+void largeStringTest() {
   std::string s(1024, 'f');
   std::string d(1024, 'o');
   s += d;
   xDoNotRemove += s.size();
 }
 
-void large_string1000_test() {
+void largeString1000Test() {
   for (int x = 0; x < 1000; x++) {
     std::string s(1024, 'f');
     std::string d(1024, 'o');
@@ -191,7 +191,7 @@ void large_string1000_test() {
   }
 }
 
-void get_property_test() {
+void getPropertyTest() {
   std::string property = "plugin_root_id";
   const char* value_ptr = nullptr;
   size_t value_size = 0;
@@ -202,7 +202,7 @@ void get_property_test() {
   ::free(reinterpret_cast<void*>(const_cast<char*>(value_ptr)));
 }
 
-void grpc_service_test() {
+void grpcServiceTest() {
   std::string value = "foo";
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name(value);
@@ -210,7 +210,7 @@ void grpc_service_test() {
   grpc_service.SerializeToString(&grpc_service_string);
 }
 
-void grpc_service1000_test() {
+void grpcService1000Test() {
   std::string value = "foo";
   for (int x = 0; x < 1000; x++) {
     GrpcService grpc_service;
@@ -220,7 +220,7 @@ void grpc_service1000_test() {
   }
 }
 
-void modify_metadata_test() {
+void modifyMetadataTest() {
   auto path = getRequestHeader(":path");
   addRequestHeader("newheader", "newheadervalue");
   auto server = getRequestHeader("server");
@@ -229,7 +229,7 @@ void modify_metadata_test() {
   removeRequestHeader("newheader");
 }
 
-void modify_metadata1000_test() {
+void modifyMetadata1000Test() {
   for (int x = 0; x < 1000; x++) {
     auto path = getRequestHeader(":path");
     addRequestHeader("newheader", "newheadervalue");
@@ -240,25 +240,25 @@ void modify_metadata1000_test() {
   }
 }
 
-void json_serialize_test() {
+void jsonSerializeTest() {
   google::protobuf::Struct proto;
   google::protobuf::util::JsonStringToMessage(test_json, &proto).IgnoreError();
 }
 
-void json_deserialize_test() {
+void jsonDeserializeTest() {
   std::string json;
   google::protobuf::util::MessageToJsonString(test_proto, &json).IgnoreError();
   xDoNotRemove += json.size();
 }
 
-void json_deserialize_empty_test() {
+void jsonDeserializeEmptyTest() {
   std::string json;
   google::protobuf::Struct empty;
   google::protobuf::util::MessageToJsonString(empty, &json).IgnoreError();
   xDoNotRemove = json.size();
 }
 
-void convert_to_filter_state_test() {
+void convertToFilterStateTest() {
   auto start = reinterpret_cast<const uint8_t*>(&*test_json.begin());
   auto end = start + test_json.size();
   std::string encoded_json = base64Encode(start, end);
@@ -278,40 +278,40 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t, uint32_t configuration_size)
                          &size);
   std::string configuration(configuration_ptr, size);
   if (configuration == "empty") {
-    test_fn = &empty_test;
+    test_fn = &emptyTest;
   } else if (configuration == "get_current_time") {
-    test_fn = &get_current_time_test;
+    test_fn = &getCurrentTimeTest;
   } else if (configuration == "small_string") {
-    test_fn = &small_string_test;
+    test_fn = &smallStringTest;
   } else if (configuration == "small_string1000") {
-    test_fn = &small_string1000_test;
+    test_fn = &smallString1000Test;
   } else if (configuration == "small_string_check_compiler") {
-    test_fn = &small_string_check_compiler_test;
+    test_fn = &smallStringCheckCompilerTest;
   } else if (configuration == "small_string_check_compiler1000") {
-    test_fn = &small_string_check_compiler1000_test;
+    test_fn = &smallStringCheckCompiler1000Test;
   } else if (configuration == "large_string") {
-    test_fn = &large_string_test;
+    test_fn = &largeStringTest;
   } else if (configuration == "large_string1000") {
-    test_fn = &large_string1000_test;
+    test_fn = &largeString1000Test;
   } else if (configuration == "get_property") {
-    test_fn = &get_property_test;
+    test_fn = &getPropertyTest;
   } else if (configuration == "grpc_service") {
-    test_fn = &grpc_service_test;
+    test_fn = &grpcServiceTest;
   } else if (configuration == "grpc_service1000") {
-    test_fn = &grpc_service1000_test;
+    test_fn = &grpcService1000Test;
   } else if (configuration == "modify_metadata") {
-    test_fn = &modify_metadata_test;
+    test_fn = &modifyMetadataTest;
   } else if (configuration == "modify_metadata1000") {
-    test_fn = &modify_metadata1000_test;
+    test_fn = &modifyMetadata1000Test;
   } else if (configuration == "json_serialize") {
-    test_fn = &json_serialize_test;
+    test_fn = &jsonSerializeTest;
   } else if (configuration == "json_deserialize") {
     google::protobuf::util::JsonStringToMessage(test_json, &test_proto).IgnoreError();
-    test_fn = &json_deserialize_test;
+    test_fn = &jsonDeserializeTest;
   } else if (configuration == "json_deserialize_empty") {
-    test_fn = &json_deserialize_empty_test;
+    test_fn = &jsonDeserializeEmptyTest;
   } else if (configuration == "convert_to_filter_state") {
-    test_fn = &convert_to_filter_state_test;
+    test_fn = &convertToFilterStateTest;
   } else {
     std::string message = "on_start " + configuration;
     proxy_log(LogLevel::info, message.c_str(), message.size());

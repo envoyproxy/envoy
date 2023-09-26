@@ -1,3 +1,5 @@
+#pragma once
+
 // NOLINT(namespace-envoy)
 constexpr char TEST_SAN_WILDCARD_DNS_CERT_256_HASH[] =
     "5467d580cb0d3cfd3406fe8f81dfdf539f4d3f1f11350d0a9a343aae17a2793a";

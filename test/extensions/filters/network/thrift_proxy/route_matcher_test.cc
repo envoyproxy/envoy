@@ -26,7 +26,7 @@ public:
 protected:
   RouteMatcher createMatcher(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& route) {
-    return RouteMatcher(route, absl::nullopt);
+    return {route, absl::nullopt};
   }
 
   RouteMatcher createMatcher(const std::string& yaml) {

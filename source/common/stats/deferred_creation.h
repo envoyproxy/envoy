@@ -49,7 +49,7 @@ public:
       getOrCreateHelper();
     }
   }
-  ~DeferredStats() {
+  ~DeferredStats() override {
     if (ctor_ == nullptr) {
       initialized_.dec();
     }

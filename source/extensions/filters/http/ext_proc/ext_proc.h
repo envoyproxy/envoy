@@ -246,7 +246,8 @@ public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client,
          const envoy::config::core::v3::GrpcService& grpc_service)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        grpc_service_(grpc_service), decoding_state_(*this, config->processingMode()),
+        grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
+        decoding_state_(*this, config->processingMode()),
         encoding_state_(*this, config->processingMode()) {}
 
   const FilterConfig& config() const { return *config_; }
@@ -278,10 +279,16 @@ public:
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
 
-  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
-                     ProcessorState::CallbackState new_state, bool end_stream);
+  envoy::service::ext_proc::v3::ProcessingRequest
+  setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
+  void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
+                     envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+  bool inHeaderProcessState() {
+    return (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
+            encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
+  }
 
 private:
   void mergePerRouteConfig();
@@ -295,7 +302,7 @@ private:
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   // Return a pair of whether to terminate returning the current result.
-  std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state, bool end_stream);
+  std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 
@@ -304,6 +311,7 @@ private:
   ExtProcFilterStats stats_;
   ExtProcLoggingInfo* logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
 
   // The state of the filter on both the encoding and decoding side.
   DecodingProcessorState decoding_state_;

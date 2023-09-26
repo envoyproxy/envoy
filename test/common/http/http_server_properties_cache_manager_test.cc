@@ -8,8 +8,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace Http {
 

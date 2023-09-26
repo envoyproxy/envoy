@@ -158,6 +158,15 @@ CAPIStatus envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer_ptr
       });
 }
 
+CAPIStatus envoyGoFilterHttpDrainBuffer(void* r, unsigned long long int buffer_ptr,
+                                        uint64_t length) {
+  return envoyGoFilterHandlerWrapper(
+      r, [buffer_ptr, length](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
+        return filter->drainBuffer(buffer, length);
+      });
+}
+
 CAPIStatus envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buffer_ptr, void* data,
                                             int length, bufferAction action) {
   return envoyGoFilterHandlerWrapper(
@@ -266,6 +275,15 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key, void* value
                                        auto value_str = reinterpret_cast<GoString*>(value);
                                        return filter->getStringFilterState(key_str, value_str);
                                      });
+}
+
+CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key, void* value, int* rc) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key, value, rc](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto key_str = referGoString(key);
+        auto value_str = reinterpret_cast<GoString*>(value);
+        return filter->getStringProperty(key_str, value_str, rc);
+      });
 }
 
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name,

@@ -89,6 +89,10 @@ def modify_compile_command(target, args):
         # old-style "-I".
         options = options.replace("-iquote ", "-I ")
 
+    if args.system_clang:
+        if cc.find("clang"):
+            cc = "clang++"
+
     if is_header(target["file"]):
         options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
         options += " -Wno-unused-function"
@@ -118,6 +122,12 @@ if __name__ == "__main__":
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
     parser.add_argument('--exclude_contrib', action='store_true')
+    parser.add_argument(
+        '--system-clang',
+        action='store_true',
+        help=
+        'Use `clang++` instead of the bazel wrapper for commands. This may help if `clangd` cannot find/run the tools.'
+    )
     parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
         'bazel_targets', nargs='*', default=[

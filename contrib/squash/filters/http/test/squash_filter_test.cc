@@ -17,7 +17,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -34,10 +33,10 @@ SquashFilterConfig constructSquashFilterConfigFromYaml(
     const std::string& yaml, NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {
   envoy::extensions::filters::http::squash::v3::Squash proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  return SquashFilterConfig(proto_config, context.cluster_manager_);
+  return {proto_config, context.cluster_manager_};
 }
 
-void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
+void expectJsonEq(const std::string& expected, const std::string& actual) {
   ProtobufWkt::Struct actualjson;
   TestUtility::loadFromJson(actual, actualjson);
 
@@ -64,7 +63,7 @@ TEST(SquashFilterConfigTest, V2ApiConversion) {
 
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_EQ("fake_cluster", config.clusterName());
-  EXPECT_JSON_EQ("{\"a\":\"b\"}", config.attachmentJson());
+  expectJsonEq("{\"a\":\"b\"}", config.attachmentJson());
   EXPECT_EQ(std::chrono::milliseconds(1001), config.requestTimeout());
   EXPECT_EQ(std::chrono::milliseconds(2002), config.attachmentPollPeriod());
   EXPECT_EQ(std::chrono::milliseconds(3003), config.attachmentTimeout());
@@ -95,7 +94,7 @@ TEST(SquashFilterConfigTest, ParsesEnvironment) {
   factory_context.cluster_manager_.initializeClusters({"squash"}, {});
 
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+  expectJsonEq(expected_json, config.attachmentJson());
 }
 
 TEST(SquashFilterConfigTest, ParsesAndEscapesEnvironment) {
@@ -112,7 +111,7 @@ TEST(SquashFilterConfigTest, ParsesAndEscapesEnvironment) {
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   factory_context.cluster_manager_.initializeClusters({"squash"}, {});
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+  expectJsonEq(expected_json, config.attachmentJson());
 }
 
 TEST(SquashFilterConfigTest, TwoEnvironmentVariables) {
@@ -130,7 +129,7 @@ TEST(SquashFilterConfigTest, TwoEnvironmentVariables) {
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   factory_context.cluster_manager_.initializeClusters({"squash"}, {});
   auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+  expectJsonEq(expected_json, config.attachmentJson());
 }
 
 TEST(SquashFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
@@ -149,7 +148,7 @@ TEST(SquashFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   factory_context.cluster_manager_.initializeClusters({"squash"}, {});
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+  expectJsonEq(expected_json, config.attachmentJson());
 }
 
 class SquashFilterTest : public testing::Test {
