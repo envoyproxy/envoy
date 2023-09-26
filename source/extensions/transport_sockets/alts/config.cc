@@ -30,7 +30,7 @@ namespace {
 class AltsSharedState : public Singleton::Instance {
 public:
   explicit AltsSharedState(absl::string_view handshaker_service_address)
-      : channel_pool_(AltsChannelPool::Create(handshaker_service_address)) {}
+      : channel_pool_(AltsChannelPool::create(handshaker_service_address)) {}
 
   ~AltsSharedState() override = default;
 
