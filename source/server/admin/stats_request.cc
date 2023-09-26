@@ -1,4 +1,5 @@
 #include "source/server/admin/stats_request.h"
+#include "source/common/upstream/host_utility.h"
 
 #ifdef ENVOY_ADMIN_HTML
 #include "source/server/admin/stats_html_render.h"
@@ -8,8 +9,8 @@ namespace Envoy {
 namespace Server {
 
 StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
-                           UrlHandlerFn url_handler_fn)
-    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {
+                           Upstream::ClusterManager& cm, UrlHandlerFn url_handler_fn)
+    : params_(params), stats_(stats), cm_(cm), url_handler_fn_(url_handler_fn) {
   switch (params_.type_) {
   case StatsType::TextReadouts:
   case StatsType::All:
@@ -92,6 +93,8 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
         startPhase();
         break;
       case Phase::CountersAndGauges:
+        renderPerHostMetrics(response);
+
         phase_ = Phase::Histograms;
         phase_string_ = "Histograms";
         startPhase();
@@ -209,6 +212,15 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
     scope->iterate(check_stat);
   }
+}
+
+void StatsRequest::renderPerHostMetrics(Buffer::Instance& response) {
+  Upstream::HostUtility::forEachHostCounter(cm_, [&](Stats::PrimitiveCounterSnapshot&& metric) {
+    render_->generate(response, metric.name(), metric.value());
+  });
+  Upstream::HostUtility::forEachHostGauge(cm_, [&](Stats::PrimitiveGaugeSnapshot&& metric) {
+    render_->generate(response, metric.name(), metric.value());
+  });
 }
 
 template <class SharedStatType>

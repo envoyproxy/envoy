@@ -39,7 +39,7 @@ public:
 
   static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
 
-  StatsRequest(Stats::Store& stats, const StatsParams& params,
+  StatsRequest(Stats::Store& stats, const StatsParams& params, Upstream::ClusterManager& cm,
                UrlHandlerFn url_handler_fn = nullptr);
 
   // Admin::Request
@@ -92,6 +92,8 @@ public:
   // duplication.
   template <class StatType> void populateStatsFromScopes(const ScopeVec& scope_vec);
 
+  void renderPerHostMetrics(Buffer::Instance& response);
+
   // Renders the templatized type, exploiting the fact that Render::generate is
   // generic to avoid code duplication.
   template <class SharedStatType>
@@ -110,6 +112,7 @@ private:
   uint64_t phase_stat_count_{0};
   absl::string_view phase_string_{"text readouts"};
   Buffer::OwnedImpl response_;
+  Upstream::ClusterManager& cm_;
   UrlHandlerFn url_handler_fn_;
   uint64_t chunk_size_{DefaultChunkSize};
 };
