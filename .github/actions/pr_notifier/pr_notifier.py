@@ -17,7 +17,9 @@ import datetime
 import os
 import sys
 
+import requests
 import github
+import icalendar
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
@@ -226,8 +228,31 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
             text=(
                 "*Untriaged Issues* (please tag and cc area experts)\n<%s|%s>" %
                 (issue_link, issue_link)))
+        # On Monday, post the new oncall.
+        if datetime.date.today().weekday() == 0:
+            oncall = parse_calendar()
+            client.chat_postMessage(channel='#envoy-maintainer-oncall', text=(oncall))
+            client.chat_postMessage(channel='#general', text=(oncall))
     except SlackApiError as e:
         print("Unexpected error %s", e.response["error"])
+
+
+def parse_calendar():
+    e = requests.get(
+        "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
+    )
+    ecal = icalendar.Calendar.from_ical(e.text)
+
+    now = datetime.datetime.now()
+    sunday = now - datetime.timedelta(days=now.weekday() + 1)
+
+    for component in ecal.walk():
+        if component.name == "VEVENT":
+            if (sunday.date() == component.decoded("dtstart").date()):
+                e.close()
+                return component.get("summary")
+    e.close()
+    return "unable to find this week's oncall"
 
 
 if __name__ == '__main__':
