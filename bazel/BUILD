@@ -1,6 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("@envoy_api//bazel:utils.bzl", "json_data")
+load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
