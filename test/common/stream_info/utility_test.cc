@@ -347,6 +347,15 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
   }
 }
 
+TEST(ProxyStatusFromStreamInfo, TestUpstreamRequestTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "false"}});
+  NiceMock<MockStreamInfo> stream_info;
+  ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout)).WillByDefault(Return(true));
+  EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), ProxyStatusError::ConnectionTimeout);
+}
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy
