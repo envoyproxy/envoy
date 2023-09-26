@@ -39,9 +39,6 @@ parameters:
 - name: authGPGKey
   type: string
   default: ""
-- name: authNetlifyURL
-  type: string
-  default: ""
 - name: authDockerUser
   type: string
   default: ""
@@ -246,28 +243,6 @@ jobs:
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
           DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
           DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
-
-      # Trigger Netlify rebuild of latest docs
-      - script: |
-          ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
-        displayName: "Upload Docs to GCS"
-        condition: |
-          and(not(canceled()),
-              eq(${{ parameters.publishDocsLatest }}, 'true'))
-        env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-      - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-publish-latest'
-        condition: |
-          and(not(canceled()),
-              eq(${{ parameters.publishDocsLatest }}, 'true'))
-        displayName: "Publish latest docs"
-        workingDirectory: $(Build.SourcesDirectory)
-        env:
-          NETLIFY_TRIGGER_URL: ${{ parameters.authNetlifyURL }}
 
       # Publish docs to the website
       - task: InstallSSHKey@0
