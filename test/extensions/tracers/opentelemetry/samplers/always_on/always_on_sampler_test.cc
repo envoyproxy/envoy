@@ -24,7 +24,7 @@ TEST(AlwaysOnSamplerTest, test) {
                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
     EXPECT_EQ(sampling_result.decision, Decision::RECORD_AND_SAMPLE);
     EXPECT_EQ(sampling_result.attributes, nullptr);
-    EXPECT_STREQ(sampling_result.trace_state.c_str(), "");
+    EXPECT_STREQ(sampling_result.tracestate.c_str(), "");
     EXPECT_TRUE(sampling_result.isRecording());
     EXPECT_TRUE(sampling_result.isSampled());
   }
@@ -36,7 +36,7 @@ TEST(AlwaysOnSamplerTest, test) {
         ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
     EXPECT_EQ(sampling_result.decision, Decision::RECORD_AND_SAMPLE);
     EXPECT_EQ(sampling_result.attributes, nullptr);
-    EXPECT_STREQ(sampling_result.trace_state.c_str(), "some_tracestate");
+    EXPECT_STREQ(sampling_result.tracestate.c_str(), "some_tracestate");
     EXPECT_TRUE(sampling_result.isRecording());
     EXPECT_TRUE(sampling_result.isSampled());
   }

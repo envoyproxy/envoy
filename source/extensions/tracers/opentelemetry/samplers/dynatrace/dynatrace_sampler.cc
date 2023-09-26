@@ -4,7 +4,7 @@
 #include <sstream>
 #include <string>
 
-#include "trace_state.h"
+#include "tracestate.h"
 #include "source/common/config/datasource.h"
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
@@ -35,7 +35,7 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
     TraceState tracesta = TraceState::parse(parent_context->tracestate());
     tracesta.is_ignored = result.isRecording() ? "0" : "1";
     att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracesta.sampling_exponent;
-    result.trace_state = tracesta.toString();
+    result.tracestate = tracesta.toString();
 
   } else { // start new trace
     (void)current_counter;
@@ -44,12 +44,12 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
       TraceState tracesta;
       tracesta.sampling_exponent = "8";
       tracesta.is_ignored = result.isRecording() ? "0" : "1";
-      result.trace_state = tracesta.toString();
+      result.tracestate = tracesta.toString();
       att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracesta.sampling_exponent;
     // } else {
     //   result.decision = Decision::RECORD_ONLY;
     //   if (parent_context.ok()) {
-    //     result.trace_state = parent_context.value().tracestate();
+    //     result.tracestate = parent_context.value().tracestate();
     //   }
     // }
   }
@@ -61,10 +61,10 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
 
 std::string DynatraceSampler::getDescription() const { return "DynatraceSampler"; }
 
-std::string DynatraceSampler::modifyTraceState(const std::string& span_id,
-                                               const std::string& current_trace_state) const {
+std::string DynatraceSampler::modifyTracestate(const std::string& span_id,
+                                               const std::string& current_tracestate) const {
   
-  TraceState tracestate = TraceState::parse(current_trace_state);
+  TraceState tracestate = TraceState::parse(current_tracestate);
   tracestate.span_id = span_id;
   return tracestate.toString();
 }

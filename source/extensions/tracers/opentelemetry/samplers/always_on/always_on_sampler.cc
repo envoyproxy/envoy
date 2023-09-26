@@ -22,7 +22,7 @@ AlwaysOnSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
   SamplingResult result;
   result.decision = Decision::RECORD_AND_SAMPLE;
   if (parent_context.ok()) {
-    result.trace_state = parent_context.value().tracestate();
+    result.tracestate = parent_context.value().tracestate();
   }
   return result;
 }

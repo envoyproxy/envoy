@@ -36,7 +36,7 @@ struct SamplingResult {
   // A set of span Attributes that will also be added to the Span. Can be nullptr.
   std::unique_ptr<const std::map<std::string, std::string>> attributes;
   // The tracestate used by the span.
-  std::string trace_state;
+  std::string tracestate;
 
   inline bool isRecording() {
     return decision == Decision::RECORD_ONLY || decision == Decision::RECORD_AND_SAMPLE;
@@ -66,7 +66,7 @@ public:
   virtual std::string getDescription() const PURE;
 
   // allow tracers to provide a vendor specific tracestate
-  virtual std::string modifyTraceState(const std::string &span_id, const std::string &current_trace_state) const PURE;
+  virtual std::string modifyTracestate(const std::string &span_id, const std::string &current_tracestate) const PURE;
 };
 
 using SamplerPtr = std::shared_ptr<Sampler>;

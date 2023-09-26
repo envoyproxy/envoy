@@ -66,7 +66,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   // Also set the tracestate.
   std::string trace_state;
   // if (parent_tracer_.sampler()) {
-  //   trace_state = parent_tracer_.sampler()->modifyTraceState(span_id_hex, span_.trace_state());
+  //   trace_state = parent_tracer_.sampler()->modifyTracestate(span_id_hex, span_.trace_state());
   // } 
   if (trace_state.empty()) {
     trace_state = span_.trace_state();
@@ -175,9 +175,9 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
     auto sampling_result = sampler_->shouldSample(
         span_context, operation_name, new_span.getTraceIdAsHex(), new_span.spankind(), {}, {});
     new_span.setSampled(sampling_result.isSampled());        
-    auto modified_trace_state = sampler()->modifyTraceState(new_span.spanId(), sampling_result.trace_state);
-    if (!modified_trace_state.empty()) {
-      sampling_result.trace_state = modified_trace_state;
+    auto modified_tracestate = sampler()->modifyTracestate(new_span.spanId(), sampling_result.tracestate);
+    if (!modified_tracestate.empty()) {
+      sampling_result.tracestate = modified_tracestate;
     }
 
     if (sampling_result.attributes) {
@@ -185,7 +185,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
         new_span.setTag(attribute.first, attribute.second);
       }
     }
-    new_span.setTracestate(sampling_result.trace_state);
+    new_span.setTracestate(sampling_result.tracestate);
   }
   return std::make_unique<Span>(new_span);
 }
@@ -213,9 +213,9 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
     absl::StatusOr<SpanContext> span_context = previous_span_context;
     auto sampling_result = sampler_->shouldSample(
         span_context, operation_name, new_span.getTraceIdAsHex(), new_span.spankind(), {}, {});
-    auto modified_trace_state = sampler()->modifyTraceState(new_span.spanId(), sampling_result.trace_state);
-    if (!modified_trace_state.empty()) {
-      sampling_result.trace_state = modified_trace_state;
+    auto modified_tracestate = sampler()->modifyTracestate(new_span.spanId(), sampling_result.tracestate);
+    if (!modified_tracestate.empty()) {
+      sampling_result.tracestate = modified_tracestate;
     }
 
     if (sampling_result.attributes) {
@@ -223,7 +223,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
         new_span.setTag(attribute.first, attribute.second);
       }
     }
-    new_span.setTracestate(sampling_result.trace_state);
+    new_span.setTracestate(sampling_result.tracestate);
   }
   return std::make_unique<Span>(new_span);
 }
