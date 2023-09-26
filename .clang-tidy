@@ -66,6 +66,7 @@ CheckOptions:
     |^evconnlistener_free$|
     |^event_base_free$|
     |^(get|set)EVP_PKEY$|
+    |^has_value$|
     |^Ip6(ntohl|htonl)$|
     |^get_$|
     |^HeaderHasValue(Ref)?$|
@@ -73,12 +74,14 @@ CheckOptions:
     |^Is(Superset|Subset)OfHeaders$|
     |^LLVMFuzzerInitialize$|
     |^LLVMFuzzerTestOneInput$|
+    |^Locality$|
     |^MOCK_METHOD$|
     |^PrepareCall$|
     |^PrintTo$|
     |^resolve_dns$|
     |^result_type$|
     |Returns(Default)?WorkerId$|
+    |^sched_getaffinity$|
     |^shutdownThread_$|
     |TEST|
     |^use_count$)
@@ -101,7 +104,7 @@ CheckOptions:
 - key: readability-identifier-naming.FunctionCase
   value: 'camelBack'
 
-HeaderFilterRegex: '^./source/.*|^./contrib/.*|^./test/.*'
+HeaderFilterRegex: '^./source/.*|^./contrib/.*|^./test/.*|^./envoy/.*'
 
 UseColor: true
 
