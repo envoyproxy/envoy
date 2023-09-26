@@ -151,4 +151,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["build"],
         release_date = "2023-05-30",
     ),
+    envoy_toolshed = dict(
+        project_name = "envoy_toolshed",
+        project_desc = "Tooling, libraries, runners and checkers for Envoy proxy's CI",
+        project_url = "https://github.com/envoyproxy/toolshed",
+        version = "0.0.6",
+        sha256 = "7047db983e49290ac14b2733459d439a8a521ff49e95fbd0b185a692bd6a6d86",
+        strip_prefix = "toolshed-bazel-v{version}/bazel",
+        urls = ["https://github.com/envoyproxy/toolshed/archive/refs/tags/bazel-v{version}.tar.gz"],
+        use_category = ["build"],
+        release_date = "2023-09-24",
+        cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/envoyproxy/envoy/blob/bazel-v{version}/LICENSE",
+    ),
 )
