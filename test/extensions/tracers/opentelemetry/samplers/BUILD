@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["sampler_test.cc"],
     deps = [
         "//envoy/registry",
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/test_common:registry_lib",
