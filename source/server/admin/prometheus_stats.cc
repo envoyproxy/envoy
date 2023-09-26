@@ -44,34 +44,6 @@ std::string sanitizeValue(const absl::string_view value) {
                                     });
 }
 
-/**
- * Determines whether a metric should be shown based on the specified query-parameters. This covers:
- * ``usedonly``, hidden, and filter.
- *
- * @param metric the metric to test
- * @param params captures query parameters indicating which metrics should be included.
- */
-template <class StatType>
-static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {
-  // This duplicates logic in StatsRequest::populateStatsFromScopes, but differs
-  // in one subtle way: in Prometheus we only use metric.name() for filtering,
-  // not rendering, so we only construct the name if there's a filter.
-  if (params.used_only_ && !metric.used()) {
-    return false;
-  }
-  if (params.hidden_ == HiddenFlag::ShowOnly && !metric.hidden()) {
-    return false;
-  }
-  if (params.hidden_ == HiddenFlag::Exclude && metric.hidden()) {
-    return false;
-  }
-  if (params.re2_filter_ != nullptr &&
-      !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
-    return false;
-  }
-  return true;
-}
-
 /*
  * Comparator for Stats::Metric that does not require a string representation
  * to make the comparison, for memory efficiency.
@@ -212,7 +184,7 @@ uint64_t outputStatType(
 
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
-    if (!shouldShowMetric(*metric, params)) {
+    if (!params.shouldShowMetric(*metric)) {
       continue;
     }
     groups[metric->tagExtractedStatName()].push_back(metric.get());
@@ -273,7 +245,7 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
   std::map<std::string, StatTypeUnsortedCollection> groups;
 
   for (const auto& metric : metrics) {
-    if (!shouldShowMetric(metric, params)) {
+    if (!params.shouldShowMetric(metric)) {
       continue;
     }
     groups[metric.tagExtractedName()].push_back(&metric);

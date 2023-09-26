@@ -70,6 +70,50 @@ struct StatsParams {
   std::shared_ptr<re2::RE2> re2_filter_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
   Http::Utility::QueryParams query_;
+
+  /**
+   * Determines whether a metric should be shown based on the specified query-parameters. This
+   * covers:
+   * ``usedonly``, hidden, and filter.
+   *
+   * @param metric the metric to test
+   * @param name_out if non-null, and the return value is true,
+   *   will contain the metric name. This improves performance because computing the name is
+   *   somewhat expensive, and in some cases it isn't needed.
+   */
+  template <class StatType>
+  bool shouldShowMetric(const StatType& metric, std::string* name_out = nullptr) const {
+    // This duplicates logic in StatsRequest::populateStatsFromScopes, but differs
+    // in one subtle way: in Prometheus we only use metric.name() for filtering,
+    // not rendering, so we only construct the name if there's a filter.
+    if (used_only_ && !metric.used()) {
+      return false;
+    }
+    if (hidden_ == HiddenFlag::ShowOnly && !metric.hidden()) {
+      return false;
+    }
+    if (hidden_ == HiddenFlag::Exclude && metric.hidden()) {
+      return false;
+    }
+
+    // Performance note: computing the name is expensive.
+    //
+    // In the prometheus case, this is only neccessary if doing regex filtering and a regex is
+    // defined (and the function parameter will be nullptr).
+    //
+    // In the non-prometheus case, the name is needed if the metric should be shown, so compute it
+    // once and use it for both regex filtering and in emitting the stat (consumed by caller by
+    // setting `name_out` to non-nullptr).
+    if (name_out != nullptr) {
+      *name_out = metric.name();
+    }
+
+    if (re2_filter_ != nullptr &&
+        !re2::RE2::PartialMatch((name_out == nullptr) ? metric.name() : *name_out, *re2_filter_)) {
+      return false;
+    }
+    return true;
+  }
 };
 
 } // namespace Server

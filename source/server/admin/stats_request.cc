@@ -180,41 +180,10 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
   }
 }
 
-namespace {
-template <class StatType>
-bool shouldShowMetric(const StatType& stat, const StatsParams& params, std::string& name_out) {
-  if (params.used_only_ && !stat.used()) {
-    return false;
-  }
-
-  if (params.hidden_ == HiddenFlag::Exclude && stat.hidden()) {
-    return false;
-  }
-
-  if (params.hidden_ == HiddenFlag::ShowOnly && !stat.hidden()) {
-    return false;
-  }
-
-  // Capture the name if we did not early-exit due to used_only -- we'll use
-  // the name for both filtering and for capturing the stat in the map.
-  // stat.name() takes a symbol table lock and builds a string, so we only
-  // want to call it once.
-  //
-  // This duplicates logic in shouldShowMetric in prometheus_stats.cc, but
-  // differs in that Prometheus only uses stat.name() for filtering, not
-  // rendering, so it only grab the name if there's a filter.
-  name_out = stat.name();
-  if (params.re2_filter_ != nullptr && !re2::RE2::PartialMatch(name_out, *params.re2_filter_)) {
-    return false;
-  }
-  return true;
-}
-} // namespace
-
 template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     std::string name;
-    if (!shouldShowMetric(*stat, params_, name)) {
+    if (!params_.shouldShowMetric(*stat, &name)) {
       return true;
     }
 
@@ -228,8 +197,7 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
 
 void StatsRequest::renderPerHostMetrics(Buffer::Instance& response) {
   auto render = [this, &response](auto&& metric) {
-    std::string name;
-    if (shouldShowMetric(metric, params_, name)) {
+    if (params_.shouldShowMetric(metric)) {
       render_->generate(response, metric.name(), metric.value());
     }
   };
