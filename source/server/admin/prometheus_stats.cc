@@ -210,8 +210,7 @@ uint64_t outputPrimitiveStatType(
   std::map<std::string, StatTypeUnsortedCollection> groups;
 
   for (const auto& metric : metrics) {
-    if (params.re2_filter_ != nullptr &&
-        !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
+    if (!shouldShowMetric(metric, params)) {
       continue;
     }
     groups[metric.tagExtractedName()].push_back(&metric);
