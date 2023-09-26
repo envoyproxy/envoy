@@ -202,12 +202,17 @@ template <class StatType, typename GetStatsFunc>
 void forEachMetric(const ClusterManager& cluster_manager,
                    const std::function<void(StatType&& metric)>& cb,
                    GetStatsFunc get_stats_vector) {
-  for (const auto& [cluster_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
+  for (const auto& [unused_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
     if (cluster_ref.get().info()->perEndpointStats()) {
+      const std::string cluster_name =
+          Stats::Utility::sanitizeStatsName(cluster_ref.get().info()->observabilityName());
+
       for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
         for (auto& host : host_set->hosts()) {
+
           Stats::TagVector tags = {{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name},
                                    {"envoy.endpoint_address", host->address()->asString()}};
+
           const auto& hostname = host->hostname();
           if (!hostname.empty()) {
             tags.push_back({"envoy.endpoint_hostname", hostname});
@@ -216,10 +221,17 @@ void forEachMetric(const ClusterManager& cluster_manager,
           for (auto& [metric_name, primitive] : get_stats_vector(*host)) {
             StatType metric(primitive.get());
 
-            metric.setName(absl::StrCat("cluster.", cluster_name, ".endpoint.", metric_name, ".",
-                                        host->address()->asStringView()));
+            metric.setName(
+                absl::StrCat("cluster.", cluster_name, ".endpoint.",
+                             Stats::Utility::sanitizeStatsName(host->address()->asStringView()),
+                             ".", metric_name));
             metric.setTagExtractedName(absl::StrCat("cluster.endpoint.", metric_name));
             metric.setTags(tags);
+
+            // Validate that all components were sanitized.
+            ASSERT(metric.name() == Stats::Utility::sanitizeStatsName(metric.name()));
+            ASSERT(metric.tagExtractedName() ==
+                   Stats::Utility::sanitizeStatsName(metric.tagExtractedName()));
 
             cb(std::move(metric));
           }
