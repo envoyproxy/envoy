@@ -57,6 +57,9 @@ jobs:
       repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
     permissions:
       contents: write
+    secrets:
+      ENVOY_CI_SYNC_APP_ID: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+      ENVOY_CI_SYNC_APP_KEY: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
 
   verify:
     uses: ./.github/workflows/_stage_verify.yml
