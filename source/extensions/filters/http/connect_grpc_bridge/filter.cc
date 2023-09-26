@@ -290,19 +290,23 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::decodeHeaders(Http::RequestHe
       unary_payload_frame_flags_ |= Envoy::Grpc::GRPC_FH_COMPRESSED;
     }
   } else {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
-    if (query_parameters[ConnectGetParams::get().APIKey] == ConnectGetParams::get().APIValue) {
+    Http::Utility::QueryParamsMulti query_parameters =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    if (query_parameters.getFirstValue(ConnectGetParams::get().APIKey).value_or("") ==
+        ConnectGetParams::get().APIValue) {
       // Unary Connect Get protocol
       is_connect_unary_ = true;
 
       headers.setMethod(Http::Headers::get().MethodValues.Post);
       headers.setPath(removeQueryParameters(headers.getPathValue()));
 
-      auto message = query_parameters[ConnectGetParams::get().MessageKey];
-      auto base64 = query_parameters[ConnectGetParams::get().Base64Key];
-      auto encoding = query_parameters[ConnectGetParams::get().EncodingKey];
-      auto compression = query_parameters[ConnectGetParams::get().CompressionKey];
+      auto message =
+          query_parameters.getFirstValue(ConnectGetParams::get().MessageKey).value_or("");
+      auto base64 = query_parameters.getFirstValue(ConnectGetParams::get().Base64Key).value_or("");
+      auto encoding =
+          query_parameters.getFirstValue(ConnectGetParams::get().EncodingKey).value_or("");
+      auto compression =
+          query_parameters.getFirstValue(ConnectGetParams::get().CompressionKey).value_or("");
 
       if (base64 == "1") {
         message = Base64Url::decode(message);

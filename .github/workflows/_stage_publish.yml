@@ -28,12 +28,26 @@ on:
         type: string
       given_ref:
         type: string
+    secrets:
+      ENVOY_CI_SYNC_APP_ID:
+      ENVOY_CI_SYNC_APP_KEY:
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
   cancel-in-progress: true
 
 jobs:
+  publish_docs:
+    if: ${{ inputs.trusted }}
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.18
+      with:
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+        key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
+        ref: main
+        repository: "envoyproxy/envoy-website"
+        workflow: envoy-sync.yaml
+
   publish_ci:
     if: ${{ ! inputs.trusted }}
     name: ${{ matrix.name || matrix.target }}
