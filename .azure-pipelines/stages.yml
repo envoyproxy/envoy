@@ -137,7 +137,6 @@ stages:
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
-      authNetlifyURL: $(NetlifyTriggerURL)
       authSSHDocsKeyPublic: $(DocsPublicKey)
       authSSHDocsKey: $(DocsPrivateKey)
       authSSHKeyPassphrase: $(SshDeployKeyPassphrase)
