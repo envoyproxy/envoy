@@ -1169,6 +1169,9 @@ public:
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
+  /**
+   * @return true if this cluster should produce per-endpoint stats.
+   */
   virtual bool perEndpointStats() const PURE;
 
   /**
