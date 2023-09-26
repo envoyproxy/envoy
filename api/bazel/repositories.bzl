@@ -51,6 +51,12 @@ def api_dependencies():
         tags = ["manual"],
     )
 
+    external_http_archive(
+        name = "envoy_toolshed",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:toolshed.patch"],
+    )
+
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
