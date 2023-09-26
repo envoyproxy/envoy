@@ -77,8 +77,7 @@ public:
     while (stream->Read(&request)) {
       if (!status_to_return_.ok()) {
         return status_to_return_;
-
-        }
+      }
       if (request_number < static_cast<int>(expected_requests_.size())) {
         EXPECT_TRUE(TestUtility::protoEqual(request, expected_requests_[request_number]));
         request_number++;

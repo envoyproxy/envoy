@@ -1,8 +1,5 @@
 #include "source/extensions/transport_sockets/alts/tsi_handshaker.h"
 
-
-#include <cstdint>
-
 #include <cstddef>
 #include <cstdint>
 #include <memory>

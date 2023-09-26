@@ -54,30 +54,26 @@ absl::Status AltsTsiHandshaker::Next(void* handshaker, const unsigned char* rece
     auto alts_proxy = AltsProxy::Create(handshaker_service_channel_);
     if (!alts_proxy.ok()) {
       return alts_proxy.status();
-
-        }
+    }
     alts_proxy_ = *std::move(alts_proxy);
     if (is_client_) {
       auto client_start = alts_proxy_->SendStartClientHandshakeReq();
       if (!client_start.ok()) {
         return client_start.status();
-
-        }
+      }
       response = *std::move(client_start);
     } else {
       auto server_start = alts_proxy_->SendStartServerHandshakeReq(in_bytes);
       if (!server_start.ok()) {
         return server_start.status();
-
-        }
+      }
       response = *std::move(server_start);
     }
   } else {
     auto next = alts_proxy_->SendNextHandshakeReq(in_bytes);
     if (!next.ok()) {
       return next.status();
-
-        }
+    }
     response = *std::move(next);
   }
 
@@ -88,8 +84,7 @@ absl::Status AltsTsiHandshaker::Next(void* handshaker, const unsigned char* rece
     auto result = GetHandshakeResult(response.result(), in_bytes, response.bytes_consumed());
     if (!result.ok()) {
       return result.status();
-
-        }
+    }
     handshake_result = *std::move(result);
   }
 
