@@ -239,15 +239,14 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
         text_readouts_.push_back(text_readout);
       });
 
-  Upstream::HostUtility::forEachHostCounter(cluster_manager,
-                                            [this](Stats::PrimitiveCounterSnapshot&& metric) {
-                                              host_counters_.emplace_back(std::move(metric));
-                                            });
-
-  Upstream::HostUtility::forEachHostGauge(cluster_manager,
-                                          [this](Stats::PrimitiveGaugeSnapshot&& metric) {
-                                            host_gauges_.emplace_back(std::move(metric));
-                                          });
+  Upstream::HostUtility::forEachHostMetric(
+      cluster_manager,
+      [this](Stats::PrimitiveCounterSnapshot&& metric) {
+        host_counters_.emplace_back(std::move(metric));
+      },
+      [this](Stats::PrimitiveGaugeSnapshot&& metric) {
+        host_gauges_.emplace_back(std::move(metric));
+      });
 
   snapshot_time_ = time_source.systemTime();
 }

@@ -369,27 +369,24 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   // Note: This assumes that there is no overlap in stat name between per-endpoint stats and all
   // other stats. If this is not true, then the counters/gauges for per-endpoint need to be combined
   // with the above counter/gauge calls so that stats can be properly grouped.
-  {
-    std::vector<Stats::PrimitiveCounterSnapshot> host_counters;
-    Upstream::HostUtility::forEachHostCounter(cluster_manager,
-                                              [&](Stats::PrimitiveCounterSnapshot&& metric) {
-                                                host_counters.emplace_back(std::move(metric));
-                                                ASSERT(metric.name().empty());
-                                              });
-    metric_name_count += outputPrimitiveStatType<Stats::PrimitiveCounterSnapshot>(
-        response, params, host_counters, generateNumericOutput, "counter", custom_namespaces);
-  }
+  std::vector<Stats::PrimitiveCounterSnapshot> host_counters;
+  std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges;
+  Upstream::HostUtility::forEachHostMetric(
+      cluster_manager,
+      [&](Stats::PrimitiveCounterSnapshot&& metric) {
+        host_counters.emplace_back(std::move(metric));
+        ASSERT(metric.name().empty());
+      },
+      [&](Stats::PrimitiveGaugeSnapshot&& metric) {
+        host_gauges.emplace_back(std::move(metric));
+        ASSERT(metric.name().empty());
+      });
 
-  {
-    std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges;
-    Upstream::HostUtility::forEachHostGauge(cluster_manager,
-                                            [&](Stats::PrimitiveGaugeSnapshot&& metric) {
-                                              host_gauges.emplace_back(std::move(metric));
-                                              ASSERT(metric.name().empty());
-                                            });
-    metric_name_count += outputPrimitiveStatType(response, params, host_gauges,
-                                                 generateNumericOutput, "gauge", custom_namespaces);
-  }
+  metric_name_count += outputPrimitiveStatType(response, params, host_counters,
+                                               generateNumericOutput, "counter", custom_namespaces);
+
+  metric_name_count += outputPrimitiveStatType(response, params, host_gauges, generateNumericOutput,
+                                               "gauge", custom_namespaces);
 
   return metric_name_count;
 }

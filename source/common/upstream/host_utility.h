@@ -30,13 +30,11 @@ public:
   static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, HostStatusSet status,
                                                LoadBalancerContext* context);
 
+  // Iterate over all per-endpoint metrics, for clusters with `per_endpoint_stats` enabled.
   static void
-  forEachHostCounter(const ClusterManager& cluster_manager,
-                     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& cb);
-
-  static void
-  forEachHostGauge(const ClusterManager& cluster_manager,
-                   const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& cb);
+  forEachHostMetric(const ClusterManager& cluster_manager,
+                    const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
+                    const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb);
 };
 
 } // namespace Upstream

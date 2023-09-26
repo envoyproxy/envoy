@@ -227,18 +227,14 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
 }
 
 void StatsRequest::renderPerHostMetrics(Buffer::Instance& response) {
-  Upstream::HostUtility::forEachHostCounter(cm_, [&](Stats::PrimitiveCounterSnapshot&& metric) {
+  auto render = [this, &response](auto&& metric) {
     std::string name;
     if (shouldShowMetric(metric, params_, name)) {
       render_->generate(response, metric.name(), metric.value());
     }
-  });
-  Upstream::HostUtility::forEachHostGauge(cm_, [&](Stats::PrimitiveGaugeSnapshot&& metric) {
-    std::string name;
-    if (shouldShowMetric(metric, params_, name)) {
-      render_->generate(response, metric.name(), metric.value());
-    }
-  });
+  };
+
+  Upstream::HostUtility::forEachHostMetric(cm_, render, render);
 }
 
 template <class SharedStatType>

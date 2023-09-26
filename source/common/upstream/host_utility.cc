@@ -197,11 +197,10 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
   return nullptr;
 }
 
-namespace {
-template <class StatType, typename GetStatsFunc>
-void forEachMetric(const ClusterManager& cluster_manager,
-                   const std::function<void(StatType&& metric)>& cb,
-                   GetStatsFunc get_stats_vector) {
+void HostUtility::forEachHostMetric(
+    const ClusterManager& cluster_manager,
+    const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
+    const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb) {
   for (const auto& [unused_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
     if (cluster_ref.get().info()->perEndpointStats()) {
       const std::string cluster_name =
@@ -218,9 +217,8 @@ void forEachMetric(const ClusterManager& cluster_manager,
             tags.push_back({"envoy.endpoint_hostname", hostname});
           }
 
-          for (auto& [metric_name, primitive] : get_stats_vector(*host)) {
-            StatType metric(primitive.get());
-
+          auto set_metric_metadata = [&](absl::string_view metric_name,
+                                         Stats::PrimitiveMetricMetadata& metric) {
             metric.setName(
                 absl::StrCat("cluster.", cluster_name, ".endpoint.",
                              Stats::Utility::sanitizeStatsName(host->address()->asStringView()),
@@ -232,38 +230,31 @@ void forEachMetric(const ClusterManager& cluster_manager,
             ASSERT(metric.name() == Stats::Utility::sanitizeStatsName(metric.name()));
             ASSERT(metric.tagExtractedName() ==
                    Stats::Utility::sanitizeStatsName(metric.tagExtractedName()));
+          };
 
-            cb(std::move(metric));
+          for (auto& [metric_name, primitive] : host->counters()) {
+            Stats::PrimitiveCounterSnapshot metric(primitive.get());
+            set_metric_metadata(metric_name, metric);
+
+            counter_cb(std::move(metric));
+          }
+
+          auto gauges = host->gauges();
+
+          // Add synthetic "healthy" gauge.
+          Stats::PrimitiveGauge healthy_gauge;
+          healthy_gauge.set((host->coarseHealth() == Host::Health::Healthy) ? 1 : 0);
+          gauges.emplace_back(absl::string_view("healthy"), healthy_gauge);
+
+          for (auto& [metric_name, primitive] : gauges) {
+            Stats::PrimitiveGaugeSnapshot metric(primitive.get());
+            set_metric_metadata(metric_name, metric);
+            gauge_cb(std::move(metric));
           }
         }
       }
     }
   }
-}
-} // namespace
-
-void HostUtility::forEachHostCounter(
-    const ClusterManager& cluster_manager,
-    const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& cb) {
-  forEachMetric(cluster_manager, cb, [](Host& host) { return host.counters(); });
-}
-
-void HostUtility::forEachHostGauge(
-    const ClusterManager& cluster_manager,
-    const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& cb) {
-  // This is held as a reference in the returned vector of gauges. It lives here so that it's
-  // lifetime is longer than `forEachMetric`.
-  Stats::PrimitiveGauge healthy_gauge;
-
-  forEachMetric(cluster_manager, cb, [&](Host& host) {
-    // std::pair<absl::string_view, Stats::PrimitiveGaugeReference>
-    auto gauges = host.gauges();
-
-    // Add synthetic "healthy" gauge.
-    healthy_gauge.set((host.coarseHealth() == Host::Health::Healthy) ? 1 : 0);
-    gauges.emplace_back(absl::string_view("healthy"), healthy_gauge);
-    return gauges;
-  });
 }
 
 } // namespace Upstream
