@@ -29,7 +29,10 @@ envoy_cc_extension(
 
 envoy_cc_library(
     name = "provider_impl",
-    srcs = ["geoip_provider.cc"],
+    srcs = select({
+        "//bazel:linux": ["geoip_provider.cc"],
+        "//conditions:default": [],
+    }),
     hdrs = ["geoip_provider.h"],
     external_deps = ["maxmind"],
     tags = ["skip_on_windows"],
