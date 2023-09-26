@@ -183,14 +183,12 @@ func (c *httpCApiImpl) HttpRemoveHeader(r unsafe.Pointer, key *string) {
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64) {
+func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte {
 	buf := make([]byte, length)
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
-	sHeader := (*reflect.StringHeader)(unsafe.Pointer(value))
-	sHeader.Data = bHeader.Data
-	sHeader.Len = int(length)
 	res := C.envoyGoFilterHttpGetBuffer(r, C.ulonglong(bufferPtr), unsafe.Pointer(bHeader.Data))
 	handleCApiStatus(res)
+	return buf
 }
 
 func (c *httpCApiImpl) HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) {
@@ -200,6 +198,15 @@ func (c *httpCApiImpl) HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, lengt
 
 func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
 	sHeader := (*reflect.StringHeader)(unsafe.Pointer(&value))
+	c.httpSetBufferHelper(r, bufferPtr, unsafe.Pointer(sHeader.Data), C.int(sHeader.Len), action)
+}
+
+func (c *httpCApiImpl) HttpSetBytesBufferHelper(r unsafe.Pointer, bufferPtr uint64, value []byte, action api.BufferAction) {
+	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&value))
+	c.httpSetBufferHelper(r, bufferPtr, unsafe.Pointer(bHeader.Data), C.int(bHeader.Len), action)
+}
+
+func (c *httpCApiImpl) httpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, data unsafe.Pointer, length C.int, action api.BufferAction) {
 	var act C.bufferAction
 	switch action {
 	case api.SetBuffer:
@@ -209,7 +216,7 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 	case api.PrependBuffer:
 		act = C.Prepend
 	}
-	res := C.envoyGoFilterHttpSetBufferHelper(r, C.ulonglong(bufferPtr), unsafe.Pointer(sHeader.Data), C.int(sHeader.Len), act)
+	res := C.envoyGoFilterHttpSetBufferHelper(r, C.ulonglong(bufferPtr), data, length, act)
 	handleCApiStatus(res)
 }
 
