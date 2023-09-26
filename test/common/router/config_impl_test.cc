@@ -9480,44 +9480,6 @@ virtual_hosts:
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 
-TEST_F(RouteMatcherTest,
-       DEPRECATED_FEATURE_TEST(PatternMatchWildcardFilenameQueryParametersTruncated)) {
-
-  mergeValues({{"envoy.reloadable_features.append_query_parameters_path_rewriter", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: path_pattern
-    domains: ["*"]
-    routes:
-      - match:
-          path_match_policy:
-            name: envoy.path.match.uri_template.uri_template_matcher
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-              path_template: "/api/cart/item/{one}/**.m3u8"
-          case_sensitive: false
-        route:
-          cluster: "path-pattern-cluster-one"
-          path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.uri_template_rewriter
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
-              path_template_rewrite: "/{one}"
-  )EOF";
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  Http::TestRequestHeaderMapImpl headers = genHeaders(
-      "path.prefix.com", "/api/cart/item/one/song.m3u8?one=0&two=1&three=2&four=3&go=ls", "GET");
-  const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ("/one", route->currentUrlPathAfterRewrite(headers));
-  route->finalizeRequestHeaders(headers, stream_info, true);
-  EXPECT_EQ("/one", headers.get_(Http::Headers::get().Path));
-  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
-}
-
 TEST_F(RouteMatcherTest, PatternMatchWildcardFilename) {
 
   const std::string yaml = R"EOF(
