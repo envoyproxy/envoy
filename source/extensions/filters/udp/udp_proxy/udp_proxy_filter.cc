@@ -269,7 +269,9 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       udp_session_info_(
-          StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr)),
+          StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(),
+                                     std::make_shared<Network::ConnectionInfoSetterImpl>(
+                                         addresses_.local_, addresses_.peer_))),
       session_id_(next_global_session_id_++) {
   cluster_.filter_.config_->stats().downstream_sess_total_.inc();
   cluster_.filter_.config_->stats().downstream_sess_active_.inc();
