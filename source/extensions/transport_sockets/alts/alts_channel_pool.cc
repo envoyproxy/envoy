@@ -19,7 +19,7 @@ namespace TransportSockets {
 namespace Alts {
 
 std::unique_ptr<AltsChannelPool>
-AltsChannelPool::Create(absl::string_view handshaker_service_address) {
+AltsChannelPool::create(absl::string_view handshaker_service_address) {
   // TODO(matthewstevenson88): Extend this to be configurable through API.
   std::size_t channel_pool_size = 10;
   std::vector<std::shared_ptr<grpc::Channel>> channel_pool;
@@ -37,13 +37,13 @@ AltsChannelPool::AltsChannelPool(const std::vector<std::shared_ptr<grpc::Channel
     : channel_pool_(channel_pool) {}
 
 // TODO(matthewstevenson88): Add logic to limit number of outstanding channels.
-std::shared_ptr<grpc::Channel> AltsChannelPool::GetChannel() const {
+std::shared_ptr<grpc::Channel> AltsChannelPool::getChannel() const {
   absl::BitGen gen;
   auto index = absl::Uniform<int>(gen, /*lo=*/0, channel_pool_.size());
   return channel_pool_[index];
 }
 
-std::size_t AltsChannelPool::GetChannelPoolSize() const { return channel_pool_.size(); }
+std::size_t AltsChannelPool::getChannelPoolSize() const { return channel_pool_.size(); }
 
 } // namespace Alts
 } // namespace TransportSockets

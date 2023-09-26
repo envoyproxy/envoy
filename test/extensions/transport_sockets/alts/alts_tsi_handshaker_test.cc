@@ -224,12 +224,12 @@ private:
 TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForClient(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
 
   // Get the ClientInit.
   {
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), kClientInit);
@@ -241,7 +241,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
   {
     std::string handshake_message = absl::StrCat(kServerInit, kServerFinished);
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(handshake_message.c_str()),
                                handshake_message.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), kClientFinished);
@@ -255,7 +255,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
 
   // Confirm that the handshake cannot continue.
   CapturingHandshaker capturing_handshaker;
-  EXPECT_THAT(handshaker->Next(&capturing_handshaker, /*received_bytes=*/nullptr,
+  EXPECT_THAT(handshaker->next(&capturing_handshaker, /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInternal));
 }
@@ -263,12 +263,12 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
 TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForClient(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
 
   // Get the ClientInit.
   {
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), kClientInit);
@@ -280,7 +280,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
   {
     std::string handshake_message = absl::StrCat(kServerInit, kServerFinished, kApplicationData);
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(handshake_message.c_str()),
                                handshake_message.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), kClientFinished);
@@ -294,7 +294,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
 
   // Confirm that the handshake cannot continue.
   CapturingHandshaker capturing_handshaker;
-  EXPECT_THAT(handshaker->Next(&capturing_handshaker, /*received_bytes=*/nullptr,
+  EXPECT_THAT(handshaker->next(&capturing_handshaker, /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInternal));
 }
@@ -302,12 +302,12 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshakeWithUnusedBytes) {
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForServer(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
 
   // Get the ServerInit and ServerFinished.
   {
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(kClientInit.data()),
                                kClientInit.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), absl::StrCat(kServerInit, kServerFinished));
@@ -319,7 +319,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   {
     std::string handshake_message = absl::StrCat(kServerInit, kServerFinished);
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(kClientFinished.data()),
                                kClientFinished.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), "");
@@ -333,7 +333,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
 
   // Confirm that the handshake cannot continue.
   CapturingHandshaker capturing_handshaker;
-  EXPECT_THAT(handshaker->Next(&capturing_handshaker, /*received_bytes=*/nullptr,
+  EXPECT_THAT(handshaker->next(&capturing_handshaker, /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInternal));
 }
@@ -341,12 +341,12 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForServer(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
 
   // Get the ServerInit and ServerFinished.
   {
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(kClientInit.data()),
                                kClientInit.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), absl::StrCat(kServerInit, kServerFinished));
@@ -359,7 +359,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
     std::string handshake_message = absl::StrCat(kServerInit, kServerFinished);
     std::string received_bytes = absl::StrCat(kClientFinished, kApplicationData);
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(received_bytes.data()),
                                received_bytes.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), "");
@@ -373,7 +373,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
 
   // Confirm that the handshake cannot continue.
   CapturingHandshaker capturing_handshaker;
-  EXPECT_THAT(handshaker->Next(&capturing_handshaker, /*received_bytes=*/nullptr,
+  EXPECT_THAT(handshaker->next(&capturing_handshaker, /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInternal));
 }
@@ -381,13 +381,13 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithUnusedBytes) {
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForServer(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
 
   // Fail to get the ServerInit and ServerFinished because the ClientInit has
   // not arrived yet.
   {
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), "");
@@ -398,7 +398,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) 
   // Get the ServerInit and ServerFinished now that the ClientInit has arrived.
   {
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(kClientInit.data()),
                                kClientInit.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), absl::StrCat(kServerInit, kServerFinished));
@@ -410,7 +410,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) 
   {
     std::string handshake_message = absl::StrCat(kServerInit, kServerFinished);
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(kClientFinished.data()),
                                kClientFinished.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), "");
@@ -424,7 +424,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) 
 
   // Confirm that the handshake cannot continue.
   CapturingHandshaker capturing_handshaker;
-  EXPECT_THAT(handshaker->Next(&capturing_handshaker, /*received_bytes=*/nullptr,
+  EXPECT_THAT(handshaker->next(&capturing_handshaker, /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInternal));
 }
@@ -432,7 +432,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithMissingInitialInBytes) 
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForServer(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
 
   // Fail to get the ServerInit and ServerFinished because only part of the
   // ClientInit has arrived.
@@ -440,7 +440,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
     absl::string_view client_init_first_half = kClientInit.substr(0, kClientInit.size() / 2);
     CapturingHandshaker capturing_handshaker;
     EXPECT_OK(
-        handshaker->Next(&capturing_handshaker,
+        handshaker->next(&capturing_handshaker,
                          reinterpret_cast<const unsigned char*>(client_init_first_half.data()),
                          client_init_first_half.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), "");
@@ -454,7 +454,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
     absl::string_view client_init_second_half = kClientInit.substr(kClientInit.size() / 2);
     CapturingHandshaker capturing_handshaker;
     EXPECT_OK(
-        handshaker->Next(&capturing_handshaker,
+        handshaker->next(&capturing_handshaker,
                          reinterpret_cast<const unsigned char*>(client_init_second_half.data()),
                          client_init_second_half.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), absl::StrCat(kServerInit, kServerFinished));
@@ -466,7 +466,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
   {
     std::string handshake_message = absl::StrCat(kServerInit, kServerFinished);
     CapturingHandshaker capturing_handshaker;
-    EXPECT_OK(handshaker->Next(&capturing_handshaker,
+    EXPECT_OK(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(kClientFinished.data()),
                                kClientFinished.size(), onNextDoneImpl));
     EXPECT_EQ(capturing_handshaker.getBytesToSend(), "");
@@ -480,7 +480,7 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
 
   // Confirm that the handshake cannot continue.
   CapturingHandshaker capturing_handshaker;
-  EXPECT_THAT(handshaker->Next(&capturing_handshaker, /*received_bytes=*/nullptr,
+  EXPECT_THAT(handshaker->next(&capturing_handshaker, /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/0, onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInternal));
 }
@@ -488,19 +488,19 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshakeWithClientInitSplit) {
 TEST_F(AltsTsiHandshakerTest, InvalidArgumentToNext) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForClient(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
 
   CapturingHandshaker capturing_handshaker;
   std::string received_bytes;
-  EXPECT_THAT(handshaker->Next(
+  EXPECT_THAT(handshaker->next(
                   /*handshaker=*/nullptr,
                   reinterpret_cast<const unsigned char*>(received_bytes.data()),
                   received_bytes.size(), onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(handshaker->Next(&capturing_handshaker, /*received_bytes=*/nullptr,
+  EXPECT_THAT(handshaker->next(&capturing_handshaker, /*received_bytes=*/nullptr,
                                /*received_bytes_size=*/1, onNextDoneImpl),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(handshaker->Next(&capturing_handshaker,
+  EXPECT_THAT(handshaker->next(&capturing_handshaker,
                                reinterpret_cast<const unsigned char*>(received_bytes.data()),
                                received_bytes.size(), /*on_next_done=*/nullptr),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
@@ -509,50 +509,50 @@ TEST_F(AltsTsiHandshakerTest, InvalidArgumentToNext) {
 TEST_F(AltsTsiHandshakerTest, InvalidHandshakeResult) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForClient(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
   std::string received_bytes;
 
   // Fail due to a missing peer identity.
   HandshakerResult handshake_result;
-  EXPECT_THAT(handshaker->GetHandshakeResult(handshake_result, received_bytes,
+  EXPECT_THAT(handshaker->getHandshakeResult(handshake_result, received_bytes,
                                              /*bytes_consumed=*/0),
               StatusIs(absl::StatusCode::kFailedPrecondition));
 
   // Fail due to a missing local identity.
   handshake_result.mutable_peer_identity();
-  EXPECT_THAT(handshaker->GetHandshakeResult(handshake_result, received_bytes,
+  EXPECT_THAT(handshaker->getHandshakeResult(handshake_result, received_bytes,
                                              /*bytes_consumed=*/0),
               StatusIs(absl::StatusCode::kFailedPrecondition));
 
   // Fail due to a missing peer RPC versions.
   handshake_result.mutable_local_identity();
-  EXPECT_THAT(handshaker->GetHandshakeResult(handshake_result, received_bytes,
+  EXPECT_THAT(handshaker->getHandshakeResult(handshake_result, received_bytes,
                                              /*bytes_consumed=*/0),
               StatusIs(absl::StatusCode::kFailedPrecondition));
 
   // Fail due to empty application protocol.
   handshake_result.mutable_peer_rpc_versions();
-  EXPECT_THAT(handshaker->GetHandshakeResult(handshake_result, received_bytes,
+  EXPECT_THAT(handshaker->getHandshakeResult(handshake_result, received_bytes,
                                              /*bytes_consumed=*/0),
               StatusIs(absl::StatusCode::kFailedPrecondition));
 
   // Fail due to unsupported record protocol.
   handshake_result.set_application_protocol(kApplicationProtocol);
   handshake_result.set_record_protocol("ALTSRP_GCM_AES128");
-  EXPECT_THAT(handshaker->GetHandshakeResult(handshake_result, received_bytes,
+  EXPECT_THAT(handshaker->getHandshakeResult(handshake_result, received_bytes,
                                              /*bytes_consumed=*/0),
               StatusIs(absl::StatusCode::kFailedPrecondition));
 
   // Fail due to short key length.
   handshake_result.set_record_protocol("ALTSRP_GCM_AES128_REKEY");
   handshake_result.set_key_data(std::string(20, 'a'));
-  EXPECT_THAT(handshaker->GetHandshakeResult(handshake_result, received_bytes,
+  EXPECT_THAT(handshaker->getHandshakeResult(handshake_result, received_bytes,
                                              /*bytes_consumed=*/0),
               StatusIs(absl::StatusCode::kFailedPrecondition));
 
   // Fail due to consuming more bytes than we received from the peer.
   handshake_result.set_key_data(std::string(44, 'a'));
-  EXPECT_THAT(handshaker->GetHandshakeResult(handshake_result, received_bytes,
+  EXPECT_THAT(handshaker->getHandshakeResult(handshake_result, received_bytes,
                                              /*bytes_consumed=*/1),
               StatusIs(absl::StatusCode::kFailedPrecondition));
 }
@@ -560,19 +560,19 @@ TEST_F(AltsTsiHandshakerTest, InvalidHandshakeResult) {
 TEST_F(AltsTsiHandshakerTest, ComputeMaxFrameSize) {
   // Max frame size is not set.
   HandshakerResult result;
-  EXPECT_EQ(AltsTsiHandshaker::ComputeMaxFrameSize(result), kAltsMinFrameSize);
+  EXPECT_EQ(AltsTsiHandshaker::computeMaxFrameSize(result), kAltsMinFrameSize);
 
   // Max frame size is over the allowed limit.
   result.set_max_frame_size(kMaxFrameSize + 1);
-  EXPECT_EQ(AltsTsiHandshaker::ComputeMaxFrameSize(result), kMaxFrameSize);
+  EXPECT_EQ(AltsTsiHandshaker::computeMaxFrameSize(result), kMaxFrameSize);
 
   // Max frame size is under the allowed limit.
   result.set_max_frame_size(kAltsMinFrameSize - 1);
-  EXPECT_EQ(AltsTsiHandshaker::ComputeMaxFrameSize(result), kAltsMinFrameSize);
+  EXPECT_EQ(AltsTsiHandshaker::computeMaxFrameSize(result), kAltsMinFrameSize);
 
   // Max frame size is within the allowed limits.
   result.set_max_frame_size(kAltsMinFrameSize + 1);
-  EXPECT_EQ(AltsTsiHandshaker::ComputeMaxFrameSize(result), kAltsMinFrameSize + 1);
+  EXPECT_EQ(AltsTsiHandshaker::computeMaxFrameSize(result), kAltsMinFrameSize + 1);
 }
 
 } // namespace

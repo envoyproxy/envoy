@@ -22,12 +22,12 @@ using ::grpc::gcp::HandshakerResp;
 constexpr std::size_t kAltsAes128GcmRekeyKeyLength = 44;
 
 std::unique_ptr<AltsTsiHandshaker>
-AltsTsiHandshaker::CreateForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
+AltsTsiHandshaker::createForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
   return absl::WrapUnique(new AltsTsiHandshaker(/*is_client=*/true, handshaker_service_channel));
 }
 
 std::unique_ptr<AltsTsiHandshaker>
-AltsTsiHandshaker::CreateForServer(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
+AltsTsiHandshaker::createForServer(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
   return absl::WrapUnique(new AltsTsiHandshaker(/*is_client=*/false, handshaker_service_channel));
 }
 
@@ -35,7 +35,7 @@ AltsTsiHandshaker::AltsTsiHandshaker(bool is_client,
                                      std::shared_ptr<grpc::Channel> handshaker_service_channel)
     : is_client_(is_client), handshaker_service_channel_(handshaker_service_channel) {}
 
-absl::Status AltsTsiHandshaker::Next(void* handshaker, const unsigned char* received_bytes,
+absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* received_bytes,
                                      size_t received_bytes_size, OnNextDone on_next_done) {
   // Argument and state checks.
   if (handshaker == nullptr || (received_bytes == nullptr && received_bytes_size > 0) ||
@@ -51,26 +51,26 @@ absl::Status AltsTsiHandshaker::Next(void* handshaker, const unsigned char* rece
   HandshakerResp response;
   if (!has_sent_initial_handshake_message_) {
     has_sent_initial_handshake_message_ = true;
-    auto alts_proxy = AltsProxy::Create(handshaker_service_channel_);
+    auto alts_proxy = AltsProxy::create(handshaker_service_channel_);
     if (!alts_proxy.ok()) {
       return alts_proxy.status();
     }
     alts_proxy_ = *std::move(alts_proxy);
     if (is_client_) {
-      auto client_start = alts_proxy_->SendStartClientHandshakeReq();
+      auto client_start = alts_proxy_->sendStartClientHandshakeReq();
       if (!client_start.ok()) {
         return client_start.status();
       }
       response = *std::move(client_start);
     } else {
-      auto server_start = alts_proxy_->SendStartServerHandshakeReq(in_bytes);
+      auto server_start = alts_proxy_->sendStartServerHandshakeReq(in_bytes);
       if (!server_start.ok()) {
         return server_start.status();
       }
       response = *std::move(server_start);
     }
   } else {
-    auto next = alts_proxy_->SendNextHandshakeReq(in_bytes);
+    auto next = alts_proxy_->sendNextHandshakeReq(in_bytes);
     if (!next.ok()) {
       return next.status();
     }
@@ -81,7 +81,7 @@ absl::Status AltsTsiHandshaker::Next(void* handshaker, const unsigned char* rece
   std::unique_ptr<AltsHandshakeResult> handshake_result = nullptr;
   if (response.has_result()) {
     is_handshake_complete_ = true;
-    auto result = GetHandshakeResult(response.result(), in_bytes, response.bytes_consumed());
+    auto result = getHandshakeResult(response.result(), in_bytes, response.bytes_consumed());
     if (!result.ok()) {
       return result.status();
     }
@@ -96,7 +96,7 @@ absl::Status AltsTsiHandshaker::Next(void* handshaker, const unsigned char* rece
   return absl::OkStatus();
 }
 
-std::size_t AltsTsiHandshaker::ComputeMaxFrameSize(const grpc::gcp::HandshakerResult& result) {
+std::size_t AltsTsiHandshaker::computeMaxFrameSize(const grpc::gcp::HandshakerResult& result) {
   std::size_t max_frame_size = kAltsMinFrameSize;
   if (result.max_frame_size() > 0) {
     max_frame_size = std::min<std::size_t>(result.max_frame_size(), kMaxFrameSize);
@@ -106,7 +106,7 @@ std::size_t AltsTsiHandshaker::ComputeMaxFrameSize(const grpc::gcp::HandshakerRe
 }
 
 absl::StatusOr<std::unique_ptr<AltsHandshakeResult>>
-AltsTsiHandshaker::GetHandshakeResult(const grpc::gcp::HandshakerResult& result,
+AltsTsiHandshaker::getHandshakeResult(const grpc::gcp::HandshakerResult& result,
                                       absl::string_view received_bytes,
                                       std::size_t bytes_consumed) {
   // Validate the HandshakerResult message.
@@ -136,7 +136,7 @@ AltsTsiHandshaker::GetHandshakeResult(const grpc::gcp::HandshakerResult& result,
   }
 
   // Create the frame protector.
-  std::size_t max_frame_size = ComputeMaxFrameSize(result);
+  std::size_t max_frame_size = computeMaxFrameSize(result);
   tsi_zero_copy_grpc_protector* protector = nullptr;
   grpc_core::ExecCtx exec_ctx;
   tsi_result ok = alts_zero_copy_grpc_protector_create(

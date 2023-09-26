@@ -84,14 +84,14 @@ TEST_F(AltsChannelPoolTest, SuccessWithDefaultChannels) {
   startFakeHandshakerService();
 
   // Create a channel pool and check that it has the correct dimensions.
-  auto channel_pool = AltsChannelPool::Create(serverAddress());
+  auto channel_pool = AltsChannelPool::create(serverAddress());
   EXPECT_THAT(channel_pool, NotNull());
-  EXPECT_THAT(channel_pool->GetChannel(), NotNull());
-  EXPECT_EQ(channel_pool->GetChannelPoolSize(), 10);
+  EXPECT_THAT(channel_pool->getChannel(), NotNull());
+  EXPECT_EQ(channel_pool->getChannelPoolSize(), 10);
 
   // Check that we can write to and read from the channel multiple times.
   for (int i = 0; i < 10; ++i) {
-    auto channel = channel_pool->GetChannel();
+    auto channel = channel_pool->getChannel();
     EXPECT_THAT(channel, NotNull());
     grpc::ClientContext client_context;
     auto stub = HandshakerService::NewStub(channel);

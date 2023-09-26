@@ -57,7 +57,7 @@ absl::Status TsiHandshaker::next(Envoy::Buffer::Instance& received) {
   calling_ = true;
 
   uint64_t received_size = received.length();
-  absl::Status status = handshaker_->Next(
+  absl::Status status = handshaker_->next(
       this, reinterpret_cast<const unsigned char*>(received.linearize(received_size)),
       received_size, onNextDone);
 

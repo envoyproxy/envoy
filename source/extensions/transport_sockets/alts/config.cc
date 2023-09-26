@@ -34,7 +34,7 @@ public:
 
   ~AltsSharedState() override = default;
 
-  std::shared_ptr<grpc::Channel> getChannel() const { return channel_pool_->GetChannel(); }
+  std::shared_ptr<grpc::Channel> getChannel() const { return channel_pool_->getChannel(); }
 
 private:
   // There is blanket google-grpc initialization in MainCommonBase, but that
@@ -75,9 +75,9 @@ TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     ASSERT(local_address != nullptr);
     std::unique_ptr<AltsTsiHandshaker> tsi_handshaker = nullptr;
     if (is_upstream) {
-      tsi_handshaker = AltsTsiHandshaker::CreateForClient(alts_shared_state->getChannel());
+      tsi_handshaker = AltsTsiHandshaker::createForClient(alts_shared_state->getChannel());
     } else {
-      tsi_handshaker = AltsTsiHandshaker::CreateForServer(alts_shared_state->getChannel());
+      tsi_handshaker = AltsTsiHandshaker::createForServer(alts_shared_state->getChannel());
     }
     return std::make_unique<TsiHandshaker>(std::move(tsi_handshaker), dispatcher);
   };

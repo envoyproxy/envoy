@@ -161,7 +161,7 @@ private:
 TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForClient(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
   Event::MockDispatcher dispatcher;
   auto tsi_handshaker = std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
 
@@ -204,7 +204,7 @@ TEST_F(AltsTsiHandshakerTest, ClientSideFullHandshake) {
 TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
   // Setup.
   startFakeHandshakerService();
-  auto handshaker = AltsTsiHandshaker::CreateForServer(getChannel());
+  auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
   Event::MockDispatcher dispatcher;
   auto tsi_handshaker = std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
 

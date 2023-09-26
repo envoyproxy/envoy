@@ -23,7 +23,7 @@ using ::grpc::gcp::ServerHandshakeParameters;
 using ::grpc::gcp::StartClientHandshakeReq;
 using ::grpc::gcp::StartServerHandshakeReq;
 
-void AltsProxy::SetRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions) {
+void AltsProxy::setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions) {
   rpc_protocol_versions->mutable_max_rpc_version()->set_major(kMaxMajorRpcVersion);
   rpc_protocol_versions->mutable_max_rpc_version()->set_minor(kMaxMinorRpcVersion);
   rpc_protocol_versions->mutable_min_rpc_version()->set_major(kMinMajorRpcVersion);
@@ -31,7 +31,7 @@ void AltsProxy::SetRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_proto
 }
 
 absl::StatusOr<std::unique_ptr<AltsProxy>>
-AltsProxy::Create(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
+AltsProxy::create(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
   if (handshaker_service_channel == nullptr) {
     return absl::InvalidArgumentError("Handshaker service channel is null.");
   }
@@ -61,7 +61,7 @@ AltsProxy::~AltsProxy() {
   }
 }
 
-absl::StatusOr<HandshakerResp> AltsProxy::SendStartClientHandshakeReq() {
+absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
   // Prepare the StartClientHandshakeReq message. Ignore the target name field:
   // it should never be populated for Envoy's use of ALTS.
   HandshakerReq request;
@@ -69,7 +69,7 @@ absl::StatusOr<HandshakerResp> AltsProxy::SendStartClientHandshakeReq() {
   client_start->set_handshake_security_protocol(grpc::gcp::ALTS);
   client_start->add_application_protocols(kApplicationProtocol);
   client_start->add_record_protocols(kRecordProtocol);
-  SetRpcProtocolVersions(client_start->mutable_rpc_versions());
+  setRpcProtocolVersions(client_start->mutable_rpc_versions());
   client_start->set_max_frame_size(kMaxFrameSize);
 
   // Send the StartClientHandshakeReq message to the handshaker service and wait
@@ -90,7 +90,7 @@ absl::StatusOr<HandshakerResp> AltsProxy::SendStartClientHandshakeReq() {
   return response;
 }
 
-absl::StatusOr<HandshakerResp> AltsProxy::SendStartServerHandshakeReq(absl::string_view in_bytes) {
+absl::StatusOr<HandshakerResp> AltsProxy::sendStartServerHandshakeReq(absl::string_view in_bytes) {
   // Prepare the StartServerHandshakeReq message.
   ServerHandshakeParameters server_parameters;
   server_parameters.add_record_protocols(kRecordProtocol);
@@ -98,7 +98,7 @@ absl::StatusOr<HandshakerResp> AltsProxy::SendStartServerHandshakeReq(absl::stri
   StartServerHandshakeReq* server_start = request.mutable_server_start();
   server_start->add_application_protocols(kApplicationProtocol);
   (*server_start->mutable_handshake_parameters())[HandshakeProtocol::ALTS] = server_parameters;
-  SetRpcProtocolVersions(server_start->mutable_rpc_versions());
+  setRpcProtocolVersions(server_start->mutable_rpc_versions());
   server_start->set_in_bytes(std::string(in_bytes));
   server_start->set_max_frame_size(kMaxFrameSize);
 
@@ -121,7 +121,7 @@ absl::StatusOr<HandshakerResp> AltsProxy::SendStartServerHandshakeReq(absl::stri
 }
 
 absl::StatusOr<grpc::gcp::HandshakerResp>
-AltsProxy::SendNextHandshakeReq(absl::string_view in_bytes) {
+AltsProxy::sendNextHandshakeReq(absl::string_view in_bytes) {
   // Prepare the NextHandshakeMessageReq message.
   HandshakerReq request;
   NextHandshakeMessageReq* next = request.mutable_next();

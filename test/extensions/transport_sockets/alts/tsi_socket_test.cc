@@ -160,13 +160,13 @@ protected:
     server_.handshaker_factory_ = [this](Event::Dispatcher& dispatcher,
                                          const Network::Address::InstanceConstSharedPtr&,
                                          const Network::Address::InstanceConstSharedPtr&) {
-      auto handshaker = AltsTsiHandshaker::CreateForServer(getChannel());
+      auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
       return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
     };
     client_.handshaker_factory_ = [this](Event::Dispatcher& dispatcher,
                                          const Network::Address::InstanceConstSharedPtr&,
                                          const Network::Address::InstanceConstSharedPtr&) {
-      auto handshaker = AltsTsiHandshaker::CreateForClient(getChannel());
+      auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
       return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
     };
   }
