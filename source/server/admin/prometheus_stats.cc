@@ -90,6 +90,72 @@ struct PrimitiveMetricSnapshotLessThan {
   }
 };
 
+std::string generateNumericOutput(uint64_t value, const Stats::TagVector& tags,
+                                  const std::string& prefixed_tag_extracted_name) {
+  const std::string formatted_tags = PrometheusStatsFormatter::formattedTags(tags);
+  return fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, formatted_tags, value);
+}
+
+/*
+ * Return the prometheus output for a numeric Stat (Counter or Gauge).
+ */
+template <class StatType>
+std::string generateStatNumericOutput(const StatType& metric,
+                                      const std::string& prefixed_tag_extracted_name) {
+  return generateNumericOutput(metric.value(), metric.tags(), prefixed_tag_extracted_name);
+}
+
+/*
+ * Returns the prometheus output for a TextReadout in gauge format.
+ * It is a workaround of a limitation of prometheus which stores only numeric metrics.
+ * The output is a gauge named the same as a given text-readout. The value of returned gauge is
+ * always equal to 0. Returned gauge contains all tags of a given text-readout and one additional
+ * tag {"text_value":"textReadout.value"}.
+ */
+std::string generateTextReadoutOutput(const Stats::TextReadout& text_readout,
+                                      const std::string& prefixed_tag_extracted_name) {
+  auto tags = text_readout.tags();
+  tags.push_back(Stats::Tag{"text_value", text_readout.value()});
+  const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
+  return fmt::format("{0}{{{1}}} 0\n", prefixed_tag_extracted_name, formattedTags);
+}
+
+/*
+ * Returns the prometheus output for a histogram. The output is a multi-line string (with embedded
+ * newlines) that contains all the individual bucket counts and sum/count for a single histogram
+ * (metric_name plus all tags).
+ */
+std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
+                                    const std::string& prefixed_tag_extracted_name) {
+  const std::string tags = PrometheusStatsFormatter::formattedTags(histogram.tags());
+  const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
+
+  const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
+  Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
+  const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
+  std::string output;
+  for (size_t i = 0; i < supported_buckets.size(); ++i) {
+    double bucket = supported_buckets[i];
+    uint64_t value = computed_buckets[i];
+    // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
+    // doesn't have a specific modifier to format as a fixed-point value only so we use the
+    // 'g' operator which prints the number in general fixed point format or scientific format
+    // with precision 50 to round the number up to 32 significant digits in fixed point format
+    // which should cover pretty much all cases
+    output.append(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", prefixed_tag_extracted_name,
+                              hist_tags, bucket, value));
+  }
+
+  output.append(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", prefixed_tag_extracted_name,
+                            hist_tags, stats.sampleCount()));
+  output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,
+                            stats.sampleSum()));
+  output.append(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags,
+                            stats.sampleCount()));
+
+  return output;
+};
+
 /**
  * Processes a stat type (counter, gauge, histogram) by generating all output lines, sorting
  * them by tag-extracted metric name, and then outputting them in the correct sorted order into
@@ -176,12 +242,9 @@ uint64_t outputStatType(
 }
 
 template <class StatType>
-uint64_t outputPrimitiveStatType(
-    Buffer::Instance& response, const StatsParams& params, const std::vector<StatType>& metrics,
-    const std::function<std::string(uint64_t value, const Stats::TagVector& tags,
-                                    const std::string& prefixed_tag_extracted_name)>&
-        generate_output,
-    absl::string_view type, const Stats::CustomStatNamespaces& custom_namespaces) {
+uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& params,
+                                 const std::vector<StatType>& metrics, absl::string_view type,
+                                 const Stats::CustomStatNamespaces& custom_namespaces) {
 
   /*
    * From
@@ -232,78 +295,12 @@ uint64_t outputPrimitiveStatType(
     std::sort(group.second.begin(), group.second.end(), PrimitiveMetricSnapshotLessThan());
 
     for (const auto& metric : group.second) {
-      response.add(
-          generate_output(metric->value(), metric->tags(), prefixed_tag_extracted_name.value()));
+      response.add(generateNumericOutput(metric->value(), metric->tags(),
+                                         prefixed_tag_extracted_name.value()));
     }
   }
   return result;
 }
-
-std::string generateNumericOutput(uint64_t value, const Stats::TagVector& tags,
-                                  const std::string& prefixed_tag_extracted_name) {
-  const std::string formatted_tags = PrometheusStatsFormatter::formattedTags(tags);
-  return fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, formatted_tags, value);
-}
-
-/*
- * Return the prometheus output for a numeric Stat (Counter or Gauge).
- */
-template <class StatType>
-std::string generateStatNumericOutput(const StatType& metric,
-                                      const std::string& prefixed_tag_extracted_name) {
-  return generateNumericOutput(metric.value(), metric.tags(), prefixed_tag_extracted_name);
-}
-
-/*
- * Returns the prometheus output for a TextReadout in gauge format.
- * It is a workaround of a limitation of prometheus which stores only numeric metrics.
- * The output is a gauge named the same as a given text-readout. The value of returned gauge is
- * always equal to 0. Returned gauge contains all tags of a given text-readout and one additional
- * tag {"text_value":"textReadout.value"}.
- */
-std::string generateTextReadoutOutput(const Stats::TextReadout& text_readout,
-                                      const std::string& prefixed_tag_extracted_name) {
-  auto tags = text_readout.tags();
-  tags.push_back(Stats::Tag{"text_value", text_readout.value()});
-  const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
-  return fmt::format("{0}{{{1}}} 0\n", prefixed_tag_extracted_name, formattedTags);
-}
-
-/*
- * Returns the prometheus output for a histogram. The output is a multi-line string (with embedded
- * newlines) that contains all the individual bucket counts and sum/count for a single histogram
- * (metric_name plus all tags).
- */
-std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
-                                    const std::string& prefixed_tag_extracted_name) {
-  const std::string tags = PrometheusStatsFormatter::formattedTags(histogram.tags());
-  const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
-
-  const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
-  Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
-  const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
-  std::string output;
-  for (size_t i = 0; i < supported_buckets.size(); ++i) {
-    double bucket = supported_buckets[i];
-    uint64_t value = computed_buckets[i];
-    // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
-    // doesn't have a specific modifier to format as a fixed-point value only so we use the
-    // 'g' operator which prints the number in general fixed point format or scientific format
-    // with precision 50 to round the number up to 32 significant digits in fixed point format
-    // which should cover pretty much all cases
-    output.append(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", prefixed_tag_extracted_name,
-                              hist_tags, bucket, value));
-  }
-
-  output.append(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", prefixed_tag_extracted_name,
-                            hist_tags, stats.sampleCount()));
-  output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,
-                            stats.sampleSum()));
-  output.append(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags,
-                            stats.sampleCount()));
-
-  return output;
-};
 
 } // namespace
 
@@ -382,11 +379,11 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
         ASSERT(metric.name().empty());
       });
 
-  metric_name_count += outputPrimitiveStatType(response, params, host_counters,
-                                               generateNumericOutput, "counter", custom_namespaces);
+  metric_name_count +=
+      outputPrimitiveStatType(response, params, host_counters, "counter", custom_namespaces);
 
-  metric_name_count += outputPrimitiveStatType(response, params, host_gauges, generateNumericOutput,
-                                               "gauge", custom_namespaces);
+  metric_name_count +=
+      outputPrimitiveStatType(response, params, host_gauges, "gauge", custom_namespaces);
 
   return metric_name_count;
 }
