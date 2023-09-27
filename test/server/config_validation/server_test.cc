@@ -23,10 +23,9 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-class NullptrComponentFactory : public ComponentFactory {
+class NullDrainManagerComponentFactory : public TestComponentFactory {
 public:
   DrainManagerPtr createDrainManager(Instance&) override { return nullptr; }
-  Runtime::LoaderPtr createRuntime(Instance&, Configuration::Initial&) override { return nullptr; }
 };
 
 // Test param is the path to the config file to validate.
@@ -223,7 +222,7 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 // the drain manager.
 TEST_P(ValidationServerTest, DrainManagerNullptrCheck) {
   // Setup the server instance.
-  NullptrComponentFactory component_factory;
+  NullDrainManagerComponentFactory component_factory;
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime time_system;
