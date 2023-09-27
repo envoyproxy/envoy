@@ -92,6 +92,7 @@ private:
   Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
 
+  Http::FilterHeadersStatus processCachedBucket(size_t bucket_id);
   FilterConfigConstSharedPtr config_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Server::Configuration::FactoryContext& factory_context_;

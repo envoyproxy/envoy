@@ -20,7 +20,7 @@ DEV_VERSION_REGEX="-dev$"
 BUILD_TYPE=html
 
 if [[ "$VERSION" =~ $DEV_VERSION_REGEX ]]; then
-   if [[ "$AZP_BRANCH" == "$MAIN_BRANCH" ]]; then
+   if [[ "$CI_BRANCH" == "$MAIN_BRANCH" ]]; then
        # no need to build html, just rst
        BUILD_TYPE=rst
    fi
@@ -37,15 +37,6 @@ IFS=" " read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
 # We want the binary at the end
 BAZEL_BUILD_OPTIONS+=(--remote_download_toplevel)
 
-if [[ "${AZP_BRANCH}" =~ ^refs/pull ]]; then
-    # For PRs use the unmerged PR commit in the version string.
-    #
-    # Staged/built docs still use the merged sha in the URL to distinguish builds
-    #
-    export BUILD_DOCS_SHA="${AZP_COMMIT_SHA}"
-    BAZEL_BUILD_OPTIONS+=("--action_env=BUILD_DOCS_SHA")
-fi
-
 if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
     export SPHINX_RUNNER_ARGS="-v warn"
     BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
@@ -56,7 +47,7 @@ if [[ "${BUILD_TYPE}" == "html" ]] || [[ -n "${DOCS_BUILD_HTML}" ]]; then
     BUILD_HTML=1
     BUILD_HTML_TARGET="//docs:html"
     BUILD_HTML_TARBALL="bazel-bin/docs/html.tar.gz"
-    if [[ -n "${AZP_BRANCH}" ]] || [[ -n "${DOCS_BUILD_RELEASE}" ]]; then
+    if [[ -n "${CI_BRANCH}" ]] || [[ -n "${DOCS_BUILD_RELEASE}" ]]; then
         # CI build - use git sha
         BUILD_HTML_TARGET="//docs:html_release"
         BUILD_HTML_TARBALL="bazel-bin/docs/html_release.tar.gz"
