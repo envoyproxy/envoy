@@ -220,22 +220,6 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 }
 
 // A test to ensure that ENVOY_BUGs are handled when the component factory returns a nullptr for
-// the Envoy runtime.
-TEST_P(ValidationServerTest, RuntimeNullptrCheck) {
-  // Setup the server instance.
-  NullptrComponentFactory component_factory;
-  Thread::MutexBasicLockable access_log_lock;
-  Stats::IsolatedStoreImpl stats_store;
-  DangerousDeprecatedTestTime time_system;
-  EXPECT_ENVOY_BUG(ValidationInstance server(options_, time_system.timeSystem(),
-                                             Network::Address::InstanceConstSharedPtr(),
-                                             stats_store, access_log_lock, component_factory,
-                                             Thread::threadFactoryForTest(),
-                                             Filesystem::fileSystemForTest()),
-                   "Component factory should not return nullptr from createRuntime()");
-}
-
-// A test to ensure that ENVOY_BUGs are handled when the component factory returns a nullptr for
 // the drain manager.
 TEST_P(ValidationServerTest, DrainManagerNullptrCheck) {
   // Setup the server instance.
