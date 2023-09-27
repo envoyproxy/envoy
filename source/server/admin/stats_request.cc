@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Server {
 
 StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
-                           Upstream::ClusterManager& cm, UrlHandlerFn url_handler_fn)
+                           const Upstream::ClusterManager& cm, UrlHandlerFn url_handler_fn)
     : params_(params), stats_(stats), cm_(cm), url_handler_fn_(url_handler_fn) {
   switch (params_.type_) {
   case StatsType::TextReadouts:

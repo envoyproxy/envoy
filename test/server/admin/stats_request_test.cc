@@ -7,6 +7,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -35,7 +36,7 @@ protected:
     params.used_only_ = used_only;
     params.type_ = type;
     params.format_ = format;
-    return std::make_unique<StatsRequest>(store_, params);
+    return std::make_unique<StatsRequest>(store_, params, cm_);
   }
 
   std::unique_ptr<StatsRequest> makeHiddenRequest(HiddenFlag hidden, StatsFormat format,
@@ -44,7 +45,7 @@ protected:
     params.hidden_ = hidden;
     params.type_ = type;
     params.format_ = format;
-    return std::make_unique<StatsRequest>(store_, params);
+    return std::make_unique<StatsRequest>(store_, params, cm_);
   }
 
   // Executes a request, counting the chunks that were generated.
@@ -92,6 +93,7 @@ protected:
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::ThreadLocalStoreImpl store_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   Buffer::OwnedImpl response_;
 };
 

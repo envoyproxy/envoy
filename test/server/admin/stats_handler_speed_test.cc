@@ -91,7 +91,7 @@ public:
       StatsHandler::prometheusRender(*store_, custom_namespaces_, cm_, params, data);
       return data.length();
     }
-    Admin::RequestPtr request = StatsHandler::makeRequest(*store_, params);
+    Admin::RequestPtr request = StatsHandler::makeRequest(*store_, params, cm_);
     auto response_headers = Http::ResponseHeaderMapImpl::create();
     request->start(*response_headers);
     uint64_t count = 0;

@@ -1228,7 +1228,7 @@ protected:
   }
 
   void statsEndpoint() {
-    StatsRequest request(*store_, StatsParams());
+    StatsRequest request(*store_, StatsParams(), cm_);
     Http::TestResponseHeaderMapImpl response_headers;
     request.start(response_headers);
     Buffer::OwnedImpl data;
@@ -1247,6 +1247,7 @@ protected:
   Stats::StatNamePool pool_;
   Stats::AllocatorImpl alloc_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   std::vector<Stats::ScopeSharedPtr> scopes_{NumScopes};
   absl::Mutex scope_mutexes_[NumScopes];
   std::atomic<uint64_t> total_lines_{0};
