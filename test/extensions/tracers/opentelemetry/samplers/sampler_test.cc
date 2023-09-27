@@ -45,9 +45,40 @@ public:
   std::string name() const override { return "envoy.tracers.opentelemetry.samplers.testsampler"; }
 };
 
-TEST(SamplerFactoryTest, test) {
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+class SamplerFactoryTest : public testing::Test {
 
+protected:
+  NiceMock<Tracing::MockConfig> config;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Tracing::TestTraceContextImpl trace_context{};
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+};
+
+TEST_F(SamplerFactoryTest, TestWithoutSampler) {
+  // using StrictMock, calls to sampler would cause a test failure
+  auto test_sampler = std::make_shared<testing::StrictMock<TestSampler>>();
+  testing::StrictMock<TestSamplerFactory> sampler_factory;
+  Registry::InjectFactory<SamplerFactory> sampler_factory_registration(sampler_factory);
+
+  // no sampler configured
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    service_name: my-service
+    )EOF";
+
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto driver = std::make_unique<Driver>(opentelemetry_config, context);
+
+  driver->startSpan(config, trace_context, stream_info, "operation_name",
+                    {Tracing::Reason::Sampling, true});
+}
+
+TEST_F(SamplerFactoryTest, TestWithSampler) {
   auto test_sampler = std::make_shared<NiceMock<TestSampler>>();
   TestSamplerFactory sampler_factory;
   Registry::InjectFactory<SamplerFactory> sampler_factory_registration(sampler_factory);
@@ -70,6 +101,11 @@ TEST(SamplerFactoryTest, test) {
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   auto driver = std::make_unique<Driver>(opentelemetry_config, context);
+
+  EXPECT_CALL(*test_sampler, modifyTracestate(_, _));
+  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _));
+  driver->startSpan(config, trace_context, stream_info, "operation_name",
+                    {Tracing::Reason::Sampling, true});
 }
 
 } // namespace
