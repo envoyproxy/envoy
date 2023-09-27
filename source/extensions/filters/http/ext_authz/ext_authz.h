@@ -89,6 +89,9 @@ public:
                                            config.typed_metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
+        charge_cluster_response_stats_(config.has_charge_cluster_response_stats()
+                                           ? config.charge_cluster_response_stats()
+                                           : true),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -174,6 +177,8 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
+  bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
+
   const Filters::Common::ExtAuthz::MatcherSharedPtr& requestHeaderMatchers() const {
     return request_header_matchers_;
   }
@@ -226,6 +231,7 @@ private:
 
   const bool include_peer_certificate_;
   const bool include_tls_session_;
+  const bool charge_cluster_response_stats_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;

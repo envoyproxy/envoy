@@ -185,6 +185,9 @@ message ExtAuthz {
   // When this field is true, Envoy will include the SNI name used for TLSClientHello, if available, in the
   // :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
   bool include_tls_session = 18;
+
+  // Whether to increment cluster.<cluster_name>.internal.upstream_rq_* statistics on authorization failure.
+  optional bool charge_cluster_response_stats = 19;
 }
 
 // Configuration for buffering the request data.
