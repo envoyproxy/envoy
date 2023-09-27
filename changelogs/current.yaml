@@ -177,6 +177,9 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed ``envoy_reloadable_features_append_query_parameters_path_rewriter`` and legacy code paths.
 - area: xDS
   change: |
     Removed ``envoy.restart_features.explicit_wildcard_resource`` and legacy code paths.
@@ -300,6 +303,11 @@ new_features:
   change: |
     Added the ability to specify a custom upstream local address selector using
     :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
+- area: redis
+  change: |
+    Added new configuration field :ref:`read_command_policy
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.read_command_policy>`
+    to specify Envoy should route read commands to another cluster.
 - area: tap
   change: |
     added :ref:`record_downstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_downstream_connection>`
@@ -312,6 +320,7 @@ new_features:
 - area: original_dst
   change: |
     added support for the internal listener address recovery using the original destination listener filter.
+
 
 deprecated:
 - area: tracing

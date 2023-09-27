@@ -27,7 +27,9 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallback
   if (file_changed_) {
     file_changed_ = false;
     TRY_ASSERT_MAIN_THREAD {
-      const std::string contents = api_.fileSystem().fileReadToEnd(filename_);
+      auto file_or_error = api_.fileSystem().fileReadToEnd(filename_);
+      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      const std::string contents = file_or_error.value();
       double pressure;
       if (absl::SimpleAtod(contents, &pressure)) {
         if (pressure < 0 || pressure > 1) {

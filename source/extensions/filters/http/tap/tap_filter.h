@@ -99,8 +99,13 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     HttpTapConfigSharedPtr config = config_->currentConfig();
-    tapper_ = config ? config->createPerRequestTapper(config_->getTapConfig(), callbacks.streamId())
-                     : nullptr;
+    if (config != nullptr) {
+      auto streamId = callbacks.streamId();
+      auto connection = callbacks.connection();
+      tapper_ = config->createPerRequestTapper(config_->getTapConfig(), streamId, connection);
+    } else {
+      tapper_ = nullptr;
+    }
   }
 
   // Http::StreamEncoderFilter

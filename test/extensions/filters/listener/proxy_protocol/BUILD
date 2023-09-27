@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -60,15 +61,19 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "proxy_proto_integration_test_lib",
+    hdrs = ["proxy_proto_integration_test.h"],
+    deps = ["@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto"],
+)
+
 envoy_extension_cc_test(
     name = "proxy_proto_integration_test",
     size = "large",
-    srcs = [
-        "proxy_proto_integration_test.cc",
-        "proxy_proto_integration_test.h",
-    ],
+    srcs = ["proxy_proto_integration_test.cc"],
     extension_names = ["envoy.filters.listener.proxy_protocol"],
     deps = [
+        ":proxy_proto_integration_test_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
         "//source/extensions/access_loggers/file:config",

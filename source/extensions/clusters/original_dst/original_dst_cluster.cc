@@ -109,9 +109,8 @@ OriginalDstCluster::LoadBalancer::filterStateOverrideHost(LoadBalancerContext* c
     if (streamInfo == nullptr) {
       continue;
     }
-    const auto* dst_address =
-        streamInfo->filterState().getDataReadOnly<Network::DestinationAddress>(
-            Network::DestinationAddress::key());
+    const auto* dst_address = streamInfo->filterState().getDataReadOnly<Network::AddressObject>(
+        OriginalDstClusterFilterStateKey);
     if (dst_address) {
       return dst_address->address();
     }
@@ -353,6 +352,13 @@ OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::C
  * Static registration for the original dst cluster factory. @see RegisterFactory.
  */
 REGISTER_FACTORY(OriginalDstClusterFactory, ClusterFactory);
+
+class OriginalDstClusterFilterStateFactory : public Network::BaseAddressObjectFactory {
+public:
+  std::string name() const override { return std::string(OriginalDstClusterFilterStateKey); }
+};
+
+REGISTER_FACTORY(OriginalDstClusterFilterStateFactory, StreamInfo::FilterState::ObjectFactory);
 
 } // namespace Upstream
 } // namespace Envoy

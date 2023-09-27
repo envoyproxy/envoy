@@ -51,7 +51,12 @@ jobs:
       env:
         # Path relative to ./mobile directory
         MOBILE_DOCS_CHECKOUT_DIR: ../mobile-docs
-        MOBILE_PUSH_CHANGES: ${{ github.event_name != 'pull_request' }}
+    # This step needs to be done outside the container to access ssh creds
+    - name: Push changes
+      if: ${{ github.event_name != 'pull_request' }}
+      run: |
+        git -C mobile-docs push origin master
+
     - uses: actions/upload-artifact@v3
       with:
         name: docs

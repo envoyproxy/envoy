@@ -117,8 +117,6 @@ fi
 docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
-       -e AZP_BRANCH \
-       -e AZP_COMMIT_SHA \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
@@ -161,8 +159,6 @@ docker run --rm \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \
        -e MOBILE_DOCS_CHECKOUT_DIR \
-       -e MOBILE_PUSH_CHANGES \
-       -e NETLIFY_TRIGGER_URL \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \

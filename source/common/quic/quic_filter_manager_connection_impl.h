@@ -177,6 +177,8 @@ protected:
                               quic::ConnectionCloseSource source,
                               const quic::ParsedQuicVersion& version);
 
+  // Apply delay close policy if there is any.
+  void maybeApplyDelayedClose();
   void closeConnectionImmediately() override;
 
   virtual bool hasDataToWrite() PURE;

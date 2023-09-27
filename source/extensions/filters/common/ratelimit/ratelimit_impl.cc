@@ -123,13 +123,13 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
-                          const envoy::config::core::v3::GrpcService& grpc_service,
+                          const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                           const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
-      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-          grpc_service, context.scope(), true),
+      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
+          config_with_hash_key, context.scope(), true),
       timeout);
 }
 
