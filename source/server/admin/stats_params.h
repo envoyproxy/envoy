@@ -104,12 +104,15 @@ struct StatsParams {
     // In the non-prometheus case, the name is needed if the metric should be shown, so compute it
     // once and use it for both regex filtering and in emitting the stat (consumed by caller by
     // setting `name_out` to non-nullptr).
+    //
+    // For per-endpoint metrics, the name is precomputed and returned as a reference, so storing
+    // it in a std::string causes an extra allocation.
     if (name_out != nullptr) {
       *name_out = metric.name();
     }
 
     if (re2_filter_ != nullptr &&
-        !re2::RE2::PartialMatch((name_out == nullptr) ? metric.name() : *name_out, *re2_filter_)) {
+        !re2::RE2::PartialMatch((name_out != nullptr) ? *name_out : metric.name(), *re2_filter_)) {
       return false;
     }
     return true;
