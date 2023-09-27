@@ -8,13 +8,25 @@ import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.common.set_filter_state.v3";
-option java_outer_classname = "SetFilterStateProto";
+option java_outer_classname = "RuleProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/common/set_filter_state/v3;set_filter_statev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // A filter state update rule.
+// [#next-free-field: 6]
 message Rule {
+  enum SharedWithUpstream {
+    // Object is not shared with the upstream internal connections.
+    NONE = 0;
+
+    // Object is shared with the upstream internal connection.
+    ONCE = 1;
+
+    // Object is shared with the upstream internal connection and any internal connection upstream from it.
+    TRANSITIVE = 2;
+  }
+
   // Filter state key.
   string key = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -28,15 +40,6 @@ message Rule {
 
   // If marked as read-only, the filter state key cannot be overridden by subsequent updates.
   bool read_only = 3;
-
-  enum SharedWithUpstream {
-    // Object is not shared with the upstream internal connections.
-    NONE = 0;
-    // Object is shared with the upstream internal connection.
-    ONCE = 1;
-    // Object is shared with the upstream internal connection and any internal connection upstream from it.
-    TRANSITIVE = 2;
-  }
 
   // Configures the object to be shared with the upstream internal connections. See :ref:`internal upstream
   // transport <config_internal_upstream_transport>` for more details.
