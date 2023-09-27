@@ -32,8 +32,6 @@ EXTENSIONS = {
     "envoy.listener_manager_impl.api":                     "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
     "envoy.connection_handler.default":                    "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
     "envoy.load_balancing_policies.round_robin":           "//source/extensions/load_balancing_policies/round_robin:config",
-    "envoy.load_balancing_policies.least_request":         "//source/extensions/load_balancing_policies/least_request:config",
-    "envoy.load_balancing_policies.random":                "//source/extensions/load_balancing_policies/random:config",
     "envoy.load_balancing_policies.cluster_provided":      "//source/extensions/load_balancing_policies/cluster_provided:config",
 }
 WINDOWS_EXTENSIONS = {}

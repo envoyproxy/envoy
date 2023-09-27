@@ -119,7 +119,8 @@ public:
 };
 
 /**
- * Implementation of SubsetSelector
+ * Implementation of SubsetSelector. This is part of subset load balancer config and is used to
+ * store config of single selector.
  */
 class SubsetSelectorImpl : public SubsetSelector {
 public:
@@ -148,77 +149,16 @@ private:
   const bool single_host_per_subset_ : 1;
 };
 
-/**
- * Implementation of LoadBalancerSubsetInfo.
- */
-class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
-public:
-  LoadBalancerSubsetInfoImpl(
-      const envoy::config::cluster::v3::Cluster::LbSubsetConfig& subset_config)
-      : default_subset_(subset_config.default_subset()),
-        fallback_policy_(subset_config.fallback_policy()),
-        metadata_fallback_policy_(subset_config.metadata_fallback_policy()),
-        enabled_(!subset_config.subset_selectors().empty()),
-        locality_weight_aware_(subset_config.locality_weight_aware()),
-        scale_locality_weight_(subset_config.scale_locality_weight()),
-        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
-    for (const auto& subset : subset_config.subset_selectors()) {
-      if (!subset.keys().empty()) {
-        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
-            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset(),
-            subset.single_host_per_subset()));
-      }
-    }
-  }
-  LoadBalancerSubsetInfoImpl()
-      : LoadBalancerSubsetInfoImpl(
-            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance()) {}
-
-  // Upstream::LoadBalancerSubsetInfo
-  bool isEnabled() const override { return enabled_; }
-  envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
-  fallbackPolicy() const override {
-    return fallback_policy_;
-  }
-  envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
-  metadataFallbackPolicy() const override {
-    return metadata_fallback_policy_;
-  }
-  const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
-  const std::vector<SubsetSelectorPtr>& subsetSelectors() const override {
-    return subset_selectors_;
-  }
-  bool localityWeightAware() const override { return locality_weight_aware_; }
-  bool scaleLocalityWeight() const override { return scale_locality_weight_; }
-  bool panicModeAny() const override { return panic_mode_any_; }
-  bool listAsAny() const override { return list_as_any_; }
-  bool allowRedundantKeys() const override { return false; }
-
-private:
-  const ProtobufWkt::Struct default_subset_;
-  std::vector<SubsetSelectorPtr> subset_selectors_;
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
-      fallback_policy_;
-  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
-      metadata_fallback_policy_;
-  const bool enabled_ : 1;
-  const bool locality_weight_aware_ : 1;
-  const bool scale_locality_weight_ : 1;
-  const bool panic_mode_any_ : 1;
-  const bool list_as_any_ : 1;
-};
-using DefaultLoadBalancerSubsetInfoImpl = ConstSingleton<LoadBalancerSubsetInfoImpl>;
-
-using HostHashSet = absl::flat_hash_set<HostSharedPtr>;
-
 using SubsetLoadbalancingPolicyProto =
     envoy::extensions::load_balancing_policies::subset::v3::Subset;
 using LegacySubsetLoadbalancingPolicyProto = envoy::config::cluster::v3::Cluster::LbSubsetConfig;
 
-class ProdLoadBalancerSubsetInfoImpl : public Upstream::LoadBalancerSubsetInfo {
+/**
+ * Implementation of LoadBalancerSubsetInfo. Both the legacy and extension subset proto configs
+ * are converted to this class.
+ */
+class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
-  // TODO(wbpcode): use legacy enum for backward compatibility for now.
   using FallbackPolicy =
       envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy;
   using MetadataFallbackPolicy =
@@ -226,25 +166,7 @@ public:
   using SubsetFallbackPolicy = envoy::config::cluster::v3::Cluster::LbSubsetConfig::
       LbSubsetSelector::LbSubsetSelectorFallbackPolicy;
 
-  ProdLoadBalancerSubsetInfoImpl(const LegacySubsetLoadbalancingPolicyProto& subset_config)
-      : default_subset_(subset_config.default_subset()),
-        fallback_policy_(static_cast<FallbackPolicy>(subset_config.fallback_policy())),
-        metadata_fallback_policy_(
-            static_cast<MetadataFallbackPolicy>(subset_config.metadata_fallback_policy())),
-        enabled_(!subset_config.subset_selectors().empty()),
-        locality_weight_aware_(subset_config.locality_weight_aware()),
-        scale_locality_weight_(subset_config.scale_locality_weight()),
-        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
-    for (const auto& subset : subset_config.subset_selectors()) {
-      if (!subset.keys().empty()) {
-        subset_selectors_.emplace_back(std::make_shared<Upstream::SubsetSelectorImpl>(
-            subset.keys(), static_cast<SubsetFallbackPolicy>(subset.fallback_policy()),
-            subset.fallback_keys_subset(), subset.single_host_per_subset()));
-      }
-    }
-  }
-
-  ProdLoadBalancerSubsetInfoImpl(const SubsetLoadbalancingPolicyProto& subset_config)
+  LoadBalancerSubsetInfoImpl(const SubsetLoadbalancingPolicyProto& subset_config)
       : default_subset_(subset_config.default_subset()),
         fallback_policy_(static_cast<FallbackPolicy>(subset_config.fallback_policy())),
         metadata_fallback_policy_(
@@ -271,6 +193,26 @@ public:
                        });
     }
   }
+
+  LoadBalancerSubsetInfoImpl(const LegacySubsetLoadbalancingPolicyProto& subset_config)
+      : default_subset_(subset_config.default_subset()),
+        fallback_policy_(subset_config.fallback_policy()),
+        metadata_fallback_policy_(subset_config.metadata_fallback_policy()),
+        enabled_(!subset_config.subset_selectors().empty()),
+        locality_weight_aware_(subset_config.locality_weight_aware()),
+        scale_locality_weight_(subset_config.scale_locality_weight()),
+        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
+    for (const auto& subset : subset_config.subset_selectors()) {
+      if (!subset.keys().empty()) {
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset(),
+            subset.single_host_per_subset()));
+      }
+    }
+  }
+  LoadBalancerSubsetInfoImpl()
+      : LoadBalancerSubsetInfoImpl(
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance()) {}
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
@@ -301,6 +243,9 @@ private:
   const bool list_as_any_ : 1;
   const bool allow_redundant_keys_{};
 };
+using DefaultLoadBalancerSubsetInfoImpl = ConstSingleton<LoadBalancerSubsetInfoImpl>;
+
+using HostHashSet = absl::flat_hash_set<HostSharedPtr>;
 
 class SubsetLoadBalancerConfig : public Upstream::LoadBalancerConfig {
 public:
@@ -326,7 +271,7 @@ public:
   const Upstream::LoadBalancerSubsetInfo& subsetInfo() const { return subset_info_; }
 
 private:
-  ProdLoadBalancerSubsetInfoImpl subset_info_;
+  LoadBalancerSubsetInfoImpl subset_info_;
 
   Upstream::LoadBalancerConfigPtr sub_load_balancer_config_;
   Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory_{};

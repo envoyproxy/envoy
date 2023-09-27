@@ -39,8 +39,6 @@
 #include "source/extensions/upstreams/http/generic/config.h"
 #include "source/extensions/load_balancing_policies/cluster_provided/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
-#include "source/extensions/load_balancing_policies/least_request/config.h"
-#include "source/extensions/load_balancing_policies/random/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
@@ -183,12 +181,8 @@ void ExtensionRegistry::registerFactories() {
   Upstream::forceRegisterDefaultUpstreamLocalAddressSelectorFactory();
 
   // This is required for load balancers of upstreams.
-  // TODO(wbpcode): maybe not all these are necessary. If some are unnecessary, we should
-  // compile them out.
   Envoy::Extensions::LoadBalancingPolices::ClusterProvided::forceRegisterFactory();
   Envoy::Extensions::LoadBalancingPolices::RoundRobin::forceRegisterFactory();
-  Envoy::Extensions::LoadBalancingPolices::LeastRequest::forceRegisterFactory();
-  Envoy::Extensions::LoadBalancingPolices::Random::forceRegisterFactory();
 
 #ifdef ENVOY_MOBILE_STATS_REPORTING
   Network::Address::forceRegisterIpResolver();
