@@ -2389,7 +2389,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401NoClusterResponseCodeStats) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
-  charge_cluster_response_stats: false
+  no_charge_cluster_response_stats: true
   )EOF");
 
   InSequence s;

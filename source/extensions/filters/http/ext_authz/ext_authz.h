@@ -89,9 +89,7 @@ public:
                                            config.typed_metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
-        charge_cluster_response_stats_(config.has_charge_cluster_response_stats()
-                                           ? config.charge_cluster_response_stats()
-                                           : true),
+        charge_cluster_response_stats_(!config.no_charge_cluster_response_stats()),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
