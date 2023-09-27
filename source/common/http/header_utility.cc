@@ -239,7 +239,7 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }
 
-bool HeaderUtility::isConnectUdp(const RequestHeaderMap& headers) {
+bool HeaderUtility::isConnectUdp(const RequestOrResponseHeaderMap& headers) {
   return headers.Upgrade() && absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                                      Http::Headers::get().UpgradeValues.ConnectUdp);
 }

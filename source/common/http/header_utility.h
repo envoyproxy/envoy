@@ -167,7 +167,7 @@ public:
   /**
    * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
    */
-  static bool isConnectUdp(const RequestHeaderMap& headers);
+  static bool isConnectUdp(const RequestOrResponseHeaderMap& headers);
 
   /**
    * @brief a helper function to determine if the headers represent an accepted CONNECT response.

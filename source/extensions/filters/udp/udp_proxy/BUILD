@@ -58,10 +58,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":udp_proxy_filter_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/formatter:substitution_format_string_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )
