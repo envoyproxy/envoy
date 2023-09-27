@@ -16,60 +16,32 @@
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
-using testing::Combine;
 using testing::Not;
-using testing::TestParamInfo;
 using testing::TestWithParam;
 using testing::ValuesIn;
 
 namespace Envoy {
 
-namespace {
-
-std::string
-testParamsToString(const TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
-  return fmt::format("{}_{}",
-                     TestUtility::ipTestParamsToString(
-                         TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
-                     std::get<1>(params.param) ? "as_downstream_filter" : "as_upstream_filter");
-}
-
-} // namespace
-
 using Headers = std::vector<std::pair<const std::string, const std::string>>;
 
-class ExtAuthzGrpcIntegrationTest
-    : public Grpc::BaseGrpcClientIntegrationParamTest,
-      public TestWithParam<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>,
-      public HttpIntegrationTest {
+class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                    public HttpIntegrationTest {
 public:
   ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
-
-  static std::string protocolTestParamsToString(
-      const TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>&
-          params) {
-    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(params.param)),
-                       std::get<1>(params.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
-                                                                                 : "EnvoyGrpc",
-                       std::get<2>(params.param) ? "as_downstream_filter" : "as_upstream_filter");
-  }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
-  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
-  bool usingDownstreamFilter() { return std::get<2>(GetParam()); }
-
   void initializeConfig(bool disable_with_metadata = false, bool failure_mode_allow = false) {
-    if (!usingDownstreamFilter()) {
-      // Need to set upstream protocol options.
-      setUpstreamProtocol(Http::CodecType::HTTP1);
-    }
     config_helper_.addConfigModifier([this, disable_with_metadata, failure_mode_allow](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ext_authz_cluster->set_name("ext_authz_cluster");
+      ConfigHelper::setHttp2(*ext_authz_cluster);
+
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz_cluster",
                      fake_upstreams_.back()->localAddress());
@@ -110,17 +82,7 @@ public:
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter),
-                                   /*downstream_filter=*/usingDownstreamFilter());
-
-      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ext_authz_cluster->set_name("ext_authz_cluster");
-      // Don't configure ext_authz_cluster to require a check call to ext_authz_cluster.
-      if (!usingDownstreamFilter()) {
-        ext_authz_cluster->clear_typed_extension_protocol_options();
-      }
-      ConfigHelper::setHttp2(*ext_authz_cluster);
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
     });
   }
 
@@ -510,14 +472,10 @@ attributes:
   )EOF";
 };
 
-class ExtAuthzHttpIntegrationTest
-    : public HttpIntegrationTest,
-      public TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+class ExtAuthzHttpIntegrationTest : public HttpIntegrationTest,
+                                    public TestWithParam<Network::Address::IpVersion> {
 public:
-  ExtAuthzHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
-
-  bool usingDownstreamFilter() { return std::get<1>(GetParam()); }
+  ExtAuthzHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -616,12 +574,12 @@ public:
   }
 
   void initializeConfig(bool legacy_allowed_headers = true) {
-    if (!usingDownstreamFilter()) {
-      // Need to set upstream protocol options.
-      setUpstreamProtocol(Http::CodecType::HTTP1);
-    }
     config_helper_.addConfigModifier([this, legacy_allowed_headers](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ext_authz_cluster->set_name("ext_authz");
+
       if (legacy_allowed_headers) {
         TestUtility::loadFromYaml(legacy_default_config_, proto_config_);
       } else {
@@ -631,16 +589,7 @@ public:
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter),
-                                   /*downstream_filter=*/usingDownstreamFilter());
-
-      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ext_authz_cluster->set_name("ext_authz");
-      // Don't configure ext_authz_cluster to require a check call to ext_authz_cluster.
-      if (!usingDownstreamFilter()) {
-        ext_authz_cluster->clear_typed_extension_protocol_options();
-      }
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
     });
   }
 
@@ -769,10 +718,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
-                                 testing::Bool()),
-                         ExtAuthzGrpcIntegrationTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.
@@ -882,41 +829,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   cleanup();
 }
 
-TEST_P(ExtAuthzGrpcIntegrationTest, Shadow) {
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        auto* virtual_hosts = hcm.mutable_route_config()->mutable_virtual_hosts(0);
-        auto* request_mirror_policies =
-            virtual_hosts->mutable_routes(0)->mutable_route()->add_request_mirror_policies();
-        request_mirror_policies->set_cluster(virtual_hosts->routes(0).route().cluster());
-      });
-
-  // Set up ext_authz filter.
-  initializeConfig();
-
-  // Use h1, set up the test.
-  setDownstreamProtocol(Http::CodecType::HTTP1);
-  HttpIntegrationTest::initialize();
-
-  // Start a client connection and start request.
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
-
-  initiateClientConnection(0);
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
-
-  waitForSuccessfulUpstreamResponse("200");
-
-  const std::string expected_body(response_size_, 'a');
-  verifyResponse(std::move(response_), "200", Http::TestResponseHeaderMapImpl{{":status", "200"}},
-                 expected_body);
-
-  cleanup();
-}
-
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   // Set up ext_authz filter.
   initializeConfig();
@@ -1014,9 +926,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 testing::Bool()),
-                         testParamsToString);
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher
 // (uses legacy config for allowed_headers).
@@ -1028,7 +939,7 @@ TEST_P(ExtAuthzHttpIntegrationTest,
 }
 
 // (uses legacy config for allowed_headers).
-TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyDirectResponse)) {
+TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyDirectReponse)) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -1041,9 +952,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyDirectResponse
   initializeConfig();
   HttpIntegrationTest::initialize();
   initiateClientConnection();
-  if (usingDownstreamFilter()) {
-    waitForExtAuthzRequest();
-  }
+  waitForExtAuthzRequest();
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
@@ -1064,9 +973,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyRedirectRespon
   initializeConfig();
   HttpIntegrationTest::initialize();
   initiateClientConnection();
-  if (usingDownstreamFilter()) {
-    waitForExtAuthzRequest();
-  }
+  waitForExtAuthzRequest();
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
@@ -1120,7 +1027,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, BodyNonUtf8) {
 }
 
 // (uses new config for allowed_headers).
-TEST_P(ExtAuthzHttpIntegrationTest, DirectResponse) {
+TEST_P(ExtAuthzHttpIntegrationTest, DirectReponse) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -1133,9 +1040,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DirectResponse) {
   initializeConfig(false);
   HttpIntegrationTest::initialize();
   initiateClientConnection();
-  if (usingDownstreamFilter()) {
-    waitForExtAuthzRequest();
-  }
+  waitForExtAuthzRequest();
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
@@ -1156,9 +1061,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
   initializeConfig(false);
   HttpIntegrationTest::initialize();
   initiateClientConnection();
-  if (usingDownstreamFilter()) {
-    waitForExtAuthzRequest();
-  }
+  waitForExtAuthzRequest();
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
@@ -1166,14 +1069,10 @@ TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
   EXPECT_EQ("http://host/redirect", response_->headers().getLocationValue());
 }
 
-class ExtAuthzLocalReplyIntegrationTest
-    : public HttpIntegrationTest,
-      public TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+class ExtAuthzLocalReplyIntegrationTest : public HttpIntegrationTest,
+                                          public TestWithParam<Network::Address::IpVersion> {
 public:
-  ExtAuthzLocalReplyIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
-
-  bool usingDownstreamFilter() { return std::get<1>(GetParam()); }
+  ExtAuthzLocalReplyIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -1194,9 +1093,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzLocalReplyIntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 testing::Bool()),
-                         testParamsToString);
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // This integration test uses ext_authz combined with `local_reply_config`.
 // * If ext_authz response status is 401; its response headers and body are sent to the client.
@@ -1205,11 +1103,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzLocalReplyIntegrationTest,
 // This integration test verifies that content-type and content-length generated
 // from `local_reply_config` are not overridden by ext_authz response.
 TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
-  if (!usingDownstreamFilter()) {
-    // Need to set upstream protocol options.
-    setUpstreamProtocol(Http::CodecType::HTTP1);
-  }
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
     const std::string ext_authz_config = R"EOF(
   transport_api_version: V3
@@ -1224,16 +1122,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
     envoy::config::listener::v3::Filter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
     ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
-    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter),
-                                 /*downstream_filter=*/usingDownstreamFilter());
-
-    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
-    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-    ext_authz_cluster->set_name("ext_authz");
-    // Don't configure ext_authz_cluster to require a check call to ext_authz_cluster.
-    if (!usingDownstreamFilter()) {
-      ext_authz_cluster->clear_typed_extension_protocol_options();
-    }
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
   });
 
   const std::string local_reply_yaml = R"EOF(
@@ -1303,16 +1192,13 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{}, Headers{});
 
-  std::string creation_stat_name =
-      usingDownstreamFilter()
-          ? "grpc.ext_authz_cluster.google_grpc_client_creation"
-          : "cluster.cluster_0.grpc.ext_authz_cluster.google_grpc_client_creation";
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
 
     // Make sure Google grpc client is created before the request coming in.
     // Since this is not laziness creation, it should create one client per
     // thread before the traffic comes.
-    expected_grpc_client_creation_count = test_server_->counter(creation_stat_name)->value();
+    expected_grpc_client_creation_count =
+        test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value();
   }
 
   waitForSuccessfulUpstreamResponse("200");
@@ -1339,7 +1225,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
     // Make sure no more Google grpc client is created no matter how many requests coming in.
     EXPECT_EQ(expected_grpc_client_creation_count,
-              test_server_->counter(creation_stat_name)->value());
+              test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value());
   }
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{}, Headers{});
@@ -1364,7 +1250,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
     // Make sure no more Google grpc client is created no matter how many requests coming in.
     EXPECT_EQ(expected_grpc_client_creation_count,
-              test_server_->counter(creation_stat_name)->value());
+              test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value());
   }
 
   cleanup();

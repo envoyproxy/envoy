@@ -303,7 +303,7 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "socket_option_test",
-    srcs = ["socket_option_test.h"],
+    hdrs = ["socket_option_test.h"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",

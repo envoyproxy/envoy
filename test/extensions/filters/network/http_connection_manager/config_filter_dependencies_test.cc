@@ -15,7 +15,6 @@ using envoy::extensions::filters::common::dependency::v3::Dependency;
 using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
 using Envoy::Server::Configuration::FilterDependenciesPtr;
 using Envoy::Server::Configuration::NamedHttpFilterConfigFactory;
-using testing::Eq;
 
 namespace Envoy {
 namespace Extensions {

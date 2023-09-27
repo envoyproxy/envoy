@@ -43,7 +43,7 @@ class TestUdpProxyFilter : public UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
 
-  MOCK_METHOD(Network::SocketPtr, createSocket, (const Upstream::HostConstSharedPtr& host));
+  MOCK_METHOD(Network::SocketPtr, createUdpSocket, (const Upstream::HostConstSharedPtr& host));
 };
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
@@ -53,8 +53,8 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 }
 
 Api::IoCallUint64Result makeError(int sys_errno) {
-  return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
-                                                    Network::IoSocketError::deleteIoError));
+  return {0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
+                             Network::IoSocketError::deleteIoError)};
 }
 
 class UdpProxyFilterBase : public testing::Test {
@@ -240,7 +240,7 @@ public:
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
-    EXPECT_CALL(*filter_, createSocket(_))
+    EXPECT_CALL(*filter_, createUdpSocket(_))
         .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
     EXPECT_CALL(
         *new_session.socket_->io_handle_,
@@ -420,7 +420,9 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
-      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%";
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
+      "%DOWNSTREAM_REMOTE_ADDRESS% "
+      "%DOWNSTREAM_LOCAL_ADDRESS%";
 
   const std::string proxy_access_log_format =
       "%DYNAMIC_METADATA(udp.proxy.proxy:bytes_received)% "
@@ -470,7 +472,7 @@ upstream_socket_config:
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
   EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
-  EXPECT_EQ(output_.back(), "17 3 17 3");
+  EXPECT_EQ(output_.back(), "17 3 17 3 10.0.0.1:1000 10.0.0.2:80");
 }
 
 // Route with source IP.

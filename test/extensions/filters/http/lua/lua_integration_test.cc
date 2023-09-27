@@ -311,6 +311,8 @@ typed_config:
           request_handle:streamInfo():downstreamLocalAddress())
         request_handle:headers():add("request_downstream_directremote_address_value",
           request_handle:streamInfo():downstreamDirectRemoteAddress())
+        request_handle:headers():add("request_downstream_remote_address_value",
+          request_handle:streamInfo():downstreamRemoteAddress())
         request_handle:headers():add("request_requested_server_name",
           request_handle:streamInfo():requestedServerName())
       end
@@ -419,6 +421,12 @@ typed_config:
           ->value()
           .getStringView(),
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+  EXPECT_EQ("10.0.0.1:0",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("request_downstream_remote_address_value"))[0]
+                ->value()
+                .getStringView());
 
   EXPECT_EQ("", upstream_request_->headers()
                     .get(Http::LowerCaseString("request_requested_server_name"))[0]

@@ -883,7 +883,8 @@ message RouteAction {
 
       // The name of the URL query parameter that will be used to obtain the hash
       // key. If the parameter is not present, no hash will be produced. Query
-      // parameter names are case-sensitive.
+      // parameter names are case-sensitive. If query parameters are repeated, only
+      // the first value will be considered.
       string name = 1 [(validate.rules).string = {min_len: 1}];
     }
 
