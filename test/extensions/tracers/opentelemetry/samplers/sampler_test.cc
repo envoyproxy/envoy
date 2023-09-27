@@ -18,7 +18,9 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
-namespace {
+
+using ::testing::NiceMock;
+using ::testing::StrictMock;
 
 class TestSampler : public Sampler {
 public:
@@ -55,9 +57,9 @@ protected:
 };
 
 TEST_F(SamplerFactoryTest, TestWithoutSampler) {
-  // using StrictMock, calls to sampler would cause a test failure
-  auto test_sampler = std::make_shared<testing::StrictMock<TestSampler>>();
-  testing::StrictMock<TestSamplerFactory> sampler_factory;
+  // using StrictMock, calls to SamplerFactory would cause a test failure
+  auto test_sampler = std::make_shared<StrictMock<TestSampler>>();
+  StrictMock<TestSamplerFactory> sampler_factory;
   Registry::InjectFactory<SamplerFactory> sampler_factory_registration(sampler_factory);
 
   // no sampler configured
@@ -76,6 +78,31 @@ TEST_F(SamplerFactoryTest, TestWithoutSampler) {
 
   driver->startSpan(config, trace_context, stream_info, "operation_name",
                     {Tracing::Reason::Sampling, true});
+}
+
+TEST_F(SamplerFactoryTest, TestWithInvalidSampler) {
+  // using StrictMock, calls to SamplerFactory would cause a test failure
+  auto test_sampler = std::make_shared<StrictMock<TestSampler>>();
+  StrictMock<TestSamplerFactory> sampler_factory;
+  Registry::InjectFactory<SamplerFactory> sampler_factory_registration(sampler_factory);
+
+  // invalid sampler configured
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    service_name: my-service
+    sampler:
+      name: envoy.tracers.opentelemetry.samplers.testsampler
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Value
+    )EOF";
+
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  EXPECT_THROW(std::make_unique<Driver>(opentelemetry_config, context), EnvoyException);
 }
 
 TEST_F(SamplerFactoryTest, TestWithSampler) {
@@ -108,7 +135,6 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
                     {Tracing::Reason::Sampling, true});
 }
 
-} // namespace
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

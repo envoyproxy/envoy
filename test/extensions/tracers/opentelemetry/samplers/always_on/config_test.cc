@@ -17,6 +17,8 @@ TEST(AlwaysOnSamplerFactoryTest, Test) {
       "envoy.tracers.opentelemetry.samplers.always_on");
   ASSERT_NE(factory, nullptr);
   EXPECT_STREQ(factory->name().c_str(), "envoy.tracers.opentelemetry.samplers.always_on");
+  EXPECT_NE(factory->createEmptyConfigProto(), nullptr);
+
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   const std::string yaml = R"EOF(
     name: envoy.tracers.opentelemetry.samplers.always_on
@@ -24,9 +26,9 @@ TEST(AlwaysOnSamplerFactoryTest, Test) {
         "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
   )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
-
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   EXPECT_NE(factory->createSampler(typed_config.typed_config(), context), nullptr);
+  EXPECT_STREQ(factory->name().c_str(), "envoy.tracers.opentelemetry.samplers.always_on");
 }
 
 } // namespace OpenTelemetry
