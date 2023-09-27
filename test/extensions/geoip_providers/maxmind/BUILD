@@ -14,7 +14,10 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     size = "small",
-    srcs = ["config_test.cc"],
+    srcs = select({
+        "//bazel:linux": ["config_test.cc"],
+        "//conditions:default": [],
+    }),
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
@@ -31,7 +34,10 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "geoip_provider_test",
     size = "small",
-    srcs = ["geoip_provider_test.cc"],
+    srcs = select({
+        "//bazel:linux": ["geoip_provider_test.cc"],
+        "//conditions:default": [],
+    }),
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],

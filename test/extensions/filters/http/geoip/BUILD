@@ -57,7 +57,10 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "geoip_filter_integration_test",
     size = "large",
-    srcs = ["geoip_filter_integration_test.cc"],
+    srcs = select({
+        "//bazel:linux": ["geoip_filter_integration_test.cc"],
+        "//conditions:default": [],
+    }),
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],

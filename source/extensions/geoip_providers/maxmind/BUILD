@@ -14,7 +14,10 @@ envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
-    srcs = ["config.cc"],
+    srcs = select({
+        "//bazel:linux": ["config.cc"],
+        "//conditions:default": [],
+    }),
     hdrs = ["config.h"],
     tags = ["skip_on_windows"],
     deps = [
