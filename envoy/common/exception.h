@@ -14,7 +14,7 @@ public:
 
 #define THROW_IF_NOT_OK(status_fn)                                                                 \
   {                                                                                                \
-    absl::Status status = status_fn;                                                               \
+    const absl::Status status = status_fn;                                                         \
     if (!status.ok()) {                                                                            \
       throw EnvoyException(std::string(status.message()));                                         \
     }                                                                                              \

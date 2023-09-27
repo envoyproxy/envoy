@@ -96,12 +96,9 @@ paths:
     - envoy/common/exception.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
-    - source/common/upstream/cds_api_helper.cc
     - source/common/upstream/thread_aware_lb_impl.cc
     - source/common/upstream/load_balancer_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
-    - source/common/upstream/od_cds_api_impl.cc
-    - source/common/upstream/cds_api_impl.cc
     - source/common/upstream/outlier_detection_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
@@ -133,7 +130,6 @@ paths:
     - source/common/protobuf/message_validator_impl.cc
     - source/common/access_log/access_log_manager_impl.cc
     - source/common/secret/secret_manager_impl.cc
-    - source/common/secret/sds_api.cc
     - source/common/grpc/async_client_manager_impl.cc
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
@@ -141,7 +137,6 @@ paths:
     - source/common/config/xds_resource.cc
     - source/common/config/datasource.cc
     - source/common/config/utility.cc
-    - source/common/config/xds_context_params.cc
     - source/common/runtime/runtime_impl.cc
     - source/common/quic/quic_transport_socket_factory.cc
     - source/common/filter/config_discovery_impl.cc
@@ -153,7 +148,6 @@ paths:
     - source/common/router/vhds.cc
     - source/common/router/config_utility.cc
     - source/common/router/header_parser.cc
-    - source/common/rds/rds_route_config_subscription.cc
     - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
     - source/common/filesystem/posix/filesystem_impl.cc

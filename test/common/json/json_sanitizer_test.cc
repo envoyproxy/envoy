@@ -115,7 +115,7 @@ TEST_F(JsonSanitizerTest, SevenBitAscii) {
 TEST_F(JsonSanitizerTest, Utf8) {
   // reference; https://www.charset.org/utf-8
   auto unicode = [](std::vector<uint8_t> chars) -> std::string {
-    return std::string(reinterpret_cast<const char*>(&chars[0]), chars.size());
+    return {reinterpret_cast<const char*>(&chars[0]), chars.size()};
   };
 
   sanitizeAndCheckAgainstProtobufJson(unicode({0xc2, 0xa2})); // Cent.
