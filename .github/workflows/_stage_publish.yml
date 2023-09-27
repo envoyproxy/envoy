@@ -39,6 +39,7 @@ concurrency:
 jobs:
   publish_docs:
     if: ${{ inputs.trusted }}
+    runs-on: ubuntu-22.04
     steps:
     - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.18
       with:
