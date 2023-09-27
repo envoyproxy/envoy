@@ -277,6 +277,10 @@ new_features:
   change: |
     Added the ability to specify a custom upstream local address selector using
     :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
+- area: redis
+  change: |
+    Added new configuration field :ref:`read_command_policy
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.read_command_policy>` to specify Envoy should route read commands to another cluster.
 
 deprecated:
 - area: tracing
