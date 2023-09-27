@@ -250,6 +250,11 @@ public:
       : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address),
         overload_state_(overload_state),
         track_global_cx_limit_in_overload_manager_(track_global_cx_limit_in_overload_manager) {
+    // In case when tracking of global connection limit is enabled in the overload manager, the
+    // global connection limit usage will be incremented in
+    // TcpListenerImpl::rejectCxOverGlobalLimit() to avoid race conditions (between checking if it
+    // is possible to increment current usage in TcpListenerImpl::rejectCxOverGlobalLimit() and
+    // actually incrementing it in the current method).
     if (!track_global_cx_limit_in_overload_manager_) {
       ++global_accepted_socket_count_;
     }

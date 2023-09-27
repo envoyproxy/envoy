@@ -57,6 +57,10 @@ new_features:
 - area: http
   change: |
     added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
+- area: listener
+  change: |
+    added possibility to track global downstream connection limit via
+    :ref:`downstream connections monitor <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` in overload manager.
 - area: extension_discovery_service
   change: |
     added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
@@ -68,3 +72,7 @@ new_features:
     added support for lmove command.
 
 deprecated:
+- area: listener
+  change: |
+    deprecated runtime key ``overload.global_downstream_max_connections`` in favor of
+    :ref:`downstream connections monitor <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`.
