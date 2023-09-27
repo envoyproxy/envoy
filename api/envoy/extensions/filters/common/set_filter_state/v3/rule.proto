@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.common.set_filter_state.v3;
+
+import "envoy/config/core/v3/substitution_format_string.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.common.set_filter_state.v3";
+option java_outer_classname = "SetFilterStateProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/common/set_filter_state/v3;set_filter_statev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// A filter state update rule.
+message Rule {
+  // Filter state key.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  oneof value {
+    option (validate.required) = true;
+
+    // Uses the :ref:`format string <config_access_log_format_strings>` to
+    // instantiate the filter state object value.
+    config.core.v3.SubstitutionFormatString format_string = 2;
+  }
+
+  // If marked as read-only, the filter state key cannot be overridden by subsequent updates.
+  bool read_only = 3;
+
+  enum SharedWithUpstream {
+    // Object is not shared with the upstream internal connections.
+    NONE = 0;
+    // Object is shared with the upstream internal connection.
+    ONCE = 1;
+    // Object is shared with the upstream internal connection and any internal connection upstream from it.
+    TRANSITIVE = 2;
+  }
+
+  // Configures the object to be shared with the upstream internal connections. See :ref:`internal upstream
+  // transport <config_internal_upstream_transport>` for more details.
+  SharedWithUpstream shared_with_upstream = 4;
+
+  // Skip the update if the value evaluates to an empty string.
+  bool skip_if_empty = 5;
+}
