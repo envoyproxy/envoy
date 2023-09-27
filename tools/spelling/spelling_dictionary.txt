@@ -36,6 +36,7 @@ DOM
 GiB
 IPTOS
 Repick
+Reserializer
 SION
 TRA
 Websockets
@@ -71,7 +72,9 @@ FIXME
 HEXDIG
 HEXDIGIT
 HPE
+Kwasi
 LRU
+Mensah
 NAK
 OWS
 Preconnecting
@@ -1291,6 +1294,7 @@ subtypes
 subzone
 suf
 superclass
+superroot
 superset
 svc
 symlink
