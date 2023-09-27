@@ -45,7 +45,6 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-using testing::AtLeast;
 using testing::ByMove;
 using testing::InSequence;
 using testing::Return;

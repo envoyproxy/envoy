@@ -113,8 +113,8 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
     }
   }
 
-  return ToolConfig(std::move(request_headers), std::move(response_headers),
-                    check_config.input().random_value());
+  return {std::move(request_headers), std::move(response_headers),
+          static_cast<int>(check_config.input().random_value())};
 }
 
 ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
@@ -144,8 +144,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
     MessageUtil::checkForUnexpectedFields(route_config, visitor);
   }
 
-  return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
-                         std::move(api), Coverage(route_config));
+  return {std::move(factory_context), std::move(config), std::move(stats), std::move(api),
+          Coverage(route_config)};
 }
 
 void RouterCheckTool::assignUniqueRouteNames(

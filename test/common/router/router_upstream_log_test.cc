@@ -53,7 +53,7 @@ typed_config:
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  return absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log);
+  return {upstream_log};
 }
 
 } // namespace
