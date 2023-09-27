@@ -63,14 +63,14 @@ public:
   void setupValidDriverWithHttpExporter() {
     const std::string yaml_string = R"EOF(
     http_service:
-      cluster_name: "my_o11y_backend"
-      path: "/otlp/v1/traces"
-      authority: "some-o11y.com"
+      http_uri:
+        cluster: "my_o11y_backend"
+        uri: "https://some-o11y.com/otlp/v1/traces"
+        timeout: 0.250s
       request_headers_to_add:
       - header:
           key: "Authorization"
           value: "auth-token"
-      timeout: 0.250s
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
@@ -110,9 +110,10 @@ TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
         cluster_name: fake-cluster
       timeout: 0.250s
     http_service:
-      cluster_name: "my_o11y_backend"
-      authority: "some-o11y.com"
-      timeout: 0.250s
+      http_uri:
+        cluster: "my_o11y_backend"
+        uri: "https://some-o11y.com/otlp/v1/traces"
+        timeout: 0.250s
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);

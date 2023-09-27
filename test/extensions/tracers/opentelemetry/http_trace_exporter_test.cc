@@ -50,9 +50,10 @@ protected:
 
 TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   std::string yaml_string = fmt::format(R"EOF(
-  cluster_name: "my_o11y_backend"
-  path: "/otlp/v1/traces"
-  authority: "some-o11y.com"
+  http_uri:
+    uri: "https://some-o11y.com/otlp/v1/traces"
+    cluster: "my_o11y_backend"
+    timeout: 0.250s
   request_headers_to_add:
   - header:
       key: "Authorization"
@@ -60,7 +61,6 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   - header:
       key: "x-custom-header"
       value: "custom-value"
-  timeout: 0.250s
   )EOF");
 
   envoy::config::core::v3::HttpService http_service;
@@ -123,10 +123,10 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
 
 TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalCluster) {
   std::string yaml_string = fmt::format(R"EOF(
-  cluster_name: "my_o11y_backend"
-  path: "/otlp/v1/traces"
-  authority: "some-o11y.com"
-  timeout: 0.250s
+  http_uri:
+    uri: "https://some-o11y.com/otlp/v1/traces"
+    cluster: "my_o11y_backend"
+    timeout: 10s
   )EOF");
 
   envoy::config::core::v3::HttpService http_service;
@@ -144,57 +144,6 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalClus
   span.set_name("test");
   *export_trace_service_request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_FALSE(trace_exporter_->log(export_trace_service_request));
-}
-
-TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpanWithDefaultPath) {
-  std::string yaml_string = fmt::format(R"EOF(
-  cluster_name: "my_o11y_backend"
-  authority: "some-o11y.com"
-  timeout: 0.250s
-  )EOF");
-
-  envoy::config::core::v3::HttpService http_service;
-  TestUtility::loadFromYaml(yaml_string, http_service);
-  setup(http_service);
-
-  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-  Http::AsyncClient::Callbacks* callback;
-
-  EXPECT_CALL(
-      cluster_manager_.thread_local_cluster_.async_client_,
-      send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(250))))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
-
-            // Default path is used when omitted in the config
-            EXPECT_EQ("/v1/traces", message->headers().getPathValue());
-
-            return &request;
-          }));
-
-  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest
-      export_trace_service_request;
-  opentelemetry::proto::trace::v1::Span span;
-  span.set_name("test");
-  *export_trace_service_request.add_resource_spans()->add_scope_spans()->add_spans() = span;
-  EXPECT_TRUE(trace_exporter_->log(export_trace_service_request));
-
-  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "202"}}}));
-  // onBeforeFinalizeUpstreamSpan is a noop — included for coverage
-  Tracing::NullSpan null_span;
-  callback->onBeforeFinalizeUpstreamSpan(null_span, nullptr);
-
-  callback->onSuccess(request, std::move(msg));
-  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_sent").value());
-  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_success").value());
-  EXPECT_EQ(0U, mock_scope_.counter("tracing.opentelemetry.http_reports_failed").value());
-
-  callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
-
-  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_failed").value());
 }
 
 } // namespace OpenTelemetry

@@ -28,38 +28,31 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
     return false;
   }
 
-  Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
-  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
-
-  // If traces_path is omitted, send to /v1/traces by default
-  if (http_service_.path().empty()) {
-    message->headers().setPath(TRACES_PATH);
-  } else {
-    message->headers().setPath(http_service_.path());
+  const auto thread_local_cluster =
+      cluster_manager_.getThreadLocalCluster(http_service_.http_uri().cluster());
+  if (thread_local_cluster == nullptr) {
+    ENVOY_LOG(error, "OTLP HTTP exporter failed: [cluster = {}] is not configured",
+              http_service_.http_uri().cluster());
+    return false;
   }
 
-  message->headers().setHost(http_service_.authority());
+  Http::RequestMessagePtr message = Http::Utility::prepareHeaders(http_service_.http_uri());
+
+  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+  message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
   // add all custom headers to the request
   for (const auto& header_value_option : http_service_.request_headers_to_add()) {
     message->headers().setCopy(Http::LowerCaseString(header_value_option.header().key()),
                                header_value_option.header().value());
   }
-
   message->body().add(request_body);
 
-  const auto thread_local_cluster =
-      cluster_manager_.getThreadLocalCluster(http_service_.cluster_name());
-  if (thread_local_cluster == nullptr) {
-    ENVOY_LOG(warn, "Thread local cluster not found for collector.");
-    return false;
-  }
+  auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
+      DurationUtil::durationToMilliseconds(http_service_.http_uri().timeout())));
 
-  std::chrono::milliseconds timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::nanoseconds(http_service_.timeout().nanos()));
-  Http::AsyncClient::Request* http_request = thread_local_cluster->httpAsyncClient().send(
-      std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+  Http::AsyncClient::Request* http_request =
+      thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   tracing_stats_.http_reports_sent_.inc();
 
   return http_request;

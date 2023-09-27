@@ -52,14 +52,14 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerWithHttpExporter) {
       typed_config:
         "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
         http_service:
-          cluster_name: "my_o11y_backend"
-          path: "/otlp/v1/traces"
-          authority: "some-o11y.com"
+          http_uri:
+            uri: "https://some-o11y.com//otlp/v1/traces"
+            cluster: "my_o11y_backend"
+            timeout: 0.250s
           request_headers_to_add:
           - header:
               key: "Authorization"
               value: "auth-token"
-          timeout: 0.250s
   )EOF";
   envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
