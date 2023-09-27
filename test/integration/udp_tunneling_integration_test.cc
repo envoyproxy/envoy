@@ -504,7 +504,8 @@ typed_config:
 };
 
 TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithBuffering) {
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
   setup(config);
 
   const std::string datagram1 = "hello";
@@ -538,7 +539,8 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowNoBuffering) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithPost) {
-  TestConfig config{"host.com", "target.com", 1, 30, true, "/post/path", BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com",           "target.com", 1, 30, true, "/post/path",
+                    BufferOptions{1, 30}, absl::nullopt};
   setup(config);
 
   const std::string datagram1 = "hello";
@@ -550,7 +552,8 @@ TEST_P(UdpTunnelingIntegrationTest, BasicFlowWithPost) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, TwoConsecutiveDownstreamSessions) {
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
   setup(config);
 
   establishConnection("hello1");
@@ -577,7 +580,8 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeout) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
   setup(config);
 
   // Send two datagrams before the upstream is established. Since the buffer capacity is 1 datagram,
@@ -586,7 +590,7 @@ TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {
   client_->write("hello2", *listener_address_);
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 1);
 
-  // "hello3" will also drop because it's send before the tunnel is established, and the buffer is full.
+  // "hello3" will drop because it's sent before the tunnel is established, and the buffer is full.
   establishConnection("hello3");
   // Wait for the buffered datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({"hello1"})));
@@ -597,7 +601,8 @@ TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToCapacity) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToSize) {
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{100, 15}, absl::nullopt};
+  TestConfig config{"host.com",   "target.com", 1, 30, false, "", BufferOptions{100, 15},
+                    absl::nullopt};
   setup(config);
 
   // Send two datagrams before the upstream is established. Since the buffer capacity is 6 bytes,
@@ -606,7 +611,7 @@ TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToSize) {
   client_->write("hello2", *listener_address_);
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_buffer_overflow", 1);
 
-  // "hello3" will also drop because it's send before the tunnel is established, and the buffer is full.
+  // "hello3" will drop because it's sent before the tunnel is established, and the buffer is full.
   establishConnection("hello3");
   // Wait for the buffered datagram.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({"hello1"})));
@@ -617,7 +622,8 @@ TEST_P(UdpTunnelingIntegrationTest, BufferOverflowDueToSize) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{100, 300}, absl::nullopt};
+  TestConfig config{"host.com",   "target.com", 1, 30, false, "", BufferOptions{100, 300},
+                    absl::nullopt};
   setup(config);
 
   // Establish connection for first session.
@@ -633,8 +639,7 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
   expectRequestHeaders(upstream_request2->headers());
 
   // Send upgrade headers downstream, fully establishing the connection.
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
-                                                    {"capsule-protocol", "?1"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"capsule-protocol", "?1"}};
   upstream_request2->encodeHeaders(response_headers, false);
 
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 2);
@@ -658,7 +663,8 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
-  TestConfig config{"host.com", "target.com", 1, 30, false, "", BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
   setup(config);
 
   // Initial datagram will create a session and a tunnel request.
@@ -678,7 +684,8 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
 }
 
 TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
-  TestConfig config{"host.com", "target.com", 2, 30, false, "", BufferOptions{1, 30}, absl::nullopt};
+  TestConfig config{"host.com",           "target.com", 2, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
   setup(config);
 
   // Initial datagram will create a session and a tunnel request.
@@ -700,8 +707,7 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   expectRequestHeaders(upstream_request_->headers());
 
   // Send upgrade headers downstream, fully establishing the connection.
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
-                                                    {"capsule-protocol", "?1"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"capsule-protocol", "?1"}};
   upstream_request_->encodeHeaders(response_headers, false);
 
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);

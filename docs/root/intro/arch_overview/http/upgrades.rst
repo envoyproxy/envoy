@@ -206,7 +206,7 @@ The HTTP/2 streams will be multiplexed over the upstream connection.
 As opposed to TCP tunneling, where downstream congestion can be applied by alternately disabling the read from the connection socket, for UDP datagrams, this mechanism is not supported.
 Therefore, when tunneling UDP and a new datagram is received from the downstream, it is either streamed upstream, if the upstream is ready or halted by the UDP Proxy.
 In case the upstream is not ready (for example, when waiting for HTTP response headers), the datagram can either be dropped or buffered until the upstream is ready.
-In such cases, by default, downstream datagrams will be dropped, unless :ref:`buffer_options <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.TunnelingConfig.buffer_options>`
+In such cases, by default, downstream datagrams will be dropped, unless :ref:`buffer_options <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.buffer_options>`
 is set by the ``tunneling_config``. The default buffer limits are modest to try and prevent a lot of unwanted buffered memory, but can and should be adjusted per the required use-case.
 When the upstream becomes ready, the UDP Proxy will first flush all the previously buffered datagrams.
 
@@ -225,7 +225,7 @@ The following example configuration makes Envoy tunnel raw UDP datagrams over an
    :linenos:
    :lines: 32-53
    :lineno-start: 32
-   :emphasize-lines: 36-36, 47-49
+   :emphasize-lines: 4-4, 15-17
    :caption: :download:`raw_udp_tunneling_http2.yaml </_configs/repo/raw_udp_tunneling_http2.yaml>`
 
 .. _tunneling-tcp-over-http:
