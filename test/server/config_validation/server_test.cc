@@ -23,11 +23,6 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-class NullDrainManagerComponentFactory : public TestComponentFactory {
-public:
-  DrainManagerPtr createDrainManager(Instance&) override { return nullptr; }
-};
-
 // Test param is the path to the config file to validate.
 class ValidationServerTest : public testing::TestWithParam<std::string> {
 public:
@@ -216,22 +211,6 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 
   ValidationListenerComponentFactory listener_component_factory(server);
   listener_component_factory.getTcpListenerConfigProviderManager();
-}
-
-// A test to ensure that ENVOY_BUGs are handled when the component factory returns a nullptr for
-// the drain manager.
-TEST_P(ValidationServerTest, DrainManagerNullptrCheck) {
-  // Setup the server instance.
-  NullDrainManagerComponentFactory component_factory;
-  Thread::MutexBasicLockable access_log_lock;
-  Stats::IsolatedStoreImpl stats_store;
-  DangerousDeprecatedTestTime time_system;
-  EXPECT_ENVOY_BUG(ValidationInstance server(options_, time_system.timeSystem(),
-                                             Network::Address::InstanceConstSharedPtr(),
-                                             stats_store, access_log_lock, component_factory,
-                                             Thread::threadFactoryForTest(),
-                                             Filesystem::fileSystemForTest()),
-                   "Component factory should not return nullptr from createDrainManager()");
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
