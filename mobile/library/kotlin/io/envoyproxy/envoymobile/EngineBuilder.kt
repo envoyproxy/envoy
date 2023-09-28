@@ -390,6 +390,18 @@ open class EngineBuilder(
   }
 
   /**
+   * Specify whether to enable HTTP3.  Defaults to true.
+   *
+   * @param enableHttp3 whether or not to enable HTTP3.
+   *
+   * @return This builder.
+   */
+  fun enableHttp3(enableHttp3: Boolean): EngineBuilder {
+    this.enableHttp3 = enableHttp3
+    return this
+  }
+
+  /**
    * Specify whether to do brotli response decompression or not.  Defaults to false.
    *
    * @param enableBrotliDecompression whether or not to brotli decompress responses.

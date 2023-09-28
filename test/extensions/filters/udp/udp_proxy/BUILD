@@ -18,6 +18,7 @@ envoy_extension_cc_mock(
     hdrs = ["mocks.h"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     deps = [
+        "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -31,12 +32,15 @@ envoy_extension_cc_test(
     srcs = ["udp_proxy_filter_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     deps = [
+        ":mocks",
         "//source/common/common:hash_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//source/extensions/matching/network/common:inputs_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/http:stream_encoder_mock",
         "//test/mocks/network:socket_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",

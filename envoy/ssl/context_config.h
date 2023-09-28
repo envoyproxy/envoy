@@ -190,6 +190,11 @@ public:
   virtual bool disableStatelessSessionResumption() const PURE;
 
   /**
+   * @return True if stateful TLS session resumption is disabled, false otherwise.
+   */
+  virtual bool disableStatefulSessionResumption() const PURE;
+
+  /**
    * @return True if we allow full scan certificates when there is no cert matching SNI during
    * downstream TLS handshake, false otherwise.
    */

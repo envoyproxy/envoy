@@ -247,5 +247,87 @@ INSTANTIATE_TEST_SUITE_P(Protocols, ConnectUdpTerminationIntegrationTest,
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+// Forwards the CONNECT-UDP request upstream.
+class ForwardingConnectUdpIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  void initialize() override {
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          ConfigHelper::setConnectUdpConfig(hcm, false,
+                                            downstream_protocol_ == Http::CodecType::HTTP3);
+        });
+
+    HttpProtocolIntegrationTest::initialize();
+  }
+
+  // The Envoy HTTP/2 and HTTP/3 clients expect the request header map to be in the form of HTTP/1
+  // upgrade to issue an extended CONNECT request.
+  Http::TestRequestHeaderMapImpl connect_udp_headers_{
+      {":method", "GET"},         {":path", "/.well-known/masque/udp/foo.lyft.com/80/"},
+      {"upgrade", "connect-udp"}, {"connection", "upgrade"},
+      {":scheme", "https"},       {":authority", "example.org"},
+      {"capsule-protocol", "?1"}};
+
+  IntegrationStreamDecoderPtr response_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, ForwardingConnectUdpIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
+        {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(ForwardingConnectUdpIntegrationTest, ForwardConnectUdp) {
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_udp_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Check the request header contains correct field values (Normalized to HTTP/1).
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(upstream_request_->headers().getConnectionValue(), "upgrade");
+  EXPECT_EQ(upstream_request_->headers().getUpgradeValue(), "connect-udp");
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "foo.lyft.com:80");
+
+  // Send response headers
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ForwardingConnectUdpIntegrationTest, DoNotForwardNonConnectUdp) {
+  initialize();
+
+  Http::TestRequestHeaderMapImpl websocket_headers_{
+      {":method", "GET"},        {":path", "/"},       {"upgrade", "websocket"},
+      {"connection", "upgrade"}, {":scheme", "https"}, {":authority", "foo.lyft.com:80"}};
+
+  // Send WebSocket request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(websocket_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+  response_->waitForHeaders();
+
+  // Envoy should return a 404 error response.
+  EXPECT_EQ("404", response_->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Envoy

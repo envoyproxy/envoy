@@ -511,8 +511,11 @@ UDP
   TCP/UDP
     Not implemented ("-")
 
+.. _config_access_log_format_upstream_host:
+
 %UPSTREAM_HOST%
-  Upstream host URL (e.g., tcp://ip:port for TCP connections).
+  Upstream host URL (e.g., tcp://ip:port for TCP connections). Identical to the :ref:`UPSTREAM_REMOTE_ADDRESS
+  <config_access_log_format_upstream_remote_address>` value.
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
@@ -530,9 +533,11 @@ UDP
   Local port of the upstream connection.
   IP addresses are the only address type with a port component.
 
+.. _config_access_log_format_upstream_remote_address:
+
 %UPSTREAM_REMOTE_ADDRESS%
   Remote address of the upstream connection. If the address is an IP address it includes both
-  address and port.
+  address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value.
 
 %UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
   Remote address of the upstream connection, without any port component.

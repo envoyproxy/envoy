@@ -16,7 +16,6 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 namespace {
 
-using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;

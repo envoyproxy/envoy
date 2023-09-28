@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/stream_info/stream_info.h"
 

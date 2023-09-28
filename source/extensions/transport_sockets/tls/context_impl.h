@@ -216,7 +216,7 @@ private:
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
   ServerNamesMap server_names_map_;
-  bool has_rsa_;
+  bool has_rsa_{false};
   bool full_scan_certs_on_sni_mismatch_;
 };
 

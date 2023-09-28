@@ -1,7 +1,10 @@
 load("@rules_python//python:pip.bzl", "pip_parse")
 load("@python3_11//:defs.bzl", "interpreter")
+load("@envoy_toolshed//:packages.bzl", "load_packages")
 
 def envoy_python_dependencies():
+    # TODO(phlax): rename base_pip3 -> pip3 and remove this
+    load_packages()
     pip_parse(
         name = "base_pip3",
         python_interpreter_target = interpreter,

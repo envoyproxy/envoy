@@ -10,6 +10,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -195,18 +196,17 @@ public:
   virtual ssize_t fileSize(const std::string& path) PURE;
 
   /**
-   * @return full file content as a string.
-   * @throw EnvoyException if the file cannot be read.
+   * @return full file content as a string or an error if the file can not be read.
    * Be aware, this is not most highly performing file reading method.
    */
-  virtual std::string fileReadToEnd(const std::string& path) PURE;
+  virtual absl::StatusOr<std::string> fileReadToEnd(const std::string& path) PURE;
 
   /**
    * @path file path to split
-   * @return PathSplitResult containing the parent directory of the input path and the file name
-   * @note will throw an exception if path does not contain any path separator character
+   * @return PathSplitResult containing the parent directory of the input path and the file name or
+   * an error status.
    */
-  virtual PathSplitResult splitPathFromFilename(absl::string_view path) PURE;
+  virtual absl::StatusOr<PathSplitResult> splitPathFromFilename(absl::string_view path) PURE;
 
   /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This
