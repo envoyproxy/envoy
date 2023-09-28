@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["hash_policy_impl.cc"],
     hdrs = ["hash_policy_impl.h"],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/udp:hash_policy_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",

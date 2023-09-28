@@ -120,7 +120,6 @@ public:
   virtual const Udp::HashPolicy* hashPolicy() const PURE;
   virtual UdpProxyDownstreamStats& stats() const PURE;
   virtual TimeSource& timeSource() const PURE;
-  virtual Random::RandomGenerator& randomGenerator() const PURE;
   virtual const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const PURE;

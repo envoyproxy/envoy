@@ -74,7 +74,6 @@ public:
   const Udp::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const override { return stats_; }
   TimeSource& timeSource() const override { return time_source_; }
-  Random::RandomGenerator& randomGenerator() const override { return random_; }
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const override {
     return upstream_socket_config_;
   }
@@ -114,7 +113,6 @@ private:
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
   std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
   std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
-  Random::RandomGenerator& random_;
   UdpTunnelingConfigPtr tunneling_config_;
   std::list<SessionFilters::FilterFactoryCb> filter_factories_;
 };

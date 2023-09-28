@@ -1924,6 +1924,14 @@ TEST(TunnelingConfigImplTest, PostWithInvalidPath) {
                             "Path must start with '/'");
 }
 
+TEST(TunnelingConfigImplTest, ValidProxyPort) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.mutable_proxy_port()->set_value(443);
+  TunnelingConfigImpl config(proto_config, context);
+  EXPECT_EQ(443, config.proxyPort());
+}
+
 TEST(TunnelingConfigImplTest, ProxyPortOutOfRange) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

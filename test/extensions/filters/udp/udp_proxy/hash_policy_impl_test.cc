@@ -6,6 +6,8 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -62,7 +64,7 @@ public:
 
 // Check invalid policy type
 TEST_F(HashPolicyImplBaseTest, NotSupportedPolicy) {
-  EXPECT_DEATH(setup(), ".*panic: corrupted enum.*");
+  EXPECT_THROW_WITH_MESSAGE(setup(), EnvoyException, "policy specifier not set");
 }
 
 // Check if generate correct hash
