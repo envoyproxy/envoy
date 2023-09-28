@@ -18,7 +18,6 @@ OpenTelemetryTracerFactory::OpenTelemetryTracerFactory()
 Tracing::DriverSharedPtr OpenTelemetryTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::OpenTelemetryConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
-
   return std::make_shared<Driver>(proto_config, context);
 }
 

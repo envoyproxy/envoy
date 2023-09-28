@@ -21,7 +21,7 @@ ResourceDetectorPtr EnvironmentResourceDetectorFactory::createResourceDetector(
       const envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
           EnvironmentResourceDetectorConfig&>(*mptr, context.messageValidationVisitor());
 
-  return std::make_shared<EnvironmentResourceDetector>(proto_config, context);
+  return std::make_unique<EnvironmentResourceDetector>(proto_config, context);
 }
 
 /**

@@ -106,10 +106,10 @@ TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
 }
 
 TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
-  auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
+  auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
   EXPECT_CALL(*detector_a, detect()).WillOnce(Return(resource_a_));
 
-  auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
+  auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
   EXPECT_CALL(*detector_b, detect()).WillOnce(Return(resource_b_));
 
   DetectorFactoryA factory_a;
@@ -118,8 +118,10 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   DetectorFactoryB factory_b;
   Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-  EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
-  EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
+  EXPECT_CALL(factory_a, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_a))));
+  EXPECT_CALL(factory_b, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_b))));
 
   // Expected merged attributes from all detectors
   ResourceAttributes expected_attributes = {
@@ -186,12 +188,12 @@ TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
   Registry::InjectFactory<ResourceDetectorFactory> factory_registration(factory);
 
   // Simulating having a problem when creating the resource detector
-  EXPECT_CALL(factory, createResourceDetector(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(factory, createResourceDetector(_, _)).WillOnce(Return(testing::ByMove(nullptr)));
 
   const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
-        cluster_name: fake-cluster
+        cluster_name: fake-clusterdetector_a
       timeout: 0.250s
     service_name: my-service
     resource_detectors:
@@ -210,31 +212,31 @@ TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
                             "'envoy.tracers.opentelemetry.resource_detectors.a'");
 }
 
-TEST_F(ResourceProviderTest, SchemaUrl) {
-  // old resource schema is empty but updating is not. should keep updating schema
-  {
-    std::string expected_schema_url = "my.schema/v1";
-    Resource old_resource = resource_a_;
+TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
+  std::string expected_schema_url = "my.schema/v1";
+  Resource old_resource = resource_a_;
 
-    Resource updating_resource = resource_b_;
-    updating_resource.schemaUrl_ = expected_schema_url;
+  Resource updating_resource = resource_b_;
+  updating_resource.schemaUrl_ = expected_schema_url;
 
-    auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
+  auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
 
-    auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
+  auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
 
-    DetectorFactoryA factory_a;
-    Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
+  DetectorFactoryA factory_a;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-    DetectorFactoryB factory_b;
-    Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
+  DetectorFactoryB factory_b;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-    EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
-    EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
+  EXPECT_CALL(factory_a, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_a))));
+  EXPECT_CALL(factory_b, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_b))));
 
-    const std::string yaml_string = R"EOF(
+  const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
@@ -248,39 +250,42 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
         typed_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
-    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-    ResourceProviderImpl resource_provider;
-    Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  ResourceProviderImpl resource_provider;
+  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-    EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
-  }
-  // old resource schema is not empty and updating one is. should keep old schema
-  {
-    std::string expected_schema_url = "my.schema/v1";
-    Resource old_resource = resource_a_;
-    old_resource.schemaUrl_ = expected_schema_url;
+  // OTel spec says the updating schema should be used
+  EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
+}
 
-    Resource updating_resource = resource_b_;
-    updating_resource.schemaUrl_ = "";
+TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
+  std::string expected_schema_url = "my.schema/v1";
+  Resource old_resource = resource_a_;
+  old_resource.schemaUrl_ = expected_schema_url;
 
-    auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
+  Resource updating_resource = resource_b_;
+  updating_resource.schemaUrl_ = "";
 
-    auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
+  auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
 
-    DetectorFactoryA factory_a;
-    Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
+  auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
 
-    DetectorFactoryB factory_b;
-    Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
+  DetectorFactoryA factory_a;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-    EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
-    EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
+  DetectorFactoryB factory_b;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-    const std::string yaml_string = R"EOF(
+  EXPECT_CALL(factory_a, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_a))));
+  EXPECT_CALL(factory_b, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_b))));
+
+  const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
@@ -294,39 +299,42 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
         typed_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
-    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-    ResourceProviderImpl resource_provider;
-    Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  ResourceProviderImpl resource_provider;
+  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-    EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
-  }
-  // old and updating resource schema are the same. should keep old schema
-  {
-    std::string expected_schema_url = "my.schema/v1";
-    Resource old_resource = resource_a_;
-    old_resource.schemaUrl_ = expected_schema_url;
+  // OTel spec says the updating schema should be used
+  EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
+}
 
-    Resource updating_resource = resource_b_;
-    updating_resource.schemaUrl_ = expected_schema_url;
+TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
+  std::string expected_schema_url = "my.schema/v1";
+  Resource old_resource = resource_a_;
+  old_resource.schemaUrl_ = expected_schema_url;
 
-    auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
+  Resource updating_resource = resource_b_;
+  updating_resource.schemaUrl_ = expected_schema_url;
 
-    auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
+  auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
 
-    DetectorFactoryA factory_a;
-    Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
+  auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
 
-    DetectorFactoryB factory_b;
-    Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
+  DetectorFactoryA factory_a;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-    EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
-    EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
+  DetectorFactoryB factory_b;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-    const std::string yaml_string = R"EOF(
+  EXPECT_CALL(factory_a, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_a))));
+  EXPECT_CALL(factory_b, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_b))));
+
+  const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
@@ -340,39 +348,41 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
         typed_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
-    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-    ResourceProviderImpl resource_provider;
-    Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  ResourceProviderImpl resource_provider;
+  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-    EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
-  }
-  // old and updating resource schema are not empty and are different. should keep old schema
-  {
-    std::string expected_schema_url = "my.schema/v1";
-    Resource old_resource = resource_a_;
-    old_resource.schemaUrl_ = expected_schema_url;
+  EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
+}
 
-    Resource updating_resource = resource_b_;
-    updating_resource.schemaUrl_ = "my.schema/v2";
+TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreDifferent) {
+  std::string expected_schema_url = "my.schema/v1";
+  Resource old_resource = resource_a_;
+  old_resource.schemaUrl_ = expected_schema_url;
 
-    auto detector_a = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
+  Resource updating_resource = resource_b_;
+  updating_resource.schemaUrl_ = "my.schema/v2";
 
-    auto detector_b = std::make_shared<NiceMock<SampleDetector>>();
-    EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
+  auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
 
-    DetectorFactoryA factory_a;
-    Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
+  auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
+  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
 
-    DetectorFactoryB factory_b;
-    Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
+  DetectorFactoryA factory_a;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
 
-    EXPECT_CALL(factory_a, createResourceDetector(_, _)).WillOnce(Return(detector_a));
-    EXPECT_CALL(factory_b, createResourceDetector(_, _)).WillOnce(Return(detector_b));
+  DetectorFactoryB factory_b;
+  Registry::InjectFactory<ResourceDetectorFactory> factory_b_registration(factory_b);
 
-    const std::string yaml_string = R"EOF(
+  EXPECT_CALL(factory_a, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_a))));
+  EXPECT_CALL(factory_b, createResourceDetector(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(detector_b))));
+
+  const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
@@ -386,14 +396,14 @@ TEST_F(ResourceProviderTest, SchemaUrl) {
         typed_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
     )EOF";
-    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-    ResourceProviderImpl resource_provider;
-    Resource resource = resource_provider.getResource(opentelemetry_config, context_);
+  ResourceProviderImpl resource_provider;
+  Resource resource = resource_provider.getResource(opentelemetry_config, context_);
 
-    EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
-  }
+  // OTel spec says Old schema should be used
+  EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
 }
 
 } // namespace
