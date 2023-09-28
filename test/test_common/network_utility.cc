@@ -71,37 +71,37 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
 
 std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return std::string("[::1]");
+    return {"[::1]"};
   }
-  return std::string("127.0.0.1");
+  return {"127.0.0.1"};
 }
 
 std::string getLoopbackAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return std::string("::1");
+    return {"::1"};
   }
-  return std::string("127.0.0.1");
+  return {"127.0.0.1"};
 }
 
 std::string getAnyAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return std::string("[::]");
+    return {"[::]"};
   }
-  return std::string("0.0.0.0");
+  return {"0.0.0.0"};
 }
 
 std::string getAnyAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return std::string("::");
+    return {"::"};
   }
-  return std::string("0.0.0.0");
+  return {"0.0.0.0"};
 }
 
 std::string addressVersionAsString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
-    return std::string("v4");
+    return {"v4"};
   }
-  return std::string("v6");
+  return {"v6"};
 }
 
 Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion version) {

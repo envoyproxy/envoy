@@ -117,8 +117,6 @@ fi
 docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
-       -e AZP_BRANCH \
-       -e AZP_COMMIT_SHA \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
@@ -129,6 +127,8 @@ docker run --rm \
        -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
        -e BAZEL_STARTUP_EXTRA_OPTIONS \
+       -e CI_BRANCH \
+       -e CI_SHA1 \
        -e CI_TARGET_BRANCH \
        -e DOCKERHUB_USERNAME \
        -e DOCKERHUB_PASSWORD \
@@ -150,6 +150,7 @@ docker run --rm \
        -e ENVOY_HEAD_REF \
        -e ENVOY_PUBLISH_DRY_RUN \
        -e ENVOY_REPO \
+       -e ENVOY_TARBALL_DIR \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
        -e GITHUB_REF_NAME \
@@ -157,7 +158,7 @@ docker run --rm \
        -e GITHUB_TOKEN \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \
-       -e NETLIFY_TRIGGER_URL \
+       -e MOBILE_DOCS_CHECKOUT_DIR \
        -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \

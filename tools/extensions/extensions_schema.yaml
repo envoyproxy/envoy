@@ -73,6 +73,7 @@ categories:
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
+- envoy.filters.udp.session
 - envoy.filters.quic_listener
 - envoy.formatter
 - envoy.geoip_providers

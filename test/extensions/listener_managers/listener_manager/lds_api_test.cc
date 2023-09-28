@@ -131,9 +131,8 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   EXPECT_CALL(init_watcher_, ready());
 
   const auto decoded_resources = TestUtility::decodeResources({listener});
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException, "Error adding/updating listener(s) invalid-listener: something is wrong\n");
+  EXPECT_EQ(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "Error adding/updating listener(s) invalid-listener: something is wrong\n");
 }
 
 TEST_F(LdsApiTest, EmptyListenersUpdate) {
@@ -182,11 +181,9 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
 
   const auto decoded_resources =
       TestUtility::decodeResources({listener_0, listener_1, listener_2, listener_3});
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException,
-      "Error adding/updating listener(s) invalid-listener-1: something is "
-      "wrong\ninvalid-listener-2: something else is wrong\n");
+  EXPECT_EQ(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "Error adding/updating listener(s) invalid-listener-1: something is "
+            "wrong\ninvalid-listener-2: something else is wrong\n");
 }
 
 // Validate onConfigUpdate throws EnvoyException with duplicate listeners.
@@ -208,11 +205,9 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   EXPECT_CALL(init_watcher_, ready());
 
   const auto decoded_resources = TestUtility::decodeResources({listener, listener});
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException,
-      "Error adding/updating listener(s) duplicate_listener: duplicate "
-      "listener duplicate_listener found\n");
+  EXPECT_EQ(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "Error adding/updating listener(s) duplicate_listener: duplicate "
+            "listener duplicate_listener found\n");
 }
 
 TEST_F(LdsApiTest, Basic) {

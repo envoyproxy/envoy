@@ -619,7 +619,8 @@ message RouteMatch {
   // match. The router will check the query string from the ``path`` header
   // against all the specified query parameters. If the number of specified
   // query parameters is nonzero, they all must match the ``path`` header's
-  // query string for a match to occur.
+  // query string for a match to occur.  In the event query parameters are
+  // repeated, only the first value for each key will be considered.
   //
   // .. note::
   //
@@ -882,7 +883,8 @@ message RouteAction {
 
       // The name of the URL query parameter that will be used to obtain the hash
       // key. If the parameter is not present, no hash will be produced. Query
-      // parameter names are case-sensitive.
+      // parameter names are case-sensitive. If query parameters are repeated, only
+      // the first value will be considered.
       string name = 1 [(validate.rules).string = {min_len: 1}];
     }
 
