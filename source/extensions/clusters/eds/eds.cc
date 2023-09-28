@@ -163,7 +163,7 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
 absl::Status
 EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                const std::string&) {
-  if (resources.size() == 0) {
+  if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", edsServiceName());
     info_->configUpdateStats().update_empty_.inc();
     onPreInitComplete();
