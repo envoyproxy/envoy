@@ -33,6 +33,7 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
     // Expects a tracestate like
     // "<tenantID>-<clusterID>@dt=fw4;0;0;0;0;<isIgnored>;8;<rootPathRandom>;<extensionChecksum>"
     TraceState tracesta = TraceState::parse(parent_context->tracestate());
+    tracesta.tenant_id = tenant_id_;
     tracesta.is_ignored = result.isRecording() ? "0" : "1";
     att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracesta.sampling_exponent;
     result.tracestate = tracesta.toString();
@@ -42,6 +43,7 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
     // if (current_counter % 2 == 0) {
       result.decision = Decision::RECORD_AND_SAMPLE;
       TraceState tracesta;
+      tracesta.tenant_id = tenant_id_;
       tracesta.sampling_exponent = "8";
       tracesta.is_ignored = result.isRecording() ? "0" : "1";
       result.tracestate = tracesta.toString();
@@ -66,6 +68,7 @@ std::string DynatraceSampler::modifyTracestate(const std::string& span_id,
   
   TraceState tracestate = TraceState::parse(current_tracestate);
   tracestate.span_id = span_id;
+  tracestate.tenant_id = tenant_id_;
   return tracestate.toString();
 }
 
