@@ -116,10 +116,10 @@ void ValidationInstance::initialize(const Options& options,
   thread_local_.registerThread(*dispatcher_, true);
 
   runtime_ = component_factory.createRuntime(*this, initial_config);
-  ENVOY_BUG(drain_manager_ == nullptr,
+  ENVOY_BUG(drain_manager_ != nullptr,
             "Component factory should not return nullptr from createRuntime()");
   drain_manager_ = component_factory.createDrainManager(*this);
-  ENVOY_BUG(drain_manager_ == nullptr,
+  ENVOY_BUG(drain_manager_ != nullptr,
             "Component factory should not return nullptr from createDrainManager()");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
