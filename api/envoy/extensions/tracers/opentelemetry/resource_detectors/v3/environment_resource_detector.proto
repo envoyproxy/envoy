@@ -15,6 +15,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the Environment Resource detector extension.
 // The resource detector reads from the `OTEL_RESOURCE_ATTRIBUTES`
 // environment variable, as per the OpenTelemetry specification.
+// .. seealso::
+//
+// `OpenTelemetry specification <https://github.com/open-telemetry/opentelemetry-specification/blob/v1.24.0/specification/resource/sdk.md#detecting-resource-information-from-the-environment>`_
+//
 // [#extension: envoy.tracers.opentelemetry.resource_detectors.environment]
 message EnvironmentResourceDetectorConfig {
 }

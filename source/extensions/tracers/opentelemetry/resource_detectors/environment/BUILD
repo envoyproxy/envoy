@@ -14,7 +14,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":resource_detector_environment_lib",
+        ":environment_resource_detector_lib",
         "//envoy/registry",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
@@ -22,7 +22,7 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
-    name = "resource_detector_environment_lib",
+    name = "environment_resource_detector_lib",
     srcs = ["environment_resource_detector.cc"],
     hdrs = ["environment_resource_detector.h"],
     deps = [

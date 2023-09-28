@@ -2,7 +2,7 @@
 
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 
-#include "resource_detector.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
 
 namespace Envoy {
 namespace Extensions {

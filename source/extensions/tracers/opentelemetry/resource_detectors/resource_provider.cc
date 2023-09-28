@@ -1,11 +1,9 @@
-#include "resource_provider.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 #include <string>
 
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
-
-#include "resource_detector.h"
 
 namespace Envoy {
 namespace Extensions {

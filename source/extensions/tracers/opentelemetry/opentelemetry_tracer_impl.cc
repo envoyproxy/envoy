@@ -1,4 +1,3 @@
-#include "opentelemetry_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
 #include <string>

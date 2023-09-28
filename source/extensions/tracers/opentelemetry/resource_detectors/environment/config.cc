@@ -1,11 +1,10 @@
-#include "config.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/environment/config.h"
 
 #include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
 #include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.validate.h"
 
 #include "source/common/config/utility.h"
-
-#include "environment_resource_detector.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/environment/environment_resource_detector.h"
 
 namespace Envoy {
 namespace Extensions {

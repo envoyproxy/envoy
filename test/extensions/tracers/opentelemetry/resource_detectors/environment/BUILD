@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/resource_detectors/environment:config",
-        "//source/extensions/tracers/opentelemetry/resource_detectors/environment:resource_detector_environment_lib",
+        "//source/extensions/tracers/opentelemetry/resource_detectors/environment:environment_resource_detector_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -29,7 +29,7 @@ envoy_extension_cc_test(
     srcs = ["environment_resource_detector_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.environment"],
     deps = [
-        "//source/extensions/tracers/opentelemetry/resource_detectors/environment:resource_detector_environment_lib",
+        "//source/extensions/tracers/opentelemetry/resource_detectors/environment:environment_resource_detector_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
