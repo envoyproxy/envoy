@@ -70,9 +70,8 @@ public:
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTest()
-      : HttpProtocolIntegrationTest(
-            ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
-                                          Http::CodecType::HTTP3)) {}
+      : HttpProtocolIntegrationTest(ConfigHelper::httpProxyConfig(
+            /*downstream_is_quic=*/GetParam().downstream_protocol == Http::CodecType::HTTP3)) {}
 
   HttpProtocolIntegrationTest(const std::string config)
       : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
