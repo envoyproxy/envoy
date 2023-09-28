@@ -607,10 +607,9 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
       }))
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, EAGAIN}));
 
-  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce(Invoke([&](){
-    dispatcher_->exit();
-  }));
-  EXPECT_CALL(listener_callbacks_, onData(_)).Times(4u)
+  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce(Invoke([&]() { dispatcher_->exit(); }));
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .Times(4u)
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, client_data.size());
 
