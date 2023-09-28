@@ -1,5 +1,6 @@
 #include "source/common/http/conn_manager_impl.h"
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -54,6 +55,11 @@
 
 namespace Envoy {
 namespace Http {
+
+const absl::string_view ConnectionManagerImpl::PrematureResetTotalStreamCountKey =
+    "overload.premature_reset_total_stream_count";
+const absl::string_view ConnectionManagerImpl::PrematureResetMinStreamLifetimeSecondsKey =
+    "overload.premature_reset_min_stream_lifetime_seconds";
 
 bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
   if (!headers) {
@@ -262,6 +268,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  ++closed_non_internally_destroyed_requests_;
+  if (isPrematureRstStream(stream)) {
+    ++number_premature_stream_resets_;
+  }
   if (stream.max_stream_duration_timer_) {
     stream.max_stream_duration_timer_->disableTimer();
     stream.max_stream_duration_timer_ = nullptr;
@@ -294,6 +304,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   if (connection_idle_timer_ && streams_.empty()) {
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
+  maybeDrainDueToPrematureResets();
 }
 
 RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
@@ -531,6 +542,59 @@ void ConnectionManagerImpl::doConnectionClose(
 
   if (close_type.has_value()) {
     read_callbacks_->connection().close(close_type.value());
+  }
+}
+
+bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) const {
+  // Check if the request was prematurely reset, by comparing its lifetime to the configured
+  // threshold.
+  MonotonicTime current_time = time_source_.monotonicTime();
+  MonotonicTime request_start_time = stream.filter_manager_.streamInfo().startTimeMonotonic();
+  std::chrono::nanoseconds duration =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(current_time - request_start_time);
+
+  // Check if request lifetime is longer than the premature reset threshold.
+  if (duration.count() > 0) {
+    const uint64_t lifetime = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+    const uint64_t min_lifetime = runtime_.snapshot().getInteger(
+        ConnectionManagerImpl::PrematureResetMinStreamLifetimeSecondsKey, 1);
+    if (lifetime > min_lifetime) {
+      return false;
+    }
+  }
+
+  // If request has completed before configured threshold, also check if the Envoy proxied the
+  // response from the upstream. Requests without the response status were reset.
+  // TODO(RyanTheOptimist): Possibly support half_closed_local instead.
+  return !stream.filter_manager_.streamInfo().responseCode();
+}
+
+// Sends a GOAWAY if too many streams have been reset prematurely on this
+// connection.
+void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.restart_features.send_goaway_for_premature_rst_streams") ||
+      closed_non_internally_destroyed_requests_ == 0) {
+    return;
+  }
+
+  const uint64_t limit =
+      runtime_.snapshot().getInteger(ConnectionManagerImpl::PrematureResetTotalStreamCountKey, 500);
+
+  if (closed_non_internally_destroyed_requests_ < limit) {
+    return;
+  }
+
+  if (static_cast<double>(number_premature_stream_resets_) /
+          closed_non_internally_destroyed_requests_ <
+      .5) {
+    return;
+  }
+
+  if (drain_state_ == DrainState::NotDraining) {
+    stats_.named_.downstream_rq_too_many_premature_resets_.inc();
+    doConnectionClose(Network::ConnectionCloseType::Abort, absl::nullopt,
+                      "too_many_premature_resets");
   }
 }
 
