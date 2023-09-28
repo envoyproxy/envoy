@@ -331,12 +331,10 @@ TEST_P(ForwardingConnectUdpIntegrationTest, DoNotForwardNonConnectUdp) {
 }
 
 // Tunneling downstream UDP over an upstream HTTP CONNECT tunnel.
-class UdpTunnelingIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                    public HttpIntegrationTest {
+class UdpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   UdpTunnelingIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(),
-                            ConfigHelper::baseUdpListenerConfig()) {}
+      : HttpProtocolIntegrationTest(ConfigHelper::baseUdpListenerConfig()) {}
 
   struct BufferOptions {
     uint32_t max_buffered_datagrams_;
@@ -356,8 +354,6 @@ public:
 
   void setup(const TestConfig& config) {
     config_ = config;
-    setDownstreamProtocol(Http::CodecType::HTTP2);
-    setUpstreamProtocol(Http::CodecType::HTTP2);
 
     std::string filter_config =
         fmt::format(R"EOF(
@@ -715,9 +711,11 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, UdpTunnelingIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpAndHttpVersions, UdpTunnelingIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace
 } // namespace Envoy

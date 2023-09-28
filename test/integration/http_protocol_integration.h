@@ -70,10 +70,12 @@ public:
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTest()
-      : HttpIntegrationTest(
-            GetParam().downstream_protocol, GetParam().version,
+      : HttpProtocolIntegrationTest(
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
-                                          Http::CodecType::HTTP3)),
+                                          Http::CodecType::HTTP3)) {}
+
+  HttpProtocolIntegrationTest(const std::string config)
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
         use_universal_header_validator_(GetParam().use_universal_header_validator) {
     setupHttp1ImplOverrides(GetParam().http1_implementation);
     setupHttp2ImplOverrides(GetParam().http2_implementation);
