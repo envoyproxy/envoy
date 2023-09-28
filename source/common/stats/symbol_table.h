@@ -702,7 +702,7 @@ public:
   StatNameManagedStorage(StatName src, SymbolTable& table) noexcept
       : StatNameStorage(src, table), symbol_table_(table) {}
 
-  ~StatNameManagedStorage() { free(symbol_table_); }
+  ~StatNameManagedStorage() { free(symbol_table_); } // NOLINT(clang-analyzer-unix.Malloc)
 
 private:
   SymbolTable& symbol_table_;

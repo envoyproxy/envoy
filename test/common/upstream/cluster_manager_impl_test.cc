@@ -2643,6 +2643,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
@@ -2864,6 +2865,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
@@ -3684,6 +3686,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
   dns_timer_->invokeCallback();
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
@@ -3768,6 +3771,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
 
   // Remove the first host, this should lead to the cp being drained.
   dns_timer_->invokeCallback();
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.

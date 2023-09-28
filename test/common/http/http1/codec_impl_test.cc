@@ -4641,7 +4641,8 @@ TEST_P(Http1ServerConnectionImplTest, SeparatorInHeaderName) {
 // BalsaParser always rejects a header name with space. HttpParser only rejects
 // it in strict mode, which is disabled when ENVOY_ENABLE_UHV is defined.
 TEST_P(Http1ClientConnectionImplTest, SpaceInHeaderName) {
-  bool accept = parser_impl_ == Http1ParserImpl::HttpParser;
+  // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
+  bool accept = (parser_impl_ == Http1ParserImpl::HttpParser);
 #ifndef ENVOY_ENABLE_UHV
   accept = false;
 #endif
@@ -4675,7 +4676,8 @@ TEST_P(Http1ClientConnectionImplTest, SpaceInHeaderName) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, SpaceInHeaderName) {
-  bool accept = parser_impl_ == Http1ParserImpl::HttpParser;
+  // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
+  bool accept = (parser_impl_ == Http1ParserImpl::HttpParser);
 #ifndef ENVOY_ENABLE_UHV
   accept = false;
 #endif
