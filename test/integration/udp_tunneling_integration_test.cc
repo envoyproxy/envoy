@@ -711,11 +711,10 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    IpAndHttpVersions, UdpTunnelingIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-        {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, UdpTunnelingIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace
 } // namespace Envoy
