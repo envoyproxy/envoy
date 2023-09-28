@@ -123,6 +123,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
+  stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
       parent_.callbacks()->streamInfo().upstreamClusterInfo();
   if (cluster_info.has_value()) {
@@ -623,6 +624,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
   StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
                                                               stream_info_);
+
   if (protocol) {
     upstream_info.setUpstreamProtocol(protocol.value());
   }
