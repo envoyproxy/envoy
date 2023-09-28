@@ -2,6 +2,15 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: http
+  change: |
+    Close HTTP/2 and HTTP/3 connections that prematurely reset streams. The runtime key
+    ``overload.premature_reset_min_stream_lifetime_seconds`` determines the interval where received stream
+    reset is considered premature (with 1 second default). The runtime key ``overload.premature_reset_total_stream_count``,
+    with the default value of 500, determines the number of requests received from a connection before the check for premature
+    resets is applied. The connection is disconnected if more than 50% of resets are premature.
+    Setting the runtime key ``envoy.restart_features.send_goaway_for_premature_rst_streams`` to ``false`` completely disables
+    this check.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
