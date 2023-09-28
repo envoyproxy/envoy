@@ -10,18 +10,23 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "ssl_integration_test_lib",
+    hdrs = ["ssl_integration_test.h"],
+)
+
 envoy_cc_test(
     name = "ssl_integration_test",
     size = "large",
     srcs = [
         "ssl_integration_test.cc",
-        "ssl_integration_test.h",
     ],
     data = [
         "//test/config/integration/certs",
     ],
     deps = [
         ":sni_to_header_filter_lib",
+        ":ssl_integration_test_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",

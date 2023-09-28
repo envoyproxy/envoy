@@ -281,6 +281,7 @@ private:
   const Tracing::CustomTagMap* customTags() const override;
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
+  bool spawnUpstreamSpan() const override;
 
   bool active_stream_reset_{false};
 

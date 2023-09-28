@@ -72,13 +72,13 @@ private:
   absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration> all_routes_;
   absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration> active_routes_;
 
-  uint32_t num_warming_;
-  uint32_t num_active_;
-  uint32_t num_draining_;
+  uint32_t num_warming_{0};
+  uint32_t num_active_{0};
+  uint32_t num_draining_{0};
 
-  uint32_t num_added_;
-  uint32_t num_modified_;
-  uint32_t num_removed_;
+  uint32_t num_added_{0};
+  uint32_t num_modified_{0};
+  uint32_t num_removed_{0};
 
   SotwOrDelta sotw_or_delta_;
 };

@@ -258,7 +258,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   initialize();
   try {
-    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    THROW_IF_NOT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   } catch (const EnvoyException& e) {
     eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
@@ -284,7 +284,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   const auto decoded_resources = TestUtility::decodeResources(
       {cluster_load_assignment, cluster_load_assignment}, "cluster_name");
   try {
-    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    THROW_IF_NOT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   } catch (const EnvoyException& e) {
     eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
@@ -2830,11 +2830,9 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
 
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException,
-      "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
-      "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
+  EXPECT_EQ(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
+            "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
 }
 
 class EdsCachedAssignmentTest : public testing::Test {

@@ -380,6 +380,7 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
+  // NOLINTNEXTLINE(modernize-make-shared)
   transport_socket_options_.reset(new Network::TransportSocketOptionsImpl("", {"non-example.com"}));
   configCertVerificationDetails(true);
   std::unique_ptr<quic::CertificateView> cert_view =

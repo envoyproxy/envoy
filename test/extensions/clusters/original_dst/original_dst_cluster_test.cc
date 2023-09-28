@@ -68,7 +68,7 @@ public:
 
 class OriginalDstClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  OriginalDstClusterTest() {}
+  OriginalDstClusterTest() = default;
 
   void setupFromYaml(const std::string& yaml, bool expect_success = true) {
     if (expect_success) {
@@ -1065,8 +1065,8 @@ TEST_F(OriginalDstClusterTest, UseFilterState) {
   // Filter state takes priority over header override.
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState()->setData(
-      Network::DestinationAddress::key(),
-      std::make_shared<Network::DestinationAddress>(
+      Upstream::OriginalDstClusterFilterStateKey,
+      std::make_shared<Network::AddressObject>(
           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
       StreamInfo::FilterState::StateType::ReadOnly);
   TestLoadBalancerContext lb_context1(&connection, Http::Headers::get().EnvoyOriginalDstHost.get(),
@@ -1133,8 +1133,8 @@ TEST_F(OriginalDstClusterTest, UseFilterStateWithPortOverride) {
   // Filter state takes priority over header override.
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState()->setData(
-      Network::DestinationAddress::key(),
-      std::make_shared<Network::DestinationAddress>(
+      Upstream::OriginalDstClusterFilterStateKey,
+      std::make_shared<Network::AddressObject>(
           std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
       StreamInfo::FilterState::StateType::ReadOnly);
   TestLoadBalancerContext lb_context1(&connection, Http::Headers::get().EnvoyOriginalDstHost.get(),

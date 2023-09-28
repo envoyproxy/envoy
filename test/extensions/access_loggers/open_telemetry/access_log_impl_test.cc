@@ -27,7 +27,6 @@
 using namespace std::chrono_literals;
 using ::Envoy::AccessLog::FilterPtr;
 using ::Envoy::AccessLog::MockFilter;
-using envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig;
 using opentelemetry::proto::common::v1::AnyValue;
 using opentelemetry::proto::common::v1::KeyValueList;
 using opentelemetry::proto::logs::v1::LogRecord;

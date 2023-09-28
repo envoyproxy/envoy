@@ -22,6 +22,20 @@ The following list of filter state objects are consumed by Envoy extensions:
        | Fields:
        | - ``ip``: IP address value as a string;
        | - ``port``: port value as a number.
+   * - ``envoy.filters.listener.original_dst.local_ip``
+     - | :ref:`Original destination listener filter <config_listener_filters_original_dst>`
+       | destination address selection for the internal listeners.
+       | Accepts an `IP:PORT` string as a constructor.
+       | Fields:
+       | - ``ip``: IP address value as a string;
+       | - ``port``: port value as a number.
+   * - ``envoy.filters.listener.original_dst.remote_ip``
+     - | :ref:`Original destination listener filter <config_listener_filters_original_dst>`
+       | source address selection for the internal listeners.
+       | Accepts an `IP:PORT` string as a constructor.
+       | Fields:
+       | - ``ip``: IP address value as a string;
+       | - ``port``: port value as a number.
    * - ``envoy.upstream.dynamic_host``
      - | :ref:`Dynamic forward proxy <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`
        | upstream host override on a per-connection basis.

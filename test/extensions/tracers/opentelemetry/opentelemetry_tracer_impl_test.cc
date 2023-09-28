@@ -347,6 +347,123 @@ TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+TEST_F(OpenTelemetryDriverTest, SpanType) {
+  // Set up driver
+  setupValidDriver();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  // Mock the random call for generating the parent span's IDs so we can check it later.
+  const uint64_t parent_trace_id_high = 0;
+  const uint64_t parent_trace_id_low = 2;
+  const uint64_t parent_span_id = 3;
+
+  {
+    mock_tracing_config_.spawn_upstream_span_ = false;
+    mock_tracing_config_.operation_name_ = Tracing::OperationName::Ingress;
+
+    NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+        context_.server_factory_context_.api_.random_;
+    {
+      InSequence s;
+
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_high));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_low));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_span_id));
+    }
+
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    EXPECT_NE(span.get(), nullptr);
+
+    // The span type should be SERVER because spawn_upstream_span_ is false and operation_name_ is
+    // Ingress.
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER);
+
+    // The child should only generate a span ID for itself; the trace id should come from the
+    // parent.
+    const uint64_t child_span_id = 3;
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(child_span_id));
+    Tracing::SpanPtr child_span =
+        span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
+
+    // The child span should also be a CLIENT span.
+    EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  }
+
+  {
+    mock_tracing_config_.spawn_upstream_span_ = false;
+    mock_tracing_config_.operation_name_ = Tracing::OperationName::Egress;
+
+    NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+        context_.server_factory_context_.api_.random_;
+    {
+      InSequence s;
+
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_high));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_low));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_span_id));
+    }
+
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    EXPECT_NE(span.get(), nullptr);
+
+    // The span type should be CLIENT because spawn_upstream_span_ is false and operation_name_ is
+    // Egress.
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+
+    // The child should only generate a span ID for itself; the trace id should come from the
+    // parent.
+    const uint64_t child_span_id = 3;
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(child_span_id));
+    Tracing::SpanPtr child_span =
+        span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
+
+    // The child span should also be a CLIENT span.
+    EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  }
+
+  {
+    mock_tracing_config_.spawn_upstream_span_ = true;
+    mock_tracing_config_.operation_name_ = Tracing::OperationName::Egress;
+
+    NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+        context_.server_factory_context_.api_.random_;
+    {
+      InSequence s;
+
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_high));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_trace_id_low));
+      EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(parent_span_id));
+    }
+
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    EXPECT_NE(span.get(), nullptr);
+
+    // The span type should be SERVER because spawn_upstream_span_ is true and this is
+    // downstream span.
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER);
+
+    // The child should only generate a span ID for itself; the trace id should come from the
+    // parent.
+    const uint64_t child_span_id = 3;
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(child_span_id));
+    Tracing::SpanPtr child_span =
+        span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
+
+    // The child span should also be a CLIENT span.
+    EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().kind(),
+              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  }
+}
+
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributes) {
   setupValidDriver();
   Http::TestRequestHeaderMapImpl request_headers{

@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val TEST_RESPONSE_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 
 class CancelStreamTest {
 
@@ -73,8 +73,7 @@ class CancelStreamTest {
         name = "cancel_validation_filter",
         factory = { CancelValidationFilter(filterExpectation) }
       )
-      .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
-      .setOnEngineRunning {}
+      .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
       .build()
 
     val client = engine.streamClient()

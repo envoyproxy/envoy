@@ -867,11 +867,11 @@ private:
 
 protected:
   ClusterMap active_clusters_;
+  ClusterInitializationMap cluster_initialization_map_;
 
 private:
   ClusterMap warming_clusters_;
   const bool deferred_cluster_creation_;
-  ClusterInitializationMap cluster_initialization_map_;
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
