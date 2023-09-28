@@ -13,6 +13,8 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/common/set_filter_state/v3;set_filter_statev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#protodoc-title: Set-Filter-State Update Rule]
+
 // A filter state update rule.
 // [#next-free-field: 6]
 message Rule {
@@ -38,7 +40,7 @@ message Rule {
     config.core.v3.SubstitutionFormatString format_string = 2;
   }
 
-  // If marked as read-only, the filter state key cannot be overridden by subsequent updates.
+  // If marked as read-only, the filter state key cannot be overridden by the subsequent updates.
   bool read_only = 3;
 
   // Configures the object to be shared with the upstream internal connections. See :ref:`internal upstream
