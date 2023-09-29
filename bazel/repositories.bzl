@@ -121,7 +121,7 @@ genrule(
     name = "project",
     outs = ["project.json"],
     cmd = """
-    $(location :get_project_json) . > $@
+    $(location :get_project_json) $$(dirname $(location @envoy//:VERSION.txt)) > $@
     """,
     tools = [
         ":get_project_json",
