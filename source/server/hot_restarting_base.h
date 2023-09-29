@@ -99,6 +99,15 @@ protected:
   static Stats::Gauge& hotRestartGeneration(Stats::Scope& scope);
 
   RpcStream main_rpc_stream_;
+  // A separate channel is used for udp forwarding because udp forwarding can
+  // begin while communication on the main channel is still occurring. The hot
+  // restarter is single-threaded, so we don't have to worry about packets coming
+  // in a jumbled order, but there are two instances of the hot restarter, the
+  // parent and the child; it is possible for the child to send a udp packet
+  // while the parent is sending a request on the main channel, for which it will
+  // expect to receive a response (and not an unrelated udp packet). Therefore, a
+  // separate channel is used to deliver udp packets, ensuring no interference
+  // between the two data sources.
   RpcStream udp_forwarding_rpc_stream_;
 };
 
