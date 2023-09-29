@@ -119,6 +119,7 @@ void ValidationInstance::initialize(const Options& options,
   ENVOY_BUG(runtime_ != nullptr,
             "Component factory should not return nullptr from createRuntime()");
   drain_manager_ = component_factory.createDrainManager(*this);
+  ENVOY_LOG(critical, "Drain manager is nullptr? {}", (drain_manager_ == nullptr));
   ENVOY_BUG(drain_manager_ != nullptr,
             "Component factory should not return nullptr from createDrainManager()");
 
