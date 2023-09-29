@@ -43,7 +43,8 @@ static_resources:
           # note: The target port value can be overridden per-session by setting the required port value for
           # the filter state key ``udp.connect.target_port``.
           default_target_port: 443
-          max_connect_attempts: 2
+          retry_options:
+            max_connect_attempts: 2
           buffer_options:
             max_buffered_datagrams: 1024
             max_buffered_bytes: 16384
