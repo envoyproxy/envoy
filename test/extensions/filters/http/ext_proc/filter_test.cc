@@ -3226,17 +3226,15 @@ TEST_F(HttpFilterTest, MultipleSetCookieHeaders) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
 
   // Validate that multiple Set-Cookie headers are preserved
-  processResponseHeaders(false,
-    [](const HttpHeaders& header_resp, ProcessingResponse&, HeadersResponse&) {
-      EXPECT_FALSE(header_resp.end_of_stream());
-      TestRequestHeaderMapImpl expected_response{
-        {":status", "200"},
-        {"content-type", "text/plain"},
-        {"set-cookie", "cookie1=value1"},
-        {"set-cookie", "cookie2=value2"}
-      };
-      EXPECT_THAT(header_resp.headers(), HeaderProtosEqual(expected_response));
-    });
+  processResponseHeaders(
+      false, [](const HttpHeaders& header_resp, ProcessingResponse&, HeadersResponse&) {
+        EXPECT_FALSE(header_resp.end_of_stream());
+        TestRequestHeaderMapImpl expected_response{{":status", "200"},
+                                                   {"content-type", "text/plain"},
+                                                   {"set-cookie", "cookie1=value1"},
+                                                   {"set-cookie", "cookie2=value2"}};
+        EXPECT_THAT(header_resp.headers(), HeaderProtosEqual(expected_response));
+      });
 
   filter_->onDestroy();
 }
