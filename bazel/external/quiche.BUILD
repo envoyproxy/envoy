@@ -5111,7 +5111,6 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
     ],
-
 )
 
 envoy_cc_library(
@@ -5121,9 +5120,9 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":quiche_simple_arena_lib",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
+        ":quiche_simple_arena_lib",
     ],
 )
 
