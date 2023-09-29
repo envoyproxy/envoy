@@ -624,7 +624,6 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
   StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
                                                               stream_info_);
-
   if (protocol) {
     upstream_info.setUpstreamProtocol(protocol.value());
   }
