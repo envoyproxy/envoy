@@ -20,7 +20,7 @@ Config::parse(const Protobuf::RepeatedPtrField<
     rule.factory_ =
         Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(rule.key_);
     if (rule.factory_ == nullptr) {
-      throw EnvoyException(fmt::format("{} does not have an object factory", rule.key_));
+      throw EnvoyException(fmt::format("'{}' does not have an object factory", rule.key_));
     }
     rule.state_type_ = proto_rule.read_only() ? StateType::ReadOnly : StateType::Mutable;
     switch (proto_rule.shared_with_upstream()) {
