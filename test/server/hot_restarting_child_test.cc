@@ -128,6 +128,24 @@ TEST_F(HotRestartingChildTest, DoesNothingOnForwardedUdpMessageWithNoMatchingLis
   EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
 }
 
+TEST_F(HotRestartingChildTest, DoesNothingOnUnparseablePeerAddress) {
+  envoy::HotRestartMessage msg;
+  auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
+  packet->set_local_addr("127.0.0.1:1234");
+  packet->set_peer_addr("/tmp/domainsocket");
+  packet->set_payload("hello");
+  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+}
+
+TEST_F(HotRestartingChildTest, DoesNothingOnUnparseableLocalAddress) {
+  envoy::HotRestartMessage msg;
+  auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
+  packet->set_local_addr("/tmp/domainsocket");
+  packet->set_peer_addr("127.0.0.1:4321");
+  packet->set_payload("hello");
+  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+}
+
 MATCHER_P4(IsUdpWith, local_addr, peer_addr, buffer, timestamp, "") {
   bool local_matched = *arg.addresses_.local_ == *local_addr;
   if (!local_matched) {
