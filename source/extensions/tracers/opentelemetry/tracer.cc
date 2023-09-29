@@ -24,6 +24,31 @@ constexpr absl::string_view kDefaultServiceName = "unknown_service:envoy";
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
+namespace {
+
+void callSampler(SamplerPtr sampler, absl::StatusOr<SpanContext> span_context, Span& new_span,
+                 const std::string& operation_name) {
+  if (sampler) {
+    auto sampling_result = sampler->shouldSample(
+        span_context, operation_name, new_span.getTraceIdAsHex(), new_span.spankind(), {}, {});
+    new_span.setSampled(sampling_result.isSampled());
+    auto modified_tracestate =
+        sampler->modifyTracestate(new_span.spanId(), sampling_result.tracestate);
+    if (!modified_tracestate.empty()) {
+      sampling_result.tracestate = modified_tracestate;
+    }
+
+    if (sampling_result.attributes) {
+      for (auto const& attribute : *sampling_result.attributes) {
+        new_span.setTag(attribute.first, attribute.second);
+      }
+    }
+    new_span.setTracestate(sampling_result.tracestate);
+  }
+}
+
+} // namespace
+
 Span::Span(const Tracing::Config& config, const std::string& name, SystemTime start_time,
            Envoy::TimeSource& time_source, Tracer& parent_tracer)
     : parent_tracer_(parent_tracer), time_source_(time_source) {
@@ -172,20 +197,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
 
   if (sampler_) {
     absl::StatusOr<SpanContext> span_context = absl::InvalidArgumentError("no parent span");
-    auto sampling_result = sampler_->shouldSample(
-        span_context, operation_name, new_span.getTraceIdAsHex(), new_span.spankind(), {}, {});
-    new_span.setSampled(sampling_result.isSampled());        
-    auto modified_tracestate = sampler()->modifyTracestate(new_span.spanId(), sampling_result.tracestate);
-    if (!modified_tracestate.empty()) {
-      sampling_result.tracestate = modified_tracestate;
-    }
-
-    if (sampling_result.attributes) {
-      for (auto const& attribute : *sampling_result.attributes) {
-        new_span.setTag(attribute.first, attribute.second);
-      }
-    }
-    new_span.setTracestate(sampling_result.tracestate);
+    callSampler(sampler_, span_context, new_span, operation_name);
   }
   return std::make_unique<Span>(new_span);
 }
@@ -210,20 +222,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   }
 
   if (sampler_) {
-    absl::StatusOr<SpanContext> span_context = previous_span_context;
-    auto sampling_result = sampler_->shouldSample(
-        span_context, operation_name, new_span.getTraceIdAsHex(), new_span.spankind(), {}, {});
-    auto modified_tracestate = sampler()->modifyTracestate(new_span.spanId(), sampling_result.tracestate);
-    if (!modified_tracestate.empty()) {
-      sampling_result.tracestate = modified_tracestate;
-    }
-
-    if (sampling_result.attributes) {
-      for (auto const& attribute : *sampling_result.attributes) {
-        new_span.setTag(attribute.first, attribute.second);
-      }
-    }
-    new_span.setTracestate(sampling_result.tracestate);
+    callSampler(sampler_, previous_span_context, new_span, operation_name);
   }
   return std::make_unique<Span>(new_span);
 }

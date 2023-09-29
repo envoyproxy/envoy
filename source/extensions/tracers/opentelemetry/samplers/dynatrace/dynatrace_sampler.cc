@@ -25,29 +25,19 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
 
   SamplingResult result;
   std::map<std::string, std::string> att;
-  uint32_t current_counter = counter_++;
+  // uint32_t current_counter = counter_++;
+  TraceState tracesta;
 
   if (parent_context.ok()) { // there is already a trace,
-
+    // we should check if there is a dynatrace sampling decision on the state and use it
     result.decision = Decision::RECORD_AND_SAMPLE;
     // Expects a tracestate like
     // "<tenantID>-<clusterID>@dt=fw4;0;0;0;0;<isIgnored>;8;<rootPathRandom>;<extensionChecksum>"
-    TraceState tracesta = TraceState::parse(parent_context->tracestate());
-    tracesta.tenant_id = tenant_id_;
-    tracesta.is_ignored = result.isRecording() ? "0" : "1";
-    att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracesta.sampling_exponent;
-    result.tracestate = tracesta.toString();
-
+    tracesta = TraceState::parse(parent_context->tracestate());
   } else { // start new trace
-    (void)current_counter;
     // if (current_counter % 2 == 0) {
       result.decision = Decision::RECORD_AND_SAMPLE;
-      TraceState tracesta;
-      tracesta.tenant_id = tenant_id_;
-      tracesta.sampling_exponent = "8";
-      tracesta.is_ignored = result.isRecording() ? "0" : "1";
-      result.tracestate = tracesta.toString();
-      att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracesta.sampling_exponent;
+      tracesta.sampling_exponent = "8"; // "8" is used for demo. Will be received from configuration in a final version
     // } else {
     //   result.decision = Decision::RECORD_ONLY;
     //   if (parent_context.ok()) {
@@ -55,7 +45,12 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
     //   }
     // }
   }
-  if (att.size()) {
+
+  tracesta.tenant_id = tenant_id_;
+  tracesta.is_ignored = result.isRecording() ? "0" : "1";
+  att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracesta.sampling_exponent;
+  result.tracestate = tracesta.toString();
+  if (!att.empty()) {
     result.attributes = std::make_unique<const std::map<std::string, std::string>>(std::move(att));
   }
   return result;
