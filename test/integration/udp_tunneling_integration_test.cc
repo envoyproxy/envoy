@@ -376,7 +376,8 @@ typed_config:
     proxy_host: {}
     target_host: {}
     default_target_port: {}
-    max_connect_attempts: {}
+    retry_options:
+      max_connect_attempts: {}
 )EOF",
                     config.proxy_host_, config.target_host_, config.default_target_port_,
                     config.max_connect_attempts_);

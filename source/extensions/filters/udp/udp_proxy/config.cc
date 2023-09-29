@@ -7,6 +7,7 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 
+constexpr uint32_t DefaultMaxConnectAttempts = 1;
 constexpr uint32_t DefaultMaxBufferedDatagrams = 1024;
 constexpr uint64_t DefaultMaxBufferedBytes = 16384;
 
@@ -15,7 +16,11 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
     : header_parser_(Envoy::Router::HeaderParser::configure(config.headers_to_add())),
       proxy_port_(), target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
-      max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
+      max_connect_attempts_(config.has_retry_options()
+                                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_options(),
+                                                                  max_connect_attempts,
+                                                                  DefaultMaxConnectAttempts)
+                                : DefaultMaxConnectAttempts),
       buffer_enabled_(config.has_buffer_options()),
       max_buffered_datagrams_(config.has_buffer_options()
                                   ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.buffer_options(),
