@@ -13,14 +13,13 @@ namespace OpenTelemetry {
 namespace {
 bool isEmptyResource(const Resource& resource) { return resource.attributes_.empty(); }
 
-Resource createInitialResource(std::string service_name) {
+Resource createInitialResource(const std::string& service_name) {
   Resource resource{};
 
   // Creates initial resource with the static service.name attribute.
-  if (service_name.empty()) {
-    service_name = std::string{kDefaultServiceName};
-  }
-  resource.attributes_[std::string(kServiceNameKey.data(), kServiceNameKey.size())] = service_name;
+  resource.attributes_[std::string(kServiceNameKey.data(), kServiceNameKey.size())] =
+      service_name.empty() ? std::string{kDefaultServiceName} : service_name;
+
   return resource;
 }
 

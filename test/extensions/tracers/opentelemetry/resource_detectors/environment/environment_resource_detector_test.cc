@@ -76,6 +76,29 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
   TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 }
 
+TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributesWrongFormat) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "key1=val1,key2val2,key3/val3, , key", 1);
+  ResourceAttributes expected_attributes = {{"key1", "val"}};
+
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(ReturnRef(*api));
+
+  envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+      EnvironmentResourceDetectorConfig config;
+
+  auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
+  Resource resource = detector->detect();
+
+  EXPECT_EQ(resource.schemaUrl_, "");
+  EXPECT_EQ(1, resource.attributes_.size());
+
+  EXPECT_EQ(resource.attributes_.begin()->first, resource.attributes_.begin()->first);
+  EXPECT_EQ(resource.attributes_.begin()->second, resource.attributes_.begin()->second);
+
+  TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
+}
+
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

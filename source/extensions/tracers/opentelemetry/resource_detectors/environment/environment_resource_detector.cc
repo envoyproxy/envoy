@@ -40,12 +40,14 @@ Resource EnvironmentResourceDetector::detect() {
     return resource;
   }
 
-  std::istringstream iss(attributes_str);
-  std::string token;
-  while (std::getline(iss, token, ',')) {
-    size_t pos = token.find('=');
-    std::string key = token.substr(0, pos);
-    std::string value = token.substr(pos + 1);
+  for (const auto& pair : StringUtil::splitToken(attributes_str, ",")) {
+    const auto keyValue = StringUtil::splitToken(pair, "=");
+    if (keyValue.size() != 2) {
+      continue;
+    }
+
+    const std::string key = std::string(keyValue[0]);
+    const std::string value = std::string(keyValue[1]);
     resource.attributes_[key] = value;
   }
   return resource;
