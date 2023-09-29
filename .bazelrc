@@ -48,6 +48,8 @@ build --action_env=BAZEL_FAKE_SCM_REVISION --host_action_env=BAZEL_FAKE_SCM_REVI
 
 build --test_summary=terse
 
+build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
+
 # TODO(keith): Remove once these 2 are the default
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
