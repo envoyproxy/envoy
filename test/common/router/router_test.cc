@@ -4923,10 +4923,10 @@ TEST_F(RouterTest, PropagatesShadowState) {
   Http::TestRequestHeaderMapImpl headers{};
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
+  ASSERT_THAT(response_decoder, testing::NotNull());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
   EXPECT_TRUE(shadow_state_verified);
