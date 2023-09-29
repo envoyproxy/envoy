@@ -378,7 +378,8 @@ FakeHttpConnection::FakeHttpConnection(
         headers_with_underscores_action)
     : FakeConnectionBase(shared_connection, time_system), type_(type),
       header_validator_factory_(
-          IntegrationUtil::makeHeaderValidationFactory(fakeUpstreamHeaderValidatorConfig())) {
+          IntegrationUtil::makeHeaderValidationFactory(fakeUpstreamHeaderValidatorConfig())),
+      dtor_helper_(*this) {
   ASSERT(max_request_headers_count != 0);
   if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;

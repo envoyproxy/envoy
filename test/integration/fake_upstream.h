@@ -523,7 +523,16 @@ private:
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      Http::Status status = parent_.codec_->dispatch(data);
+      Http::Status status;
+
+      {
+        absl::MutexLock lock(&parent_.dtor_lock_);
+        if (parent_.disconnecting_) {
+          return Network::FilterStatus::StopIteration;
+        }
+
+        status = parent_.codec_->dispatch(data);
+      }
 
       if (Http::isCodecProtocolError(status)) {
         ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", status.message());
@@ -544,6 +553,19 @@ private:
     FakeHttpConnection& parent_;
   };
 
+  class DtorHelper {
+  public:
+    DtorHelper(FakeHttpConnection& parent) : parent_(parent) {}
+    ~DtorHelper() {
+      absl::MutexLock lock(&parent_.dtor_lock_);
+      parent_.disconnecting_ = true;
+    }
+
+    FakeHttpConnection& parent_;
+  };
+
+  bool disconnecting_ = false;
+  absl::Mutex dtor_lock_;
   const Http::CodecType type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
@@ -551,6 +573,7 @@ private:
   testing::NiceMock<Random::MockRandomGenerator> random_;
   testing::NiceMock<Http::MockHeaderValidatorStats> header_validator_stats_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  DtorHelper dtor_helper_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
