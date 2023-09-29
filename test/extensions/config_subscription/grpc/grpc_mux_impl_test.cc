@@ -1281,7 +1281,7 @@ TEST_F(GrpcMuxImplTest, RemoveCachedResourceOnLastSubscription) {
  */
 class NullGrpcMuxImplTest : public testing::Test {
 public:
-  NullGrpcMuxImplTest() {}
+  NullGrpcMuxImplTest() = default;
   NullGrpcMuxImpl null_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
 };

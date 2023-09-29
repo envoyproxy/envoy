@@ -60,8 +60,6 @@ void FilterChainUtility::createFilterChainForFactories(
   }
 }
 
-void FilterChainUtility::throwError(std::string message) { throw EnvoyException(message); }
-
 SINGLETON_MANAGER_REGISTRATION(downstream_filter_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(upstream_filter_config_provider_manager);
 

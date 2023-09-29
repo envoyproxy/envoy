@@ -46,7 +46,8 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
 }
 
 UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_lib,
-                           unsigned long long int goConnID, Event::Dispatcher* dispatcher)
+                           unsigned long long int goConnID, // NOLINT(readability-identifier-naming)
+                           Event::Dispatcher* dispatcher)
     : dynamic_lib_(dynamic_lib), goConnID_(goConnID), dispatcher_(dispatcher), addr_(addr) {
   if (dispatcher_ == nullptr) {
     DispatcherStore& store = dispatcherStore();
@@ -58,8 +59,8 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
   stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info_->filterState()->setData(
-      Network::DestinationAddress::key(),
-      std::make_shared<Network::DestinationAddress>(
+      "envoy.network.transport_socket.original_dst_address",
+      std::make_shared<Network::AddressObject>(
           Network::Utility::parseInternetAddressAndPort(addr, false)),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
       StreamInfo::StreamSharingMayImpactPooling::None);

@@ -26,11 +26,13 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+bm
 BSON
 BPF
 Bdecoded
 Bencoded
 CIO
+deadcode
 DFP
 DOM
 GiB

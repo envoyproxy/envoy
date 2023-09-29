@@ -7,7 +7,6 @@ namespace Config {
 using testing::_;
 using testing::Return;
 
-using testing::Invoke;
 MockEdsResourcesCache::MockEdsResourcesCache() {
   ON_CALL(*this, getResource(_, _)).WillByDefault(Return(absl::nullopt));
 }

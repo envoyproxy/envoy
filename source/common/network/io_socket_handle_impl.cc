@@ -62,7 +62,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
   const int rc = Api::OsSysCallsSingleton::get().close(fd_).return_value_;
   SET_SOCKET_INVALID(fd_);
-  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  return {static_cast<unsigned long>(rc), Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 bool IoSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
@@ -560,7 +560,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
         fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
-  if (ss_len >= (offsetof(sockaddr_storage, ss_family) + sizeof(ss.ss_family)) &&
+  if (static_cast<unsigned int>(ss_len) >=
+          (offsetof(sockaddr_storage, ss_family) + sizeof(ss.ss_family)) &&
       ss.ss_family == AF_UNIX) {
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other

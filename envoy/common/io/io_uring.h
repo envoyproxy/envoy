@@ -260,7 +260,7 @@ using IoUringSocketPtr = std::unique_ptr<IoUringSocket>;
  */
 class IoUringWorker : public ThreadLocal::ThreadLocalObject {
 public:
-  virtual ~IoUringWorker() = default;
+  ~IoUringWorker() override = default;
 
   /**
    * Return the current thread's dispatcher.

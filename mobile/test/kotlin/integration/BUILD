@@ -101,6 +101,20 @@ envoy_mobile_jni_kt_test(
 )
 
 envoy_mobile_jni_kt_test(
+    name = "stream_idle_timeout_test",
+    srcs = [
+        "StreamIdleTimeoutTest.kt",
+    ],
+    native_deps = [
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_jni_kt_test(
     name = "cancel_grpc_stream_test",
     srcs = [
         "CancelGRPCStreamTest.kt",
@@ -192,7 +206,6 @@ envoy_mobile_jni_kt_test(
     ],
 )
 
-#envoy_mobile_jni_kt_test(
 envoy_mobile_android_test(
     name = "send_data_test",
     srcs = [
@@ -267,5 +280,32 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
+    ],
+)
+
+envoy_mobile_android_test(
+    name = "xds_test",
+    srcs = [
+        "XdsTest.kt",
+    ],
+    native_deps = [
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+    ],
+    deps = [
+        ":test_utilities",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
+    ],
+)
+
+envoy_mobile_kt_library(
+    name = "test_utilities",
+    srcs = [
+        "TestUtilities.kt",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "@maven//:junit_junit",
     ],
 )

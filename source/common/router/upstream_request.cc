@@ -94,8 +94,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
       upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")) {
-  if (parent_.config().start_child_span_) {
-    if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+  if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+    if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
           tracing_config.value().get(),
           absl::StrCat("router ", parent.cluster()->observabilityName(), " egress"),

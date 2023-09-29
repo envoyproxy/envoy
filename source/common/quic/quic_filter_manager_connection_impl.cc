@@ -123,7 +123,7 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
-  return Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_);
+  return {quic_ssl_info_};
 }
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
@@ -156,8 +156,9 @@ void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_a
   }
 }
 
-void QuicFilterManagerConnectionImpl::onWriteEventDone() {
-  // Apply delay close policy if there is any.
+void QuicFilterManagerConnectionImpl::onWriteEventDone() { maybeApplyDelayedClose(); }
+
+void QuicFilterManagerConnectionImpl::maybeApplyDelayedClose() {
   if (!hasDataToWrite() && inDelayedClose() &&
       delayed_close_state_ != DelayedCloseState::CloseAfterFlushAndWait) {
     closeConnectionImmediately();

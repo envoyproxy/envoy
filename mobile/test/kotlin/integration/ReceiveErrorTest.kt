@@ -20,9 +20,9 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
-private const val filterName = "error_validation_filter"
+private const val PBF_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+private const val LOCAL_ERROR_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+private const val FILTER_NAME = "error_validation_filter"
 
 class ReceiveErrorTest {
   init {
@@ -80,12 +80,11 @@ class ReceiveErrorTest {
 
     val engine = EngineBuilder(Standard())
       .addPlatformFilter(
-        name = filterName,
+        name = FILTER_NAME,
         factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
       )
-      .setOnEngineRunning {}
-      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $pbfType, platform_filter_name: $filterName}")
-      .addNativeFilter("envoy.filters.http.local_error", "{'@type': $localErrorFilterType}")
+      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}")
+      .addNativeFilter("envoy.filters.http.local_error", "{'@type': $LOCAL_ERROR_FILTER_TYPE}")
       .build()
 
     var errorCode: Int? = null

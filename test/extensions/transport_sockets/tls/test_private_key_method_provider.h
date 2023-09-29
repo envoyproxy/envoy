@@ -31,6 +31,9 @@ struct TestPrivateKeyConnectionTestOptions {
 
   // Return an error from the private key method completion function.
   bool async_method_error_{};
+
+  // Return true if the private key method is available.
+  bool is_available_{true};
 };
 
 // An example private key method provider for testing the decrypt() and sign()
@@ -41,7 +44,7 @@ public:
                            bssl::UniquePtr<EVP_PKEY> pkey,
                            TestPrivateKeyConnectionTestOptions& test_options);
   EVP_PKEY* getPrivateKey() { return pkey_.get(); }
-  void delayed_op();
+  void delayedOp();
   // Store the output data temporarily.
   std::vector<uint8_t> output_;
   // The complete callback can return other value than "retry" only after
@@ -68,6 +71,7 @@ public:
                                 Event::Dispatcher& dispatcher) override;
   void unregisterPrivateKeyMethod(SSL* ssl) override;
   bool checkFips() override;
+  bool isAvailable() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int rsaConnectionIndex();

@@ -455,49 +455,6 @@ protected:
     EXPECT_CALL(*listener_origin, onDestroy());
   }
 
-  void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(
-      const std::string& origin, const std::string& updated, bool multiple_addresses = false) {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.enable_update_listener_socket_options", "false"}});
-    InSequence s;
-
-    EXPECT_CALL(*worker_, start(_, _));
-    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
-
-    ListenerHandle* listener_origin = expectListenerCreate(true, true);
-    if (multiple_addresses) {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
-    } else {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
-    }
-    EXPECT_CALL(listener_origin->target_, initialize());
-    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
-    checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
-    EXPECT_CALL(*worker_, addListener(_, _, _, _));
-    listener_origin->target_.ready();
-    worker_->callAddCompletion();
-    EXPECT_EQ(1UL, manager_->listeners().size());
-    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
-
-    ListenerHandle* listener_updated = expectListenerCreate(true, true);
-    if (multiple_addresses) {
-      EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
-    } else {
-      EXPECT_CALL(*listener_factory_.socket_, duplicate());
-    }
-    EXPECT_CALL(listener_updated->target_, initialize());
-    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(updated)));
-
-    // Should be both active and warming now.
-    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
-    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
-    checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
-
-    EXPECT_CALL(*listener_updated, onDestroy());
-    EXPECT_CALL(*listener_origin, onDestroy());
-  }
-
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;

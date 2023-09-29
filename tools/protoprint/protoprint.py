@@ -71,7 +71,7 @@ def extract_clang_proto_style(clang_format_text):
     return str(format_dict)
 
 
-def clang_format(style, contents):
+def clang_format(clang_format_path, style, contents):
     """Run proto-style oriented clang-format over given string.
 
     Args:
@@ -80,11 +80,6 @@ def clang_format(style, contents):
     Returns:
         clang-formatted string
     """
-    clang_format_path = os.getenv("CLANG_FORMAT", shutil.which("clang-format"))
-    if not clang_format_path:
-        if not os.path.exists("/opt/llvm/bin/clang-format"):
-            raise RuntimeError("Unable to find clang-format, sorry")
-        clang_format_path = "/opt/llvm/bin/clang-format"
     return subprocess.run(
         [clang_format_path, '--style=%s' % style, '--assume-filename=.proto'],
         input=contents.encode('utf-8'),
@@ -592,6 +587,10 @@ class ProtoFormatVisitor(visitor.Visitor):
         if params['type_db_path']:
             utils.load_type_db(params['type_db_path'])
 
+        self.clang_format_path = pathlib.Path(params["clang-format"])
+        if not self.clang_format_path.exists():
+            raise ProtoPrintError(f"Unable to find clang-format binary: {self.clang_format_path}")
+
         self.clang_format_config = pathlib.Path(params[".clang-format"])
         if not self.clang_format_config.exists():
             raise ProtoPrintError(f"Unable to find .clang-format file: {self.clang_format_config}")
@@ -739,6 +738,7 @@ class ProtoFormatVisitor(visitor.Visitor):
         formatted_enums = format_block('\n'.join(enums))
         formatted_msgs = format_block('\n'.join(msgs))
         return clang_format(
+            str(self.clang_format_path),
             extract_clang_proto_style(self.clang_format_config.read_text()),
             header + formatted_services + formatted_enums + formatted_msgs)
 
@@ -756,7 +756,6 @@ class ProtoprintTraverser:
 
 def main(data=None):
     utils.load_protos()
-
     plugin.plugin([plugin.direct_output_descriptor('.proto', ProtoFormatVisitor, want_params=True)],
                   traverser=ProtoprintTraverser().traverse_file)
 

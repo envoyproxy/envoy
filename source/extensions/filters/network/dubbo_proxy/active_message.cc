@@ -15,8 +15,7 @@ ActiveResponseDecoder::ActiveResponseDecoder(ActiveMessage& parent, DubboFilterS
                                              ProtocolPtr&& protocol)
     : parent_(parent), stats_(stats), response_connection_(connection),
       protocol_(std::move(protocol)),
-      decoder_(std::make_unique<ResponseDecoder>(*protocol_, *this)), complete_(false),
-      response_status_(DubboFilters::UpstreamResponseStatus::MoreData) {}
+      decoder_(std::make_unique<ResponseDecoder>(*protocol_, *this)), complete_(false) {}
 
 DubboFilters::UpstreamResponseStatus ActiveResponseDecoder::onData(Buffer::Instance& data) {
   ENVOY_LOG(debug, "dubbo response: the received reply data length is {}", data.length());

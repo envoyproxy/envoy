@@ -38,11 +38,6 @@ public:
   static std::shared_ptr<UpstreamFilterConfigProviderManager>
   createSingletonUpstreamFilterConfigProviderManager(
       Server::Configuration::ServerFactoryContext& context);
-
-  // Our tooling checks say that throwing exceptions is not allowed in .h files, so work
-  // around the fact the template required moving code to the .h file with a
-  // static method.
-  static void throwError(std::string message);
 };
 
 template <class FilterCtx, class NeutralNamedHttpFilterFactory>
@@ -65,23 +60,25 @@ public:
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
   // Process the filters in this filter chain.
-  void processFilters(const FiltersList& filters, const std::string& prefix,
-                      const std::string& filter_chain_type, FilterFactoriesList& filter_factories) {
+  absl::Status processFilters(const FiltersList& filters, const std::string& prefix,
+                              const std::string& filter_chain_type,
+                              FilterFactoriesList& filter_factories) {
 
     DependencyManager dependency_manager;
     for (int i = 0; i < filters.size(); i++) {
-      processFilter(filters[i], i, prefix, filter_chain_type, i == filters.size() - 1,
-                    filter_factories, dependency_manager);
+      absl::Status status =
+          processFilter(filters[i], i, prefix, filter_chain_type, i == filters.size() - 1,
+                        filter_factories, dependency_manager);
+      if (!status.ok()) {
+        return status;
+      }
     }
     // TODO(auni53): Validate encode dependencies too.
-    auto status = dependency_manager.validDecodeDependencies();
-    if (!status.ok()) {
-      FilterChainUtility::throwError(std::string(status.message()));
-    }
+    return dependency_manager.validDecodeDependencies();
   }
 
 private:
-  void
+  absl::Status
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
                 int i, const std::string& prefix, const std::string& filter_chain_type,
@@ -91,10 +88,9 @@ private:
     if (proto_config.config_type_case() ==
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::
             ConfigTypeCase::kConfigDiscovery) {
-      processDynamicFilterConfig(proto_config.name(), proto_config.config_discovery(),
-                                 filter_factories, filter_chain_type,
-                                 last_filter_in_current_config);
-      return;
+      return processDynamicFilterConfig(proto_config.name(), proto_config.config_discovery(),
+                                        filter_factories, filter_chain_type,
+                                        last_filter_in_current_config);
     }
 
     // Now see if there is a factory that will accept the config.
@@ -104,7 +100,7 @@ private:
     if (factory == nullptr) {
       ENVOY_LOG(warn, "Didn't find a registered factory for the optional http filter {}",
                 proto_config.name());
-      return;
+      return absl::OkStatus();
     }
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, server_context_.messageValidationVisitor(), *factory);
@@ -124,9 +120,10 @@ private:
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 #endif
     filter_factories.push_back(std::move(filter_config_provider));
+    return absl::OkStatus();
   }
 
-  void
+  absl::Status
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
                              FilterFactoriesList& filter_factories,
@@ -135,7 +132,7 @@ private:
     ENVOY_LOG(debug, "      dynamic filter name: {}", name);
     if (config_discovery.apply_default_config_without_warming() &&
         !config_discovery.has_default_config()) {
-      FilterChainUtility::throwError(fmt::format(
+      return absl::InvalidArgumentError(fmt::format(
           "Error: filter config {} applied without warming but has no default config.", name));
     }
     for (const auto& type_url : config_discovery.type_urls()) {
@@ -143,7 +140,7 @@ private:
       auto* factory = Registry::FactoryRegistry<NeutralNamedHttpFilterFactory>::getFactoryByType(
           factory_type_url);
       if (factory == nullptr) {
-        FilterChainUtility::throwError(
+        return absl::InvalidArgumentError(
             fmt::format("Error: no factory found for a required type URL {}.", factory_type_url));
       }
     }
@@ -152,6 +149,7 @@ private:
         config_discovery, name, server_context_, factory_context_, cluster_manager_,
         last_filter_in_current_config, filter_chain_type, nullptr);
     filter_factories.push_back(std::move(filter_config_provider));
+    return absl::OkStatus();
   }
 
   FilterConfigProviderManager& filter_config_provider_manager_;

@@ -186,7 +186,7 @@ private:
     const std::string name_;
     ResourceMonitorPtr monitor_;
     OverloadManagerImpl& manager_;
-    bool pending_update_;
+    bool pending_update_{false};
     FlushEpochId flush_epoch_;
     Stats::Gauge& pressure_gauge_;
     Stats::Counter& failed_updates_counter_;
@@ -205,7 +205,7 @@ private:
   // Flushes any enqueued action state updates to all worker threads.
   void flushResourceUpdates();
 
-  bool started_;
+  bool started_{false};
   Event::Dispatcher& dispatcher_;
   TimeSource& time_source_;
   ThreadLocal::TypedSlot<ThreadLocalOverloadStateImpl> tls_;

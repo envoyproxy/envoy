@@ -25,6 +25,11 @@ behavior_changes:
     Switch from http_parser to BalsaParser for handling HTTP/1.1 traffic. See https://github.com/envoyproxy/envoy/issues/21245 for
     details. This behavioral change can be reverted by setting runtime flag ``envoy.reloadable_features.http1_use_balsa_parser`` to
     false.
+- area: udp_proxy
+  change: |
+    When the UDP proxy has session filters, choosing the upstream host and creating a socket only happens after iterating all
+    ``onNewSession()`` calls for all the filters in the chain. Upstream host health check for each downstream datagram does
+    not apply when there are session filters, and per-packet load balancing can't be used when there are session filters.
 - area: zone-aware routing
   change: |
     Zone-aware routing is now enabled even when the originating and upstream cluster have different numbers of zones.
@@ -58,6 +63,11 @@ minor_behavior_changes:
     Don't append the local address to ``x-forwarded-for`` header when sending an http (not gRPC) auth request.
     This behavior can be reverted by setting runtime flag
     ``envoy.reloadable_features.ext_authz_http_send_original_xff`` to false.
+- area: ext_proc
+  change: |
+    Envoy will only take
+    :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    when waiting for the header responses. It will be ignored if it is in other processing states.
 - area: outlier detection
   change: |
     Outlier detection will always respect max_ejection_percent now.
@@ -85,6 +95,11 @@ minor_behavior_changes:
     The redis network filter :ref:`connection_rate_limit_per_sec
     <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit.connection_rate_limit_per_sec>`
     must be greater than 0. A config that sets this value to 0 will be rejected.
+- area: local_rate_limit
+  change: |
+    Added new configuration field :ref:`always_consume_default_token_bucket
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.always_consume_default_token_bucket>`
+    to allow for setting if default token bucket should be always consumed or only be consumed when there is no matching descriptor.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -144,6 +159,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: listener
+  change: |
+    Removed ``envoy.reloadable_features.enable_update_listener_socket_options`` runtime flag and legacy code paths.
 - area: tcp
   change: |
     Removed runtime key ``envoy.reloadable_features.tcp_pool_idle_timeout``.
@@ -159,6 +177,9 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed ``envoy_reloadable_features_append_query_parameters_path_rewriter`` and legacy code paths.
 - area: xDS
   change: |
     Removed ``envoy.restart_features.explicit_wildcard_resource`` and legacy code paths.
@@ -204,6 +225,10 @@ new_features:
 - area: extension_discovery_service
   change: |
     added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
+- area: lua
+  change: |
+    added :ref:`downstreamRemoteAddress() <config_http_filters_lua_stream_info_downstream_remote_address>`
+    method to the Stream info object API.
 - area: quic
   change: |
     added support for QUIC listener filters with ECDS support reusing the same config API
@@ -230,6 +255,11 @@ new_features:
   change: |
     added :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` type to enable writing tap data
     out to a custom sink extension.
+- area: tls
+  change: |
+    added :ref:`disable_stateful_session_resumption
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` config option to
+    disable stateful TLS session resumption.
 - area: udp_proxy
   change: |
     added :ref:`session_filters <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters>` config to
@@ -243,10 +273,28 @@ new_features:
   change: |
     added :ref:` stats prefix option<envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.stats_prefix>`
     to OTLP stats sink that enables adding a static prefix to all stats flushed by this sink.
+- area: udp_proxy
+  change: |
+    added :ref:`http_capsule <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig>` UDP session filter
+    that can be used to encapsule or decapsulate UDP datagrams in HTTP, when used for UDP tunneling.
 - area: tap
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: zookeeper
+  change: |
+    added support for emitting per opcode request bytes metrics via :ref:`enable_per_opcode_request_bytes_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>`.
+    added support for emitting per opcode response bytes metrics via :ref:`enable_per_opcode_response_bytes_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>`.
+- area: tls
+  change: |
+    added fallback :ref:`fallback
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.PrivateKeyProvider.fallback>`
+    to support private key provider to fallback to boringssl tls handshake.
+    If the private key provider isn't available (eg. the required hardware capability doesn't existed),
+    Envoy will fallback to the BoringSSL default implementation when the fallback is true.
+    The default value is false.
 - area: tcp
   change: |
     added the support to detect and send TCP RST for raw buffer socket based connections. This is currently supported on Linux only.
@@ -255,6 +303,23 @@ new_features:
   change: |
     added the ability to specify a custom upstream local address selector using
     :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
+- area: redis
+  change: |
+    Added new configuration field :ref:`read_command_policy
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.read_command_policy>`
+    to specify Envoy should route read commands to another cluster.
+- area: tap
+  change: |
+    added :ref:`record_downstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_downstream_connection>`
+    to control writing downstream connection address info in trace output.
+- area: tracing
+  change: |
+    Added :ref:`spawn_upstream_span
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`
+    to control whether to create separate upstream span for upstream request.
+- area: original_dst
+  change: |
+    added support for the internal listener address recovery using the original destination listener filter.
 - area: composite filter
   change: |
     added :ref:`ExtensionConfiguration discovery service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>` support for
@@ -267,3 +332,10 @@ deprecated:
 - area: tracing
   change: |
     Opencensus is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.
+- area: tracing
+  change: |
+    :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+    is deprecated by
+    :ref:`spawn_upstream_span
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
+    Please use the new field to control whether to create separate upstream span for upstream request.

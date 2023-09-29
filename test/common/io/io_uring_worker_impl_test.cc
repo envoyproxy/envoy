@@ -10,7 +10,6 @@
 using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnNew;
 using testing::SaveArg;
 

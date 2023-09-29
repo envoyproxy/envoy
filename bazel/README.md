@@ -930,61 +930,9 @@ TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 
 # Running format linting without docker
 
-The easiest way to run the clang-format check/fix commands is to run them via
-docker, which helps ensure the right toolchain is set up. However you may prefer
-to run clang-format scripts on your workstation directly:
- * It's possible there is a speed advantage
- * Docker itself can sometimes go awry and you then have to deal with that
- * Type-ahead doesn't always work when waiting running a command through docker
-
-To run the tools directly, you must install the correct version of clang. This
-may change over time, check the version of clang in the docker image. You must
-also have 'buildifier' installed from the bazel distribution.
-
 Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
 
-Edit the paths shown here to reflect the installation locations on your system:
-
-```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
-export BUILDIFIER_BIN="/usr/bin/buildifier"
-```
-
-A relatively easy way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
-
-* Run the ci docker image
-
-```shell
-ci/run_envoy_docker.sh bash
-```
-
-* Get the docker container ID
-
-```shell
-dockerContainerID=$(docker ps | grep envoy-build-ubuntu | awk '{print $1}')
-```
-
-* Copy the `clang-format` to host machine
-
-```shell
-docker cp $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
-```
-
-* Ensure that the copied `clang-format` is the default one, by ensuring it is in `$PATH`:
-
-```shell
-cp clang-format-ci /usr/local/bin/clang-format
-```
-
-Alternatively, if you are a non-root user, you can use a bin dir and add that to `$PATH`
-
-```shell
-mkdir bin
-mv clang-format-ci bin/clang-format
-export PATH=$PATH:$PWD/bin/
-```
-
-Once this is set up, you can run clang-format without docker:
+You can run clang-format directly, without docker:
 
 ```shell
 bazel run //tools/code_format:check_format -- check
