@@ -25,10 +25,7 @@ namespace {
 
 class NullptrComponentFactory : public TestComponentFactory {
 public:
-  DrainManagerPtr createDrainManager(Instance&) override {
-    ENVOY_LOG_MISC(critical, "Returning nullptr for drain manager");
-    return nullptr;
-  }
+  DrainManagerPtr createDrainManager(Instance&) override { return nullptr; }
 };
 
 // Test param is the path to the config file to validate.
