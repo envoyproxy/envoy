@@ -5,13 +5,9 @@ package envoy.extensions.filters.http.composite.v3;
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
-<<<<<<< HEAD
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/migrate.proto";
-=======
->>>>>>> upstream/main
 import "udpa/annotations/status.proto";
+
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.composite.v3";
