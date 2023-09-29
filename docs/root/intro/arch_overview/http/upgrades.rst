@@ -213,7 +213,7 @@ When the upstream becomes ready, the UDP Proxy will first flush all the previous
 .. note::
    If ``POST`` is set, the upstream stream does not comply with the connect-udp RFC, and instead it will be a POST request.
    The path used in the headers will be set from the post_path field, and the headers will not contain the target host and
-   target port, as required by the connect-udp protocol. This option should be carefully used.
+   target port, as required by the connect-udp protocol. This option should be used carefully.
 
 Example Configuration
 ---------------------
