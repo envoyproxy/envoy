@@ -26,18 +26,18 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
   SamplingResult result;
   std::map<std::string, std::string> att;
   // uint32_t current_counter = counter_++;
-  TraceState tracesta;
+  TraceState tracestate;
 
   if (parent_context.ok()) { // there is already a trace,
     // we should check if there is a dynatrace sampling decision on the state and use it
     result.decision = Decision::RECORD_AND_SAMPLE;
     // Expects a tracestate like
     // "<tenantID>-<clusterID>@dt=fw4;0;0;0;0;<isIgnored>;8;<rootPathRandom>;<extensionChecksum>"
-    tracesta = TraceState::parse(parent_context->tracestate());
+    tracestate = TraceState::parse(parent_context->tracestate());
   } else { // start new trace
     // if (current_counter % 2 == 0) {
       result.decision = Decision::RECORD_AND_SAMPLE;
-      tracesta.sampling_exponent = "8"; // "8" is used for demo. Will be received from configuration in a final version
+      tracestate.sampling_exponent = "8"; // "8" is used for demo. Will be received from configuration in a final version
     // } else {
     //   result.decision = Decision::RECORD_ONLY;
     //   if (parent_context.ok()) {
@@ -46,10 +46,11 @@ DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
     // }
   }
 
-  tracesta.tenant_id = tenant_id_;
-  tracesta.is_ignored = result.isRecording() ? "0" : "1";
-  att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracesta.sampling_exponent;
-  result.tracestate = tracesta.toString();
+  tracestate.tenant_id = tenant_id_;
+  tracestate.cluster_id = cluster_id_;
+  tracestate.is_ignored = result.isRecording() ? "0" : "1";
+  att[SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME] = tracestate.sampling_exponent;
+  result.tracestate = tracestate.toString();
   if (!att.empty()) {
     result.attributes = std::make_unique<const std::map<std::string, std::string>>(std::move(att));
   }
@@ -64,6 +65,7 @@ std::string DynatraceSampler::modifyTracestate(const std::string& span_id,
   TraceState tracestate = TraceState::parse(current_tracestate);
   tracestate.span_id = span_id;
   tracestate.tenant_id = tenant_id_;
+  tracestate.cluster_id = cluster_id_;
   return tracestate.toString();
 }
 

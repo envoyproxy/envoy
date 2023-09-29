@@ -14,13 +14,13 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 /**
- * @brief A sampler which samples every span *
+ * @brief A Dynatrace specific sampler *
  */
 class DynatraceSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
 public:
   explicit DynatraceSampler(
       const envoy::extensions::tracers::opentelemetry::samplers::v3::DynatraceSamplerConfig config)
-      : tenant_id_(config.tenant_id()), counter_(0) {}
+      : tenant_id_(config.tenant_id()), cluster_id_(config.cluster_id()), counter_(0) {}
 
   SamplingResult shouldSample(absl::StatusOr<SpanContext>& parent_context,
                               const std::string& trace_id, const std::string& name,
@@ -35,6 +35,7 @@ public:
 
 private:
   std::string tenant_id_;
+  std::string cluster_id_;
   std::atomic<uint32_t> counter_;
 };
 

@@ -30,7 +30,7 @@ public:
   }
 
   std::string tenant_id = "<tenant_id_t>";
-  static constexpr absl::string_view cluster_id = "<cluster_id_t>";
+  std::string cluster_id = "<cluster_id_t>";
   static constexpr absl::string_view at_dt_format = "@dt=fw4";
   static constexpr absl::string_view server_id = "0";
   static constexpr absl::string_view agent_d = "0";
@@ -44,7 +44,7 @@ public:
   std::string toString() {
     // absl::StrCat
     std::string tracestate = absl::StrCat(
-        absl::string_view(tenant_id), "-", cluster_id, at_dt_format, ";", server_id, ";", agent_d, ";", tag_id, ";",
+        absl::string_view(tenant_id), "-", absl::string_view(cluster_id), at_dt_format, ";", server_id, ";", agent_d, ";", tag_id, ";",
         link_id, ";", absl::string_view(is_ignored), ";", absl::string_view(sampling_exponent), ";",
         path_info);
 
