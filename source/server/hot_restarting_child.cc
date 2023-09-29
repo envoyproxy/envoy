@@ -230,13 +230,13 @@ void HotRestartingChild::onSocketEventUdpForwarding() {
     switch (wrapped_request->request().request_case()) {
     case HotRestartMessage::Request::kForwardedUdpPacket: {
       const auto& req = wrapped_request->request().forwarded_udp_packet();
-      Network::UdpRecvData data;
-      data.addresses_.local_ = Network::Utility::parseInternetAddressAndPort(req.local_addr());
-      data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort(req.peer_addr());
-      data.receive_time_ =
+      Network::UdpRecvData packet;
+      packet.addresses_.local_ = Network::Utility::parseInternetAddressAndPort(req.local_addr());
+      packet.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort(req.peer_addr());
+      packet.receive_time_ =
           MonotonicTime(std::chrono::microseconds{req.receive_time_epoch_microseconds()});
-      data.buffer_ = std::make_unique<Buffer::OwnedImpl>(req.packet());
-      onForwardedUdpPacket(req.worker_index(), std::move(data));
+      packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(req.payload());
+      onForwardedUdpPacket(req.worker_index(), std::move(packet));
       break;
     }
     default: {

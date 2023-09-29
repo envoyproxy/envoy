@@ -124,7 +124,7 @@ TEST_F(HotRestartingChildTest, DoesNothingOnForwardedUdpMessageWithNoMatchingLis
   auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
   packet->set_local_addr("127.0.0.1:1234");
   packet->set_peer_addr("127.0.0.1:4321");
-  packet->set_packet("hello");
+  packet->set_payload("hello");
   EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
 }
 
@@ -173,7 +173,7 @@ TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
   packet->set_local_addr(test_listener_addr->asStringView());
   packet->set_peer_addr(test_remote_addr->asStringView());
   packet->set_worker_index(worker_index);
-  packet->set_packet(udp_contents);
+  packet->set_payload(udp_contents);
   packet->set_receive_time_epoch_microseconds(packet_timestamp);
   Network::MockUdpListenerWorkerRouter mock_worker_router;
   EXPECT_CALL(*mock_udp_listener_config,

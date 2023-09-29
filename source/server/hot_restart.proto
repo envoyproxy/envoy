@@ -23,7 +23,7 @@ message HotRestartMessage {
       string local_addr = 1;
       string peer_addr = 2;
       uint64 receive_time_epoch_microseconds = 3;
-      bytes packet = 4;
+      bytes payload = 4;
       uint32 worker_index = 5;
     }
     oneof request {

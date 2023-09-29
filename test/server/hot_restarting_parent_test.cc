@@ -334,7 +334,7 @@ TEST_F(HotRestartingParentTest, UdpPacketIsForwarded) {
   auto* expected_packet = expected_msg.mutable_request()->mutable_forwarded_udp_packet();
   expected_packet->set_local_addr("127.0.0.1:12345");
   expected_packet->set_peer_addr("127.0.0.1:54321");
-  expected_packet->set_packet(msg);
+  expected_packet->set_payload(msg);
   expected_packet->set_receive_time_epoch_microseconds(1234567890);
   expected_packet->set_worker_index(worker_index);
   EXPECT_CALL(message_sender_, sendHotRestartMessage(ProtoEq(expected_msg)));

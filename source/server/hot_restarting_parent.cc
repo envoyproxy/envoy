@@ -43,7 +43,7 @@ void HotRestartingParent::Internal::handle(uint32_t worker_index,
   packet_msg->set_receive_time_epoch_microseconds(
       std::chrono::duration_cast<std::chrono::microseconds>(packet.receive_time_.time_since_epoch())
           .count());
-  *packet_msg->mutable_packet() = packet.buffer_->toString();
+  *packet_msg->mutable_payload() = packet.buffer_->toString();
   packet_msg->set_worker_index(worker_index);
   udp_sender_.sendHotRestartMessage(std::move(msg));
 }
