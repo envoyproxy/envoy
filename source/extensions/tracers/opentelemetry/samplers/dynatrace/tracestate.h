@@ -20,6 +20,7 @@ public:
     if (tracestate_components.size() > 7) {
       ret.is_ignored = tracestate_components[5];
       ret.sampling_exponent = tracestate_components[6];
+      ret.path_info = tracestate_components[7];
       for (auto const& component : tracestate_components) {
         if (absl::StartsWith(component, "7h")) {
           ret.span_id = component;
@@ -38,7 +39,7 @@ public:
   static constexpr absl::string_view link_id = "0";
   std::string is_ignored = "0";
   std::string sampling_exponent = "0";
-  static constexpr absl::string_view path_info = "0";
+  std::string path_info = "0";
   std::string span_id = "";
 
   std::string toString() {
@@ -46,7 +47,7 @@ public:
     std::string tracestate = absl::StrCat(
         absl::string_view(tenant_id), "-", absl::string_view(cluster_id), at_dt_format, ";", server_id, ";", agent_d, ";", tag_id, ";",
         link_id, ";", absl::string_view(is_ignored), ";", absl::string_view(sampling_exponent), ";",
-        path_info);
+        absl::string_view(path_info));
 
     if (!span_id.empty()) {
         std::string tmp(tracestate);
