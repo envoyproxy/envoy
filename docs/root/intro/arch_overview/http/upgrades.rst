@@ -203,7 +203,7 @@ to the `Proxying UDP in HTTP RFC <https://www.rfc-editor.org/rfc/rfc9298.html>`_
 it's required to apply the :ref:`HTTP Capsule <config_udp_session_filters_http_capsule>` session filter.
 The HTTP/2 streams will be multiplexed over the upstream connection.
 
-As opposed to TCP tunneling, where downstream congestion can be applied by alternately disabling the read from the connection socket, for UDP datagrams, this mechanism is not supported.
+As opposed to TCP tunneling, where downstream flow control can be applied by alternately disabling the read from the connection socket, for UDP datagrams, this mechanism is not supported.
 Therefore, when tunneling UDP and a new datagram is received from the downstream, it is either streamed upstream, if the upstream is ready or halted by the UDP Proxy.
 In case the upstream is not ready (for example, when waiting for HTTP response headers), the datagram can either be dropped or buffered until the upstream is ready.
 In such cases, by default, downstream datagrams will be dropped, unless :ref:`buffer_options <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.buffer_options>`
