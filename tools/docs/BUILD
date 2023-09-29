@@ -42,6 +42,7 @@ py_binary(
 envoy_entry_point(
     name = "sphinx_runner",
     pkg = "envoy.docs.sphinx_runner",
+    visibility = ["//visibility:public"],
 )
 
 py_binary(

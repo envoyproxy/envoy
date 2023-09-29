@@ -119,7 +119,7 @@ genrule(
     srcs = [":empty_extensions.json"],
     outs = ["empty_protos_rst.tar.gz"],
     cmd = """
-    $(location //tools/protodoc:generate_empty) \\
+    $(location //tools/protodoc:generate_empty) \
         $(location empty_extensions.json) $@
     """,
     exec_tools = ["//tools/protodoc:generate_empty"],
@@ -176,7 +176,7 @@ genrule(
     name = "version_histories",
     outs = ["version_histories.tar.gz"],
     cmd = """
-    $(location //tools/docs:generate_version_histories) $@
+    $(location //tools/docs:generate_version_histories) --path=$$(dirname $(location //:VERSION.txt)) $@
     """,
     exec_tools = [
         ":versions.yaml",
@@ -243,7 +243,7 @@ genrule(
          --build_sha="$${BUILD_DOCS_SHA:-$${BUILD_SCM_REVISION}}" \
          --docs_tag="$${BUILD_DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
-         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location rst) \
          $@
     """,
@@ -264,6 +264,7 @@ genrule(
     cmd = """
     $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
+         --build_sha="$${BUILD_DOCS_SHA:-}" \
          --version_file=$(location //:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location :rst) \
@@ -275,4 +276,9 @@ genrule(
         "//:VERSION.txt",
         "@envoy_api//:v3_proto_set",
     ],
+)
+
+alias(
+    name = "docs",
+    actual = ":html",
 )

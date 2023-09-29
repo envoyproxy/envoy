@@ -1,5 +1,6 @@
 abstracts>=0.0.12
 aio.api.bazel
+aio.api.github>=0.2.5
 aiohttp>=3.8.1
 cffi>=1.15.0
 clang-format==14.0.6
@@ -8,7 +9,7 @@ colorama
 coloredlogs
 cryptography>=41.0.1
 dependatool>=0.2.2
-envoy.base.utils>=0.4.11
+envoy.base.utils>=0.4.12
 envoy.code.check>=0.5.8
 envoy.dependency.check>=0.1.7
 envoy.distribution.release>=0.0.9
