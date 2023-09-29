@@ -25,9 +25,9 @@ namespace {
 
 class NullptrComponentFactory : public TestComponentFactory {
 public:
-  DrainManagerPtr createDrainManager(Instance&) override { 
+  DrainManagerPtr createDrainManager(Instance&) override {
     ENVOY_LOG_MISC(critical, "Returning nullptr for drain manager");
-    return nullptr; 
+    return nullptr;
   }
 };
 
