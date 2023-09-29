@@ -98,7 +98,11 @@ protected:
   // child increments this number.
   static Stats::Gauge& hotRestartGeneration(Stats::Scope& scope);
 
+  // A stream over a unix socket between the parent and child instances, used
+  // for the child instance to request socket information and control draining
+  // and shutdown of the parent.
   RpcStream main_rpc_stream_;
+
   // A separate channel is used for udp forwarding because udp forwarding can
   // begin while communication on the main channel is still occurring. The hot
   // restarter is single-threaded, so we don't have to worry about packets coming

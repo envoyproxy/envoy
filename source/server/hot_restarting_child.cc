@@ -80,6 +80,22 @@ void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::Ud
       udp_forwarding_context_.getListenerForDestination(*data.addresses_.local_);
   if (addr_and_listener.has_value()) {
     auto [addr, listener_config] = *addr_and_listener;
+    // We send to the worker index from the parent instance.
+    // In the case that the number of workers changes between instances,
+    // or the quic connection id generator changes how it selects worker
+    // ids, the hot restart packet handoff will fail.
+    //
+    // One option would be to dispatch an onData call to have the receiving
+    // worker forward the packet if the calculated destination differs from
+    // the parent instance worker index; however, this would require
+    // temporarily disabling kernel_worker_routing_ in each instance of
+    // ActiveQuicListener, and a much more convoluted pipeline to collect
+    // the set of destinations (listenerWorkerRouter doesn't currently
+    // expose the actual listeners.)
+    //
+    // Since the vast majority of hot restarts will change neither of these
+    // things, this implementation is "pretty good", and much better than no
+    // hot restart capability at all.
     listener_config->listenerWorkerRouter(*addr).deliver(worker_index, std::move(data));
   }
 }
