@@ -119,8 +119,10 @@ void ValidationInstance::initialize(const Options& options,
   ENVOY_BUG(runtime_ != nullptr,
             "Component factory should not return nullptr from createRuntime()");
   drain_manager_ = component_factory.createDrainManager(*this);
+  ENVOY_LOG_MISC(critical, "Drain manager is null? {}", (drain_manager_ == nullptr));
   ENVOY_BUG(drain_manager_ != nullptr,
             "Component factory should not return nullptr from createDrainManager()");
+  ENVOY_LOG_MISC(critical, "After envoy bug");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
