@@ -99,7 +99,7 @@ TEST_F(AwsMetadataIntegrationTestSuccess, Success) {
   const auto authority = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
                                      lookupPort("listener_0"));
   auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
-      {":path", "/"}, {":authority", authority}, {":method", "GET"}}};
+      {":path", "/"}, {":authority", authority}, {":scheme", "http"}, {":method", "GET"}}};
   Http::RequestMessageImpl message(std::move(headers));
   const auto response = Utility::fetchMetadata(message);
 
@@ -116,6 +116,7 @@ TEST_F(AwsMetadataIntegrationTestSuccess, AuthToken) {
   auto headers = Http::RequestHeaderMapPtr{
       new Http::TestRequestHeaderMapImpl{{":path", "/"},
                                          {":authority", authority},
+                                         {":scheme", "http"},
                                          {":method", "GET"},
                                          {"authorization", "AUTH_TOKEN"}}};
   Http::RequestMessageImpl message(std::move(headers));
@@ -155,6 +156,7 @@ TEST_F(AwsMetadataIntegrationTestSuccess, Redirect) {
   auto headers = Http::RequestHeaderMapPtr{
       new Http::TestRequestHeaderMapImpl{{":path", "/redirect"},
                                          {":authority", authority},
+                                         {":scheme", "http"},
                                          {":method", "GET"},
                                          {"authorization", "AUTH_TOKEN"}}};
   Http::RequestMessageImpl message(std::move(headers));
@@ -182,6 +184,7 @@ TEST_F(AwsMetadataIntegrationTestFailure, Failure) {
   auto headers = Http::RequestHeaderMapPtr{
       new Http::TestRequestHeaderMapImpl{{":path", "/"},
                                          {":authority", authority},
+                                         {":scheme", "http"},
                                          {":method", "GET"},
                                          {"authorization", "AUTH_TOKEN"}}};
 
@@ -210,7 +213,7 @@ TEST_F(AwsMetadataIntegrationTestTimeout, Timeout) {
   const auto authority = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
                                      lookupPort("listener_0"));
   auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
-      {":path", "/"}, {":authority", authority}, {":method", "GET"}}};
+      {":path", "/"}, {":authority", authority}, {":scheme", "http"}, {":method", "GET"}}};
   Http::RequestMessageImpl message(std::move(headers));
 
   const auto start_time = timeSystem().monotonicTime();

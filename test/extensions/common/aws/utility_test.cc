@@ -1,17 +1,26 @@
 #include "source/extensions/common/aws/utility.h"
 
+#include "test/extensions/common/aws/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::ElementsAre;
+using testing::InSequence;
+using testing::NiceMock;
 using testing::Pair;
+using testing::Ref;
+using testing::Return;
+using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 namespace {
+
+MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 // Headers must be in alphabetical order by virtue of std::map
 TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
@@ -344,6 +353,39 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   std::map<std::string, std::string> headers;
   const auto names = Utility::joinCanonicalHeaderNames(headers);
   EXPECT_EQ("", names);
+}
+
+// Verify that we don't add a thread local cluster if it already exists.
+TEST(UtilityTest, ThreadLocalClusterExistsAlready) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
+  EXPECT_CALL(cm_, addOrUpdateCluster(_, _)).Times(0);
+  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", ""));
+}
+
+// Verify that if thread local cluster doesn't exist we can create a new one.
+TEST(UtilityTest, AddStaticClusterSuccess) {
+  NiceMock<Upstream::MockClusterManager> cm_;
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
+  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1:80"));
+}
+
+// Handle exception when adding thread local cluster fails.
+TEST(UtilityTest, AddStaticClusterFailure) {
+  NiceMock<Upstream::MockClusterManager> cm_;
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _))
+      .WillOnce(Throw(EnvoyException("exeption message")));
+  EXPECT_FALSE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1:80"));
+}
+
+// Verify that missing port value from host will return false.
+TEST(UtilityTest, AddStaticClusterFailureWithMissingPort) {
+  NiceMock<Upstream::MockClusterManager> cm_;
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_FALSE(Utility::addInternalClusterStatic(cm_, "cluster_name", "STATIC", "127.0.0.1"));
 }
 
 } // namespace
