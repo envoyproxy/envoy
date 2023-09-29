@@ -365,6 +365,11 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
 
 } // namespace
 
+// Allow disabling ALPN checks for transport sockets. See
+// https://github.com/envoyproxy/envoy/issues/22876
+const absl::string_view ClusterImplBase::DoNotValidateAlpnRuntimeKey =
+    "config.do_not_validate_alpn_support";
+
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
 // stat name into every host that receives a copy of that metric. This can be improved by putting
 // a single copy of the stat name into a thread-local key->index map so that the lock can be avoided
@@ -843,7 +848,7 @@ ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
     Stats::Scope& scope, const ClusterRequestResponseSizeStatNames& stat_names) {
-  return ClusterRequestResponseSizeStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 ClusterLoadReportStats
@@ -857,74 +862,6 @@ ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
                                             const ClusterTimeoutBudgetStatNames& stat_names) {
   return {stat_names, scope};
 }
-
-// Implements the FactoryContext interface required by network filters.
-class FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
-public:
-  // Create from a TransportSocketFactoryContext using parent stats_scope and runtime
-  // other contexts taken from TransportSocketFactoryContext.
-  FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
-                     Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.serverFactoryContext().admin()),
-        server_scope_(c.serverFactoryContext().serverScope()), stats_scope_(stats_scope),
-        cluster_manager_(c.clusterManager()), local_info_(c.serverFactoryContext().localInfo()),
-        dispatcher_(c.serverFactoryContext().mainThreadDispatcher()), runtime_(runtime),
-        singleton_manager_(c.serverFactoryContext().singletonManager()),
-        tls_(c.serverFactoryContext().threadLocal()), api_(c.serverFactoryContext().api()),
-        options_(c.serverFactoryContext().options()),
-        message_validation_visitor_(c.messageValidationVisitor()) {}
-
-  Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
-  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
-  const Server::Options& options() override { return options_; }
-  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
-  Envoy::Runtime::Loader& runtime() override { return runtime_; }
-  Stats::Scope& scope() override { return stats_scope_; }
-  Stats::Scope& serverScope() override { return server_scope_; }
-  Singleton::Manager& singletonManager() override { return singleton_manager_; }
-  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
-  OptRef<Server::Admin> admin() override { return admin_; }
-  TimeSource& timeSource() override { return api().timeSource(); }
-  ProtobufMessage::ValidationContext& messageValidationContext() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  AccessLog::AccessLogManager& accessLogManager() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return message_validation_visitor_;
-  }
-
-  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  Init::Manager& initManager() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  Api::Api& api() override { return api_; }
-
-private:
-  OptRef<Server::Admin> admin_;
-  Stats::Scope& server_scope_;
-  Stats::Scope& stats_scope_;
-  Upstream::ClusterManager& cluster_manager_;
-  const LocalInfo::LocalInfo& local_info_;
-  Event::Dispatcher& dispatcher_;
-  Envoy::Runtime::Loader& runtime_;
-  Singleton::Manager& singleton_manager_;
-  ThreadLocal::SlotAllocator& tls_;
-  Api::Api& api_;
-  const Server::Options& options_;
-  ProtobufMessage::ValidationVisitor& message_validation_visitor_;
-};
 
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
@@ -1061,8 +998,6 @@ ClusterInfoImpl::ClusterInfoImpl(
               server_context)),
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
-      factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
@@ -1243,7 +1178,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);
-    helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
+    THROW_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
+                                          http_filter_factories_));
   }
 }
 
@@ -1431,7 +1367,8 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
     }
-    if (!matcher_supports_alpn) {
+    if (!matcher_supports_alpn &&
+        !runtime_.snapshot().featureEnabled(ClusterImplBase::DoNotValidateAlpnRuntimeKey, 0)) {
       throw EnvoyException(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));

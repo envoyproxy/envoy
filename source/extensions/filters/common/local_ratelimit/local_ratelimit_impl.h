@@ -22,7 +22,8 @@ public:
       const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
       const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
-          envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors);
+          envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
+      bool always_consume_default_token_bucket = true);
   ~LocalRateLimiterImpl();
 
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
@@ -84,6 +85,7 @@ private:
   absl::flat_hash_set<LocalDescriptorImpl, LocalDescriptorHash, LocalDescriptorEqual> descriptors_;
   std::vector<LocalDescriptorImpl> sorted_descriptors_;
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
+  const bool always_consume_default_token_bucket_{};
 
   friend class LocalRateLimiterImplTest;
 };

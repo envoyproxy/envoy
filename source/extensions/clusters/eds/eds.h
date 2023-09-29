@@ -35,7 +35,7 @@ class EdsClusterImpl
 public:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                  ClusterFactoryContext& cluster_context);
-  virtual ~EdsClusterImpl();
+  ~EdsClusterImpl() override;
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }

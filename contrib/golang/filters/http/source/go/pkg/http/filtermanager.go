@@ -51,6 +51,8 @@ func getOrCreateHttpFilterFactory(name string, configId uint64) api.StreamFilter
 		return (v.(*filterConfigFactoryAndParser)).configFactory(config)
 	}
 
+	api.LogErrorf("plugin %s not found, pass through by default", name)
+
 	// pass through by default
 	return PassThroughFactory(config)
 }

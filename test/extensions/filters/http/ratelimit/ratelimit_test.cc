@@ -49,7 +49,7 @@ public:
         .WillByDefault(Return(true));
   }
 
-  void SetUpTest(const std::string& yaml) {
+  void setUpTest(const std::string& yaml) {
     envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
@@ -130,7 +130,7 @@ public:
 };
 
 TEST_F(HttpRateLimitFilterTest, NoRoute) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
 
@@ -146,7 +146,7 @@ TEST_F(HttpRateLimitFilterTest, NoRoute) {
 }
 
 TEST_F(HttpRateLimitFilterTest, NoCluster) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   ON_CALL(filter_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
 
@@ -160,7 +160,7 @@ TEST_F(HttpRateLimitFilterTest, NoCluster) {
 }
 
 TEST_F(HttpRateLimitFilterTest, NoApplicableRateLimit) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
   EXPECT_CALL(*client_, limit(_, _, _, _, _, 0)).Times(0);
@@ -174,7 +174,7 @@ TEST_F(HttpRateLimitFilterTest, NoApplicableRateLimit) {
 }
 
 TEST_F(HttpRateLimitFilterTest, NoDescriptor) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _));
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _));
@@ -189,7 +189,7 @@ TEST_F(HttpRateLimitFilterTest, NoDescriptor) {
 }
 
 TEST_F(HttpRateLimitFilterTest, RuntimeDisabled) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enabled", 100))
       .WillOnce(Return(false));
@@ -203,7 +203,7 @@ TEST_F(HttpRateLimitFilterTest, RuntimeDisabled) {
 }
 
 TEST_F(HttpRateLimitFilterTest, OkResponse) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -247,7 +247,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
 }
 
 TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -303,7 +303,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
 }
 
 TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
-  SetUpTest(enable_x_ratelimit_headers_config_);
+  setUpTest(enable_x_ratelimit_headers_config_);
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -360,7 +360,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
 }
 
 TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -390,7 +390,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
 }
 
 TEST_F(HttpRateLimitFilterTest, ImmediateErrorResponse) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -425,7 +425,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateErrorResponse) {
 }
 
 TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -459,7 +459,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
 }
 
 TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
-  SetUpTest(fail_close_config_);
+  setUpTest(fail_close_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -491,7 +491,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponse) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -532,7 +532,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithDynamicMetadata) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -585,7 +585,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithDynamicMetadata) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -637,7 +637,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithBody) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -700,7 +700,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithBody) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithBodyAndContentType) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -769,7 +769,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithBodyAndContentType) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithFilterHeaders) {
-  SetUpTest(enable_x_ratelimit_headers_config_);
+  setUpTest(enable_x_ratelimit_headers_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -821,7 +821,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithFilterHeaders) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithoutEnvoyRateLimitedHeader) {
-  SetUpTest(disable_x_envoy_ratelimited_header_config_);
+  setUpTest(disable_x_envoy_ratelimited_header_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -860,7 +860,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithoutEnvoyRateLimitedHeader) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -901,7 +901,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithRateLimitedStatus) {
-  SetUpTest(rate_limited_status_config_);
+  setUpTest(rate_limited_status_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -942,7 +942,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithRateLimitedStatus) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithInvalidRateLimitedStatus) {
-  SetUpTest(invalid_rate_limited_status_config_);
+  setUpTest(invalid_rate_limited_status_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -983,7 +983,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithInvalidRateLimitedStatus) {
 }
 
 TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1003,7 +1003,7 @@ TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
 
 TEST_F(HttpRateLimitFilterTest, RouteRateLimitDisabledForRouteKey) {
   route_rate_limit_.disable_key_ = "test_key";
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.http_filter_enabled", 100))
       .WillByDefault(Return(false));
@@ -1022,7 +1022,7 @@ TEST_F(HttpRateLimitFilterTest, RouteRateLimitDisabledForRouteKey) {
 
 TEST_F(HttpRateLimitFilterTest, VirtualHostRateLimitDisabledForRouteKey) {
   vh_rate_limit_.disable_key_ = "test_vh_key";
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
 
   ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_vh_key.http_filter_enabled", 100))
       .WillByDefault(Return(false));
@@ -1046,7 +1046,7 @@ TEST_F(HttpRateLimitFilterTest, IncorrectRequestType) {
     "request_type" : "internal"
   }
   )EOF";
-  SetUpTest(internal_filter_config);
+  setUpTest(internal_filter_config);
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
@@ -1065,7 +1065,7 @@ TEST_F(HttpRateLimitFilterTest, IncorrectRequestType) {
     "request_type" : "external"
   }
   )EOF";
-  SetUpTest(external_filter_config);
+  setUpTest(external_filter_config);
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
@@ -1087,7 +1087,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
     "request_type" : "internal"
   }
   )EOF";
-  SetUpTest(internal_filter_config);
+  setUpTest(internal_filter_config);
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
   InSequence s;
 
@@ -1130,7 +1130,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
     "request_type" : "external"
   }
   )EOF";
-  SetUpTest(external_filter_config);
+  setUpTest(external_filter_config);
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "false"}};
   InSequence s;
 
@@ -1171,7 +1171,7 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
     "domain": "foo"
   }
   )EOF";
-  SetUpTest(external_filter_config);
+  setUpTest(external_filter_config);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute vh_settings;
   vh_settings.clear_vh_rate_limits();
   FilterConfigPerRoute per_route_config_(vh_settings);
@@ -1220,7 +1220,7 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
 // Tests that the route rate limit is used when VhRateLimitsOptions::OVERRIDE and route rate limit
 // is set
 TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
@@ -1270,7 +1270,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
 // Tests that the virtual host rate limit is used when VhRateLimitsOptions::OVERRIDE is set and
 // route rate limit is empty
 TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
@@ -1320,7 +1320,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
 // Tests that the virtual host rate limit is used when VhRateLimitsOptions::INCLUDE is set and route
 // rate limit is empty
 TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
@@ -1367,7 +1367,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
 // Tests that the virtual host rate limit is used when VhRateLimitsOptions::INCLUDE and route rate
 // limit is set
 TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
@@ -1416,7 +1416,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
 // Tests that the route rate limit is used when VhRateLimitsOptions::IGNORE and route rate limit is
 // set
 TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
@@ -1463,7 +1463,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
 // Tests that no rate limit is used when VhRateLimitsOptions::IGNORE is set and route rate limit
 // empty
 TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
@@ -1496,7 +1496,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
 
 // Tests that the domain is properly overridden when set at the per-route level
 TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
-  SetUpTest(filter_config_);
+  setUpTest(filter_config_);
   const std::string per_route_domain = "bar";
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_domain(per_route_domain);
@@ -1545,7 +1545,7 @@ TEST_F(HttpRateLimitFilterTest, ConfigValueTest) {
   }
   )EOF";
 
-  SetUpTest(stage_filter_config);
+  setUpTest(stage_filter_config);
 
   EXPECT_EQ(5UL, config_->stage());
   EXPECT_EQ("foo", config_->domain());
@@ -1559,7 +1559,7 @@ TEST_F(HttpRateLimitFilterTest, DefaultConfigValueTest) {
   }
   )EOF";
 
-  SetUpTest(stage_filter_config);
+  setUpTest(stage_filter_config);
 
   EXPECT_EQ(0UL, config_->stage());
   EXPECT_EQ("foo", config_->domain());

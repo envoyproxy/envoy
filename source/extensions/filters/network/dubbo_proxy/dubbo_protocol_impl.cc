@@ -89,7 +89,7 @@ DubboProtocolImpl::decodeHeader(Buffer::Instance& buffer, MessageMetadataSharedP
   }
 
   if (buffer.length() < DubboProtocolImpl::MessageSize) {
-    return std::pair<ContextSharedPtr, bool>(nullptr, false);
+    return {nullptr, false};
   }
 
   uint16_t magic_number = buffer.peekBEInt<uint16_t>();
@@ -130,7 +130,7 @@ DubboProtocolImpl::decodeHeader(Buffer::Instance& buffer, MessageMetadataSharedP
   context->setBodySize(body_size);
   context->setHeartbeat(is_event);
 
-  return std::pair<ContextSharedPtr, bool>(context, true);
+  return {context, true};
 }
 
 bool DubboProtocolImpl::decodeData(Buffer::Instance& buffer, ContextSharedPtr context,

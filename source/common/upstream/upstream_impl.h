@@ -1094,7 +1094,6 @@ private:
   std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
   std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
       network_filter_config_provider_manager_;
-  const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   Filter::NetworkFilterFactoriesList filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
@@ -1232,6 +1231,8 @@ protected:
       const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
 
 private:
+  static const absl::string_view DoNotValidateAlpnRuntimeKey;
+
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 

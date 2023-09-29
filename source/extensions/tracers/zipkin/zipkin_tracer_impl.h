@@ -225,7 +225,7 @@ public:
    *
    * @return Pointer to the newly-created ZipkinReporter.
    */
-  static ReporterPtr NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+  static ReporterPtr newInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                  const CollectorInfo& collector);
 
 private:

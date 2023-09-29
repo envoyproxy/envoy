@@ -10,7 +10,7 @@ load(
     "envoy_select_enable_http3",
     "envoy_select_signal_trace",
 )
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//bazel:repositories.bzl", "NO_HTTP3_SKIP_TARGETS", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
@@ -46,6 +46,7 @@ envoy_cc_library(
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:disable_http3": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )

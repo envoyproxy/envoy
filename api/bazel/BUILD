@@ -1,5 +1,5 @@
+load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
-load(":utils.bzl", "json_data")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load(":repository_locations_utils.bzl", "load_repository_locations_spec")
 load(

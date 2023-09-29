@@ -14,7 +14,7 @@ public:
   MockClient();
   ~MockClient() override;
   MOCK_METHOD(ExternalProcessorStreamPtr, start,
-              (ExternalProcessorCallbacks&, const envoy::config::core::v3::GrpcService&,
+              (ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
                const StreamInfo::StreamInfo&));
 };
 
