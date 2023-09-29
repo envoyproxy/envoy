@@ -128,7 +128,6 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
 
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  // EXPECT_CALL(context, messageValidationVisitor());
   GeoipFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context),
