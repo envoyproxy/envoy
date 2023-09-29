@@ -79,8 +79,9 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
       filter_chain_scope_(parent_context_.listenerScope().createScope("")),
-      init_manager_(init_manager),filter_config_provider_manager_(std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {
-      }
+      init_manager_(init_manager),
+      filter_config_provider_manager_(
+          std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
@@ -206,10 +207,10 @@ PerFilterChainFactoryContextImpl::createDynamicFilterConfigProvider(
       last_filter_in_filter_chain, filter_chain_type, listener_filter_matcher);
 }
 
-Configuration::DownstreamFilterConfigProviderManagerPtr PerFilterChainFactoryContextImpl::downstreamFilterConfigProviderManager() {
+Configuration::DownstreamFilterConfigProviderManagerPtr
+PerFilterChainFactoryContextImpl::downstreamFilterConfigProviderManager() {
   return filter_config_provider_manager_;
 }
-
 
 FilterChainManagerImpl::FilterChainManagerImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,

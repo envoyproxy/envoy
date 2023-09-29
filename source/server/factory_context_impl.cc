@@ -66,9 +66,10 @@ Configuration::HttpExtensionConfigProvider FactoryContextImpl::createDynamicFilt
     const std::string&, const Network::ListenerFilterMatcherSharedPtr&) {
   return nullptr;
 }
-  Configuration::DownstreamFilterConfigProviderManagerPtr FactoryContextImpl::downstreamFilterConfigProviderManager() {
-    return nullptr;
-  }
+Configuration::DownstreamFilterConfigProviderManagerPtr
+FactoryContextImpl::downstreamFilterConfigProviderManager() {
+  return nullptr;
+}
 
 } // namespace Server
 } // namespace Envoy

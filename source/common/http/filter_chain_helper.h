@@ -13,9 +13,6 @@
 namespace Envoy {
 namespace Http {
 
-using DownstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
-                                        Server::Configuration::FactoryContext>;
 using UpstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
@@ -30,10 +27,6 @@ public:
   static void createFilterChainForFactories(Http::FilterChainManager& manager,
                                             const FilterChainOptions& options,
                                             const FilterFactoriesList& filter_factories);
-
-  static std::shared_ptr<DownstreamFilterConfigProviderManager>
-  createSingletonDownstreamFilterConfigProviderManager(
-      Server::Configuration::ServerFactoryContext& context);
 
   static std::shared_ptr<UpstreamFilterConfigProviderManager>
   createSingletonUpstreamFilterConfigProviderManager(

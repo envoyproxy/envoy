@@ -18,7 +18,8 @@ public:
                                     const Network::ListenerFilterMatcherSharedPtr&) override {
     return nullptr;
   }
-    Configuration::DownstreamFilterConfigProviderManagerPtr FactoryContextImpl::downstreamFilterConfigProviderManager() override {
+  Configuration::DownstreamFilterConfigProviderManagerPtr
+  FactoryContextImpl::downstreamFilterConfigProviderManager() override {
     return nullptr;
   }
 };

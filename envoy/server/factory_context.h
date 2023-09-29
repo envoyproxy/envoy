@@ -37,9 +37,9 @@
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
-  namespace Filter {
-    template <class FactoryCb, class FactoryCtx> class FilterConfigProviderManager;
-  } // namespace Filter
+namespace Filter {
+template <class FactoryCb, class FactoryCtx> class FilterConfigProviderManager;
+} // namespace Filter
 namespace Server {
 namespace Configuration {
 
@@ -218,7 +218,8 @@ class FactoryContext;
 using DownstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
-using DownstreamFilterConfigProviderManagerPtr = std::shared_ptr<DownstreamFilterConfigProviderManager>;
+using DownstreamFilterConfigProviderManagerPtr =
+    std::shared_ptr<DownstreamFilterConfigProviderManager>;
 /**
  * Context passed to network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
@@ -296,7 +297,7 @@ public:
    * @param filter_chain_type is the filter chain type
    * @param listener_filter_matcher is the filter matcher for TCP listener filter. nullptr for other
    * filter types.
-   * 
+   *
    * @return HttpExtensionConfigProvider
    */
   virtual Configuration::HttpExtensionConfigProvider createDynamicFilterConfigProvider(
@@ -307,8 +308,8 @@ public:
 
   /**
    * Returns the downstream filter config provider manager.
-   * 
-   * @return DownstreamFilterConfigProviderManagerPtr 
+   *
+   * @return DownstreamFilterConfigProviderManagerPtr
    */
   virtual DownstreamFilterConfigProviderManagerPtr downstreamFilterConfigProviderManager() PURE;
 };
