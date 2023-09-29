@@ -64,7 +64,7 @@ public:
     return nullptr;
   }
   Configuration::DownstreamFilterConfigProviderManagerPtr
-  FactoryContextImpl::downstreamFilterConfigProviderManager() override {
+  downstreamFilterConfigProviderManager() override {
     return nullptr;
   }
 
