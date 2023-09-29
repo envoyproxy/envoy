@@ -18,6 +18,9 @@ public:
                                     const Network::ListenerFilterMatcherSharedPtr&) override {
     return nullptr;
   }
+    Configuration::DownstreamFilterConfigProviderManagerPtr FactoryContextImpl::downstreamFilterConfigProviderManager() override {
+    return nullptr;
+  }
 };
 } // namespace Configuration
 } // namespace Server

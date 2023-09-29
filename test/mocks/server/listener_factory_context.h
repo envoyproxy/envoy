@@ -63,6 +63,10 @@ public:
     return nullptr;
   }
 
+    Configuration::DownstreamFilterConfigProviderManagerPtr FactoryContextImpl::downstreamFilterConfigProviderManager() override {
+    return nullptr;
+  }
+
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;

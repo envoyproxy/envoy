@@ -95,7 +95,7 @@ public:
       const std::string& filter_config_name, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override;
-
+  Configuration::DownstreamFilterConfigProviderManagerPtr downstreamFilterConfigProviderManager() override;
   void startDraining() override { is_draining_.store(true); }
 
 private:
@@ -106,11 +106,7 @@ private:
   Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
-  // TODO(ramaraochavali): Move DownstreamFilterConfigProviderManager usages to use this instead of
-  // current singleton.
-  std::shared_ptr<Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
-                                                      Server::Configuration::FactoryContext>>
-      filter_config_provider_manager_{};
+  Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager_{};
 };
 
 using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;

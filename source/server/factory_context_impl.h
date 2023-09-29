@@ -52,7 +52,7 @@ public:
       const std::string& filter_config_name, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override;
-
+Configuration::DownstreamFilterConfigProviderManagerPtr downstreamFilterConfigProviderManager()  override;
 private:
   Server::Instance& server_;
   const envoy::config::listener::v3::Listener& config_;

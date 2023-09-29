@@ -305,6 +305,10 @@ ListenerFactoryContextBaseImpl::createDynamicFilterConfigProvider(
     const std::string&, const Network::ListenerFilterMatcherSharedPtr&) {
   return nullptr;
 }
+Configuration::DownstreamFilterConfigProviderManagerPtr ListenerFactoryContextBaseImpl::downstreamFilterConfigProviderManager() {
+  return nullptr;
+}
+
 
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
@@ -969,6 +973,10 @@ PerListenerFactoryContextImpl::createDynamicFilterConfigProvider(
       config_source, filter_config_name, last_filter_in_filter_chain, filter_chain_type,
       listener_filter_matcher);
 }
+  Configuration::DownstreamFilterConfigProviderManagerPtr PerListenerFactoryContextImpl::downstreamFilterConfigProviderManager() {
+  return listener_factory_context_base_->downstreamFilterConfigProviderManager();
+  }
+
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
 bool ListenerImpl::createNetworkFilterChain(
