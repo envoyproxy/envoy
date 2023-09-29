@@ -45,15 +45,6 @@ parameters:
 - name: authDockerPassword
   type: string
   default: ""
-- name: authSSHDocsKey
-  type: string
-  default: ""
-- name: authSSHDocsKeyPublic
-  type: string
-  default: ""
-- name: authSSHKeyPassphrase
-  type: string
-  default: ""
 
 - name: runDocker
   displayName: "Run Docker"
@@ -66,18 +57,6 @@ parameters:
 
 - name: publishDockerhub
   displayName: "Publish Dockerhub"
-  type: string
-  default: false
-- name: publishDocs
-  displayName: "Publish Docs"
-  type: string
-  default: false
-- name: publishDocsLatest
-  displayName: "Publish latest docs"
-  type: string
-  default: false
-- name: publishDocsRelease
-  displayName: "Publish release docs"
   type: string
   default: false
 - name: publishGithubRelease
@@ -135,6 +114,22 @@ jobs:
           DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_DOCKER_IN_DOCKER: 1
+
+      stepsPost:
+      - script: |
+          ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-publish'
+        condition: |
+          and(not(canceled()), succeeded(),
+              eq(${{ parameters.publishDockerhub }}, 'true'))
+        displayName: "Publish Dockerhub description and README"
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          ENVOY_RBE: "1"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
+          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
+          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+          DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
+          DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
 
 - job: package_x64
   displayName: Linux debs (x64)
@@ -209,58 +204,6 @@ jobs:
           set -e
           rm -rf $(Build.StagingDirectory)/.gnupg
 
-- job: docs
-  displayName: Publish docs
-  dependsOn: []
-  condition: |
-    and(not(canceled()),
-        eq(${{ parameters.publishDocs }}, 'true'))
-  pool:
-    vmImage: $(agentUbuntu)
-  steps:
-  - template: ../ci.yml
-    parameters:
-      ciTarget: docs
-      cacheName: docs
-      cacheVersion: $(cacheKeyBazel)
-      publishEnvoy: false
-      publishTestResults: false
-      env:
-        CI_BRANCH: $(Build.SourceBranch)
-      stepsPost:
-
-      - script: |
-          ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-publish'
-        condition: |
-          and(not(canceled()),
-              eq(${{ parameters.publishDockerhub }}, 'true'))
-        displayName: "Publish Dockerhub description and README"
-        env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=rbe-google --jobs=$(RbeJobs)"
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
-          GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
-          DOCKERHUB_USERNAME: ${{ parameters.authDockerUser }}
-          DOCKERHUB_PASSWORD: ${{ parameters.authDockerPassword }}
-
-      # Publish docs to the website
-      - task: InstallSSHKey@0
-        condition: |
-          and(not(canceled()),
-              eq(${{ parameters.publishDocsRelease }}, 'true'))
-        inputs:
-          hostName: $(authGithubSSHKeyPublic)
-          sshPublicKey: "${{ parameters.authSSHDocsKeyPublic }}"
-          sshPassphrase: "${{ parameters.authSSHKeyPassphrase }}"
-          sshKeySecureFile: "${{ parameters.authSSHDocsKey }}"
-      - script: docs/publish.sh
-        condition: |
-          and(not(canceled()),
-              eq(${{ parameters.publishDocsRelease }}, 'true'))
-        displayName: "Publish release docs"
-        workingDirectory: $(Build.SourcesDirectory)
-
 - job: signed_release
   displayName: Signed binaries
   dependsOn:
@@ -301,7 +244,7 @@ jobs:
           pathGPGConfiguredHome: /build/.gnupg
           pathGPGHome: $(Build.StagingDirectory)/.gnupg
 - job: success
-  dependsOn: ["docker", "docs", "signed_release"]
+  dependsOn: ["docker", "signed_release"]
   displayName: Success (linux artefacts)
   pool:
     vmImage: $(agentUbuntu)
@@ -312,7 +255,6 @@ jobs:
   condition: |
     and(
       in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
-      in(dependencies.docs.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.signed_release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
   - checkout: none
