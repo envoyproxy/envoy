@@ -43,7 +43,7 @@ void FilterChainUtility::createFilterChainForFactories(
 
     auto config = filter_config_provider->config();
     if (config.has_value()) {
-      Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
+      Http::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
       manager.applyFilterFactoryCb({filter_config_provider->name(), factory_cb.name},
                                    factory_cb.factory_cb);
       continue;

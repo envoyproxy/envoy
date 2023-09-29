@@ -61,13 +61,10 @@ envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const 
 Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
 Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
 bool FactoryContextImpl::isQuicListener() const { return is_quic_; }
-void FactoryContextImpl::createDynamicFilterConfigProvider(
-    const envoy::config::core::v3::ExtensionConfigSource&, const std::string&,
-    Server::Configuration::ServerFactoryContext&, Server::Configuration::FactoryContext&,
-    Upstream::ClusterManager&, bool, const std::string&,
-    const Network::ListenerFilterMatcherSharedPtr&) {}
-OptRef<Http::FilterFactoryCb> FactoryContextImpl::dynamicProviderConfig(const std::string&) {
-  return absl::nullopt;
+Configuration::HttpExtensionConfigProvider FactoryContextImpl::createDynamicFilterConfigProvider(
+    const envoy::config::core::v3::ExtensionConfigSource&, const std::string&, bool,
+    const std::string&, const Network::ListenerFilterMatcherSharedPtr&) {
+  return nullptr;
 }
 
 } // namespace Server

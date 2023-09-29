@@ -56,15 +56,11 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
-  void createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
-                                         const std::string&,
-                                         Server::Configuration::ServerFactoryContext&,
-                                         Server::Configuration::FactoryContext&,
-                                         Upstream::ClusterManager&, bool, const std::string&,
-                                         const Network::ListenerFilterMatcherSharedPtr&) override {}
-
-  OptRef<Http::FilterFactoryCb> dynamicProviderConfig(const std::string&) override {
-    return absl::nullopt;
+  HttpExtensionConfigProvider
+  createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
+                                    const std::string&, bool, const std::string&,
+                                    const Network::ListenerFilterMatcherSharedPtr&) override {
+    return nullptr;
   }
 
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;

@@ -194,31 +194,19 @@ bool PerFilterChainFactoryContextImpl::isQuicListener() const {
   return parent_context_.isQuicListener();
 }
 
-void PerFilterChainFactoryContextImpl::createDynamicFilterConfigProvider(
+Configuration::HttpExtensionConfigProvider
+PerFilterChainFactoryContextImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ExtensionConfigSource& config_source,
-    const std::string& filter_config_name,
-    Server::Configuration::ServerFactoryContext& server_factory_context,
-    Server::Configuration::FactoryContext& factory_context,
-    Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
+    const std::string& filter_config_name, bool last_filter_in_filter_chain,
     const std::string& filter_chain_type,
     const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
   if (filter_config_provider_manager_ == nullptr) {
     filter_config_provider_manager_ =
         std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>();
   }
-  auto provider = filter_config_provider_manager_->createDynamicFilterConfigProvider(
-      config_source, filter_config_name, server_factory_context, factory_context, cluster_manager,
+  return filter_config_provider_manager_->createDynamicFilterConfigProvider(
+      config_source, filter_config_name, getServerFactoryContext(), *this, clusterManager(),
       last_filter_in_filter_chain, filter_chain_type, listener_filter_matcher);
-  dynamic_providers_[filter_config_name] = std::move(provider);
-}
-
-OptRef<Http::FilterFactoryCb>
-PerFilterChainFactoryContextImpl::dynamicProviderConfig(const std::string& filter_config_name) {
-  auto provider = dynamic_providers_.find(filter_config_name);
-  if (provider == dynamic_providers_.end()) {
-    return absl::nullopt;
-  }
-  return provider->second->config()->factory_cb;
 }
 
 FilterChainManagerImpl::FilterChainManagerImpl(

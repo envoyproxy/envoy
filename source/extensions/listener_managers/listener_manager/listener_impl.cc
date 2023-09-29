@@ -299,15 +299,13 @@ ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
 }
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
 bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
-void ListenerFactoryContextBaseImpl::createDynamicFilterConfigProvider(
-    const envoy::config::core::v3::ExtensionConfigSource&, const std::string&,
-    Server::Configuration::ServerFactoryContext&, Server::Configuration::FactoryContext&,
-    Upstream::ClusterManager&, bool, const std::string&,
-    const Network::ListenerFilterMatcherSharedPtr&) {}
-OptRef<Http::FilterFactoryCb>
-ListenerFactoryContextBaseImpl::dynamicProviderConfig(const std::string&) {
-  return absl::nullopt;
+Configuration::HttpExtensionConfigProvider
+ListenerFactoryContextBaseImpl::createDynamicFilterConfigProvider(
+    const envoy::config::core::v3::ExtensionConfigSource&, const std::string&, bool,
+    const std::string&, const Network::ListenerFilterMatcherSharedPtr&) {
+  return nullptr;
 }
+
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { return server_.initManager(); }
@@ -961,21 +959,15 @@ Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
 bool PerListenerFactoryContextImpl::isQuicListener() const {
   return listener_factory_context_base_->isQuicListener();
 }
-void PerListenerFactoryContextImpl::createDynamicFilterConfigProvider(
+Configuration::HttpExtensionConfigProvider
+PerListenerFactoryContextImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ExtensionConfigSource& config_source,
-    const std::string& filter_config_name,
-    Server::Configuration::ServerFactoryContext& server_context,
-    Server::Configuration::FactoryContext& factory_context,
-    Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
+    const std::string& filter_config_name, bool last_filter_in_filter_chain,
     const std::string& filter_chain_type,
     const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
   return listener_factory_context_base_->createDynamicFilterConfigProvider(
-      config_source, filter_config_name, server_context, factory_context, cluster_manager,
-      last_filter_in_filter_chain, filter_chain_type, listener_filter_matcher);
-}
-OptRef<Http::FilterFactoryCb>
-PerListenerFactoryContextImpl::dynamicProviderConfig(const std::string& filter_config_name) {
-  return listener_factory_context_base_->dynamicProviderConfig(filter_config_name);
+      config_source, filter_config_name, last_filter_in_filter_chain, filter_chain_type,
+      listener_filter_matcher);
 }
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 

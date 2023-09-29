@@ -12,15 +12,11 @@ public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
 
-  void createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
-                                         const std::string&,
-                                         Server::Configuration::ServerFactoryContext&,
-                                         Server::Configuration::FactoryContext&,
-                                         Upstream::ClusterManager&, bool, const std::string&,
-                                         const Network::ListenerFilterMatcherSharedPtr&) override {}
-
-  OptRef<Http::FilterFactoryCb> dynamicProviderConfig(const std::string&) override {
-    return absl::nullopt;
+  HttpExtensionConfigProvider
+  createDynamicFilterConfigProvider(const envoy::config::core::v3::ExtensionConfigSource&,
+                                    const std::string&, bool, const std::string&,
+                                    const Network::ListenerFilterMatcherSharedPtr&) override {
+    return nullptr;
   }
 };
 } // namespace Configuration

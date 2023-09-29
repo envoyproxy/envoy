@@ -17,20 +17,17 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   // Process dynamic filter configuration and setup extension configuration discovery service.
   if (composite_action.has_dynamic_config()) {
     auto config_discovery = composite_action.dynamic_config().config_discovery();
-    Server::Configuration::ServerFactoryContext& server_factory_context =
-        context.server_factory_context_.value();
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
     // Create a dynamic filter config provider and register it with the server factory context.
-    factory_context.createDynamicFilterConfigProvider(
-        config_discovery, composite_action.dynamic_config().name(), server_factory_context,
-        factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
-    return [&factory_context = factory_context,
-            name = composite_action.dynamic_config().name()]() -> Matcher::ActionPtr {
-      auto factory_cb = factory_context.dynamicProviderConfig(name);
-      if (!factory_cb.has_value()) {
+    auto provider = factory_context.createDynamicFilterConfigProvider(
+        config_discovery, composite_action.dynamic_config().name(), false, "http", nullptr);
+    return [provider = std::move(provider)]() -> Matcher::ActionPtr {
+      auto config_value = provider->config();
+      if (!config_value.has_value()) {
         throw EnvoyException("Failed to get dynamic config for filter");
       }
-      return std::make_unique<ExecuteFilterAction>(factory_cb.value());
+      auto factory_cb = config_value.value().get().factory_cb;
+      return std::make_unique<ExecuteFilterAction>(factory_cb);
     };
   } else {
     // Static filter configuration.

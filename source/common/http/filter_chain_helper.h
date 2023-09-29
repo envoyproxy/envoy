@@ -14,16 +14,16 @@ namespace Envoy {
 namespace Http {
 
 using DownstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
 using UpstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
 
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:
   using FilterFactoriesList =
-      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
+      std::list<Filter::FilterConfigProviderPtr<Http::NamedHttpFilterFactoryCb>>;
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
@@ -49,9 +49,9 @@ template <class FilterCtx, class NeutralNamedHttpFilterFactory>
 class FilterChainHelper : Logger::Loggable<Logger::Id::config> {
 public:
   using FilterFactoriesList =
-      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
+      std::list<Filter::FilterConfigProviderPtr<Http::NamedHttpFilterFactoryCb>>;
   using FilterConfigProviderManager =
-      Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb, FilterCtx>;
+      Filter::FilterConfigProviderManager<Http::NamedHttpFilterFactoryCb, FilterCtx>;
 
   FilterChainHelper(FilterConfigProviderManager& filter_config_provider_manager,
                     Server::Configuration::ServerFactoryContext& server_context,

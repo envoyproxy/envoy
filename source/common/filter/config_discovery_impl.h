@@ -179,20 +179,12 @@ private:
   const ProtobufTypes::MessagePtr default_configuration_;
 };
 
-// Struct of canonical filter name and HTTP stream filter factory callback.
-struct NamedHttpFilterFactoryCb {
-  // Canonical filter name.
-  std::string name;
-  // Factory function used to create filter instances.
-  Http::FilterFactoryCb factory_cb;
-};
-
 // Implementation of a HTTP dynamic filter config provider.
 // NeutralHttpFilterConfigFactory can either be a NamedHttpFilterConfigFactory
 // or an UpstreamHttpFilterConfigFactory.
 template <class FactoryCtx, class NeutralHttpFilterConfigFactory>
 class HttpDynamicFilterConfigProviderImpl
-    : public DynamicFilterConfigProviderImpl<NamedHttpFilterFactoryCb> {
+    : public DynamicFilterConfigProviderImpl<Http::NamedHttpFilterFactoryCb> {
 public:
   HttpDynamicFilterConfigProviderImpl(
       FilterConfigSubscriptionSharedPtr& subscription,
@@ -216,7 +208,7 @@ public:
   }
 
 private:
-  NamedHttpFilterFactoryCb
+  Http::NamedHttpFilterFactoryCb
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
@@ -643,7 +635,7 @@ protected:
 // HTTP filter
 class HttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::NamedHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
+          Server::Configuration::NamedHttpFilterConfigFactory, Http::NamedHttpFilterFactoryCb,
           Server::Configuration::FactoryContext,
           HttpDynamicFilterConfigProviderImpl<
               Server::Configuration::FactoryContext,
@@ -670,7 +662,7 @@ protected:
 // HTTP filter
 class UpstreamHttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::UpstreamHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
+          Server::Configuration::UpstreamHttpFilterConfigFactory, Http::NamedHttpFilterFactoryCb,
           Server::Configuration::UpstreamFactoryContext,
           HttpDynamicFilterConfigProviderImpl<
               Server::Configuration::UpstreamFactoryContext,
