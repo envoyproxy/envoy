@@ -12,7 +12,7 @@ def _protodoc_impl(target, ctx):
 #
 # The aspect builds the transitive docs, so any .proto in the dependency graph
 # get docs created.
-protodoc_aspect = api_proto_plugin_aspect("//tools/protodoc", _protodoc_impl)
+protodoc_aspect = api_proto_plugin_aspect("@envoy//tools/protodoc", _protodoc_impl)
 
 def _protodoc_rule_impl(ctx):
     deps = []

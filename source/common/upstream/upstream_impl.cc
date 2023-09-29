@@ -15,13 +15,16 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+#include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/registry/registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -60,7 +63,6 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
-
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
   if (!address) {
     return "";
@@ -169,83 +171,9 @@ Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Clust
       "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
 
-} // namespace
-
-UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
-    const envoy::config::cluster::v3::Cluster& cluster_config,
-    const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
-  base_socket_options_ = buildBaseSocketOptions(
-      cluster_config, bootstrap_bind_config.value_or(envoy::config::core::v3::BindConfig{}));
-  cluster_socket_options_ = buildClusterSocketOptions(
-      cluster_config, bootstrap_bind_config.value_or(envoy::config::core::v3::BindConfig{}));
-
-  ASSERT(base_socket_options_ != nullptr);
-  ASSERT(cluster_socket_options_ != nullptr);
-
-  if (cluster_config.has_upstream_bind_config()) {
-    parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config(),
-                    base_socket_options_, cluster_socket_options_);
-  } else if (bootstrap_bind_config.has_value()) {
-    parseBindConfig("", *bootstrap_bind_config, base_socket_options_, cluster_socket_options_);
-  }
-}
-
 Network::ConnectionSocket::OptionsSharedPtr
-UpstreamLocalAddressSelectorImpl::combineConnectionSocketOptions(
-    const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) const {
-  Network::ConnectionSocket::OptionsSharedPtr connection_options =
-      std::make_shared<Network::ConnectionSocket::Options>();
-
-  if (options) {
-    connection_options = std::make_shared<Network::ConnectionSocket::Options>();
-    *connection_options = *options;
-    Network::Socket::appendOptions(connection_options, local_address_options);
-  } else {
-    *connection_options = *local_address_options;
-  }
-
-  return connection_options;
-}
-
-UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
-    const Network::Address::InstanceConstSharedPtr& endpoint_address,
-    const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
-  // If there is no upstream local address specified, then return a nullptr for the address. And
-  // return the socket options.
-  if (upstream_local_addresses_.empty()) {
-    UpstreamLocalAddress local_address;
-    local_address.address_ = nullptr;
-    local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
-    Network::Socket::appendOptions(local_address.socket_options_, base_socket_options_);
-    Network::Socket::appendOptions(local_address.socket_options_, cluster_socket_options_);
-    local_address.socket_options_ =
-        combineConnectionSocketOptions(local_address.socket_options_, socket_options);
-    return local_address;
-  }
-
-  for (auto& local_address : upstream_local_addresses_) {
-    if (local_address.address_ == nullptr) {
-      continue;
-    }
-
-    ASSERT(local_address.address_->ip() != nullptr);
-    if (endpoint_address->ip() != nullptr &&
-        local_address.address_->ip()->version() == endpoint_address->ip()->version()) {
-      return {local_address.address_,
-              combineConnectionSocketOptions(local_address.socket_options_, socket_options)};
-    }
-  }
-
-  return {
-      upstream_local_addresses_[0].address_,
-      combineConnectionSocketOptions(upstream_local_addresses_[0].socket_options_, socket_options)};
-}
-
-const Network::ConnectionSocket::OptionsSharedPtr
-UpstreamLocalAddressSelectorImpl::buildBaseSocketOptions(
-    const envoy::config::cluster::v3::Cluster& cluster_config,
-    const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
+buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config,
+                       const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
   Network::ConnectionSocket::OptionsSharedPtr base_options =
       std::make_shared<Network::ConnectionSocket::Options>();
 
@@ -271,131 +199,176 @@ UpstreamLocalAddressSelectorImpl::buildBaseSocketOptions(
   return base_options;
 }
 
-const Network::ConnectionSocket::OptionsSharedPtr
-UpstreamLocalAddressSelectorImpl::buildClusterSocketOptions(
-    const envoy::config::cluster::v3::Cluster& cluster_config,
-    const envoy::config::core::v3::BindConfig bind_config) {
+Network::ConnectionSocket::OptionsSharedPtr
+buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config,
+                          const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options =
       std::make_shared<Network::ConnectionSocket::Options>();
   // Cluster socket_options trump cluster manager wide.
-  if (bind_config.socket_options().size() +
+  if (bootstrap_bind_config.socket_options().size() +
           cluster_config.upstream_bind_config().socket_options().size() >
       0) {
     auto socket_options = !cluster_config.upstream_bind_config().socket_options().empty()
                               ? cluster_config.upstream_bind_config().socket_options()
-                              : bind_config.socket_options();
+                              : bootstrap_bind_config.socket_options();
     Network::Socket::appendOptions(
         cluster_options, Network::SocketOptionFactory::buildLiteralOptions(socket_options));
   }
   return cluster_options;
 }
 
-void UpstreamLocalAddressSelectorImpl::parseBindConfig(
-    const std::string cluster_name, const envoy::config::core::v3::BindConfig& bind_config,
-    const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
-    const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options) {
-  if (bind_config.additional_source_addresses_size() > 0 &&
-      bind_config.extra_source_addresses_size() > 0) {
-    throw EnvoyException(
-        fmt::format("Can't specify both `extra_source_addresses` and `additional_source_addresses` "
-                    "in the {}'s upstream binding config",
-                    cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-  }
+std::vector<::Envoy::Upstream::UpstreamLocalAddress>
+parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
+                const absl::optional<std::string>& cluster_name,
+                Network::ConnectionSocket::OptionsSharedPtr base_socket_options,
+                Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options) {
 
-  if (bind_config.extra_source_addresses_size() > 1) {
-    throw EnvoyException(fmt::format(
-        "{}'s upstream binding config has more than one extra source addresses. Only one "
-        "extra source can be supported in BindConfig's extra_source_addresses field",
-        cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-  }
+  std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses;
+  if (bind_config.has_value()) {
+    UpstreamLocalAddress upstream_local_address;
+    upstream_local_address.address_ =
+        bind_config->has_source_address()
+            ? ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address())
+            : nullptr;
+    upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
 
-  if (bind_config.additional_source_addresses_size() > 1) {
-    throw EnvoyException(fmt::format(
-        "{}'s upstream binding config has more than one additional source addresses. Only one "
-        "additional source can be supported in BindConfig's additional_source_addresses field",
-        cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-  }
+    ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
+                                            base_socket_options);
+    ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
+                                            cluster_socket_options);
 
-  if (!bind_config.has_source_address() && (bind_config.extra_source_addresses_size() > 0 ||
-                                            bind_config.additional_source_addresses_size() > 0)) {
-    throw EnvoyException(
-        fmt::format("{}'s upstream binding config has extra/additional source addresses but no "
-                    "source_address. Extra/additional addresses cannot be specified if "
-                    "source_address is not set.",
-                    cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-  }
+    upstream_local_addresses.push_back(upstream_local_address);
 
-  UpstreamLocalAddress upstream_local_address;
-  upstream_local_address.address_ =
-      bind_config.has_source_address()
-          ? Network::Address::resolveProtoSocketAddress(bind_config.source_address())
-          : nullptr;
-  upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
+    for (const auto& extra_source_address : bind_config->extra_source_addresses()) {
+      UpstreamLocalAddress extra_upstream_local_address;
+      extra_upstream_local_address.address_ =
+          ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
 
-  Network::Socket::appendOptions(upstream_local_address.socket_options_, base_socket_options);
-  Network::Socket::appendOptions(upstream_local_address.socket_options_, cluster_socket_options);
+      extra_upstream_local_address.socket_options_ =
+          std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
+      ::Envoy::Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
+                                              base_socket_options);
 
-  upstream_local_addresses_.push_back(upstream_local_address);
-
-  if (bind_config.extra_source_addresses_size() == 1) {
-    UpstreamLocalAddress extra_upstream_local_address;
-    extra_upstream_local_address.address_ = Network::Address::resolveProtoSocketAddress(
-        bind_config.extra_source_addresses(0).address());
-    ASSERT(extra_upstream_local_address.address_->ip() != nullptr &&
-           upstream_local_address.address_->ip() != nullptr);
-    if (extra_upstream_local_address.address_->ip()->version() ==
-        upstream_local_address.address_->ip()->version()) {
-      throw EnvoyException(fmt::format(
-          "{}'s upstream binding config has two same IP version source addresses. Only two "
-          "different IP version source addresses can be supported in BindConfig's source_address "
-          "and extra_source_addresses fields",
-          cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+      if (extra_source_address.has_socket_options()) {
+        ::Envoy::Network::Socket::appendOptions(
+            extra_upstream_local_address.socket_options_,
+            ::Envoy::Network::SocketOptionFactory::buildLiteralOptions(
+                extra_source_address.socket_options().socket_options()));
+      } else {
+        ::Envoy::Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
+                                                cluster_socket_options);
+      }
+      upstream_local_addresses.push_back(extra_upstream_local_address);
     }
 
-    extra_upstream_local_address.socket_options_ =
-        std::make_shared<Network::ConnectionSocket::Options>();
-    Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
-                                   base_socket_options);
-
-    if (bind_config.extra_source_addresses(0).has_socket_options()) {
-      Network::Socket::appendOptions(
-          extra_upstream_local_address.socket_options_,
-          Network::SocketOptionFactory::buildLiteralOptions(
-              bind_config.extra_source_addresses(0).socket_options().socket_options()));
-    } else {
-      Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
-                                     cluster_socket_options);
+    for (const auto& additional_source_address : bind_config->additional_source_addresses()) {
+      UpstreamLocalAddress additional_upstream_local_address;
+      additional_upstream_local_address.address_ =
+          ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
+      additional_upstream_local_address.socket_options_ =
+          std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
+      ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
+                                              base_socket_options);
+      ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
+                                              cluster_socket_options);
+      upstream_local_addresses.push_back(additional_upstream_local_address);
     }
-
-    upstream_local_addresses_.push_back(extra_upstream_local_address);
+  } else {
+    // If there is no bind config specified, then return a nullptr for the address.
+    UpstreamLocalAddress local_address;
+    local_address.address_ = nullptr;
+    local_address.socket_options_ = std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
+    ::Envoy::Network::Socket::appendOptions(local_address.socket_options_, base_socket_options);
+    Network::Socket::appendOptions(local_address.socket_options_, cluster_socket_options);
+    upstream_local_addresses.push_back(local_address);
   }
 
-  if (bind_config.additional_source_addresses_size() == 1) {
-    UpstreamLocalAddress additional_upstream_local_address;
-    additional_upstream_local_address.address_ =
-        Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(0));
-    ASSERT(additional_upstream_local_address.address_->ip() != nullptr &&
-           upstream_local_address.address_->ip() != nullptr);
-    if (additional_upstream_local_address.address_->ip()->version() ==
-        upstream_local_address.address_->ip()->version()) {
-      throw EnvoyException(fmt::format(
-          "{}'s upstream binding config has two same IP version source addresses. Only two "
-          "different IP version source addresses can be supported in BindConfig's source_address "
-          "and additional_source_addresses fields",
-          cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+  // Verify that we have valid addresses if size is greater than 1.
+  if (upstream_local_addresses.size() > 1) {
+    for (auto const& upstream_local_address : upstream_local_addresses) {
+      if (upstream_local_address.address_ == nullptr) {
+        throw EnvoyException(fmt::format("{}'s upstream binding config has invalid IP addresses.",
+                                         !(cluster_name.has_value())
+                                             ? "Bootstrap"
+                                             : fmt::format("Cluster {}", cluster_name.value())));
+      }
     }
-
-    additional_upstream_local_address.socket_options_ =
-        std::make_shared<Network::ConnectionSocket::Options>();
-
-    Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
-                                   base_socket_options);
-    Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
-                                   cluster_socket_options);
-
-    upstream_local_addresses_.push_back(additional_upstream_local_address);
   }
+
+  return upstream_local_addresses;
 }
+
+Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalAddressSelector(
+    const envoy::config::cluster::v3::Cluster& cluster_config,
+    const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
+
+  // Use the cluster bind config if specified. This completely overrides the
+  // bootstrap bind config when present.
+  OptRef<const envoy::config::core::v3::BindConfig> bind_config;
+  absl::optional<std::string> cluster_name;
+  if (cluster_config.has_upstream_bind_config()) {
+    bind_config.emplace(cluster_config.upstream_bind_config());
+    cluster_name.emplace(cluster_config.name());
+  } else if (bootstrap_bind_config.has_value()) {
+    bind_config.emplace(*bootstrap_bind_config);
+  }
+
+  // Verify that bind config is valid.
+  if (bind_config.has_value()) {
+    if (bind_config->additional_source_addresses_size() > 0 &&
+        bind_config->extra_source_addresses_size() > 0) {
+      throw EnvoyException(fmt::format(
+          "Can't specify both `extra_source_addresses` and `additional_source_addresses` "
+          "in the {}'s upstream binding config",
+          !(cluster_name.has_value()) ? "Bootstrap"
+                                      : fmt::format("Cluster {}", cluster_name.value())));
+    }
+
+    if (!bind_config->has_source_address() &&
+        (bind_config->extra_source_addresses_size() > 0 ||
+         bind_config->additional_source_addresses_size() > 0)) {
+      throw EnvoyException(fmt::format(
+          "{}'s upstream binding config has extra/additional source addresses but no "
+          "source_address. Extra/additional addresses cannot be specified if "
+          "source_address is not set.",
+          !(cluster_name.has_value()) ? "Bootstrap"
+                                      : fmt::format("Cluster {}", cluster_name.value())));
+    }
+  }
+  UpstreamLocalAddressSelectorFactory* local_address_selector_factory;
+  const envoy::config::core::v3::TypedExtensionConfig* const local_address_selector_config =
+      bind_config.has_value() && bind_config->has_local_address_selector()
+          ? &bind_config->local_address_selector()
+          : nullptr;
+  if (local_address_selector_config) {
+    local_address_selector_factory =
+        Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(
+            *local_address_selector_config, false);
+  } else {
+    // Create the default local address selector if one was not specified.
+    envoy::config::upstream::local_address_selector::v3::DefaultLocalAddressSelector default_config;
+    envoy::config::core::v3::TypedExtensionConfig typed_extension;
+    typed_extension.mutable_typed_config()->PackFrom(default_config);
+    local_address_selector_factory =
+        Config::Utility::getAndCheckFactory<UpstreamLocalAddressSelectorFactory>(typed_extension,
+                                                                                 false);
+  }
+  return local_address_selector_factory->createLocalAddressSelector(
+      parseBindConfig(
+          bind_config, cluster_name,
+          buildBaseSocketOptions(cluster_config, bootstrap_bind_config.value_or(
+                                                     envoy::config::core::v3::BindConfig{})),
+          buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
+                                                        envoy::config::core::v3::BindConfig{}))),
+      cluster_name);
+}
+
+} // namespace
+
+// Allow disabling ALPN checks for transport sockets. See
+// https://github.com/envoyproxy/envoy/issues/22876
+const absl::string_view ClusterImplBase::DoNotValidateAlpnRuntimeKey =
+    "config.do_not_validate_alpn_support";
 
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
 // stat name into every host that receives a copy of that metric. This can be improved by putting
@@ -875,7 +848,7 @@ ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
     Stats::Scope& scope, const ClusterRequestResponseSizeStatNames& stat_names) {
-  return ClusterRequestResponseSizeStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 ClusterLoadReportStats
@@ -889,74 +862,6 @@ ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
                                             const ClusterTimeoutBudgetStatNames& stat_names) {
   return {stat_names, scope};
 }
-
-// Implements the FactoryContext interface required by network filters.
-class FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
-public:
-  // Create from a TransportSocketFactoryContext using parent stats_scope and runtime
-  // other contexts taken from TransportSocketFactoryContext.
-  FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
-                     Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.serverFactoryContext().admin()),
-        server_scope_(c.serverFactoryContext().serverScope()), stats_scope_(stats_scope),
-        cluster_manager_(c.clusterManager()), local_info_(c.serverFactoryContext().localInfo()),
-        dispatcher_(c.serverFactoryContext().mainThreadDispatcher()), runtime_(runtime),
-        singleton_manager_(c.serverFactoryContext().singletonManager()),
-        tls_(c.serverFactoryContext().threadLocal()), api_(c.serverFactoryContext().api()),
-        options_(c.serverFactoryContext().options()),
-        message_validation_visitor_(c.messageValidationVisitor()) {}
-
-  Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
-  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
-  const Server::Options& options() override { return options_; }
-  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
-  Envoy::Runtime::Loader& runtime() override { return runtime_; }
-  Stats::Scope& scope() override { return stats_scope_; }
-  Stats::Scope& serverScope() override { return server_scope_; }
-  Singleton::Manager& singletonManager() override { return singleton_manager_; }
-  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
-  OptRef<Server::Admin> admin() override { return admin_; }
-  TimeSource& timeSource() override { return api().timeSource(); }
-  ProtobufMessage::ValidationContext& messageValidationContext() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  AccessLog::AccessLogManager& accessLogManager() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return message_validation_visitor_;
-  }
-
-  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  Init::Manager& initManager() override {
-    // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    PANIC("unimplemented");
-  }
-
-  Api::Api& api() override { return api_; }
-
-private:
-  OptRef<Server::Admin> admin_;
-  Stats::Scope& server_scope_;
-  Stats::Scope& stats_scope_;
-  Upstream::ClusterManager& cluster_manager_;
-  const LocalInfo::LocalInfo& local_info_;
-  Event::Dispatcher& dispatcher_;
-  Envoy::Runtime::Loader& runtime_;
-  Singleton::Manager& singleton_manager_;
-  ThreadLocal::SlotAllocator& tls_;
-  Api::Api& api_;
-  const Server::Options& options_;
-  ProtobufMessage::ValidationVisitor& message_validation_visitor_;
-};
 
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
@@ -1067,8 +972,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
-      upstream_local_address_selector_(
-          std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
+      upstream_local_address_selector_(createUpstreamLocalAddressSelector(config, bind_config)),
       lb_policy_config_(std::make_unique<const LBPolicyConfig>(config)),
       upstream_config_(config.has_upstream_config()
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
@@ -1089,8 +993,11 @@ ClusterInfoImpl::ClusterInfoImpl(
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())
                         : nullptr),
-      factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      http_filter_config_provider_manager_(
+          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+              server_context)),
+      network_filter_config_provider_manager_(
+          createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
@@ -1222,7 +1129,23 @@ ClusterInfoImpl::ClusterInfoImpl(
   filter_factories_.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
+    const bool is_terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  upstream filter #{}:", i);
+
+    if (proto_config.has_config_discovery()) {
+      if (proto_config.has_typed_config()) {
+        throw EnvoyException("Only one of typed_config or config_discovery can be used");
+      }
+
+      ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
+      filter_factories_.push_back(
+          network_filter_config_provider_manager_->createDynamicFilterConfigProvider(
+              proto_config.config_discovery(), proto_config.name(), server_context,
+              upstream_context_, factory_context.clusterManager(), is_terminal, "network",
+              nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
@@ -1230,9 +1153,10 @@ ClusterInfoImpl::ClusterInfoImpl(
     Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, *factory_context_);
-    filter_factories_.push_back(network_config_provider_manager_.createStaticFilterConfigProvider(
-        callback, proto_config.name()));
+        factory.createFilterFactoryFromProto(*message, upstream_context_);
+    filter_factories_.push_back(
+        network_filter_config_provider_manager_->createStaticFilterConfigProvider(
+            callback, proto_config.name()));
   }
 
   if (http_protocol_options_) {
@@ -1248,16 +1172,14 @@ ClusterInfoImpl::ClusterInfoImpl(
       throw EnvoyException(
           fmt::format("The codec filter is the only valid terminal upstream filter"));
     }
-    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
-        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-            upstream_context_.getServerFactoryContext());
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
-    Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+    Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
+        helper(*http_filter_config_provider_manager_, upstream_context_.getServerFactoryContext(),
                factory_context.clusterManager(), upstream_context_, prefix);
-    helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
+    THROW_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
+                                          http_filter_factories_));
   }
 }
 
@@ -1382,6 +1304,22 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
+bool validateTransportSocketSupportsQuic(
+    const envoy::config::core::v3::TransportSocket& transport_socket) {
+  // The transport socket is valid for QUIC if it is either a QUIC transport socket,
+  // or if it is a QUIC transport socket wrapped in an HTTP/1.1 proxy socket.
+  if (transport_socket.name() == "envoy.transport_sockets.quic") {
+    return true;
+  }
+  if (transport_socket.name() != "envoy.transport_sockets.http_11_proxy") {
+    return false;
+  }
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
+      http11_socket;
+  MessageUtil::unpackTo(transport_socket.typed_config(), http11_socket);
+  return http11_socket.transport_socket().name() == "envoy.transport_sockets.quic";
+}
+
 ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
                                  ClusterFactoryContext& cluster_context)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
@@ -1429,7 +1367,8 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
     }
-    if (!matcher_supports_alpn) {
+    if (!matcher_supports_alpn &&
+        !runtime_.snapshot().featureEnabled(ClusterImplBase::DoNotValidateAlpnRuntimeKey, 0)) {
       throw EnvoyException(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));
@@ -1438,11 +1377,10 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
 #if defined(ENVOY_ENABLE_QUIC)
-    if (cluster.transport_socket().DebugString().find("envoy.transport_sockets.quic") ==
-        std::string::npos) {
+    if (!validateTransportSocketSupportsQuic(cluster.transport_socket())) {
       throw EnvoyException(
-          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
-                      cluster.DebugString()));
+          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {} {}",
+                      cluster.name(), cluster.transport_socket().DebugString()));
     }
 #else
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
@@ -1776,6 +1714,16 @@ std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::get
         thresholds.retry_budget(), min_retry_concurrency, default_retry_concurrency);
   }
   return std::make_pair(budget_percent, min_retry_concurrency);
+}
+
+SINGLETON_MANAGER_REGISTRATION(upstream_network_filter_config_provider_manager);
+
+std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
+ClusterInfoImpl::createSingletonUpstreamNetworkFilterConfigProviderManager(
+    Server::Configuration::ServerFactoryContext& context) {
+  return context.singletonManager().getTyped<UpstreamNetworkFilterConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(upstream_network_filter_config_provider_manager),
+      [] { return std::make_shared<Filter::UpstreamNetworkFilterConfigProviderManagerImpl>(); });
 }
 
 ResourceManagerImplPtr

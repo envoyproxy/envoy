@@ -22,7 +22,7 @@ namespace Tracers {
 namespace DynamicOt {
 namespace {
 
-TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
+TEST(DynamicOtTracerConfigTest, DEPRECATED_FEATURE_TEST(DynamicOpentracingHttpTracer)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   EXPECT_CALL(context.server_factory_context_.cluster_manager_,
               getThreadLocalCluster(Eq("fake_cluster")))

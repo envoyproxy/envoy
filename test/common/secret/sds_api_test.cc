@@ -176,7 +176,7 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
-  subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+  EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), ctx, *api_);
@@ -197,9 +197,10 @@ protected:
     api_ = Api::createApiForTest(filesystem_);
     setupMocks();
     EXPECT_CALL(filesystem_, splitPathFromFilename(_))
-        .WillRepeatedly(Invoke([](absl::string_view path) -> Filesystem::PathSplitResult {
-          return Filesystem::fileSystemForTest().splitPathFromFilename(path);
-        }));
+        .WillRepeatedly(
+            Invoke([](absl::string_view path) -> absl::StatusOr<Filesystem::PathSplitResult> {
+              return Filesystem::fileSystemForTest().splitPathFromFilename(path);
+            }));
   }
 
   Secret::MockSecretCallbacks secret_callback_;
@@ -265,7 +266,8 @@ protected:
                 watch_cbs_.push_back(cb);
               }));
     }
-    subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+    EXPECT_TRUE(
+        subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
 
   const bool watched_directory_;
@@ -323,7 +325,8 @@ protected:
         .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
           watch_cbs_.push_back(cb);
         }));
-    subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+    EXPECT_TRUE(
+        subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
 
   std::unique_ptr<CertificateValidationContextSdsApi> sds_api_;
@@ -513,12 +516,12 @@ public:
     init_manager.add(init_target_);
   }
 
-  MOCK_METHOD(void, onConfigUpdate,
+  MOCK_METHOD(absl::Status, onConfigUpdate,
               (const std::vector<Config::DecodedResourceRef>&, const std::string&));
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added,
-                      const Protobuf::RepeatedPtrField<std::string>& removed,
-                      const std::string& version) override {
-    SdsApi::onConfigUpdate(added, removed, version);
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added,
+                              const Protobuf::RepeatedPtrField<std::string>& removed,
+                              const std::string& version) override {
+    return SdsApi::onConfigUpdate(added, removed, version);
   }
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
   void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
@@ -543,7 +546,7 @@ TEST_F(SdsApiTest, Delta) {
                      *dispatcher_, *api_);
   initialize();
   EXPECT_CALL(sds, onConfigUpdate(DecodedResourcesEq(resources), "version1"));
-  subscription_factory_.callbacks_->onConfigUpdate(resources, {}, "ignored");
+  EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(resources, {}, "ignored").ok());
 
   // An attempt to remove a resource logs an error, but otherwise just carries on (ignoring the
   // removal attempt).
@@ -554,7 +557,8 @@ TEST_F(SdsApiTest, Delta) {
   EXPECT_CALL(sds, onConfigUpdate(DecodedResourcesEq(resources_v2), "version2"));
   Protobuf::RepeatedPtrField<std::string> removals;
   *removals.Add() = "route_0";
-  subscription_factory_.callbacks_->onConfigUpdate(resources_v2, removals, "ignored");
+  EXPECT_TRUE(
+      subscription_factory_.callbacks_->onConfigUpdate(resources_v2, removals, "ignored").ok());
 }
 
 // Tests SDS's use of the delta variant of onConfigUpdate().
@@ -585,7 +589,8 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
 
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   initialize();
-  subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "");
+  EXPECT_TRUE(
+      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), ctx, *api_);
@@ -627,7 +632,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   initialize();
-  subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+  EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
 
   auto cvc_config =
       Ssl::CertificateValidationContextConfigImpl::create(*sds_api.secret(), *api_).value();
@@ -691,7 +696,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
 
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   initialize();
-  subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+  EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
 
   const std::string default_verify_certificate_hash =
       "0000000000000000000000000000000000000000000000000000000000000000";
@@ -781,7 +786,7 @@ generic_secret:
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   EXPECT_CALL(validation_callback, validateGenericSecret(_));
   initialize();
-  subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+  EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
       *sds_api.secret());
@@ -801,9 +806,8 @@ TEST_F(SdsApiTest, EmptyResource) {
   init_manager_.add(*sds_api.initTarget());
 
   initialize();
-  EXPECT_THROW_WITH_MESSAGE(subscription_factory_.callbacks_->onConfigUpdate({}, ""),
-                            EnvoyException,
-                            "Missing SDS resources for abc.com in onConfigUpdate()");
+  EXPECT_EQ(subscription_factory_.callbacks_->onConfigUpdate({}, "").message(),
+            "Missing SDS resources for abc.com in onConfigUpdate()");
 }
 
 // Validate that SdsApi throws exception if multiple secrets are passed to onConfigUpdate().
@@ -830,9 +834,13 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   const auto decoded_resources = TestUtility::decodeResources({typed_secret, typed_secret});
 
   initialize();
-  EXPECT_THROW_WITH_MESSAGE(
-      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
-      EnvoyException, "Unexpected SDS secrets length: 2");
+  EXPECT_EQ(
+      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+      "Unexpected SDS secrets length: 2");
+  Protobuf::RepeatedPtrField<std::string> unused;
+  EXPECT_EQ(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, unused, "")
+                .message(),
+            "Unexpected SDS secrets length: 2");
 }
 
 // Validate that SdsApi throws exception if secret name passed to onConfigUpdate()
@@ -860,9 +868,9 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
   initialize();
-  EXPECT_THROW_WITH_MESSAGE(
-      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
-      EnvoyException, "Unexpected SDS secret (expecting abc.com): wrong.name.com");
+  EXPECT_EQ(
+      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+      "Unexpected SDS secret (expecting abc.com): wrong.name.com");
 }
 
 } // namespace

@@ -32,8 +32,10 @@ type HttpCAPI interface {
 	HttpSetHeader(r unsafe.Pointer, key *string, value *string, add bool)
 	HttpRemoveHeader(r unsafe.Pointer, key *string)
 
-	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
+	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte
+	HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64)
 	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	HttpSetBytesBufferHelper(r unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
 
 	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	HttpSetTrailer(r unsafe.Pointer, key *string, value *string, add bool)
@@ -49,9 +51,17 @@ type HttpCAPI interface {
 	HttpLogLevel() LogType
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+	HttpConfigFinalize(c unsafe.Pointer)
 
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	HttpGetStringFilterState(r unsafe.Pointer, key string) string
+
+	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
+
+	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
+	HttpIncrementMetric(c unsafe.Pointer, metricId uint32, offset int64)
+	HttpGetMetric(c unsafe.Pointer, metricId uint32) uint64
+	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
 }
 
 type NetworkCAPI interface {

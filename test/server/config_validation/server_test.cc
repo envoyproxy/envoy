@@ -3,6 +3,7 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
 #include "source/server/config_validation/server.h"
 
 #include "test/integration/server.h"
@@ -179,7 +180,7 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
                             Filesystem::fileSystemForTest());
 
   // Execute dummy methods.
-  server.drainListeners();
+  server.drainListeners(absl::nullopt);
   server.failHealthcheck(true);
   server.lifecycleNotifier();
   server.secretManager();
@@ -207,6 +208,9 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
                                      overload_state);
 
   server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
+
+  ValidationListenerComponentFactory listener_component_factory(server);
+  listener_component_factory.getTcpListenerConfigProviderManager();
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
@@ -236,7 +240,7 @@ TEST_P(ValidationServerTest1, RunWithoutCrash) {
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest1,
                          ::testing::ValuesIn(ValidationServerTest1::getAllConfigFiles()));
 
-TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
+TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoader) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime time_system;

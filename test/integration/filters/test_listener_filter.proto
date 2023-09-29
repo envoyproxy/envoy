@@ -15,3 +15,10 @@ message TestTcpListenerFilterConfig {
 // Configuration for UDP listener filter test
 message TestUdpListenerFilterConfig {
 }
+
+// Configuration for QUIC listener filter test
+message TestQuicListenerFilterConfig {
+  string added_value = 1 [(validate.rules).string = {min_len: 1}];
+  bool allow_server_migration = 2;
+  bool allow_client_migration = 3;
+}

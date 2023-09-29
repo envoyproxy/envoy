@@ -66,6 +66,21 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
+bool FilterChainUtility::buildQuicFilterChain(
+    Network::QuicListenerFilterManager& filter_manager,
+    const Filter::QuicListenerFilterFactoriesList& factories) {
+  for (const auto& filter_config_provider : factories) {
+    auto config = filter_config_provider->config();
+    if (!config.has_value()) {
+      return false;
+    }
+    auto config_value = config.value();
+    config_value(filter_manager);
+  }
+
+  return true;
+}
+
 StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
     : deferred_stat_options_(bootstrap.deferred_stat_options()) {
   if (bootstrap.has_stats_flush_interval() &&
@@ -251,7 +266,7 @@ void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstr
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
                                           admin.access_log_path()};
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
         server.accessLogManager()));
   }
 }

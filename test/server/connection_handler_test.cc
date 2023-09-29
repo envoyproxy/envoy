@@ -631,17 +631,17 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 }
 
@@ -677,18 +677,18 @@ TEST_F(ConnectionHandlerTest, RemoveListenerWithMultiAddrs) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList()).Times(2);
   handler_->removeListeners(1);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 }
 
@@ -815,10 +815,10 @@ TEST_F(ConnectionHandlerTest, StopAndDisableStoppedListener) {
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   // Test stop a stopped listener.
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   // Test disable a stopped listener.
   handler_->disableListeners();
@@ -1157,7 +1157,7 @@ TEST_F(ConnectionHandlerTest, MatchLatestListener) {
   // This emulated the case of update listener in-place. Stop the old listener and
   // add the new listener.
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
+  handler_->stopListeners(2, {});
   handler_->addListener(absl::nullopt, *test_listener3, runtime_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
@@ -1221,7 +1221,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedListener) {
 
   // Stop the listener2.
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
+  handler_->stopListeners(2, {});
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -1281,7 +1281,7 @@ TEST_F(ConnectionHandlerTest, EnsureNotMatchStoppedAnyAddressListener) {
 
   // Stop the listener2.
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
+  handler_->stopListeners(2, {});
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   EXPECT_CALL(*test_filter, destroy_());
@@ -2404,7 +2404,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(listener_tag);
+  handler_->stopListeners(listener_tag, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   EXPECT_CALL(*access_log_, log(_, _, _, _, _));
@@ -2456,18 +2456,18 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveListener) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
-  handler_->stopListeners(0);
+  handler_->stopListeners(0, {});
   handler_->removeListeners(0);
 }
 
@@ -2488,7 +2488,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv6AnyAddressWithIpv4CompatListe
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
@@ -2517,7 +2517,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv4CompatAddressListener) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
@@ -2560,7 +2560,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
 
   // Remove Listener1 first.
   EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
+  handler_->stopListeners(1, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
@@ -2571,7 +2571,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
 
   // Now remove Listener2.
   EXPECT_CALL(*listener2, onDestroy());
-  handler_->stopListeners(2);
+  handler_->stopListeners(2, {});
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(2);

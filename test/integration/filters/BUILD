@@ -15,6 +15,11 @@ envoy_proto_library(
 )
 
 envoy_proto_library(
+    name = "add_header_filter_proto",
+    srcs = ["add_header_filter.proto"],
+)
+
+envoy_proto_library(
     name = "test_listener_filter_proto",
     srcs = ["test_listener_filter.proto"],
 )
@@ -32,6 +37,7 @@ envoy_cc_test_library(
         "//envoy/network:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/router:string_accessor_lib",
     ],
 )
 
@@ -55,6 +61,7 @@ envoy_cc_test_library(
     name = "add_header_filter_config_lib",
     srcs = ["add_header_filter.cc"],
     deps = [
+        ":add_header_filter_proto_cc_proto",
         ":common_lib",
         "//envoy/http:filter_interface",
         "//envoy/registry",

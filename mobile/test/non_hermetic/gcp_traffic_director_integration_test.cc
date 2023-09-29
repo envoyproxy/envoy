@@ -69,7 +69,6 @@ public:
     const char* api_key = std::getenv("GCP_TEST_PROJECT_API_KEY");
     RELEASE_ASSERT(api_key != nullptr, "GCP_TEST_PROJECT_API_KEY environment variable not set.");
 
-    // TODO(abeyad): switch to using API key authentication instead of a JWT token.
     Platform::XdsBuilder xds_builder(/*xds_server_address=*/std::string(TD_API_ENDPOINT),
                                      /*xds_server_port=*/443);
     xds_builder.setAuthenticationToken("x-goog-api-key", std::string(api_key));

@@ -254,8 +254,11 @@ public:
   }
 
   void init(const HostURLMetadataMap& host_metadata,
-            const HostURLMetadataMap& failover_host_metadata) {
-    EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+            const HostURLMetadataMap& failover_host_metadata, bool use_actual_subset_info = false) {
+
+    if (!use_actual_subset_info) {
+      EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+    }
 
     configureHostSet(host_metadata, host_set_);
     if (!failover_host_metadata.empty()) {
@@ -282,9 +285,11 @@ public:
             : absl::nullopt,
         common_config_);
 
-    lb_ = std::make_shared<SubsetLoadBalancer>(subset_info_, std::move(child_lb_creator),
-                                               priority_set_, nullptr, stats_, *scope_, runtime_,
-                                               random_, simTime());
+    lb_ = std::make_shared<SubsetLoadBalancer>(
+        use_actual_subset_info ? static_cast<const LoadBalancerSubsetInfo&>(*actual_subset_info_)
+                               : static_cast<const LoadBalancerSubsetInfo&>(subset_info_),
+        std::move(child_lb_creator), priority_set_, nullptr, stats_, *scope_, runtime_, random_,
+        simTime());
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -585,7 +590,12 @@ public:
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
+  // Mock subset info is used for testing most logic.
   NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
+  // Actual subset info is used for testing actual subset config parsing and behavior.
+  std::unique_ptr<LoadBalancerSubsetInfoImplBase<
+      envoy::extensions::load_balancing_policies::subset::v3::Subset>>
+      actual_subset_info_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::config::cluster::v3::Cluster::RingHashLbConfig ring_hash_lb_config_;
   envoy::config::cluster::v3::Cluster::MaglevLbConfig maglev_lb_config_;
@@ -1967,6 +1977,177 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 }
 
+TEST_F(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsets) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillRepeatedly(Return(2));
+
+  // L=local cluster host
+  // U=upstream host
+  //
+  //              residuals
+  //     A: 2L 0U  0.00%
+  //     B: 2L 2U  6.67%
+  //     C: 2L 2U  6.67%
+  //     D: 0L 1U 20.00%
+  // total: 6L 5U 33.33%
+
+  zoneAwareInit({{
+                     {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:86", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:87", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:88", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:89", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:90", {{"version", "1.1"}}},
+                 }},
+                {{
+                     {"tcp://127.0.0.1:91", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:92", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:93", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:94", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:95", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:96", {{"version", "1.1"}}},
+                 }});
+
+  TestLoadBalancerContext context({{"version", "1.1"}});
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(666));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(667));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1334));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+}
+
+TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
+      {"version"},
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillRepeatedly(Return(2));
+
+  // Before update:
+  //
+  // L=local cluster host
+  // U=upstream host
+  //
+  //              residuals
+  //     A: 2L 0U  0.00%
+  //     B: 2L 2U  6.67%
+  //     C: 2L 2U  6.67%
+  //     D: 0L 1U 20.00%
+  // total: 6L 5U 33.33%
+
+  zoneAwareInit({{
+                     {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:86", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:87", {{"version", "1.1"}}},
+                     {"tcp://127.0.0.1:88", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:89", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:90", {{"version", "1.1"}}},
+                 }},
+                {{
+                     {"tcp://127.0.0.1:91", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:92", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:93", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:94", {{"version", "1.1"}}},
+                 },
+                 {
+                     {"tcp://127.0.0.1:95", {{"version", "1.0"}}},
+                     {"tcp://127.0.0.1:96", {{"version", "1.1"}}},
+                 }});
+
+  TestLoadBalancerContext context({{"version", "1.1"}});
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(666));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(667));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1334));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+
+  envoy::config::core::v3::Locality local_locality;
+  local_locality.set_zone("0");
+  envoy::config::core::v3::Locality locality_2;
+  locality_2.set_zone("2");
+
+  modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)}, {},
+              absl::optional<uint32_t>(0));
+
+  modifyLocalHosts({makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, locality_2)}, {}, 2);
+
+  // After update:
+  //
+  // L=local cluster host
+  // U=upstream host
+  //
+  //              residuals
+  //     A: 2L 1U  0.00%
+  //     B: 2L 2U  4.76%
+  //     C: 3L 2U  0.00%
+  //     D: 0L 1U 16.67%
+  // total: 7L 6U 21.42%
+  //
+  // Chance of sampling local host in zone 0: 58.34%
+
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(5830)); // 58.31% local routing chance due to rounding error
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(5831)).WillOnce(Return(475));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(476));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2143));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+}
+
 TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
@@ -2302,6 +2483,111 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackMatchesTopLevelOne) {
   EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_key));
   EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
   EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
+}
+
+TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
+  // Yaml config for subset load balancer.
+  const std::string yaml = R"EOF(
+  subset_selectors:
+  - keys:
+    - A
+    fallback_policy: NO_FALLBACK
+  - keys:
+    - A
+    - B
+    fallback_policy: NO_FALLBACK
+  - keys:
+    - A
+    - B
+    - C
+    fallback_policy: NO_FALLBACK
+  - keys:
+    - A
+    - D
+    fallback_policy: NO_FALLBACK
+  - keys:
+    - version
+    - stage
+    fallback_policy: NO_FALLBACK
+  fallback_policy: NO_FALLBACK
+  allow_redundant_keys: true
+  )EOF";
+
+  envoy::extensions::load_balancing_policies::subset::v3::Subset subset_proto_config;
+  TestUtility::loadFromYaml(yaml, subset_proto_config);
+
+  actual_subset_info_ = std::make_unique<LoadBalancerSubsetInfoImplBase<
+      envoy::extensions::load_balancing_policies::subset::v3::Subset>>(subset_proto_config);
+
+  // Add hosts initial hosts.
+  init({{"tcp://127.0.0.1:80", {{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-0"}, {"D", "D-V-0"}}},
+        {"tcp://127.0.0.1:81", {{"A", "A-V-1"}, {"B", "B-V-1"}, {"C", "C-V-1"}, {"D", "D-V-1"}}},
+        {"tcp://127.0.0.1:82", {{"A", "A-V-2"}, {"B", "B-V-2"}, {"C", "C-V-2"}, {"D", "D-V-2"}}},
+        {"tcp://127.0.0.1:83", {{"A", "A-V-3"}, {"B", "B-V-3"}, {"C", "C-V-3"}, {"D", "D-V-3"}}},
+        {"tcp://127.0.0.1:84", {{"A", "A-V-4"}, {"B", "B-V-4"}, {"C", "C-V-4"}, {"D", "D-V-4"}}},
+        {"tcp://127.0.0.1:85", {{"version", "1.0"}, {"stage", "dev"}}},
+        {"tcp://127.0.0.1:86", {{"version", "1.0"}, {"stage", "canary"}}}},
+       {}, true);
+
+  TestLoadBalancerContext context_empty(
+      std::initializer_list<std::map<std::string, std::string>::value_type>{});
+  context_empty.matches_.reset();
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_empty));
+
+  // Request metadata is same with {version, stage}.
+  // version, stage will be kept and host 6 will be selected.
+  TestLoadBalancerContext context_v_s_0({{"version", "1.0"}, {"stage", "canary"}});
+  EXPECT_EQ(host_set_.hosts_[6], lb_->chooseHost(&context_v_s_0));
+
+  // Request metadata is superset of {version, stage}. The redundant key will be ignored.
+  // version, stage will be kept and host 5 will be selected.
+  TestLoadBalancerContext context_v_s_1({{"version", "1.0"}, {"stage", "dev"}, {"redundant", "X"}});
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context_v_s_1));
+
+  // Request metadata is superset of {version, stage}. The redundant key will be ignored.
+  // But one of value not match, so no host will be selected.
+  TestLoadBalancerContext context_v_s_2(
+      {{"version", "1.0"}, {"stage", "prod"}, {"redundant", "X"}});
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_v_s_2));
+
+  // Request metadata is same with {A, B, C} and is superset of selectors {A}, {A, B}.
+  // All A, B, C will be kept and host 0 will be selected.
+  TestLoadBalancerContext context_0({{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-0"}});
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_0));
+
+  // Request metadata is same with {A, B, C} and is superset of selectors {A}, {A, B}.
+  // All A, B, C will be kept But one of value not match, so no host will be selected.
+  TestLoadBalancerContext context_1({{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-X"}});
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_1));
+
+  // Request metadata is superset of selectors {A}, {A, B} {A, B, C}, {A, D}, the longest win.
+  // A, B, C will be kept and D will be ignored, so host 1 will be selected.
+  TestLoadBalancerContext context_2(
+      {{"A", "A-V-1"}, {"B", "B-V-1"}, {"C", "C-V-1"}, {"D", "D-V-X"}});
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_2));
+
+  // Request metadata is superset of selectors {A}, {A, B} {A, B, C}, {A, D}, the longest win.
+  // A, B, C will be kept and D will be ignored, but one of value not match, so no host will be
+  // selected.
+  TestLoadBalancerContext context_3(
+      {{"A", "A-V-1"}, {"B", "B-V-1"}, {"C", "C-V-X"}, {"D", "D-V-X"}});
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_3));
+
+  // Request metadata is superset of selectors {A}, {A, B}, {A, D}, the longest and first win.
+  // Only A, B will be kept and D will be ignored, so host 2 will be selected.
+  TestLoadBalancerContext context_4({{"A", "A-V-2"}, {"B", "B-V-2"}, {"D", "D-V-X"}});
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_4));
+
+  // Request metadata is superset of selectors {A}, {A, B}, {A, D}, the longest and first win.
+  // Only A, B will be kept and D will be ignored, but one of value not match, so no host will be
+  // selected.
+  TestLoadBalancerContext context_5({{"A", "A-V-3"}, {"B", "B-V-X"}, {"D", "D-V-3"}});
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_5));
+
+  // Request metadata is superset of selectors {A}, {A, D}, the longest win.
+  // Only A, D will be kept and C will be ignored, so host 3 will be selected.
+  TestLoadBalancerContext context_6({{"A", "A-V-3"}, {"C", "C-V-X"}, {"D", "D-V-3"}});
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_6));
 }
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAnyFallbackPerSelector) {

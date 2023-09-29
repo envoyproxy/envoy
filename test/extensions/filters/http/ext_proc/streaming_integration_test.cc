@@ -319,8 +319,8 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
           ProcessingResponse resp;
           if (req.has_request_body()) {
             received_count++;
-            if (received_count == 2) {
-              // After two body chunks, change the processing mode. Since the body
+            if (received_count == 1) {
+              // After first body chunk, change the processing mode. Since the body
               // is pipelined, we might still get body chunks, however. This test can't
               // validate this, but at least we can ensure that this doesn't blow up the
               // protocol.
@@ -330,7 +330,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
             resp.mutable_request_body();
           } else if (req.has_response_headers()) {
             // Should not see response headers until we changed the processing mode.
-            EXPECT_GE(received_count, 2);
+            EXPECT_GE(received_count, 1);
             resp.mutable_response_headers();
           } else {
             FAIL() << "unexpected stream message";
@@ -676,13 +676,9 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
         ProcessingRequest header_resp;
         bool seen_response_headers = false;
 
-        // Reading from the stream, we might receive the response headers
-        // later if we execute the local reply after the filter executes.
-        const int num_reads_for_response_headers =
-            Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")
-                ? 2
-                : 1;
+        // Reading from the stream, we receive the response headers
+        // later due to executing the local reply after the filter executes.
+        const int num_reads_for_response_headers = 2;
         for (int i = 0; i < num_reads_for_response_headers; ++i) {
           if (stream->Read(&header_resp) && header_resp.has_response_headers()) {
             seen_response_headers = true;

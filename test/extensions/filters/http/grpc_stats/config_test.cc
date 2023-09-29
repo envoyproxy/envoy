@@ -15,7 +15,6 @@
 
 using testing::_;
 using testing::Property;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {

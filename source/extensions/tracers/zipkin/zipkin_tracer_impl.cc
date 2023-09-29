@@ -105,7 +105,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
         local_info_.clusterName(), local_info_.address(), random_generator, trace_id_128bit,
         shared_span_context, time_source_, split_spans_for_request);
     tracer->setReporter(
-        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
+        ReporterImpl::newInstance(std::ref(*this), std::ref(dispatcher), collector));
     return std::make_shared<TlsTracer>(std::move(tracer), *this);
   });
 }
@@ -155,7 +155,7 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
   enableTimer();
 }
 
-ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+ReporterPtr ReporterImpl::newInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                       const CollectorInfo& collector) {
   return std::make_unique<ReporterImpl>(driver, dispatcher, collector);
 }
