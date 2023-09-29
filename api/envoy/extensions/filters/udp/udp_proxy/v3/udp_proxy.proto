@@ -127,7 +127,7 @@ message UdpProxyConfig {
     //   If use_post is set, the upstream stream does not comply with the connect-udp RFC, and
     //   instead it will be a POST request. the path used in the headers will be set from the
     //   post_path field, and the headers will not contain the target host and target port, as
-    //   required by the connect-udp protocol. This flag should be carefully used.
+    //   required by the connect-udp protocol. This flag should be used carefully.
     //
     bool use_post = 5;
 
