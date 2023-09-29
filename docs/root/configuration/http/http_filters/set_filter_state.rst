@@ -1,7 +1,7 @@
 .. _config_http_filters_set_filter_state:
 
-Envoy Set-Filter-State HTTP Filter
-==================================
+Set-Filter-State HTTP Filter
+============================
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.set_filter_state.v3.Config>`
 
@@ -20,8 +20,8 @@ address:
 .. validated-code-block:: yaml
   :type-name: envoy.extensions.filters.http.set_filter_state.v3.Config
 
-  rules:
-  - key: envoy.network.transport_socket.original_dst_address
+  on_request_headers:
+  - object_key: envoy.network.transport_socket.original_dst_address
     format_string:
       text_format_source:
         inline_string: "%REQ(:AUTHORITY)%"
@@ -35,13 +35,13 @@ filter addresses on the upstream :ref:`internal listener connection
 .. validated-code-block:: yaml
   :type-name: envoy.extensions.filters.http.set_filter_state.v3.Config
 
-  rules:
-  - key: envoy.filters.listener.original_dst.local_ip
+  on_request_headers:
+  - object_key: envoy.filters.listener.original_dst.local_ip
     format_string:
       text_format_source:
         inline_string: "%REQ(:AUTHORITY)%"
     shared_with_upstream: ONCE
-  - key: envoy.filters.listener.original_dst.remote_ip
+  - object_key: envoy.filters.listener.original_dst.remote_ip
     format_string:
       text_format_source:
         inline_string: "%DOWNSTREAM_REMOTE_ADDRESS%"

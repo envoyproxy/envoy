@@ -16,7 +16,7 @@ Config::parse(const Protobuf::RepeatedPtrField<
   rules.reserve(proto_rules.size());
   for (const auto& proto_rule : proto_rules) {
     Rule rule;
-    rule.key_ = proto_rule.key();
+    rule.key_ = proto_rule.object_key();
     rule.factory_ =
         Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(rule.key_);
     if (rule.factory_ == nullptr) {

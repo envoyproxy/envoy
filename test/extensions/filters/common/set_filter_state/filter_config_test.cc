@@ -64,7 +64,7 @@ public:
 
 TEST_F(ConfigTest, SetValue) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "XXX"
@@ -79,7 +79,7 @@ TEST_F(ConfigTest, SetValue) {
 
 TEST_F(ConfigTest, SetValueConnection) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "XXX"
@@ -95,7 +95,7 @@ TEST_F(ConfigTest, SetValueConnection) {
 
 TEST_F(ConfigTest, UpdateValue) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "XXX"
@@ -112,7 +112,7 @@ TEST_F(ConfigTest, UpdateValue) {
 
 TEST_F(ConfigTest, SetValueFromHeader) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "%REQ(test-header)%"
@@ -127,19 +127,19 @@ TEST_F(ConfigTest, SetValueFromHeader) {
 
 TEST_F(ConfigTest, MultipleRules) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "XXX"
   )YAML",
               R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "YYY"
   )YAML",
               R"YAML(
-    key: bar
+    object_key: bar
     format_string:
       text_format_source:
         inline_string: "ZZZ"
@@ -156,7 +156,7 @@ TEST_F(ConfigTest, MultipleRules) {
 
 TEST_F(ConfigTest, BadValue) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "BAD_VALUE"
@@ -169,7 +169,7 @@ TEST_F(ConfigTest, BadValue) {
 
 TEST_F(ConfigTest, MissingKey) {
   EXPECT_THROW_WITH_MESSAGE(initialize({R"YAML(
-    key: unknown_key
+    object_key: unknown_key
     format_string:
       text_format_source:
         inline_string: "XXX"
@@ -179,7 +179,7 @@ TEST_F(ConfigTest, MissingKey) {
 
 TEST_F(ConfigTest, EmptyValue) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: ""
@@ -194,7 +194,7 @@ TEST_F(ConfigTest, EmptyValue) {
 
 TEST_F(ConfigTest, EmptyValueSkip) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: ""
@@ -208,7 +208,7 @@ TEST_F(ConfigTest, EmptyValueSkip) {
 
 TEST_F(ConfigTest, SetValueUpstreamSharedOnce) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "XXX"
@@ -229,7 +229,7 @@ TEST_F(ConfigTest, SetValueUpstreamSharedOnce) {
 
 TEST_F(ConfigTest, SetValueUpstreamSharedTransitive) {
   initialize({R"YAML(
-    key: foo
+    object_key: foo
     format_string:
       text_format_source:
         inline_string: "XXX"

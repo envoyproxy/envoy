@@ -1,7 +1,7 @@
 .. _config_network_filters_set_filter_state:
 
-Envoy Set-Filter-State Network Filter
-=====================================
+Set-Filter-State Network Filter
+===============================
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.set_filter_state.v3.Config>`
 
@@ -18,8 +18,8 @@ A sample filter configuration that propagates the downstream SNI as the upstream
 .. validated-code-block:: yaml
   :type-name: envoy.extensions.filters.http.set_filter_state.v3.Config
 
-  rules:
-  - key: envoy.network.upstream_server_name
+  on_new_connection:
+  - object_key: envoy.network.upstream_server_name
     format_string:
       text_format_source:
         inline_string: "%REQUESTED_SERVER_NAME%"
