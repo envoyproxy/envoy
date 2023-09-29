@@ -231,8 +231,6 @@ void SslSocket::drainErrorQueue() {
                     absl::NullSafeStringView(ERR_reason_error_string(err)));
   }
 
-  // TLS error:|33554536:system library:OPENSSL_internal:Connection reset by peer|33554464:system
-  // library:OPENSSL_internal:Broken pipe:TLS_error_end
   if (!failure_reason_.empty()) {
     if (new_ssl_failure_format) {
       absl::StrAppend(&failure_reason_, ":TLS_error_end");
