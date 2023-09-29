@@ -57,7 +57,6 @@ stages:
   jobs:
   - template: env.yml
 
-
 - stage: prechecks
   displayName: Prechecks
   dependsOn: ["env"]
@@ -123,9 +122,6 @@ stages:
     RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
     PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
     PUBLISH_DOCKERHUB: $[stageDependencies.env.repo.outputs['publish.dockerhub']]
-    PUBLISH_DOCS: $[stageDependencies.env.repo.outputs['publish.docs']]
-    PUBLISH_DOCS_LATEST: $[stageDependencies.env.repo.outputs['publish.docsLatest']]
-    PUBLISH_DOCS_RELEASE: $[stageDependencies.env.repo.outputs['publish.docsRelease']]
   jobs:
   - template: stage/publish.yml
     parameters:
@@ -138,17 +134,11 @@ stages:
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
-      authSSHDocsKeyPublic: $(DocsPublicKey)
-      authSSHDocsKey: $(DocsPrivateKey)
-      authSSHKeyPassphrase: $(SshDeployKeyPassphrase)
       bucketGCP: $(GcsArtifactBucket)
       timeoutDockerBuild: ${{ parameters.timeoutDockerBuild }}
       timeoutDockerPublish: ${{ parameters.timeoutDockerPublish }}
       runDocker: variables['RUN_DOCKER']
       runPackaging: variables['RUN_PACKAGING']
-      publishDocs: variables['PUBLISH_DOCS']
-      publishDocsLatest: variables['PUBLISH_DOCS_LATEST']
-      publishDocsRelease: variables['PUBLISH_DOCS_RELEASE']
       publishDockerhub: variables['PUBLISH_DOCKERHUB']
       publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
 
