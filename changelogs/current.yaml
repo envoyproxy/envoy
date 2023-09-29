@@ -177,6 +177,9 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed ``envoy_reloadable_features_append_query_parameters_path_rewriter`` and legacy code paths.
 - area: xDS
   change: |
     Removed ``envoy.restart_features.explicit_wildcard_resource`` and legacy code paths.
@@ -278,6 +281,12 @@ new_features:
   change: |
     added :ref:`record_headers_received_time <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_headers_received_time>`
     to control writing request and response headers received time in trace output.
+- area: zookeeper
+  change: |
+    added support for emitting per opcode request bytes metrics via :ref:`enable_per_opcode_request_bytes_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_request_bytes_metrics>`.
+    added support for emitting per opcode response bytes metrics via :ref:`enable_per_opcode_response_bytes_metrics
+    <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>`.
 - area: tls
   change: |
     added fallback :ref:`fallback
@@ -290,11 +299,19 @@ new_features:
   change: |
     added the support to detect and send TCP RST for raw buffer socket based connections. This is currently supported on Linux only.
     It can be disabled by the runtime guard ``envoy_reloadable_features_detect_and_raise_rst_tcp_connection``.
-
 - area: upstream
   change: |
     Added the ability to specify a custom upstream local address selector using
     :ref:`local_address_selector:<envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>`.
+- area: redis
+  change: |
+    Added new configuration field :ref:`read_command_policy
+    <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.read_command_policy>`
+    to specify Envoy should route read commands to another cluster.
+- area: tap
+  change: |
+    added :ref:`record_downstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_downstream_connection>`
+    to control writing downstream connection address info in trace output.
 - area: tracing
   change: |
     Added :ref:`spawn_upstream_span
@@ -303,6 +320,7 @@ new_features:
 - area: original_dst
   change: |
     added support for the internal listener address recovery using the original destination listener filter.
+
 
 deprecated:
 - area: tracing

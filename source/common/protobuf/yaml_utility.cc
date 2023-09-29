@@ -183,7 +183,9 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
                                Api::Api& api) {
-  const std::string contents = api.fileSystem().fileReadToEnd(path);
+  auto file_or_error = api.fileSystem().fileReadToEnd(path);
+  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  const std::string contents = file_or_error.value();
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.

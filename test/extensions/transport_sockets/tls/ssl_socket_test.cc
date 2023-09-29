@@ -125,9 +125,7 @@ public:
   TestUtilOptions(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
                   bool expect_success, Network::Address::IpVersion version)
       : TestUtilOptionsBase(expect_success, version), client_ctx_yaml_(client_ctx_yaml),
-        server_ctx_yaml_(server_ctx_yaml), expect_no_cert_(false), expect_no_cert_chain_(false),
-        expect_private_key_method_(false),
-        expected_server_close_event_(Network::ConnectionEvent::RemoteClose) {
+        server_ctx_yaml_(server_ctx_yaml) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake");
     } else {
@@ -305,11 +303,11 @@ private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
 
-  bool expect_no_cert_;
-  bool expect_no_cert_chain_;
-  bool expect_private_key_method_;
+  bool expect_no_cert_{false};
+  bool expect_no_cert_chain_{false};
+  bool expect_private_key_method_{false};
   NiceMock<Runtime::MockLoader> runtime_;
-  Network::ConnectionEvent expected_server_close_event_;
+  Network::ConnectionEvent expected_server_close_event_{Network::ConnectionEvent::RemoteClose};
   std::string expected_sha256_digest_;
   std::string expected_sha1_digest_;
   std::vector<std::string> expected_local_uri_;

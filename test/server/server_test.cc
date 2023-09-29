@@ -1273,13 +1273,13 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "LogToFile test string");
   Logger::Registry::getSink()->flush();
-  std::string log = server_->api().fileSystem().fileReadToEnd(path);
+  std::string log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_GT(log.size(), 0);
   EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
 
   // Test that critical messages get immediately flushed
   ENVOY_LOG_MISC(critical, "LogToFile second test string");
-  log = server_->api().fileSystem().fileReadToEnd(path);
+  log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
 }
 

@@ -121,7 +121,7 @@ genrule(
     name = "project",
     outs = ["project.json"],
     cmd = """
-    $(location :get_project_json) . > $@
+    $(location :get_project_json) $$(dirname $(location @envoy//:VERSION.txt)) > $@
     """,
     tools = [
         ":get_project_json",
@@ -263,7 +263,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_axboe_liburing()
     _com_github_bazel_buildtools()
     _com_github_c_ares_c_ares()
-    _com_github_circonus_labs_libcircllhist()
+    _com_github_openhistogram_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_trace_cpp()
     _com_github_mirror_tclap()
@@ -378,14 +378,14 @@ def _boringssl_fips():
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
     )
 
-def _com_github_circonus_labs_libcircllhist():
+def _com_github_openhistogram_libcircllhist():
     external_http_archive(
-        name = "com_github_circonus_labs_libcircllhist",
+        name = "com_github_openhistogram_libcircllhist",
         build_file = "@envoy//bazel/external:libcircllhist.BUILD",
     )
     native.bind(
         name = "libcircllhist",
-        actual = "@com_github_circonus_labs_libcircllhist//:libcircllhist",
+        actual = "@com_github_openhistogram_libcircllhist//:libcircllhist",
     )
 
 def _com_github_axboe_liburing():

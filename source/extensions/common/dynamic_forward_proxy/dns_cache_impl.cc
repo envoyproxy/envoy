@@ -15,6 +15,19 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
+absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
+    Server::Configuration::FactoryContextBase& context,
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
+  const uint32_t max_hosts = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024);
+  if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts) {
+    return absl::InvalidArgumentError(fmt::format(
+        "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
+        config.name(), config.preresolve_hostnames().size(), max_hosts));
+  }
+
+  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(context, config));
+}
+
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::FactoryContextBase& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
@@ -35,12 +48,6 @@ DnsCacheImpl::DnsCacheImpl(
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
-
-  if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts_) {
-    throw EnvoyException(fmt::format(
-        "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
-        config.name(), config.preresolve_hostnames().size(), max_hosts_));
-  }
 
   loadCacheEntries(config);
 
