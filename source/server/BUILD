@@ -327,6 +327,7 @@ envoy_cc_library(
     deps = [
         "//envoy/server:factory_context_interface",
         "//envoy/server:instance_interface",
+        "//source/common/filter:config_discovery_lib",
     ],
 )
 

@@ -9,7 +9,9 @@ FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        Stats::Scope& global_scope, Stats::Scope& listener_scope,
                                        bool is_quic)
     : server_(server), config_(config), drain_decision_(drain_decision),
-      global_scope_(global_scope), listener_scope_(listener_scope), is_quic_(is_quic) {}
+      global_scope_(global_scope), listener_scope_(listener_scope), is_quic_(is_quic),
+      filter_config_provider_manager_(
+          std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
 
 AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -68,7 +70,7 @@ Configuration::HttpExtensionConfigProvider FactoryContextImpl::createDynamicFilt
 }
 Configuration::DownstreamFilterConfigProviderManagerPtr
 FactoryContextImpl::downstreamFilterConfigProviderManager() {
-  return nullptr;
+  return filter_config_provider_manager_;
 }
 
 } // namespace Server

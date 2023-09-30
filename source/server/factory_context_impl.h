@@ -3,6 +3,8 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
+#include "source/common/filter/config_discovery_impl.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -62,6 +64,7 @@ private:
   Stats::Scope& global_scope_;
   Stats::Scope& listener_scope_;
   bool is_quic_;
+  Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager_{};
 };
 
 } // namespace Server
