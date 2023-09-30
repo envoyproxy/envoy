@@ -60,6 +60,10 @@ const absl::string_view ConnectionManagerImpl::PrematureResetTotalStreamCountKey
     "overload.premature_reset_total_stream_count";
 const absl::string_view ConnectionManagerImpl::PrematureResetMinStreamLifetimeSecondsKey =
     "overload.premature_reset_min_stream_lifetime_seconds";
+// Runtime key for maximum number of requests that can be processed from a single connection per
+// I/O cycle. Requests over this limit are deferred until the next I/O cycle.
+const absl::string_view ConnectionManagerImpl::MaxRequestsPerIoCycle =
+    "http.max_requests_per_io_cycle";
 
 bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
   if (!headers) {
@@ -113,7 +117,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       time_source_(time_source), proxy_name_(StreamInfo::ProxyStatusUtils::makeProxyName(
                                      /*node_id=*/local_info_.node().id(),
                                      /*server_name=*/config_.serverName(),
-                                     /*proxy_status_config=*/config_.proxyStatusConfig())) {}
+                                     /*proxy_status_config=*/config_.proxyStatusConfig())),
+      max_requests_during_dispatch_(runtime_.snapshot().getInteger(
+          ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -123,6 +129,12 @@ const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+  if (max_requests_during_dispatch_ != UINT32_MAX) {
+    deferred_request_processing_callback_ =
+        callbacks.connection().dispatcher().createSchedulableCallback(
+            [this]() -> void { onDeferredRequestProcessing(); });
+  }
+
   stats_.named_.downstream_cx_total_.inc();
   stats_.named_.downstream_cx_active_.inc();
   if (read_callbacks_->connection().ssl()) {
@@ -391,6 +403,7 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
 }
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
+  requests_during_dispatch_count_ = 0;
   if (!codec_) {
     // Http3 codec should have been instantiated by now.
     createCodec(data);
@@ -1250,7 +1263,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     traceRequest();
   }
 
-  filter_manager_.decodeHeaders(*request_headers_, end_stream);
+  if (!connection_manager_.shouldDeferRequestProxyingToNextIoCycle()) {
+    filter_manager_.decodeHeaders(*request_headers_, end_stream);
+  } else {
+    state_.deferred_to_next_io_iteration_ = true;
+    state_.deferred_end_stream_ = end_stream;
+  }
 
   // Reset it here for both global and overridden cases.
   resetIdleTimer();
@@ -1317,8 +1335,15 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
                                connection_manager_.read_callbacks_->connection().dispatcher());
   maybeEndDecode(end_stream);
   filter_manager_.streamInfo().addBytesReceived(data.length());
-
-  filter_manager_.decodeData(data, end_stream);
+  if (!state_.deferred_to_next_io_iteration_) {
+    filter_manager_.decodeData(data, end_stream);
+  } else {
+    if (!deferred_data_) {
+      deferred_data_ = std::make_unique<Buffer::OwnedImpl>();
+    }
+    deferred_data_->move(data);
+    state_.deferred_end_stream_ = end_stream;
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& trailers) {
@@ -1334,7 +1359,9 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
     return;
   }
   maybeEndDecode(true);
-  filter_manager_.decodeTrailers(*request_trailers_);
+  if (!state_.deferred_to_next_io_iteration_) {
+    filter_manager_.decodeTrailers(*request_trailers_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
@@ -1934,6 +1961,62 @@ void ConnectionManagerImpl::ActiveStream::onResponseDataTooLarge() {
 void ConnectionManagerImpl::ActiveStream::resetStream(Http::StreamResetReason, absl::string_view) {
   connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
   connection_manager_.doEndStream(*this);
+}
+
+bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
+  // TODO(yanavlasov): Merge this with the filter manager continueIteration() method
+  if (!state_.deferred_to_next_io_iteration_) {
+    return false;
+  }
+  state_.deferred_to_next_io_iteration_ = false;
+  bool end_stream =
+      state_.deferred_end_stream_ && deferred_data_ == nullptr && request_trailers_ == nullptr;
+  filter_manager_.decodeHeaders(*request_headers_, end_stream);
+  if (end_stream) {
+    return true;
+  }
+  if (deferred_data_ != nullptr) {
+    end_stream = state_.deferred_end_stream_ && request_trailers_ == nullptr;
+    filter_manager_.decodeData(*deferred_data_, end_stream);
+  }
+  if (request_trailers_ != nullptr) {
+    filter_manager_.decodeTrailers(*request_trailers_);
+  }
+  return true;
+}
+
+bool ConnectionManagerImpl::shouldDeferRequestProxyingToNextIoCycle() {
+  // Do not defer this stream if stream deferral is disabled
+  if (deferred_request_processing_callback_ == nullptr) {
+    return false;
+  }
+  // Defer this stream if there are already deferred streams, so they are not
+  // processed out of order
+  if (deferred_request_processing_callback_->enabled()) {
+    return true;
+  }
+  ++requests_during_dispatch_count_;
+  bool defer = requests_during_dispatch_count_ > max_requests_during_dispatch_;
+  if (defer) {
+    deferred_request_processing_callback_->scheduleCallbackNextIteration();
+  }
+  return defer;
+}
+
+void ConnectionManagerImpl::onDeferredRequestProcessing() {
+  requests_during_dispatch_count_ = 1; // 1 stream is always let through
+  // Streams are inserted at the head of the list. As such process deferred
+  // streams at the back of the list first.
+  for (auto reverse_iter = streams_.rbegin(); reverse_iter != streams_.rend();) {
+    auto& stream_ptr = *reverse_iter;
+    // Move the iterator to the next item in case the `onDeferredRequestProcessing` call removes the
+    // stream from the list.
+    ++reverse_iter;
+    bool was_deferred = stream_ptr->onDeferredRequestProcessing();
+    if (was_deferred && shouldDeferRequestProxyingToNextIoCycle()) {
+      break;
+    }
+  }
 }
 
 } // namespace Http
