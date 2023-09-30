@@ -1394,7 +1394,6 @@ variadic
 varint
 vec
 vectorize
-vectoscan
 ver
 verifier
 verifiers
