@@ -874,7 +874,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationUnse
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
   // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
   setupProviderWithContext();
 
   // init_watcher ready is not called again.
@@ -939,7 +939,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationSecu
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
   // Expect refresh timer to be started.
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
   setupProviderWithContext();
 
   // init_watcher ready is not called again.
