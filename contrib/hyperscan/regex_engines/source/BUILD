@@ -31,7 +31,7 @@ envoy_cc_contrib_extension(
     hdrs = ["config.h"],
     defines = select({
         "//bazel:linux_x86_64": [],
-	"//bazel:linux_aarch64": [],
+        "//bazel:linux_aarch64": [],
         "//conditions:default": [
             "HYPERSCAN_DISABLED=1",
         ],

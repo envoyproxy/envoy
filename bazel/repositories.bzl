@@ -1,8 +1,8 @@
-load(":dev_binding.bzl", "envoy_dev_binding")
+load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
+load(":dev_binding.bzl", "envoy_dev_binding")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
-load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -677,7 +677,7 @@ def _io_vectorscan():
     external_http_archive(
         name = "io_vectorscan",
         build_file_content = BUILD_ALL_CONTENT,
-	type = "tar.gz",
+        type = "tar.gz",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:vectorscan.patch"],
     )

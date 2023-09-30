@@ -10,7 +10,7 @@ def envoy_contrib_linux_x86_64_constraints():
 def envoy_contrib_linux_aarch64_constraints():
     return [
         "@platforms//os:linux",
-	"@platforms//cpu:aarch64",
+        "@platforms//cpu:aarch64",
     ]
 
 ARM64_SKIP_CONTRIB_TARGETS = [

@@ -11,8 +11,8 @@ load(
 )
 load(
     "//contrib:all_contrib_extensions.bzl",
-    "envoy_contrib_linux_x86_64_constraints",
     "envoy_contrib_linux_aarch64_constraints",
+    "envoy_contrib_linux_x86_64_constraints",
 )
 
 licenses(["notice"])  # Apache 2
@@ -47,9 +47,9 @@ envoy_cmake(
     build_data = ["@org_boost//:header"],
     cache_entries = {
         "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
-#        "BUILD_SVE2_BITPERM": "on",
-#        "BUILD_SVE2": "on",
-#        "BUILD_SVE": "on",
+        #        "BUILD_SVE2_BITPERM": "on",
+        #        "BUILD_SVE2": "on",
+        #        "BUILD_SVE": "on",
         "BUILD_EXAMPLES": "off",
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_LIBDIR": "lib",
@@ -111,9 +111,9 @@ envoy_cc_contrib_extension(
         "//bazel:linux_x86_64": [
             ":hyperscan_matcher_lib",
         ],
-	"//bazel:linux_aarch64": [
+        "//bazel:linux_aarch64": [
             ":vectorscan_matcher_lib",
-	],
+        ],
         "//conditions:default": [
         ],
     }),

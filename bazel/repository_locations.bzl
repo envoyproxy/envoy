@@ -491,7 +491,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "5.4.10.1",
         sha256 = "ed4fb5aafecca155c4ce2f9b2c0ab781dc92fee720f77f4f4d56b651787ae118",
         strip_prefix = "vectorscan-vectorscan-{version}",
-	urls = ["https://codeload.github.com/VectorCamp/vectorscan/tar.gz/refs/tags/vectorscan/{version}"],
+        urls = ["https://codeload.github.com/VectorCamp/vectorscan/tar.gz/refs/tags/vectorscan/{version}"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.matching.input_matchers.hyperscan",
@@ -500,7 +500,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2023-09-08",
         cpe = "N/A",
         license = "BSD-3-Clause",
-	license_url = "https://github.com/VectorCamp/vectorscan/blob/vectorscan/{version}/LICENSE",
+        license_url = "https://github.com/VectorCamp/vectorscan/blob/vectorscan/{version}/LICENSE",
     ),
     io_opentracing_cpp = dict(
         project_name = "OpenTracing",
