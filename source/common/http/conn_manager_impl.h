@@ -122,6 +122,7 @@ public:
   // The minimum lifetime of a stream, in seconds, in order not to be considered
   // prematurely closed.
   static const absl::string_view PrematureResetMinStreamLifetimeSecondsKey;
+  static const absl::string_view MaxRequestsPerIoCycle;
 
 private:
   struct ActiveStream;
@@ -322,7 +323,7 @@ private:
       State()
           : codec_saw_local_complete_(false), saw_connection_close_(false),
             successful_upgrade_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true) {}
+            decorated_propagate_(true), deferred_to_next_io_iteration_(false) {}
 
       bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
                                           // the way through to the codec.
@@ -338,6 +339,14 @@ private:
       bool is_tunneling_ : 1;
 
       bool decorated_propagate_ : 1;
+
+      // Indicates that sending headers to the filter manager is deferred to the
+      // next I/O cycle. If data or trailers are received when this flag is set
+      // they are deferred too.
+      // TODO(yanavlasov): encapsulate the entire state of deferred streams into a separate
+      // structure, so it can be atomically created and cleared.
+      bool deferred_to_next_io_iteration_ : 1;
+      bool deferred_end_stream_ : 1;
     };
 
     // Per-stream idle timeout callback.
@@ -369,6 +378,11 @@ private:
     // Call header validator extension to validate request header map after it was deserialized.
     // If header map failed validation, it sends an error response and returns false.
     bool validateHeaders();
+
+    // Dispatch deferred headers, body and trailers to the filter manager.
+    // Return true if this stream was deferred and dispatched pending headers, body and trailers (if
+    // present). Return false if this stream was not deferred.
+    bool onDeferredRequestProcessing();
 
     ConnectionManagerImpl& connection_manager_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
@@ -414,6 +428,8 @@ private:
     Http::HeaderValidatorPtr header_validator_;
 
     friend FilterManager;
+
+    std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -457,6 +473,9 @@ private:
   // Sends a GOAWAY if both sufficient streams have been closed on a connection
   // and at least half have been prematurely reset?
   void maybeDrainDueToPrematureResets();
+
+  bool shouldDeferRequestProxyingToNextIoCycle();
+  void onDeferredRequestProcessing();
 
   enum class DrainState { NotDraining, Draining, Closing };
 
@@ -502,6 +521,9 @@ private:
   // the definition given in `isPrematureRstStream()`.
   uint64_t number_premature_stream_resets_{0};
   const std::string proxy_name_; // for Proxy-Status.
+  uint32_t requests_during_dispatch_count_{0};
+  const uint32_t max_requests_during_dispatch_{UINT32_MAX};
+  Event::SchedulableCallbackPtr deferred_request_processing_callback_;
 };
 
 } // namespace Http
