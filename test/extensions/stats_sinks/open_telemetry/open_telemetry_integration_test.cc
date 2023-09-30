@@ -23,7 +23,7 @@ namespace {
 class OpenTelemetryGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                          public HttpIntegrationTest {
 public:
-  OpenTelemetryGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+  OpenTelemetryGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {
     // TODO(ohadvano): add tag extraction rules.
     // Missing stat tag-extraction rule for stat 'grpc.otlp_collector.streams_closed_x' and
     // stat_prefix 'otlp_collector'.
@@ -61,7 +61,7 @@ public:
       metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
-          Protobuf::util::TimeUtil::MillisecondsToDuration(500));
+          Protobuf::util::TimeUtil::MillisecondsToDuration(300));
     });
 
     HttpIntegrationTest::initialize();
