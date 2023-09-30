@@ -11,6 +11,13 @@ behavior_changes:
     resets is applied. The connection is disconnected if more than 50% of resets are premature.
     Setting the runtime key ``envoy.restart_features.send_goaway_for_premature_rst_streams`` to ``false`` completely disables
     this check.
+- area: http
+  change: |
+    Add runtime flag ``http.max_requests_per_io_cycle`` for setting the limit on the number of HTTP requests processed
+    from a single connection in a single I/O cycle. Requests over this limit are processed in subsequent I/O cycles. This
+    mitigates CPU starvation by connections that simultaneously send high number of requests by allowing requests from other
+    connections to make progress. This runtime value can be set to 1 in the presence of abusive HTTP/2 or HTTP/3 connections.
+    By default this limit is disabled.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
