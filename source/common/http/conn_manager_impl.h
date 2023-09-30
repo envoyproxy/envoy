@@ -125,6 +125,7 @@ public:
   // The minimum lifetime of a stream, in seconds, in order not to be considered
   // prematurely closed.
   static const absl::string_view PrematureResetMinStreamLifetimeSecondsKey;
+  static const absl::string_view MaxRequestsPerIoCycle;
 
 private:
   struct ActiveStream;
@@ -348,7 +349,7 @@ private:
           : codec_saw_local_complete_(false), codec_encode_complete_(false),
             on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
             is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true) {}
+            decorated_propagate_(true), deferred_to_next_io_iteration_(false) {}
 
       // It's possibly for the codec to see the completed response but not fully
       // encode it.
@@ -373,6 +374,14 @@ private:
       bool is_tunneling_ : 1;
 
       bool decorated_propagate_ : 1;
+
+      // Indicates that sending headers to the filter manager is deferred to the
+      // next I/O cycle. If data or trailers are received when this flag is set
+      // they are deferred too.
+      // TODO(yanavlasov): encapsulate the entire state of deferred streams into a separate
+      // structure, so it can be atomically created and cleared.
+      bool deferred_to_next_io_iteration_ : 1;
+      bool deferred_end_stream_ : 1;
     };
 
     bool canDestroyStream() const {
@@ -421,6 +430,11 @@ private:
     bool validateTrailers();
 
     std::weak_ptr<bool> stillAlive() { return {still_alive_}; }
+
+    // Dispatch deferred headers, body and trailers to the filter manager.
+    // Return true if this stream was deferred and dispatched pending headers, body and trailers (if
+    // present). Return false if this stream was not deferred.
+    bool onDeferredRequestProcessing();
 
     ConnectionManagerImpl& connection_manager_;
     OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
@@ -511,6 +525,7 @@ private:
     bool spawnUpstreamSpan() const override;
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
+    std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -588,6 +603,9 @@ private:
   // and at least half have been prematurely reset?
   void maybeDrainDueToPrematureResets();
 
+  bool shouldDeferRequestProxyingToNextIoCycle();
+  void onDeferredRequestProcessing();
+
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
@@ -634,6 +652,9 @@ private:
   // the definition given in `isPrematureRstStream()`.
   uint64_t number_premature_stream_resets_{0};
   const std::string proxy_name_; // for Proxy-Status.
+  uint32_t requests_during_dispatch_count_{0};
+  const uint32_t max_requests_during_dispatch_{UINT32_MAX};
+  Event::SchedulableCallbackPtr deferred_request_processing_callback_;
 
   const bool refresh_rtt_after_request_{};
 };
