@@ -204,7 +204,8 @@ public:
       }
     }
     if (decoded_grpc_frames_.empty()) {
-      if (!waitForData(client_dispatcher, grpc_decoder_.length() - last_body_size, bound.timeLeft())) {
+      if (!waitForData(client_dispatcher, grpc_decoder_.length() - last_body_size,
+                       bound.timeLeft())) {
         return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
       }
       {
