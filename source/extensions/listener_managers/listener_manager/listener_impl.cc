@@ -229,13 +229,15 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
+    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager,
+    Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager)
     : server_(server), metadata_(config.metadata()), typed_metadata_(config.metadata()),
       direction_(config.traffic_direction()), global_scope_(server.stats().createScope("")),
       listener_scope_(
           server_.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config)))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
-      is_quic_(config.udp_listener_config().has_quic_options()) {}
+      is_quic_(config.udp_listener_config().has_quic_options()),
+      filter_config_provider_manager_(filter_config_provider_manager) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -307,7 +309,7 @@ ListenerFactoryContextBaseImpl::createDynamicFilterConfigProvider(
 }
 Configuration::DownstreamFilterConfigProviderManagerPtr
 ListenerFactoryContextBaseImpl::downstreamFilterConfigProviderManager() {
-  return nullptr;
+  return filter_config_provider_manager_;
 }
 
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
@@ -348,7 +350,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
-          parent_.factory_->createDrainManager(config.drain_type()))),
+          parent_.factory_->createDrainManager(config.drain_type()),
+          parent_.filter_config_provider_manager_)),
       reuse_port_(getReusePortOrDefault(parent_.server_, config_, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),

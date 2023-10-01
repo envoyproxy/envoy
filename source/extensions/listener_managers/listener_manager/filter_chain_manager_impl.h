@@ -107,7 +107,6 @@ private:
   Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
-  Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager_{};
 };
 
 using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;

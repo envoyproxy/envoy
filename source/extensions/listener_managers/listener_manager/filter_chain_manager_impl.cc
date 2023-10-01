@@ -79,9 +79,7 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
       filter_chain_scope_(parent_context_.listenerScope().createScope("")),
-      init_manager_(init_manager),
-      filter_config_provider_manager_(
-          std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()) {}
+      init_manager_(init_manager) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
@@ -202,14 +200,14 @@ PerFilterChainFactoryContextImpl::createDynamicFilterConfigProvider(
     const std::string& filter_config_name, bool last_filter_in_filter_chain,
     const std::string& filter_chain_type,
     const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) {
-  return filter_config_provider_manager_->createDynamicFilterConfigProvider(
+  return downstreamFilterConfigProviderManager()->createDynamicFilterConfigProvider(
       config_source, filter_config_name, getServerFactoryContext(), *this, clusterManager(),
       last_filter_in_filter_chain, filter_chain_type, listener_filter_matcher);
 }
 
 Configuration::DownstreamFilterConfigProviderManagerPtr
 PerFilterChainFactoryContextImpl::downstreamFilterConfigProviderManager() {
-  return filter_config_provider_manager_;
+  return parent_context_.downstreamFilterConfigProviderManager();
 }
 
 FilterChainManagerImpl::FilterChainManagerImpl(

@@ -19,6 +19,7 @@
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -125,10 +126,10 @@ private:
 class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContext,
                                              public Network::DrainDecision {
 public:
-  ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 const envoy::config::listener::v3::Listener& config,
-                                 Server::DrainManagerPtr drain_manager);
+  ListenerFactoryContextBaseImpl(
+      Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
+      const envoy::config::listener::v3::Listener& config, Server::DrainManagerPtr drain_manager,
+      Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& mainThreadDispatcher() override;
@@ -189,6 +190,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
   bool is_quic_;
+  Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager_{};
 };
 
 class ListenerImpl;
@@ -198,13 +200,15 @@ class ListenerImpl;
 // listener update or during the lifetime of listener?
 class PerListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
 public:
-  PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
-                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                                const envoy::config::listener::v3::Listener& config_message,
-                                const Network::ListenerConfig* listener_config,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
+  PerListenerFactoryContextImpl(
+      Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
+      const envoy::config::listener::v3::Listener& config_message,
+      const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl,
+      DrainManagerPtr drain_manager,
+      Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager)
       : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-            server, validation_visitor, config_message, std::move(drain_manager))),
+            server, validation_visitor, config_message, std::move(drain_manager),
+            filter_config_provider_manager)),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
