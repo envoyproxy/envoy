@@ -70,6 +70,11 @@ public:
   FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
              Event::TestTimeSystem& time_system);
 
+  virtual ~FakeStream() {
+    absl::MutexLock lock(&dtor_lock_);
+    deleting_ = true;
+  }
+
   uint64_t bodyLength() {
     absl::MutexLock lock(&lock_);
     return body_.length();
@@ -251,6 +256,8 @@ public:
   }
 
 protected:
+  bool deleting_ = false;
+  absl::Mutex dtor_lock_;
   absl::Mutex lock_;
   Http::RequestHeaderMapSharedPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
@@ -471,6 +478,11 @@ protected:
  */
 class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeConnectionBase {
 public:
+  virtual ~FakeHttpConnection() {
+    absl::MutexLock lock(&dtor_lock_);
+    deleting_ = true;
+  }
+
   // This is a legacy alias.
   using Type = Envoy::Http::CodecType;
   static absl::string_view typeToString(Http::CodecType type) {
@@ -526,17 +538,12 @@ private:
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      Http::Status status;
-
-      {
-        absl::MutexLock lock(&parent_.dtor_lock_);
-        if (parent_.disconnecting_) {
-          return Network::FilterStatus::StopIteration;
-        }
-
-        status = parent_.codec_->dispatch(data);
+      absl::MutexLock lock(&parent_.dtor_lock_);
+      if (parent_.deleting_) {
+        return Network::FilterStatus::StopIteration;
       }
 
+      Http::Status status = parent_.codec_->dispatch(data);
       if (Http::isCodecProtocolError(status)) {
         ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", status.message());
         // We don't do a full stream shutdown like HCM, but just shutdown the
@@ -556,18 +563,7 @@ private:
     FakeHttpConnection& parent_;
   };
 
-  class DtorHelper {
-  public:
-    DtorHelper(FakeHttpConnection& parent) : parent_(parent) {}
-    ~DtorHelper() {
-      absl::MutexLock lock(&parent_.dtor_lock_);
-      parent_.disconnecting_ = true;
-    }
-
-    FakeHttpConnection& parent_;
-  };
-
-  bool disconnecting_ = false;
+  bool deleting_ = false;
   absl::Mutex dtor_lock_;
   const Http::CodecType type_;
   Http::ServerConnectionPtr codec_;
@@ -576,7 +572,6 @@ private:
   testing::NiceMock<Random::MockRandomGenerator> random_;
   testing::NiceMock<Http::MockHeaderValidatorStats> header_validator_stats_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
-  DtorHelper dtor_helper_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
