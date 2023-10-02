@@ -192,7 +192,8 @@ TEST_F(DynamicProxyFilterTest, PassesThroughImmediatelyWhenDnsAlreadyInCache) {
   EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, LoadingCacheEntryScenario) {
+TEST_F(DynamicProxyFilterTest,
+       RequestWithCacheMissShouldStopIterationBufferPopulateCacheAndFlushWhenReady) {
   setup();
   setFilterState("host", 50);
   Upstream::ResourceAutoIncDec* circuit_breakers_{
