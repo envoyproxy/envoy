@@ -1,12 +1,13 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy_repo//:path.bzl", "PATH")
-load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_py_namespace", "envoy_pytool_binary")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_py_namespace()
 
 envoy_entry_point(
     name = "check",
@@ -30,7 +31,7 @@ envoy_entry_point(
     pkg = "dependatool",
 )
 
-py_binary(
+envoy_pytool_binary(
     name = "validate",
     srcs = ["validate.py"],
     args = [

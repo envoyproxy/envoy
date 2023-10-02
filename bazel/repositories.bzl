@@ -108,6 +108,7 @@ envoy_entry_point(
     name = "get_project_json",
     pkg = "envoy.base.utils",
     script = "envoy.project_data",
+    init_data = [":__init__.py"],
 )
 
 genrule(
@@ -132,6 +133,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -142,6 +144,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -152,6 +155,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -162,6 +166,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 envoy_entry_point(
@@ -172,6 +177,7 @@ envoy_entry_point(
     ],
     pkg = "envoy.base.utils",
     script = "envoy.project",
+    init_data = [":__init__.py"],
 )
 
 ''')
