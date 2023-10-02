@@ -1,11 +1,13 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_py_namespace()
 
 jq(
     name = "extensions_build_config",
