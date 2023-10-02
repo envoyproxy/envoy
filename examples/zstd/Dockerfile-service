@@ -7,7 +7,7 @@ RUN apt-get -qq update \
     && apt-get -qq autoremove -y && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* \
     && rm -rf /var/lib/apt/lists/*
-RUN pip3 install -q Flask==2.0.3
+RUN pip3 install -q Flask==2.0.3 Werkzeug==2.2.2
 RUN mkdir -p /code/data
 RUN dd if=/dev/zero of="/code/data/file.txt" bs=1024 count=10240 \
     && dd if=/dev/zero of="/code/data/file.json" bs=1024 count=10240
