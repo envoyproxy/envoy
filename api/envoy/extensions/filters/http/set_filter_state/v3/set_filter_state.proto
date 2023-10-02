@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.set_filter_state.v3;
 
-import "envoy/extensions/filters/common/set_filter_state/v3/rule.proto";
+import "envoy/extensions/filters/common/set_filter_state/v3/value.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -21,6 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.set_filter_state]
 
 message Config {
-  // A sequence of the filter state updates to apply on request headers events.
-  repeated common.set_filter_state.v3.Rule on_request_headers = 1;
+  // A sequence of the filter state values to apply in the specified order
+  // when a new request is received.
+  repeated common.set_filter_state.v3.FilterStateValue on_request_headers = 1;
 }

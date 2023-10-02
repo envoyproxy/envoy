@@ -8,16 +8,16 @@ import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.common.set_filter_state.v3";
-option java_outer_classname = "RuleProto";
+option java_outer_classname = "ValueProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/common/set_filter_state/v3;set_filter_statev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Set-Filter-State Update Rule]
+// [#protodoc-title: Set-Filter-State filter state value]
 
-// A filter state update rule.
+// A filter state key and value pair.
 // [#next-free-field: 6]
-message Rule {
+message FilterStateValue {
   enum SharedWithUpstream {
     // Object is not shared with the upstream internal connections.
     NONE = 0;
@@ -45,13 +45,16 @@ message Rule {
     config.core.v3.SubstitutionFormatString format_string = 2;
   }
 
-  // If marked as read-only, the filter state key cannot be overridden by the subsequent updates.
+  // If marked as read-only, the filter state key value is locked, and cannot
+  // be overridden by any filter, including this filter.
   bool read_only = 3;
 
   // Configures the object to be shared with the upstream internal connections. See :ref:`internal upstream
-  // transport <config_internal_upstream_transport>` for more details.
+  // transport <config_internal_upstream_transport>` for more details on the filter state sharing with
+  // the internal connections.
   SharedWithUpstream shared_with_upstream = 4;
 
   // Skip the update if the value evaluates to an empty string.
+  // This option can be used to supply multiple alternatives for the same filter state object key.
   bool skip_if_empty = 5;
 }
