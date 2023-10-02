@@ -444,26 +444,22 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidationFailure) {
   // On the client side, get the ClientInit and write it to the server.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
   client_.tsi_socket_->onConnected();
-  expectIoResult(
-      client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
-      {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
-      "While writing ClientInit.");
+  expectIoResult(client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
+                 {Envoy::Network::PostIoAction::KeepOpen, 0UL, false}, "While writing ClientInit.");
   EXPECT_EQ(client_to_server_.toString(), kClientInit);
 
   // On the server side, read the ClientInit and write the ServerInit and the
   // ServerFinished to the client.
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
-    EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
   expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
-                 {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
-                 "While reading ClientInit.");
+                 {Envoy::Network::PostIoAction::KeepOpen, 0UL, false}, "While reading ClientInit.");
   EXPECT_EQ(server_.read_buffer_.length(), 0L);
-  EXPECT_EQ(server_to_client_.toString(),
-            absl::StrCat(kServerInit, kServerFinished));
+  EXPECT_EQ(server_to_client_.toString(), absl::StrCat(kServerInit, kServerFinished));
 
   // On the client side, read the ServerInit and the ServerFinished, and fail
   // the validation before writing the ClientFinished to the server.
-  EXPECT_CALL(*client_.raw_socket_, doRead(_)).Times(1);
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
   expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doRead(client_.read_buffer_),
                  "While reading ServerInit and ServerFinished.");

@@ -5,15 +5,16 @@
 #include <string>
 #include <utility>
 
-#include "src/proto/grpc/gcp/handshaker.grpc.pb.h"
-#include "src/proto/grpc/gcp/handshaker.pb.h"
-#include "src/proto/grpc/gcp/transport_security_common.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 
 #include "source/common/common/thread.h"
 #include "source/extensions/transport_sockets/alts/config.h"
 #include "source/extensions/transport_sockets/alts/tsi_socket.h"
+
+#include "src/proto/grpc/gcp/handshaker.grpc.pb.h"
+#include "src/proto/grpc/gcp/handshaker.pb.h"
+#include "src/proto/grpc/gcp/transport_security_common.pb.h"
 
 #ifdef major
 #undef major
@@ -112,29 +113,31 @@ public:
 // relying on real ALTS handshaker service inside GCE.
 // It is thread-safe.
 class FakeHandshakerService : public HandshakerService::Service {
- public:
+public:
   explicit FakeHandshakerService(const std::string& peer_identity)
       : peer_identity_(peer_identity) {}
 
-  grpc::Status DoHandshake(
-      grpc::ServerContext* /*server_context*/,
-      grpc::ServerReaderWriter<grpc::gcp::HandshakerResp,
-                               grpc::gcp::HandshakerReq>* stream) override {
+  grpc::Status
+  DoHandshake(grpc::ServerContext* /*server_context*/,
+              grpc::ServerReaderWriter<grpc::gcp::HandshakerResp, grpc::gcp::HandshakerReq>* stream)
+      override {
     grpc::Status status;
     HandshakerContext context;
     grpc::gcp::HandshakerReq request;
     grpc::gcp::HandshakerResp response;
     while (stream->Read(&request)) {
       status = ProcessRequest(&context, request, &response);
-      if (!status.ok()) return WriteErrorResponse(stream, status);
+      if (!status.ok())
+        return WriteErrorResponse(stream, status);
       stream->Write(response);
-      if (context.state == COMPLETED) return grpc::Status::OK;
+      if (context.state == COMPLETED)
+        return grpc::Status::OK;
       request.Clear();
     }
     return grpc::Status::OK;
   }
 
- private:
+private:
   // HandshakeState is used by fake handshaker server to keep track of client's
   // handshake status. In the beginning of a handshake, the state is INITIAL.
   // If start_client or start_server request is called, the state becomes at
@@ -148,8 +151,7 @@ class FakeHandshakerService : public HandshakerService::Service {
     HandshakeState state = INITIAL;
   };
 
-  grpc::Status ProcessRequest(HandshakerContext* context,
-                              const grpc::gcp::HandshakerReq& request,
+  grpc::Status ProcessRequest(HandshakerContext* context, const grpc::gcp::HandshakerReq& request,
                               grpc::gcp::HandshakerResp* response) {
     response->Clear();
     if (request.has_client_start()) {
@@ -159,18 +161,15 @@ class FakeHandshakerService : public HandshakerService::Service {
     } else if (request.has_next()) {
       return ProcessNext(context, request.next(), response);
     }
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
-                        "Request is empty.");
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "Request is empty.");
   }
 
-  grpc::Status ProcessClientStart(
-      HandshakerContext* context,
-      const grpc::gcp::StartClientHandshakeReq& request,
-      grpc::gcp::HandshakerResp* response) {
+  grpc::Status ProcessClientStart(HandshakerContext* context,
+                                  const grpc::gcp::StartClientHandshakeReq& request,
+                                  grpc::gcp::HandshakerResp* response) {
     // Checks request.
     if (context->state != INITIAL) {
-      return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
-                          kWrongStateError);
+      return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
     }
     if (request.application_protocols_size() == 0) {
       return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
@@ -190,14 +189,12 @@ class FakeHandshakerService : public HandshakerService::Service {
     return grpc::Status::OK;
   }
 
-  grpc::Status ProcessServerStart(
-      HandshakerContext* context,
-      const grpc::gcp::StartServerHandshakeReq& request,
-      grpc::gcp::HandshakerResp* response) {
+  grpc::Status ProcessServerStart(HandshakerContext* context,
+                                  const grpc::gcp::StartServerHandshakeReq& request,
+                                  grpc::gcp::HandshakerResp* response) {
     // Checks request.
     if (context->state != INITIAL) {
-      return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
-                          kWrongStateError);
+      return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
     }
     if (request.application_protocols_size() == 0) {
       return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
@@ -233,8 +230,7 @@ class FakeHandshakerService : public HandshakerService::Service {
     if (context->is_client) {
       // Processes next request on client side.
       if (context->state != SENT) {
-        return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
-                            kWrongStateError);
+        return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
       }
       if (request.in_bytes() != kServerFrame) {
         return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
@@ -255,15 +251,13 @@ class FakeHandshakerService : public HandshakerService::Service {
       } else if (current_state == SENT) {
         // Client finish frame may be sent along with the first payload from the
         // client, handshaker only consumes the client finish frame.
-        if (request.in_bytes().substr(0, strlen(kClientFinishFrame)) !=
-            kClientFinishFrame) {
+        if (request.in_bytes().substr(0, strlen(kClientFinishFrame)) != kClientFinishFrame) {
           return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
         }
         response->set_bytes_consumed(strlen(kClientFinishFrame));
         context->state = COMPLETED;
       } else {
-        return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
-                            kWrongStateError);
+        return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
       }
     }
     // At this point, processing next request succeeded.
@@ -275,8 +269,7 @@ class FakeHandshakerService : public HandshakerService::Service {
   }
 
   grpc::Status WriteErrorResponse(
-      grpc::ServerReaderWriter<grpc::gcp::HandshakerResp,
-                               grpc::gcp::HandshakerReq>* stream,
+      grpc::ServerReaderWriter<grpc::gcp::HandshakerResp, grpc::gcp::HandshakerReq>* stream,
       const grpc::Status& status) {
     EXPECT_OK(status);
     grpc::gcp::HandshakerResp response;
@@ -305,8 +298,7 @@ class FakeHandshakerService : public HandshakerService::Service {
   const std::string peer_identity_;
 };
 
-std::unique_ptr<Service> CreateFakeHandshakerService(
-    const std::string& peer_identity) {
+std::unique_ptr<Service> CreateFakeHandshakerService(const std::string& peer_identity) {
   return std::unique_ptr<Service>{new FakeHandshakerService(peer_identity)};
 }
 
@@ -375,7 +367,8 @@ public:
     // state, this is done by the test server instead.
     class FakeSingletonManager : public Singleton::Manager {
     public:
-      Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb cb) override {
+      Singleton::InstanceSharedPtr get(const std::string&,
+                                       Singleton::SingletonFactoryCb cb) override {
         return cb();
       }
     };

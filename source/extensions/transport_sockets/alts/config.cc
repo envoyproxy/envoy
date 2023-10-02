@@ -53,18 +53,18 @@ SINGLETON_MANAGER_REGISTRATION(alts_shared_state);
 
 // Returns true if the peer's service account is found in peers, otherwise
 // returns false and fills out err with an error message.
-bool doValidate(const absl::node_hash_set<std::string>& peers,
-                TsiInfo& tsi_info, std::string& err) {
+bool doValidate(const absl::node_hash_set<std::string>& peers, TsiInfo& tsi_info,
+                std::string& err) {
   if (peers.find(tsi_info.peer_identity) != peers.end()) {
     return true;
   }
-  err = "Couldn't find peer's service account in peer_service_accounts: " +
-        absl::StrJoin(peers, ",");
+  err =
+      "Couldn't find peer's service account in peer_service_accounts: " + absl::StrJoin(peers, ",");
   return false;
 }
 
-HandshakeValidator createHandshakeValidator(
-    const envoy::extensions::transport_sockets::alts::v3::Alts& config) {
+HandshakeValidator
+createHandshakeValidator(const envoy::extensions::transport_sockets::alts::v3::Alts& config) {
   const auto& peer_service_accounts = config.peer_service_accounts();
   const absl::node_hash_set<std::string> peers(peer_service_accounts.cbegin(),
                                                peer_service_accounts.cend());

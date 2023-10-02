@@ -112,25 +112,22 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
       tsi_info.peer_identity_ = handshake_result->peer_identity;
       const bool peer_validated = handshake_validator_(tsi_info, err);
       if (peer_validated) {
-        ENVOY_CONN_LOG(debug, "TSI: Handshake validation succeeded.",
-                       callbacks_->connection());
+        ENVOY_CONN_LOG(debug, "TSI: Handshake validation succeeded.", callbacks_->connection());
       } else {
-        ENVOY_CONN_LOG(debug, "TSI: Handshake validation failed: {}",
-                       callbacks_->connection(), err);
+        ENVOY_CONN_LOG(debug, "TSI: Handshake validation failed: {}", callbacks_->connection(),
+                       err);
         return Network::PostIoAction::Close;
       }
       ProtobufWkt::Struct dynamic_metadata;
       ProtobufWkt::Value val;
       val.set_string_value(tsi_info.peer_identity_);
-      dynamic_metadata.mutable_fields()->insert(
-          {std::string("peer_identity"), val});
+      dynamic_metadata.mutable_fields()->insert({std::string("peer_identity"), val});
       callbacks_->connection().streamInfo().setDynamicMetadata(
           "envoy.transport_sockets.peer_information", dynamic_metadata);
-      ENVOY_CONN_LOG(debug, "TSI handshake with peer: {}",
-                     callbacks_->connection(), tsi_info.peer_identity_);
+      ENVOY_CONN_LOG(debug, "TSI handshake with peer: {}", callbacks_->connection(),
+                     tsi_info.peer_identity_);
     } else {
-      ENVOY_CONN_LOG(debug, "TSI: Handshake validation skipped.",
-                     callbacks_->connection());
+      ENVOY_CONN_LOG(debug, "TSI: Handshake validation skipped.", callbacks_->connection());
     }
 
     if (!handshake_result->unused_bytes.empty()) {
