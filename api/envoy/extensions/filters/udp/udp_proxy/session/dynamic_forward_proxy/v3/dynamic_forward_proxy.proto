@@ -40,11 +40,13 @@ message FilterConfig {
   // The prefix to use when emitting :ref:`statistics <config_udp_session_filters_dynamic_forward_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The DNS cache configuration that the filter will attach to. Note this
-  // configuration must match that of associated :ref:`dynamic forward proxy cluster configuration
-  // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
-  common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 2
-      [(validate.rules).message = {required: true}];
+  oneof implementation_specifier {
+    // The DNS cache configuration that the filter will attach to. Note this
+    // configuration must match that of associated :ref:`dynamic forward proxy cluster configuration
+    // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
+    common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 2
+        [(validate.rules).message = {required: true}];
+  }
 
   // If configured, the filter will buffer datagrams in case that it is waiting for a DNS response.
   // If this field is not configured, there will be no buffering and downstream datagrams that arrive
