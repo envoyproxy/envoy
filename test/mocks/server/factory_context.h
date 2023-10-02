@@ -65,7 +65,7 @@ public:
   }
   Configuration::DownstreamFilterConfigProviderManagerPtr
   downstreamFilterConfigProviderManager() override {
-    return nullptr;
+    return filter_config_provider_manager_;
   }
 
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
@@ -93,6 +93,8 @@ public:
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
+  Configuration::DownstreamFilterConfigProviderManagerPtr filter_config_provider_manager_{
+      std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>()};
 };
 
 class MockUpstreamFactoryContext : public UpstreamFactoryContext {
