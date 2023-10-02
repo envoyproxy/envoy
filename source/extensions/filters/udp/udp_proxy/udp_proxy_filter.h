@@ -301,14 +301,13 @@ private:
     }
 
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
-      auto status = Http::Utility::getResponseStatus(*headers);
-      bool is_valid_post = parent_.tunnel_config_.usePost() && Http::CodeUtility::is2xx(status);
-      // In connect-udp case, Envoy will transform the H2 headers to H1 upgrade headers.
-      // A valid response should have SwitchingProtocol status and connect-udp upgrade.
-      bool is_valid_upgrade = status == 101 && Http::HeaderUtility::isConnectUdp(*headers);
-
-      ASSERT(!(is_valid_post && is_valid_upgrade));
-      bool is_valid_response = is_valid_post || is_valid_upgrade;
+      bool is_valid_response;
+      if (parent_.tunnel_config_.usePost()) {
+        auto status = Http::Utility::getResponseStatus(*headers);
+        is_valid_response = Http::CodeUtility::is2xx(status);
+      } else {
+        is_valid_response = Http::HeaderUtility::isConnectUdpResponse(*headers);
+      }
 
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
