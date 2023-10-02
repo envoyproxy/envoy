@@ -36,6 +36,7 @@ class DownstreamFilterManager;
 
 struct ActiveStreamFilterBase;
 
+constexpr char FS_LOCAL_REPLAY_KEY[] = "filter_manager.local_replay_owner";
 class LocalReplyOwnerType : public StreamInfo::FilterState::Object {
 public:
   LocalReplyOwnerType(const std::string& filter_type, const std::string& filter_name,

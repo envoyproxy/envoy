@@ -81,7 +81,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
         headers.setContentType("text/plain");
 
         filter->callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr, absl::nullopt,
-                                           "");
+                                           "details");
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -98,13 +98,14 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({}, factory);
+        manager.applyFilterFactoryCb({"filter1", "filter1"}, factory);
         return true;
       }));
 
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
+
   EXPECT_CALL(local_reply_, rewrite(_, _, _, _, _, _));
   EXPECT_CALL(filter_manager_callbacks_, setResponseHeaders_(_))
       .WillOnce(Invoke([](auto& response_headers) {
@@ -114,7 +115,17 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
   EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
+
   filter_manager_->decodeHeaders(*grpc_headers, true);
+
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY));
+  EXPECT_EQ(filter_manager_->streamInfo()
+                .filterState()
+                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
+                ->serializeAsString(),
+            "filter1|filter1|details");
+
   filter_manager_->destroyFilters();
 }
 
@@ -140,17 +151,17 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   EXPECT_CALL(*encoder_filter, encodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](auto&, bool) -> FilterHeadersStatus {
         encoder_filter->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
-                                                           absl::nullopt, "");
+                                                           absl::nullopt, "details");
         return FilterHeadersStatus::StopIteration;
       }));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({}, decoder_factory);
+        manager.applyFilterFactoryCb({"filter1", "filter1"}, decoder_factory);
 
         auto stream_factory = createStreamFilterFactoryCb(encoder_filter);
-        manager.applyFilterFactoryCb({}, stream_factory);
+        manager.applyFilterFactoryCb({"filter2", "filter2"}, stream_factory);
         return true;
       }));
 
@@ -174,7 +185,17 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
       }));
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
+
   filter_manager_->decodeHeaders(*grpc_headers, true);
+
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY));
+  EXPECT_EQ(filter_manager_->streamInfo()
+                .filterState()
+                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
+                ->serializeAsString(),
+            "filter2|filter2|details");
+
   filter_manager_->destroyFilters();
 }
 
@@ -193,11 +214,11 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
         auto stream_factory = createStreamFilterFactoryCb(stream_filter);
-        manager.applyFilterFactoryCb({}, stream_factory);
+        manager.applyFilterFactoryCb({"configName2", "filterName2"}, stream_factory);
         auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
-        manager.applyFilterFactoryCb({}, encoder_factory);
+        manager.applyFilterFactoryCb({"configName3", "filterName3"}, encoder_factory);
         return true;
       }));
 
@@ -231,9 +252,18 @@ TEST_F(FilterManagerTest, OnLocalReply) {
 
   // The reason for the response (in this case the reset) will still be tracked
   // but as no response is sent the response code will remain absent.
+
   ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY));
+  EXPECT_EQ(filter_manager_->streamInfo()
+                .filterState()
+                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
+                ->serializeAsString(),
+            "filterName1|configName1|details");
 
   filter_manager_->destroyFilters();
 }
@@ -253,11 +283,11 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
         auto stream_factory = createStreamFilterFactoryCb(stream_filter);
-        manager.applyFilterFactoryCb({}, stream_factory);
+        manager.applyFilterFactoryCb({"configName2", "filterName2"}, stream_factory);
         auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
-        manager.applyFilterFactoryCb({}, encoder_factory);
+        manager.applyFilterFactoryCb({"configName3", "filterName3"}, encoder_factory);
         return true;
       }));
 
@@ -300,6 +330,14 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details2");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY));
+  EXPECT_EQ(filter_manager_->streamInfo()
+                .filterState()
+                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
+                ->serializeAsString(),
+            "filterName1|configName1|details2");
 
   filter_manager_->destroyFilters();
 }
@@ -606,6 +644,13 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
   filter_manager_->decodeMetadata(map);
 
   EXPECT_THAT(*filter_manager_->streamInfo().responseCodeDetails(), "bad_metadata");
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY));
+  EXPECT_EQ(filter_manager_->streamInfo()
+                .filterState()
+                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
+                ->serializeAsString(),
+            "filter1|filter1|bad_metadata");
 
   filter_manager_->destroyFilters();
 }
@@ -645,6 +690,14 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
   EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::LocalReset, ""));
   MetadataMap map1 = {{"a", "b"}};
   filter_2->decoder_callbacks_->encodeMetadata(std::make_unique<MetadataMap>(map1));
+
+  ASSERT_TRUE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerType>(
+      FS_LOCAL_REPLAY_KEY));
+  EXPECT_EQ(filter_manager_->streamInfo()
+                .filterState()
+                ->getDataReadOnly<LocalReplyOwnerType>(FS_LOCAL_REPLAY_KEY)
+                ->serializeAsString(),
+            "filter2|filter2|bad_metadata");
 
   filter_manager_->destroyFilters();
 }
