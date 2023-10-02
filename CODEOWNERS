@@ -84,8 +84,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
-/*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123 @tonya11en
-/*/extensions/common/aws @lavignes @mattklein123 @tonya11en
+/*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123
+/*/extensions/common/aws @lavignes @mattklein123
 # adaptive concurrency limit extension.
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
 # admission control extension.
@@ -147,8 +147,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
-/*/extensions/filters/http/aws_request_signing @derekargueta @mattklein123 @marcomagdy @tonya11en
-/*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
+/*/extensions/filters/http/aws_request_signing @derekargueta @mattklein123 @marcomagdy
+/*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123
 /*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
 # Watchdog Extensions
