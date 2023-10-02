@@ -500,6 +500,7 @@ private:
     const Tracing::CustomTagMap* customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
+    bool spawnUpstreamSpan() const override;
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
   };

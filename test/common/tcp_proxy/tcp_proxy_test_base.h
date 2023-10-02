@@ -54,7 +54,7 @@ inline Config constructConfigFromYaml(const std::string& yaml,
                                       Server::Configuration::FactoryContext& context) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
-  return Config(tcp_proxy, context);
+  return {tcp_proxy, context};
 }
 
 class TcpProxyTestBase : public testing::Test {

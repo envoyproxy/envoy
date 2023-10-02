@@ -787,8 +787,8 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
     return false;
   }
   if (!config_query_parameters_.empty()) {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.getPathValue());
+    auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
     if (!matches) {
       return false;
@@ -1011,13 +1011,7 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
     if (!new_path.ok()) {
       return std::string(headers.getPathValue());
     }
-
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.append_query_parameters_path_rewriter")) {
-      return path.replace(0, just_path.size(), new_path.value());
-    } else {
-      return *std::move(new_path);
-    }
+    return path.replace(0, just_path.size(), new_path.value());
   }
 
   // There are no rewrites configured.

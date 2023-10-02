@@ -20,7 +20,7 @@ public:
   getUpstreamLocalAddressImpl(const Network::Address::InstanceConstSharedPtr&) const override {
     ++(*num_calls_);
     if (return_empty_source_address_) {
-      return UpstreamLocalAddress();
+      return {};
     }
     current_idx_ = (current_idx_ + 1) % upstream_local_addresses_.size();
     return upstream_local_addresses_[current_idx_];

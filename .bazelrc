@@ -48,6 +48,8 @@ build --action_env=BAZEL_FAKE_SCM_REVISION --host_action_env=BAZEL_FAKE_SCM_REVI
 
 build --test_summary=terse
 
+build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
+
 # TODO(keith): Remove once these 2 are the default
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
@@ -89,6 +91,14 @@ build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Use gold linker for gcc compiler.
 build:gcc --linkopt=-fuse-ld=gold
+
+# Clang-tidy
+# TODO(phlax): enable this, its throwing some errors as well as finding more issues
+# build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
+build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_config
+build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
+build:clang-tidy --output_groups=report
+build:clang-tidy --build_tag_filters=-notidy
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=ENVOY_ASAN=1
@@ -343,7 +353,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:56f235b141079013e64912d676fe7da981368402@sha256:d44499c6fd28a8a6a75dc61668b8a9e7bc3d99db11f9a61e8ea1d1f39c20a236
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:94e5d873c145ae86f205117e76276161c9af4806@sha256:8d3763e19d5b71fdc95666d75073ce4581e566ce28ca09106607b6a3ef7ba902
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

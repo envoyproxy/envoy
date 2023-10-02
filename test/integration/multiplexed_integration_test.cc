@@ -1803,22 +1803,27 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
 
 struct FrameIntegrationTestParam {
   Network::Address::IpVersion ip_version;
+  Http2Impl http2_implementation;
 };
 
 std::string
 frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
-  return TestUtility::ipVersionToString(params.param.ip_version);
+  return absl::StrCat(TestUtility::ipVersionToString(params.param.ip_version), "_",
+                      http2ImplementationToString(params.param.http2_implementation));
 }
 
 class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
                                   public Http2RawFrameIntegrationTest {
 public:
-  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {}
+  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {
+    setupHttp2ImplOverrides(GetParam().http2_implementation);
+  }
 
   static std::vector<FrameIntegrationTestParam> testParams() {
     std::vector<FrameIntegrationTestParam> v;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-      v.push_back({ip_version});
+      v.push_back({ip_version, Http2Impl::Nghttp2});
+      v.push_back({ip_version, Http2Impl::Oghttp2});
     }
     return v;
   }
@@ -2055,6 +2060,40 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
       << " stream wire bytes from Envoy but access log reported " << hcm_logged_wire_bytes_sent;
 
   // Cleanup.
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, HostDifferentFromAuthority) {
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", "two.example.com"}});
+  sendFrame(request);
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,two.example.com");
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, HostSameAsAuthority) {
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", "one.example.com"}});
+  sendFrame(request);
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,one.example.com");
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
   tcp_client_->close();
 }
 

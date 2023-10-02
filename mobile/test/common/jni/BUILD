@@ -30,6 +30,7 @@ cc_library(
     deps = [
         "//library/common/jni:envoy_jni_lib",
         "//test/common/integration:test_server_interface_lib",
+        "//test/common/integration:xds_test_server_interface_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,

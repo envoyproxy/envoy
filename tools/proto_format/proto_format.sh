@@ -30,7 +30,7 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
        --ci
 
 # Dont run this in git hooks by default
-if [[ -n "$AZP_BRANCH" ]] || [[ "${FORCE_PROTO_FORMAT}" == "yes" ]]; then
+if [[ -n "$CI_BRANCH" ]] || [[ "${FORCE_PROTO_FORMAT}" == "yes" ]]; then
     echo "Run buf tests"
     cd api/ || exit 1
     bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @com_github_bufbuild_buf//:bin/buf lint

@@ -30,7 +30,7 @@
 
 using testing::_;
 using testing::AtMost;
-using testing::ByMove;
+using testing::ByMove; // NOLINT(misc-unused-using-decls)
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;

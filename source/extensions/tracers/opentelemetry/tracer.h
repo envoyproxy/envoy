@@ -40,10 +40,12 @@ public:
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,
-                             SystemTime start_time, const Tracing::Decision tracing_decision);
+                             SystemTime start_time, const Tracing::Decision tracing_decision,
+                             bool downstream_span = true);
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, const std::string& operation_name,
-                             SystemTime start_time, const SpanContext& previous_span_context);
+                             SystemTime start_time, const SpanContext& previous_span_context,
+                             bool downstream_span = true);
 
 private:
   /**
@@ -72,7 +74,7 @@ private:
 class Span : Logger::Loggable<Logger::Id::tracing>, public Tracing::Span {
 public:
   Span(const Tracing::Config& config, const std::string& name, SystemTime start_time,
-       Envoy::TimeSource& time_source, Tracer& parent_tracer);
+       Envoy::TimeSource& time_source, Tracer& parent_tracer, bool downstream_span);
 
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override{};
@@ -133,6 +135,11 @@ public:
   void setTracestate(const absl::string_view& tracestate) {
     span_.set_trace_state(std::string{tracestate});
   }
+
+  /**
+   * Method to access the span for testing.
+   */
+  const ::opentelemetry::proto::trace::v1::Span& spanForTest() const { return span_; }
 
 private:
   ::opentelemetry::proto::trace::v1::Span span_;

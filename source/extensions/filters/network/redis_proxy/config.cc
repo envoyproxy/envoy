@@ -27,6 +27,9 @@ inline void addUniqueClusters(
   for (auto& mirror : route.request_mirror_policy()) {
     clusters.emplace(mirror.cluster());
   }
+  if (route.has_read_command_policy()) {
+    clusters.emplace(route.read_command_policy().cluster());
+  }
 }
 } // namespace
 

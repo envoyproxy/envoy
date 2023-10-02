@@ -64,7 +64,7 @@ template <typename ReturnValue> struct IoCallResult {
       : return_value_(return_value), err_(std::move(err)) {}
 
   IoCallResult(IoCallResult<ReturnValue>&& result) noexcept
-      : return_value_(result.return_value_), err_(std::move(result.err_)) {}
+      : return_value_(std::move(result.return_value_)), err_(std::move(result.err_)) {}
 
   virtual ~IoCallResult() = default;
 
