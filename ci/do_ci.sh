@@ -650,7 +650,21 @@ case $CI_TARGET in
         setup_clang_toolchain
         echo "generating docs..."
         # Build docs.
-        "${ENVOY_SRCDIR}/docs/build.sh"
+        # We want the binary at the end
+        BAZEL_BUILD_OPTIONS+=(--remote_download_toplevel)
+        [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
+        rm -rf "${DOCS_OUTPUT_DIR}"
+        mkdir -p "${DOCS_OUTPUT_DIR}"
+        if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
+            export SPHINX_RUNNER_ARGS="-v warn"
+            BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
+        fi
+        if [[ -n "${DOCS_BUILD_RST}" ]]; then
+            bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
+            cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+        fi
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:html
+        tar -xzf bazel-bin/docs/html.tar.gz -C "$DOCS_OUTPUT_DIR"
         ;;
 
     docs-upload)
