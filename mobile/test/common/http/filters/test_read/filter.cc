@@ -19,7 +19,7 @@ Http::FilterHeadersStatus TestReadFilter::decodeHeaders(Http::RequestHeaderMap& 
     stream_info.setResponseFlag(TestReadFilter::mapErrorToResponseFlag(response_flag));
 
     // check if we want a quic server error: sample path is /failed?quic=1&error=0x10000
-    if (query_parameters.find("quic") != query_parameters.end()) {
+    if (query_parameters.getFirstValue("quic").has_value()) {
       stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
       stream_info.upstreamInfo()->setUpstreamProtocol(Http::Protocol::Http3);
     }
