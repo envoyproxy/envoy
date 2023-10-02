@@ -1,11 +1,16 @@
 #include "source/extensions/load_balancing_policies/subset/config.h"
 
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/common/factory_base.h"
 #include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
 namespace Subset {
+
+using SubsetLbProto = envoy::extensions::load_balancing_policies::subset::v3::Subset;
+using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 Upstream::LoadBalancerPtr Factory::create(const Upstream::ClusterInfo& cluster,
                                           const Upstream::PrioritySet& priority_set,
@@ -109,14 +114,36 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 }
 
 Upstream::LoadBalancerConfigPtr
-SubsetLbFactory::loadConfig(ProtobufTypes::MessagePtr config,
+SubsetLbFactory::loadConfig(const Protobuf::Message& config,
                             ProtobufMessage::ValidationVisitor& visitor) {
-  ASSERT(config != nullptr);
-  auto* proto_config = dynamic_cast<Upstream::SubsetLoadbalancingPolicyProto*>(config.get());
+
+  auto active_or_legacy = Common::ActiveOrLegacy<SubsetLbProto, ClusterProto>::get(&config);
+  ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
+
+  if (active_or_legacy.hasLegacy()) {
+    if (active_or_legacy.legacy()->lb_policy() ==
+        envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(
+                          active_or_legacy.legacy()->lb_policy())));
+    }
+
+    auto sub_lb_pair =
+        Upstream::LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
+            *active_or_legacy.legacy(), visitor);
+    ASSERT(sub_lb_pair.second != nullptr,
+           fmt::format("LB policy {} is not supported for subset load balancer",
+                       envoy::config::cluster::v3::Cluster::LbPolicy_Name(
+                           active_or_legacy.legacy()->lb_policy())));
+    return std::make_unique<Upstream::SubsetLoadBalancerConfig>(
+        active_or_legacy.legacy()->lb_subset_config(), std::move(sub_lb_pair.first),
+        sub_lb_pair.second);
+  }
 
   // Load the subset load balancer configuration. This will contains child load balancer
   // config and child load balancer factory.
-  return std::make_unique<Upstream::SubsetLoadBalancerConfig>(*proto_config, visitor);
+  return std::make_unique<Upstream::SubsetLoadBalancerConfig>(*active_or_legacy.active(), visitor);
 }
 
 /**

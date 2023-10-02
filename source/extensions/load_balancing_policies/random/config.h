@@ -15,6 +15,21 @@ namespace Random {
 
 using RandomLbProto = envoy::extensions::load_balancing_policies::random::v3::Random;
 
+class EmptyRandomLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  EmptyRandomLbConfig() = default;
+};
+
+/**
+ * Load balancer config that used to wrap the random config.
+ */
+class TypedRandomLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  TypedRandomLbConfig(const RandomLbProto& lb_config);
+
+  const RandomLbProto lb_config_;
+};
+
 struct RandomCreator : public Logger::Loggable<Logger::Id::upstream> {
   Upstream::LoadBalancerPtr operator()(
       Upstream::LoadBalancerParams params, OptRef<const Upstream::LoadBalancerConfig> lb_config,
@@ -26,10 +41,13 @@ class Factory : public Common::FactoryBase<RandomLbProto, RandomCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.random") {}
 
-  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
-                                             ProtobufMessage::ValidationVisitor& visitor) override {
-    return std::make_unique<Upstream::TypedRandomLbConfig>(
-        MessageUtil::downcastAndValidate<const RandomLbProto&>(*config, visitor));
+  Upstream::LoadBalancerConfigPtr loadConfig(const Protobuf::Message& config,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    auto typed_config = dynamic_cast<const RandomLbProto*>(&config);
+    if (typed_config == nullptr) {
+      return std::make_unique<EmptyRandomLbConfig>();
+    }
+    return std::make_unique<TypedRandomLbConfig>(*typed_config);
   }
 };
 

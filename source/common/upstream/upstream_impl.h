@@ -75,6 +75,17 @@ using UpstreamNetworkFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
 
+class LegacyLbPolicyConfigHelper {
+public:
+  static std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
+  getTypedLbConfigFromLegacyProtoWithoutSubset(const envoy::config::cluster::v3::Cluster& cluster,
+                                               ProtobufMessage::ValidationVisitor& visitor);
+
+  static std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
+  getTypedLbConfigFromLegacyProto(const envoy::config::cluster::v3::Cluster& cluster,
+                                  ProtobufMessage::ValidationVisitor& visitor);
+};
+
 /**
  * Class for LBPolicies
  * Uses a absl::variant to store pointers for the LBPolicy

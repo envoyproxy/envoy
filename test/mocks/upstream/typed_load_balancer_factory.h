@@ -21,9 +21,12 @@ public:
                const PrioritySet& priority_set, Runtime::Loader& runtime,
                Random::RandomGenerator& random, TimeSource& time_source));
 
-  LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+  LoadBalancerConfigPtr loadConfig(const Protobuf::Message& config,
                                    ProtobufMessage::ValidationVisitor&) override {
-    return std::make_unique<LoadBalancerConfigWrapper>(std::move(config));
+    ProtobufTypes::MessagePtr config_copy{config.New()};
+    config_copy->CopyFrom(config);
+
+    return std::make_unique<LoadBalancerConfigWrapper>(std::move(config_copy));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

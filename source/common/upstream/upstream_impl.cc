@@ -891,64 +891,62 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
-getTypedLbConfigFromLegacyProto(const envoy::config::cluster::v3::Cluster& config) {
+LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    ProtobufMessage::ValidationVisitor& visitor) {
 
   LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
-  switch (config.lb_policy()) {
+  switch (cluster.lb_policy()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.round_robin");
-    lb_config = std::make_unique<LegacyTypedRoundRobinLbConfig>(config);
     break;
   case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.least_request");
-    lb_config = std::make_unique<LegacyTypedLeastRequestLbConfig>(config);
     break;
   case envoy::config::cluster::v3::Cluster::RANDOM:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.random");
-    lb_config = std::make_unique<LegacyTypedRandomLbConfig>();
     break;
   case envoy::config::cluster::v3::Cluster::RING_HASH:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.ring_hash");
-    lb_config = std::make_unique<LegacyTypedRingHashLbConfig>(config);
     break;
   case envoy::config::cluster::v3::Cluster::MAGLEV:
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.maglev");
-    lb_config = std::make_unique<LegacyTypedMaglevLbConfig>(config);
     break;
   case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
     lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.cluster_provided");
     break;
   case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG:
-    PANIC("Should not reach here");
+    PANIC("getTypedLbConfigFromLegacyProtoWithoutSubset: should not reach here");
     break;
   }
 
-  if (config.has_lb_subset_config()) {
-    auto subset_lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
-        "envoy.load_balancing_policies.subset");
-    ASSERT(subset_lb_factory != nullptr, "subset LB factory is null");
-    auto typed_subset_lb_config = std::make_unique<SubsetLoadBalancerConfig>(
-        config.lb_subset_config(), std::move(lb_config), lb_factory);
+  ASSERT(lb_factory != nullptr);
+  return {lb_factory->loadConfig(cluster, visitor), lb_factory};
+}
 
-    return {std::move(typed_subset_lb_config), subset_lb_factory};
+std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
+LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    ProtobufMessage::ValidationVisitor& visitor) {
+
+  // Handle the lb subset config case first.
+  if (cluster.has_lb_subset_config()) {
+    auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+        "envoy.load_balancing_policies.subset");
+    ASSERT(lb_factory != nullptr, "subset LB factory is null");
+    return {lb_factory->loadConfig(cluster, visitor), lb_factory};
   }
 
-  return {std::move(lb_config), lb_factory};
+  return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
 }
 
 LBPolicyConfig::LBPolicyConfig(const envoy::config::cluster::v3::Cluster& config) {
@@ -1093,7 +1091,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       config.lb_policy() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
     configureLbPolicies(config, server_context);
   } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.convert_legacy_lb_config")) {
-    auto lb_pair = getTypedLbConfigFromLegacyProto(config);
+    auto lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
+        config, server_context.messageValidationVisitor());
     load_balancer_config_ = std::move(lb_pair.first);
     load_balancer_factory_ = lb_pair.second;
     lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
@@ -1102,7 +1101,8 @@ ClusterInfoImpl::ClusterInfoImpl(
         load_balancer_factory_,
         fmt::format(
             "No load balancer factory found from legacy LB configuration (type: {}, subset: {}).",
-            static_cast<int>(config.lb_policy()), config.has_lb_subset_config()));
+            envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy()),
+            config.has_lb_subset_config()));
 
     // Clear unnecessary legacy config because all legacy config is wrapped in load_balancer_config_
     // except the original_dst_lb_config.
@@ -1298,7 +1298,7 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
                                              context.messageValidationVisitor(), *proto_message);
 
       load_balancer_config_ =
-          factory->loadConfig(std::move(proto_message), context.messageValidationVisitor());
+          factory->loadConfig(*proto_message, context.messageValidationVisitor());
 
       load_balancer_factory_ = factory;
       break;

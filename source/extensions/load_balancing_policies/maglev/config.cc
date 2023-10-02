@@ -15,18 +15,16 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                 const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
                 Random::RandomGenerator& random, TimeSource&) {
 
-  const auto* typed_lb_config = dynamic_cast<const Upstream::TypedMaglevLbConfig*>(lb_config.ptr());
-
-  const auto* legacy_lb_config =
-      dynamic_cast<const Upstream::LegacyTypedMaglevLbConfig*>(lb_config.ptr());
+  auto active_or_legacy =
+      Common::ActiveOrLegacy<Upstream::TypedMaglevLbConfig, Upstream::LegacyMaglevLbConfig>::get(
+          lb_config.ptr());
 
   // Assume legacy config.
-  if (typed_lb_config == nullptr) {
+  if (!active_or_legacy.hasActive()) {
     return std::make_unique<Upstream::MaglevLoadBalancer>(
         priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
-        legacy_lb_config == nullptr || !legacy_lb_config->lb_config_.has_value()
-            ? cluster_info.lbMaglevConfig()
-            : legacy_lb_config->lb_config_.value(),
+        !active_or_legacy.hasLegacy() ? cluster_info.lbMaglevConfig()
+                                      : active_or_legacy.legacy()->lbConfig(),
         cluster_info.lbConfig());
   }
 
@@ -34,7 +32,7 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
       priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
       static_cast<uint32_t>(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           cluster_info.lbConfig(), healthy_panic_threshold, 100, 50)),
-      typed_lb_config->lb_config_);
+      active_or_legacy.active()->lb_config_);
 }
 
 /**

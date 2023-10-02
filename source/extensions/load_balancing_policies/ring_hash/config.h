@@ -7,6 +7,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/upstream/load_balancer_factory_base.h"
+#include "source/extensions/load_balancing_policies/common/factory_base.h"
 #include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
 
 namespace Envoy {
@@ -27,10 +28,18 @@ public:
                                               Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
 
-  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
-                                             ProtobufMessage::ValidationVisitor& visitor) override {
-    return std::make_unique<Upstream::TypedRingHashLbConfig>(
-        MessageUtil::downcastAndValidate<const RingHashLbProto&>(*config, visitor));
+  Upstream::LoadBalancerConfigPtr loadConfig(const Protobuf::Message& config,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    auto active_or_legacy =
+        Common::ActiveOrLegacy<Upstream::RingHashLbProto, Upstream::ClusterProto>::get(&config);
+
+    ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
+
+    return active_or_legacy.hasLegacy()
+               ? Upstream::LoadBalancerConfigPtr{new Upstream::LegacyRingHashLbConfig(
+                     *active_or_legacy.legacy())}
+               : Upstream::LoadBalancerConfigPtr{
+                     new Upstream::TypedRingHashLbConfig(*active_or_legacy.active())};
   }
 };
 

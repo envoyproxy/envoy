@@ -68,6 +68,45 @@ private:
   const std::string name_;
 };
 
+/**
+ * Helper class to hold either a legacy or production config.
+ */
+template <class ActiveType, class LegacyType> class ActiveOrLegacy {
+public:
+  template <class BaseType> static ActiveOrLegacy get(const BaseType* base) {
+    auto* active_type = dynamic_cast<const ActiveType*>(base);
+    if (active_type != nullptr) {
+      return {active_type};
+    }
+    auto* legacy_type = dynamic_cast<const LegacyType*>(base);
+    if (legacy_type != nullptr) {
+      return {legacy_type};
+    }
+
+    return {};
+  }
+
+  bool hasActive() const { return active_ != nullptr; }
+  bool hasLegacy() const { return legacy_ != nullptr; }
+
+  const ActiveType* active() const {
+    ASSERT(hasActive());
+    return active_;
+  }
+  const LegacyType* legacy() const {
+    ASSERT(hasLegacy());
+    return legacy_;
+  }
+
+private:
+  ActiveOrLegacy() = default;
+  ActiveOrLegacy(const ActiveType* active) : active_(active) {}
+  ActiveOrLegacy(const LegacyType* legacy) : legacy_(legacy) {}
+
+  const ActiveType* active_{};
+  const LegacyType* legacy_{};
+};
+
 } // namespace Common
 } // namespace LoadBalancingPolices
 } // namespace Extensions

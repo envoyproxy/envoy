@@ -2,121 +2,13 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/load_balancing_policies/common/v3/common.pb.h"
-#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
-#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.validate.h"
-#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
-#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.validate.h"
-#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
-#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.validate.h"
-#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
-#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.validate.h"
-#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
-#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.validate.h"
+#include "envoy/extensions/load_balancing_policies/common/v3/common.pb.validate.h"
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
 #include "envoy/upstream/load_balancer.h"
 
 namespace Envoy {
 namespace Upstream {
-
-/**
- * Load balancer config that used to wrap the legacy proto config.
- */
-class LegacyTypedRoundRobinLbConfig : public LoadBalancerConfig {
-public:
-  LegacyTypedRoundRobinLbConfig(const envoy::config::cluster::v3::Cluster& config);
-
-  absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap the proto config.
- */
-class TypedRoundRobinLbConfig : public LoadBalancerConfig {
-public:
-  TypedRoundRobinLbConfig(
-      const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin& lb_config);
-
-  const envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap the legacy least request config.
- */
-class LegacyTypedLeastRequestLbConfig : public LoadBalancerConfig {
-public:
-  LegacyTypedLeastRequestLbConfig(const envoy::config::cluster::v3::Cluster& config);
-
-  absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap the least request config.
- */
-class TypedLeastRequestLbConfig : public LoadBalancerConfig {
-public:
-  TypedLeastRequestLbConfig(
-      const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest& lb_config);
-
-  const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap the legacy random config.
- */
-class LegacyTypedRandomLbConfig : public LoadBalancerConfig {};
-
-/**
- * Load balancer config that used to wrap the random config.
- */
-class TypedRandomLbConfig : public LoadBalancerConfig {
-public:
-  TypedRandomLbConfig(
-      const envoy::extensions::load_balancing_policies::random::v3::Random& lb_config);
-
-  const envoy::extensions::load_balancing_policies::random::v3::Random lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap legacy maglev config.
- */
-class LegacyTypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  LegacyTypedMaglevLbConfig(const envoy::config::cluster::v3::Cluster& config);
-
-  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap typed maglev config.
- */
-class TypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  TypedMaglevLbConfig(const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config);
-
-  const envoy::extensions::load_balancing_policies::maglev::v3::Maglev lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap legacy ring hash config.
- */
-class LegacyTypedRingHashLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  LegacyTypedRingHashLbConfig(const envoy::config::cluster::v3::Cluster& config);
-
-  absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap typed ring hash config.
- */
-class TypedRingHashLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  TypedRingHashLbConfig(
-      const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& config);
-
-  const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash lb_config_;
-};
 
 /**
  * Implementation of SubsetSelector. This is part of subset load balancer config and is used to
@@ -244,38 +136,6 @@ private:
   const bool allow_redundant_keys_{};
 };
 using DefaultLoadBalancerSubsetInfoImpl = ConstSingleton<LoadBalancerSubsetInfoImpl>;
-
-using HostHashSet = absl::flat_hash_set<HostSharedPtr>;
-
-class SubsetLoadBalancerConfig : public Upstream::LoadBalancerConfig {
-public:
-  SubsetLoadBalancerConfig(const SubsetLoadbalancingPolicyProto& subset_config,
-                           ProtobufMessage::ValidationVisitor& visitor);
-
-  SubsetLoadBalancerConfig(const LegacySubsetLoadbalancingPolicyProto& subset_config,
-                           Upstream::LoadBalancerConfigPtr sub_load_balancer_config,
-                           Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory)
-      : subset_info_(subset_config), sub_load_balancer_config_(std::move(sub_load_balancer_config)),
-        sub_load_balancer_factory_(sub_load_balancer_factory) {
-    ASSERT(sub_load_balancer_factory_ != nullptr, "sub_load_balancer_factory_ must not be nullptr");
-  }
-
-  Upstream::ThreadAwareLoadBalancerPtr
-  createLoadBalancer(const Upstream::ClusterInfo& cluster_info,
-                     const Upstream::PrioritySet& child_priority_set, Runtime::Loader& runtime,
-                     Random::RandomGenerator& random, TimeSource& time_source) const {
-    return sub_load_balancer_factory_->create(*sub_load_balancer_config_, cluster_info,
-                                              child_priority_set, runtime, random, time_source);
-  }
-
-  const Upstream::LoadBalancerSubsetInfo& subsetInfo() const { return subset_info_; }
-
-private:
-  LoadBalancerSubsetInfoImpl subset_info_;
-
-  Upstream::LoadBalancerConfigPtr sub_load_balancer_config_;
-  Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory_{};
-};
 
 } // namespace Upstream
 } // namespace Envoy

@@ -97,7 +97,7 @@ paths:
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/upstream/thread_aware_lb_impl.cc
-    - source/common/upstream/load_balancer_config.cc
+    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/load_balancer_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/outlier_detection_impl.cc

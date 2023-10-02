@@ -257,20 +257,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "load_balancer_config_lib",
-    srcs = ["load_balancer_config.cc"],
-    hdrs = ["load_balancer_config.h"],
+    name = "subset_lb_config_lib",
+    srcs = ["subset_lb_config.cc"],
+    hdrs = ["subset_lb_config.h"],
     deps = [
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/subset/v3:pkg_cc_proto",
     ],
 )
@@ -280,8 +275,8 @@ envoy_cc_library(
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
     deps = [
-        ":load_balancer_config_lib",
         ":scheduler_lib",
+        ":subset_lb_config_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",

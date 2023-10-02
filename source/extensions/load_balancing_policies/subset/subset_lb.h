@@ -100,6 +100,38 @@ private:
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 
+using HostHashSet = absl::flat_hash_set<HostSharedPtr>;
+
+class SubsetLoadBalancerConfig : public Upstream::LoadBalancerConfig {
+public:
+  SubsetLoadBalancerConfig(const SubsetLoadbalancingPolicyProto& subset_config,
+                           ProtobufMessage::ValidationVisitor& visitor);
+
+  SubsetLoadBalancerConfig(const LegacySubsetLoadbalancingPolicyProto& subset_config,
+                           Upstream::LoadBalancerConfigPtr sub_load_balancer_config,
+                           Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory)
+      : subset_info_(subset_config), sub_load_balancer_config_(std::move(sub_load_balancer_config)),
+        sub_load_balancer_factory_(sub_load_balancer_factory) {
+    ASSERT(sub_load_balancer_factory_ != nullptr, "sub_load_balancer_factory_ must not be nullptr");
+  }
+
+  Upstream::ThreadAwareLoadBalancerPtr
+  createLoadBalancer(const Upstream::ClusterInfo& cluster_info,
+                     const Upstream::PrioritySet& child_priority_set, Runtime::Loader& runtime,
+                     Random::RandomGenerator& random, TimeSource& time_source) const {
+    return sub_load_balancer_factory_->create(*sub_load_balancer_config_, cluster_info,
+                                              child_priority_set, runtime, random, time_source);
+  }
+
+  const Upstream::LoadBalancerSubsetInfo& subsetInfo() const { return subset_info_; }
+
+private:
+  LoadBalancerSubsetInfoImpl subset_info_;
+
+  Upstream::LoadBalancerConfigPtr sub_load_balancer_config_;
+  Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory_{};
+};
+
 class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
 public:
   SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets, ChildLoadBalancerCreatorPtr child_lb,
