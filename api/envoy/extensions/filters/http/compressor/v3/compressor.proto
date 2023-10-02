@@ -126,18 +126,18 @@ message Compressor {
   //    ``<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*``.
   ResponseDirectionConfig response_direction_config = 8;
 
-  // If true, chooses this compressor first to do compression when the q-values in `Accept-Encoding` are same.
+  // If true, chooses this compressor first to do compression when the q-values in ``Accept-Encoding`` are same.
   // The last compressor which enables choose_first will be chosen if multiple compressor filters in the chain have choose_first as true.
   bool choose_first = 9;
 }
 
-// Per-route overrides of `ResponseDirectionConfig`. Anything added here should be optional,
+// Per-route overrides of ``ResponseDirectionConfig``. Anything added here should be optional,
 // to allow overriding arbitrary subsets of configuration. Omitted fields must have no affect.
 message ResponseDirectionOverrides {
 }
 
 // Per-route overrides. As per-route overrides are needed, they should be
-// added here, mirroring the structure of `Compressor`. All fields should be
+// added here, mirroring the structure of ``Compressor``. All fields should be
 // optional, to allow overriding arbitrary subsets of configuration.
 message CompressorOverrides {
   // If present, response compression is enabled.
@@ -152,7 +152,7 @@ message CompressorPerRoute {
     // Overrides Compressor.runtime_enabled and CommonDirectionConfig.enabled.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
 
-    // Per-route overrides. Fields set here will override corresponding fields in `Compressor`.
+    // Per-route overrides. Fields set here will override corresponding fields in ``Compressor``.
     CompressorOverrides overrides = 2;
   }
 }
