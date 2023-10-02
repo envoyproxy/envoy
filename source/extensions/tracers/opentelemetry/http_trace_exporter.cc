@@ -64,7 +64,10 @@ void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request&
   tracing_stats_.http_reports_success_.inc();
   const auto response_code = message->headers().Status()->value().getStringView();
   if (response_code != "200") {
-    ENVOY_LOG(error, "OTLP HTTP exporter received a non-success status code: {} while exporting the OTLP message", response_code);
+    ENVOY_LOG(error,
+              "OTLP HTTP exporter received a non-success status code: {} while exporting the OTLP "
+              "message",
+              response_code);
   }
 }
 
