@@ -1,16 +1,17 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
-load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_py_data")
+load("//tools/base:envoy_python.bzl", "envoy_py_data", "envoy_py_namespace", "envoy_pytool_binary")
 load("//tools/protoprint:protoprint.bzl", "protoprint_rule")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-py_binary(
+envoy_py_namespace()
+
+envoy_pytool_binary(
     name = "protoprint",
     srcs = ["protoprint.py"],
     data = [
