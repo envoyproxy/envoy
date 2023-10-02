@@ -9,11 +9,11 @@ namespace TestRead {
 Http::FilterHeadersStatus TestReadFilter::decodeHeaders(Http::RequestHeaderMap& request_headers,
                                                         bool) {
   // sample path is /failed?error=0x10000
-  Http::Utility::QueryParams query_parameters =
-      Http::Utility::parseQueryString(request_headers.Path()->value().getStringView());
-  auto error = query_parameters.find("error");
+  auto query_parameters = Http::Utility:: ::QueryParamsMulti::parseQueryString(
+      request_headers.Path()->value().getStringView());
+  auto error = query_parameters.getFirstValue("error");
   uint64_t response_flag;
-  if (error != query_parameters.end() && absl::SimpleAtoi(error->second, &response_flag)) {
+  if (error.has_value() && absl::SimpleAtoi(error.value(), &response_flag)) {
     // set response error code
     StreamInfo::StreamInfo& stream_info = decoder_callbacks_->streamInfo();
     stream_info.setResponseFlag(TestReadFilter::mapErrorToResponseFlag(response_flag));
