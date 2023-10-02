@@ -241,16 +241,6 @@ public:
                                               const Network::ListenerConfig& listener_config) PURE;
 
   /**
-   * Creates a logical udp listener on a specific port.
-   * @param socket supplies the socket to listen on.
-   * @param cb supplies the udp listener callbacks to invoke for listener events.
-   * @param config provides the UDP socket configuration.
-   * @return Network::ListenerPtr a new listener that is owned by the caller.
-   */
-  virtual Network::UdpListenerPtr
-  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-                    const envoy::config::core::v3::UdpSocketConfig& config) PURE;
-  /**
    * Submits an item for deferred delete. @see DeferredDeletable.
    */
   virtual void deferredDelete(DeferredDeletablePtr&& to_delete) PURE;
