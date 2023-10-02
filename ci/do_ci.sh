@@ -900,6 +900,10 @@ case $CI_TARGET in
         else
             PACKAGE_BUILD=/build/distribution/arm64/packages.arm64.tar.gz
         fi
+
+        echo "$PACKAGE_BUILD"
+        ls -alh "$PACKAGE_BUILD"
+
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //distribution:verify_packages \
               "$PACKAGE_BUILD"
