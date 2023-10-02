@@ -1,7 +1,7 @@
-diff --git a/bazel/packages.bzl b/bazel/packages.bzl
+diff --git a/packages.bzl b/packages.bzl
 index 5403f1f2..5e44ff99 100644
---- a/bazel/packages.bzl
-+++ b/bazel/packages.bzl
+--- a/packages.bzl
++++ b/packages.bzl
 @@ -1,4 +1,4 @@
 -load("@python3_11//:defs.bzl", "interpreter")
 +load("@python3_10//:defs.bzl", "interpreter")
