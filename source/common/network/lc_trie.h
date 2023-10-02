@@ -271,15 +271,6 @@ private:
 
     bool operator<(const IpPrefix& other) const { return (this->compare(other) == -1); }
 
-    bool operator!=(const IpPrefix& other) const { return (this->compare(other) != 0); }
-
-    /**
-     * @return true if other is a prefix of this.
-     */
-    bool isPrefix(const IpPrefix& other) {
-      return (length_ == 0 || (length_ <= other.length_ && contains(other.ip_)));
-    }
-
     /**
      * @param address supplies an IP address to check against this prefix.
      * @return bool true if this prefix contains the address.
@@ -288,8 +279,6 @@ private:
       return (extractBits<IpType, address_size>(0, length_, ip_) ==
               extractBits<IpType, address_size>(0, length_, address));
     }
-
-    std::string asString() { return fmt::format("{}/{}", toString(ip_), length_); }
 
     // The address represented either in Ipv4(uint32_t) or Ipv6(absl::uint128).
     IpType ip_{0};

@@ -127,18 +127,6 @@ bool PayloadMatcher::match(const MatchSegments& expected, const Buffer::Instance
   return true;
 }
 
-std::ostream& operator<<(std::ostream& out, HealthState state) {
-  switch (state) {
-  case HealthState::Unhealthy:
-    out << "Unhealthy";
-    break;
-  case HealthState::Healthy:
-    out << "Healthy";
-    break;
-  }
-  return out;
-}
-
 std::ostream& operator<<(std::ostream& out, HealthTransition changed_state) {
   switch (changed_state) {
   case HealthTransition::Unchanged:

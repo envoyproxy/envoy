@@ -46,7 +46,6 @@ public:
  */
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
-  static ClusterSharedPtr create();
   HdsCluster(Server::Configuration::ServerFactoryContext& server_context,
              envoy::config::cluster::v3::Cluster cluster,
              const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
@@ -57,7 +56,6 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
-  void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }

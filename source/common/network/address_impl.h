@@ -294,8 +294,6 @@ public:
   explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0,
                         const SocketInterface* sock_interface = nullptr);
 
-  static absl::Status validateProtocolSupported() { return absl::OkStatus(); }
-
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return nullptr; }
@@ -304,7 +302,6 @@ public:
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&pipe_.address_);
   }
-  const sockaddr_un& getSockAddr() const { return pipe_.address_; }
   socklen_t sockAddrLen() const override {
     if (pipe_.abstract_namespace_) {
       return offsetof(struct sockaddr_un, sun_path) + pipe_.address_length_;

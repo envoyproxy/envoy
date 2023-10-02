@@ -91,13 +91,6 @@ public:
   virtual ~Route() = default;
 
   /**
-   * Check whether this route matches a given connection.
-   * @param connection supplies the connection to test against.
-   * @return bool true if this route matches a given connection.
-   */
-  virtual bool matches(Network::Connection& connection) const PURE;
-
-  /**
    * @return const std::string& the upstream cluster that owns the route.
    */
   virtual const std::string& clusterName() const PURE;
@@ -317,7 +310,6 @@ private:
     SimpleRouteImpl(const Config& parent, absl::string_view cluster_name);
 
     // Route
-    bool matches(Network::Connection&) const override { return true; }
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
       return parent_.metadataMatchCriteria();
@@ -336,7 +328,6 @@ private:
     uint64_t clusterWeight() const { return cluster_weight_; }
 
     // Route
-    bool matches(Network::Connection&) const override { return false; }
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
       if (metadata_match_criteria_) {

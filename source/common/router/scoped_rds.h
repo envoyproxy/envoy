@@ -100,11 +100,6 @@ private:
 
 struct ScopedRdsStats {
   ALL_SCOPED_RDS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-
-  static ScopedRdsStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return ScopedRdsStats{
-        ALL_SCOPED_RDS_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
-  }
 };
 
 // A scoped RDS subscription to be used with the dynamic scoped RDS ConfigProvider.

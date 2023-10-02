@@ -217,14 +217,6 @@ private:
     absl::optional<bool> initialize_read_filters_;
   };
 
-  // State which is needed to construct a new connection.
-  struct ConnectionConstructionState {
-    Address::InstanceConstSharedPtr source_address_;
-    UpstreamTransportSocketFactory& socket_factory_;
-    TransportSocketOptionsConstSharedPtr transport_socket_options_;
-    const ConnectionSocket::OptionsSharedPtr options_;
-  };
-
   // ID for this connection which is distinct from the ID of the underlying connections.
   const uint64_t id_;
 

@@ -80,8 +80,6 @@ public:
   }
   ~ScopedInjectableLoader() { InjectableSingleton<T>::clear(); }
 
-  T& instance() { return *instance_; }
-
 private:
   std::unique_ptr<T> instance_;
 };

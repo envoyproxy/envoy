@@ -524,8 +524,6 @@ void HdsCluster::updateHosts(
                             hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
 }
 
-ClusterSharedPtr HdsCluster::create() { return nullptr; }
-
 ClusterInfoConstSharedPtr
 ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
   Envoy::Stats::ScopeSharedPtr scope =
@@ -576,8 +574,6 @@ void HdsCluster::initialize(std::function<void()> callback) {
     initialized_ = true;
   }
 }
-
-void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {}
 
 } // namespace Upstream
 } // namespace Envoy

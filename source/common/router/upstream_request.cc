@@ -348,12 +348,6 @@ void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
   parent_.onUpstreamMetadata(std::move(metadata_map));
 }
 
-void UpstreamRequest::maybeEndDecode(bool end_stream) {
-  if (end_stream) {
-    upstreamTiming().onLastUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
-  }
-}
-
 void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
   StreamInfo::UpstreamInfo& upstream_info = *streamInfo().upstreamInfo();
   upstream_info.setUpstreamHost(host);

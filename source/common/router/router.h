@@ -595,7 +595,6 @@ private:
 
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
-  UpstreamRequestPtr createUpstreamRequest();
   absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
                                                      const Http::HeaderMap& headers) const;
 
@@ -603,11 +602,9 @@ private:
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();
-  void onGlobalTimeout();
   void onRequestComplete();
   void onResponseTimeout();
   // Handle an upstream request aborted due to a local timeout.
-  void onSoftPerTryTimeout();
   void onSoftPerTryTimeout(UpstreamRequest& upstream_request);
   void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag, absl::string_view details);
   // Handle an "aborted" upstream request, meaning we didn't see response

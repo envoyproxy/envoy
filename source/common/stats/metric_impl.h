@@ -26,7 +26,6 @@ public:
   ~MetricHelper();
 
   StatName statName() const;
-  std::string name(const SymbolTable& symbol_table) const;
   TagVector tags(const SymbolTable& symbol_table) const;
   StatName tagExtractedStatName() const;
   void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const;

@@ -30,11 +30,5 @@ public:
   bool actuallyDeferSend() const { return defer_send_in_response_to_packets(); }
 };
 
-// An implementation that issues connection IDs with stable first 4 types.
-class EnvoyQuicSelfIssuedConnectionIdManager : public quic::QuicSelfIssuedConnectionIdManager {
-public:
-  using QuicSelfIssuedConnectionIdManager::QuicSelfIssuedConnectionIdManager;
-};
-
 } // namespace Quic
 } // namespace Envoy

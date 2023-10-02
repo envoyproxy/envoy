@@ -83,7 +83,6 @@ public:
 
   void resetStream();
   void setupPerTryTimeout();
-  void maybeEndDecode(bool end_stream);
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
 
   // Http::StreamDecoder
@@ -140,9 +139,6 @@ public:
 
     UpstreamRequest& parent_;
   };
-
-  void readEnable();
-  void encodeBodyAndTrailers();
 
   // Getters and setters
   Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }

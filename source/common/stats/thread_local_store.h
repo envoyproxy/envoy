@@ -125,7 +125,6 @@ public:
 
   // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
   void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
-  bool shuttingDown() const { return shutting_down_; }
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -484,7 +483,6 @@ private:
         [fn](const ScopeImplSharedPtr& scope) -> bool { return scope->iterateLockHeld(fn); });
   }
 
-  std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopesFromCaches();
   void clearHistogramsFromCaches();
   void releaseScopeCrossThread(ScopeImpl* scope);
