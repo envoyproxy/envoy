@@ -1828,6 +1828,15 @@ TEST_F(TaskRoleCredentialsProviderTest, FailedFetchingDocumentCurl) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
+TEST_F(TaskRoleCredentialsProviderTest, EmptyDocumentCurl) {
+  setupProviderForLibcurl();
+  expectDocumentCurl("");
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
 TEST_F(TaskRoleCredentialsProviderTest, MalformedDocumentCurl) {
   setupProviderForLibcurl();
   expectDocumentCurl(R"EOF(

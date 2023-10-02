@@ -146,8 +146,7 @@ public:
 protected:
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCredentialsCache() {
-      // Creating empty credentials as default.
-      credentials_ = std::make_shared<Credentials>();
+      credentials_ = std::make_shared<Credentials>(); // Creating empty credentials as default.
     }
     // The credentials object.
     CredentialsConstSharedPtr credentials_;
@@ -183,7 +182,7 @@ protected:
 
   OnAsyncFetchCb on_async_fetch_cb_;
   bool continue_on_async_fetch_failure_ = false;
-  std::string continue_on_async_fetch_failure_reason_ = "{}";
+  std::string continue_on_async_fetch_failure_reason_ = "";
   SystemTime last_updated_;
   Credentials cached_credentials_;
   Thread::MutexBasicLockable lock_;

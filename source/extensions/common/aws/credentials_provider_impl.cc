@@ -235,8 +235,7 @@ void InstanceProfileCredentialsProvider::refresh() {
       return this->fetchInstanceRoleAsync(std::move(arg));
     };
     continue_on_async_fetch_failure_ = true;
-    continue_on_async_fetch_failure_reason_ =
-        "Failed to get token from EC2MetadataService, reason:{}. Falling back to less secure way";
+    continue_on_async_fetch_failure_reason_ = "Token fetch failed so fall back to less secure way";
     metadata_fetcher_->fetch(token_req_message, Tracing::NullSpan::instance(), *this);
   }
 }
@@ -376,10 +375,10 @@ void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& b
 void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
   // TODO(suniltheta): increment fetch failed stats
   if (continue_on_async_fetch_failure_) {
-    ENVOY_LOG(warn, continue_on_async_fetch_failure_reason_,
+    ENVOY_LOG(critical, "{}. Reason: {}", continue_on_async_fetch_failure_reason_,
               metadata_fetcher_->failureToString(reason));
     continue_on_async_fetch_failure_ = false;
-    continue_on_async_fetch_failure_reason_ = "{}";
+    continue_on_async_fetch_failure_reason_ = "";
     on_async_fetch_cb_(std::move(""));
   } else {
     ENVOY_LOG(error, "AWS Instance metadata fetch failure: {}",
