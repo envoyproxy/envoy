@@ -1,13 +1,14 @@
 load("@base_pip3//:requirements.bzl", "requirement")
-load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_py_namespace", "envoy_pytool_binary")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-py_binary(
+envoy_py_namespace()
+
+envoy_pytool_binary(
     name = "generate_extensions_security_rst",
     srcs = ["generate_extensions_security_rst.py"],
     deps = [
@@ -15,20 +16,16 @@ py_binary(
     ],
 )
 
-py_binary(
+envoy_pytool_binary(
     name = "generate_external_deps_rst",
-    srcs = [
-        "generate_external_deps_rst.py",
-    ],
+    srcs = ["generate_external_deps_rst.py"],
     args = ["$(location //bazel:all_repository_locations)"],
     data = ["//bazel:all_repository_locations"],
 )
 
-py_binary(
+envoy_pytool_binary(
     name = "generate_api_rst",
-    srcs = [
-        "generate_api_rst.py",
-    ],
+    srcs = ["generate_api_rst.py"],
 )
 
 # The upstream lib is maintained here:
@@ -45,11 +42,9 @@ envoy_entry_point(
     visibility = ["//visibility:public"],
 )
 
-py_binary(
+envoy_pytool_binary(
     name = "generate_version_histories",
-    srcs = [
-        "generate_version_histories.py",
-    ],
+    srcs = ["generate_version_histories.py"],
     deps = [
         requirement("aio.run.runner"),
         requirement("envoy.base.utils"),
