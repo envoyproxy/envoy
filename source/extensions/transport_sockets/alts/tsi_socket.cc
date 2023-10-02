@@ -106,6 +106,33 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
   }
 
   if (status.ok() && handshake_result != nullptr) {
+    if (handshake_validator_) {
+      std::string err;
+      TsiInfo tsi_info;
+      tsi_info.peer_identity_ = handshake_result->peer_identity;
+      const bool peer_validated = handshake_validator_(tsi_info, err);
+      if (peer_validated) {
+        ENVOY_CONN_LOG(debug, "TSI: Handshake validation succeeded.",
+                       callbacks_->connection());
+      } else {
+        ENVOY_CONN_LOG(debug, "TSI: Handshake validation failed: {}",
+                       callbacks_->connection(), err);
+        return Network::PostIoAction::Close;
+      }
+      ProtobufWkt::Struct dynamic_metadata;
+      ProtobufWkt::Value val;
+      val.set_string_value(tsi_info.peer_identity_);
+      dynamic_metadata.mutable_fields()->insert(
+          {std::string("peer_identity"), val});
+      callbacks_->connection().streamInfo().setDynamicMetadata(
+          "envoy.transport_sockets.peer_information", dynamic_metadata);
+      ENVOY_CONN_LOG(debug, "TSI handshake with peer: {}",
+                     callbacks_->connection(), tsi_info.peer_identity_);
+    } else {
+      ENVOY_CONN_LOG(debug, "TSI: Handshake validation skipped.",
+                     callbacks_->connection());
+    }
+
     if (!handshake_result->unused_bytes.empty()) {
       // All handshake data is consumed.
       ASSERT(raw_read_buffer_.length() == 0);
@@ -291,7 +318,7 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
     // dedicated thread in a separate API within which handshake_complete_
     // will be set to true if the handshake completes.
     ASSERT(!handshake_complete_);
-    return {action, 0, false};
+    return {action, 0, action == Network::PostIoAction::Close ? true : false};
   } else {
     ASSERT(frame_protector_);
     // Check if we need to flush outstanding handshake bytes.

@@ -51,6 +51,33 @@ private:
 
 SINGLETON_MANAGER_REGISTRATION(alts_shared_state);
 
+// Returns true if the peer's service account is found in peers, otherwise
+// returns false and fills out err with an error message.
+bool doValidate(const absl::node_hash_set<std::string>& peers,
+                TsiInfo& tsi_info, std::string& err) {
+  if (peers.find(tsi_info.peer_identity) != peers.end()) {
+    return true;
+  }
+  err = "Couldn't find peer's service account in peer_service_accounts: " +
+        absl::StrJoin(peers, ",");
+  return false;
+}
+
+HandshakeValidator createHandshakeValidator(
+    const envoy::extensions::transport_sockets::alts::v3::Alts& config) {
+  const auto& peer_service_accounts = config.peer_service_accounts();
+  const absl::node_hash_set<std::string> peers(peer_service_accounts.cbegin(),
+                                               peer_service_accounts.cend());
+  HandshakeValidator validator;
+  // Skip validation if peers is empty.
+  if (!peers.empty()) {
+    validator = [peers](TsiInfo& tsi_info, std::string& err) {
+      return doValidate(peers, tsi_info, err);
+    };
+  }
+  return validator;
+}
+
 template <class TransportSocketFactoryPtr>
 TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     const Protobuf::Message& message, bool is_upstream,
@@ -58,6 +85,7 @@ TransportSocketFactoryPtr createTransportSocketFactoryHelper(
   auto config =
       MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::alts::v3::Alts&>(
           message, factory_ctxt.messageValidationVisitor());
+  HandshakeValidator validator = createHandshakeValidator(config);
   const std::string& handshaker_service_address = config.handshaker_service();
 
   // A reference to this is held in the factory closure to keep the singleton
@@ -82,7 +110,7 @@ TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     return std::make_unique<TsiHandshaker>(std::move(tsi_handshaker), dispatcher);
   };
 
-  return std::make_unique<TsiSocketFactory>(factory, [](TsiInfo&, std::string&) { return true; });
+  return std::make_unique<TsiSocketFactory>(factory, validator);
 }
 
 } // namespace

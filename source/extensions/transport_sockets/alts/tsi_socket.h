@@ -16,7 +16,7 @@ namespace TransportSockets {
 namespace Alts {
 
 struct TsiInfo {
-  std::string name_;
+  std::string peer_identity_;
 };
 
 /**

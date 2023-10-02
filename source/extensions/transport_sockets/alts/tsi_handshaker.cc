@@ -63,7 +63,8 @@ absl::Status TsiHandshaker::next(Envoy::Buffer::Instance& received) {
 
   received.drain(received_size);
   if (!status.ok()) {
-    calling_ = false;
+    onNextDone(status, this, /*bytes_to_send=*/nullptr,
+               /*bytes_to_send_size=*/0, /*handshake_result=*/nullptr);
   }
   return status;
 }

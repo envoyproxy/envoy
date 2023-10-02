@@ -10,7 +10,9 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
@@ -23,6 +25,7 @@
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
 #include "grpcpp/support/sync_stream.h"
+#include "grpcpp/security/server_credentials.h"
 #include "gtest/gtest.h"
 #include "src/proto/grpc/gcp/handshaker.grpc.pb.h"
 #include "src/proto/grpc/gcp/handshaker.pb.h"
@@ -34,6 +37,7 @@ namespace TransportSockets {
 namespace Alts {
 namespace {
 
+using ::Envoy::StatusHelpers::StatusCodeIs;
 using ::grpc::gcp::HandshakerReq;
 using ::grpc::gcp::HandshakerResp;
 using ::grpc::gcp::HandshakerResult;
@@ -118,6 +122,28 @@ public:
   }
 };
 
+class ErrorHandshakerService final : public HandshakerService::Service {
+ public:
+  ErrorHandshakerService() = default;
+
+  grpc::Status DoHandshake(
+      grpc::ServerContext* context,
+      grpc::ServerReaderWriter<HandshakerResp, HandshakerReq>* stream)
+      override {
+    EXPECT_THAT(context, NotNull());
+    HandshakerReq request;
+    while (stream->Read(&request)) {
+      HandshakerResp response;
+      response.mutable_status()->set_code(
+          static_cast<int>(grpc::StatusCode::INTERNAL));
+      response.mutable_status()->set_details("Internal error.");
+      EXPECT_TRUE(stream->Write(response));
+    }
+    return grpc::Status(grpc::StatusCode::INTERNAL,
+                        "DoHandshake internal error.");
+  }
+};
+
 class AltsTsiHandshakerTest : public Test {
 protected:
   void startFakeHandshakerService() {
@@ -130,6 +156,28 @@ protected:
       server_builder.AddListeningPort(server_address_, grpc::InsecureServerCredentials(),
                                       &listening_port);
       server_builder.RegisterService(&fake_handshaker_service);
+      server_ = server_builder.BuildAndStart();
+      EXPECT_THAT(server_, NotNull());
+      EXPECT_NE(listening_port, -1);
+      server_address_ = absl::StrCat("[::1]:", listening_port);
+      notification.Notify();
+      server_->Wait();
+    });
+    notification.WaitForNotification();
+  }
+
+  void startErrorHandshakerService() {
+    server_address_ = absl::StrCat("[::1]:", 0);
+    absl::Notification notification;
+    server_thread_ = std::make_unique<std::thread>([this, &notification]() {
+      ErrorHandshakerService error_handshaker_service;
+      grpc::ServerBuilder server_builder;
+      int listening_port = -1;
+      server_builder.AddListeningPort(
+          server_address_,
+          grpc::InsecureServerCredentials(),
+          &listening_port);
+      server_builder.RegisterService(&error_handshaker_service);
       server_ = server_builder.BuildAndStart();
       EXPECT_THAT(server_, NotNull());
       EXPECT_NE(listening_port, -1);
@@ -241,6 +289,63 @@ TEST_F(AltsTsiHandshakerTest, ServerSideFullHandshake) {
     EXPECT_THAT(result->result_->frame_protector, NotNull());
     EXPECT_EQ(result->result_->peer_identity, kPeerServiceAccount);
     EXPECT_EQ(result->result_->unused_bytes, "");
+  }
+}
+
+TEST_F(AltsTsiHandshakerTest, ClientSideError) {
+  // Setup.
+  startErrorHandshakerService();
+  auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
+  Event::MockDispatcher dispatcher;
+  auto tsi_handshaker =
+      std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
+
+  // Try to get the ClientInit and observe failure.
+  {
+    CapturingTsiHandshakerCallbacks capturing_callbacks;
+    tsi_handshaker->setHandshakerCallbacks(capturing_callbacks);
+    EXPECT_CALL(dispatcher, post(_)).WillOnce([](Envoy::Event::PostCb cb) {
+      cb();
+    });
+    Buffer::OwnedImpl received_bytes;
+    ASSERT_THAT(tsi_handshaker->next(received_bytes),
+                StatusCodeIs(absl::StatusCode::kInternal));
+
+    auto result = capturing_callbacks.getNextResult();
+    EXPECT_THAT(result, NotNull());
+    EXPECT_THAT(result->status_,
+                StatusCodeIs(absl::StatusCode::kInternal));
+    EXPECT_EQ(result->to_send_->toString(), "");
+    EXPECT_THAT(result->result_, IsNull());
+  }
+}
+
+TEST_F(AltsTsiHandshakerTest, ServerSideError) {
+  // Setup.
+  startErrorHandshakerService();
+  auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
+  Event::MockDispatcher dispatcher;
+  auto tsi_handshaker =
+      std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
+
+  // Try to get the ServerInit and ServerFinished and observe failure.
+  {
+    CapturingTsiHandshakerCallbacks capturing_callbacks;
+    tsi_handshaker->setHandshakerCallbacks(capturing_callbacks);
+    EXPECT_CALL(dispatcher, post(_)).WillOnce([](Envoy::Event::PostCb cb) {
+      cb();
+    });
+    Buffer::OwnedImpl received_bytes;
+    received_bytes.add(kClientInit.data(), kClientInit.size());
+    ASSERT_THAT(tsi_handshaker->next(received_bytes),
+                StatusCodeIs(absl::StatusCode::kInternal));
+
+    auto result = capturing_callbacks.getNextResult();
+    EXPECT_THAT(result, NotNull());
+    EXPECT_THAT(result->status_,
+                StatusCodeIs(absl::StatusCode::kInternal));
+    EXPECT_EQ(result->to_send_->toString(), "");
+    EXPECT_THAT(result->result_, IsNull());
   }
 }
 

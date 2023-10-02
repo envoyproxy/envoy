@@ -375,6 +375,11 @@ protected:
   std::unique_ptr<std::thread> handshaker_server_thread_;
 };
 
+TEST_F(TsiSocketTest, DoesNotStartSecureTransport) {
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  EXPECT_FALSE(client_.tsi_socket_->startSecureTransport());
+}
+
 TEST_F(TsiSocketTest, DoesNotHaveSsl) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   EXPECT_EQ(client_.tsi_socket_->ssl(), nullptr);
@@ -397,8 +402,6 @@ TEST_F(TsiSocketTest, UpstreamHandshakeFactoryFailure) {
   EXPECT_CALL(*raw_socket, setTransportSocketCallbacks(_));
   tsi_socket->setTransportSocketCallbacks(callbacks);
   tsi_socket->onConnected();
-  // TODO(matthewstevenson88): Investigate whether this should this be close instead of
-  // keep open.
   expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  tsi_socket->doWrite(client_.write_buffer_, /*end_stream=*/false),
                  "While writing ClientInit.");
@@ -414,8 +417,6 @@ TEST_F(TsiSocketTest, DownstreamHandshakeFactoryFailure) {
   EXPECT_CALL(*raw_socket, setTransportSocketCallbacks(_));
   tsi_socket->setTransportSocketCallbacks(callbacks);
   tsi_socket->onConnected();
-  // TODO(matthewstevenson88): Investigate whether this should this be close instead of
-  // keep open.
   expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  tsi_socket->doWrite(client_.write_buffer_, /*end_stream=*/false),
                  "While writing ClientInit.");
@@ -434,6 +435,40 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidation) {
   initializeSockets(validator, validator);
   doHandshakeAndExpectSuccess();
   expectTransferDataFromClientToServer(kApplicationData);
+}
+
+TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidationFailure) {
+  startFakeHandshakerService();
+  auto validator = [](TsiInfo&, std::string&) { return false; };
+  initializeSockets(validator, validator);
+  // On the client side, get the ClientInit and write it to the server.
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  client_.tsi_socket_->onConnected();
+  expectIoResult(
+      client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
+      {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+      "While writing ClientInit.");
+  EXPECT_EQ(client_to_server_.toString(), kClientInit);
+
+  // On the server side, read the ClientInit and write the ServerInit and the
+  // ServerFinished to the client.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+    EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
+                 {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+                 "While reading ClientInit.");
+  EXPECT_EQ(server_.read_buffer_.length(), 0L);
+  EXPECT_EQ(server_to_client_.toString(),
+            absl::StrCat(kServerInit, kServerFinished));
+
+  // On the client side, read the ServerInit and the ServerFinished, and fail
+  // the validation before writing the ClientFinished to the server.
+  EXPECT_CALL(*client_.raw_socket_, doRead(_)).Times(1);
+  expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_),
+                 "While reading ServerInit and ServerFinished.");
+  EXPECT_EQ(client_.read_buffer_.length(), 0L);
+  EXPECT_EQ(client_to_server_.toString(), "");
 }
 
 TEST_F(TsiSocketTest, HandshakeSuccessAndFailToUnprotect) {
@@ -470,7 +505,6 @@ TEST_F(TsiSocketTest, HandshakeErrorButStreamIsKeptAlive) {
   startErrorHandshakerService(/*keep_stream_alive=*/true);
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   client_.tsi_socket_->onConnected();
-  // TODO(matthewstevenson88): Should this be close instead of keep open.
   expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
                  "While writing ClientInit.");
@@ -481,7 +515,6 @@ TEST_F(TsiSocketTest, HandshakeErrorButStreamIsNotKeptAlive) {
   startErrorHandshakerService(/*keep_stream_alive=*/false);
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   client_.tsi_socket_->onConnected();
-  // TODO(matthewstevenson88): Should this be close instead of keep open.
   expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
                  "While writing ClientInit.");
