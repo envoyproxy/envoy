@@ -24,7 +24,7 @@ ProxyFilterConfig::ProxyFilterConfig(
     : dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       stats_scope_(context.scope().createScope(
-          fmt::format("udp.session.dynamic_forward_proxy.{}.", config.stat_prefix()))),
+          absl::StrCat("udp.session.dynamic_forward_proxy.", config.stat_prefix(), "."))),
       filter_stats_(generateStats(*stats_scope_)), buffer_enabled_(config.has_buffer_options()),
       max_buffered_datagrams_(config.has_buffer_options()
                                   ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.buffer_options(),
