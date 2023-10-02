@@ -375,17 +375,15 @@ case $CI_TARGET in
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
-        BAZEL_BUILD_OPTIONS+=(--remote_download_minimal)
-        NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
-            if [[ -s "$FIX_YAML" ]]; then
-                echo >&2
-                echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
-                echo >&2
-            else
-                echo "Clang-tidy failed." >&2
-            fi
-            exit 1
-        }
+        CLANG_TIDY_TARGETS=(
+            //contrib/...
+            //source/...
+            //test/...
+            @envoy_api//...)
+        bazel build \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --config clang-tidy \
+              "${CLANG_TIDY_TARGETS[@]}"
         ;;
 
     clean|expunge)
