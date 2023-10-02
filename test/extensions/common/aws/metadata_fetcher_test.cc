@@ -120,6 +120,20 @@ TEST_F(MetadataFetcherTest, TestGet400) {
   fetcher_->fetch(message, parent_span_, receiver);
 }
 
+TEST_F(MetadataFetcherTest, TestGet400NoBody) {
+  // Setup
+  setupFetcher();
+  Http::RequestMessageImpl message;
+
+  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "400", "");
+  MockMetadataReceiver receiver;
+  EXPECT_CALL(receiver, onMetadataSuccess(testing::_)).Times(0);
+  EXPECT_CALL(receiver, onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network));
+
+  // Act
+  fetcher_->fetch(message, parent_span_, receiver);
+}
+
 TEST_F(MetadataFetcherTest, TestGetNoBody) {
   // Setup
   setupFetcher();
@@ -128,7 +142,8 @@ TEST_F(MetadataFetcherTest, TestGetNoBody) {
   MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "200", "");
   MockMetadataReceiver receiver;
   EXPECT_CALL(receiver, onMetadataSuccess(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network));
+  EXPECT_CALL(receiver,
+              onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata));
 
   // Act
   fetcher_->fetch(message, parent_span_, receiver);

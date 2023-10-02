@@ -33,6 +33,18 @@ public:
     reset();
   }
 
+  absl::string_view failureToString(MetadataFetcher::MetadataReceiver::Failure reason) override {
+    switch (reason) {
+    case MetadataFetcher::MetadataReceiver::Failure::Network:
+      return "Network";
+    case MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata:
+      return "InvalidMetadata";
+    case MetadataFetcher::MetadataReceiver::Failure::MissingConfig:
+      return "MissingConfig";
+    }
+    return "";
+  }
+
   void fetch(Http::RequestMessage& message, Tracing::Span& parent_span,
              MetadataFetcher::MetadataReceiver& receiver) override {
     complete_ = false;
@@ -112,7 +124,7 @@ public:
       } else {
         ENVOY_LOG(debug, "{}: fetch AWS Metadata [cluster = {}]: body is empty", __func__,
                   cluster_name_);
-        receiver_->onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
+        receiver_->onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
       }
     } else {
       if (response->body().length() != 0) {
@@ -138,6 +150,7 @@ public:
     reset();
   }
 
+  // TODO(suniltheta): Add metadata fetch status into the span like it is done on ext_authz filter.
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
 private:

@@ -76,6 +76,13 @@ public:
                      MetadataReceiver& receiver) PURE;
 
   /**
+   * @brief Return MetadataReceiver Failure enum as a string.
+   *
+   * @return absl::string_view
+   */
+  virtual absl::string_view failureToString(MetadataReceiver::Failure) PURE;
+
+  /**
    * @brief Factory method for creating a Metadata Fetcher.
    *
    * @param cm the cluster manager to use during AWS Metadata retrieval

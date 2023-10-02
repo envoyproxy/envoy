@@ -17,6 +17,7 @@ using Envoy::Extensions::Common::Aws::MetadataFetcher;
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using Envoy::Extensions::Common::Aws::MockMetadataFetcher;
 using testing::_;
+using testing::Eq;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
@@ -312,11 +313,7 @@ public:
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
-        [this](Upstream::ClusterManager&, absl::string_view) {
-          metadata_fetcher_.reset(raw_metadata_fetcher_);
-          return std::move(metadata_fetcher_);
-        },
-        "credentials_provider_cluster");
+        nullptr, "credentials_provider_cluster");
   }
 
   void expectSessionTokenCurl(const absl::optional<std::string>& token) {
@@ -328,18 +325,33 @@ public:
     EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(token));
   }
 
-  void expectSessionTokenHttpAsync(const std::string&& token) {
+  void expectSessionTokenHttpAsync(const uint64_t status_code, const std::string&& token) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/api/token"},
                                            {":authority", "169.254.169.254:80"},
                                            {":method", "PUT"},
                                            {":scheme", "http"},
                                            {"X-aws-ec2-metadata-token-ttl-seconds", "21600"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(
-            Invoke([token = std::move(token)](Http::RequestMessage&, Tracing::Span&,
-                                              MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly(Invoke([this, status_code, token = std::move(token)](
+                                   Http::RequestMessage&, Tracing::Span&,
+                                   MetadataFetcher::MetadataReceiver& receiver) {
+          if (status_code == enumToInt(Http::Code::OK)) {
+            if (!token.empty()) {
               receiver.onMetadataSuccess(std::move(token));
-            }));
+            } else {
+              EXPECT_CALL(
+                  *raw_metadata_fetcher_,
+                  failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata)))
+                  .WillRepeatedly(testing::Return("InvalidMetadata"));
+              receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
+            }
+          } else {
+            EXPECT_CALL(*raw_metadata_fetcher_,
+                        failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::Network)))
+                .WillRepeatedly(testing::Return("Network"));
+            receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
+          }
+        }));
   }
 
   void expectCredentialListingCurl(const absl::optional<std::string>& listing) {
@@ -359,30 +371,62 @@ public:
     EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
   }
 
-  void expectCredentialListingHttpAsync(const std::string&& instance_role) {
+  void expectCredentialListingHttpAsync(const uint64_t status_code,
+                                        const std::string&& instance_role) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
                                            {":authority", "169.254.169.254:80"},
                                            {":scheme", "http"},
                                            {":method", "GET"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([instance_role = std::move(instance_role)](
+        .WillRepeatedly(Invoke([this, status_code, instance_role = std::move(instance_role)](
                                    Http::RequestMessage&, Tracing::Span&,
                                    MetadataFetcher::MetadataReceiver& receiver) {
-          receiver.onMetadataSuccess(std::move(instance_role));
+          if (status_code == enumToInt(Http::Code::OK)) {
+            if (!instance_role.empty()) {
+              receiver.onMetadataSuccess(std::move(instance_role));
+            } else {
+              EXPECT_CALL(
+                  *raw_metadata_fetcher_,
+                  failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata)))
+                  .WillRepeatedly(testing::Return("InvalidMetadata"));
+              receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
+            }
+          } else {
+            EXPECT_CALL(*raw_metadata_fetcher_,
+                        failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::Network)))
+                .WillRepeatedly(testing::Return("Network"));
+            receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
+          }
         }));
   }
 
-  void expectCredentialListingHttpAsyncSecure(const std::string&& instance_role) {
+  void expectCredentialListingHttpAsyncSecure(const uint64_t status_code,
+                                              const std::string&& instance_role) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
                                            {":authority", "169.254.169.254:80"},
                                            {":scheme", "http"},
                                            {":method", "GET"},
                                            {"X-aws-ec2-metadata-token", "TOKEN"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([instance_role = std::move(instance_role)](
+        .WillRepeatedly(Invoke([this, status_code, instance_role = std::move(instance_role)](
                                    Http::RequestMessage&, Tracing::Span&,
                                    MetadataFetcher::MetadataReceiver& receiver) {
-          receiver.onMetadataSuccess(std::move(instance_role));
+          if (status_code == enumToInt(Http::Code::OK)) {
+            if (!instance_role.empty()) {
+              receiver.onMetadataSuccess(std::move(instance_role));
+            } else {
+              EXPECT_CALL(
+                  *raw_metadata_fetcher_,
+                  failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata)))
+                  .WillRepeatedly(testing::Return("InvalidMetadata"));
+              receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
+            }
+          } else {
+            EXPECT_CALL(*raw_metadata_fetcher_,
+                        failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::Network)))
+                .WillRepeatedly(testing::Return("Network"));
+            receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
+          }
         }));
   }
 
@@ -405,21 +449,39 @@ public:
     EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
   }
 
-  void expectDocumentHttpAsync(const std::string&& credential_document_value) {
+  void expectDocumentHttpAsync(const uint64_t status_code,
+                               const std::string&& credential_document_value) {
     Http::TestRequestHeaderMapImpl headers{
         {":path", "/latest/meta-data/iam/security-credentials/doc1"},
         {":authority", "169.254.169.254:80"},
         {":scheme", "http"},
         {":method", "GET"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([credential_document_value = std::move(credential_document_value)](
+        .WillRepeatedly(Invoke([this, status_code,
+                                credential_document_value = std::move(credential_document_value)](
                                    Http::RequestMessage&, Tracing::Span&,
                                    MetadataFetcher::MetadataReceiver& receiver) {
-          receiver.onMetadataSuccess(std::move(credential_document_value));
+          if (status_code == enumToInt(Http::Code::OK)) {
+            if (!credential_document_value.empty()) {
+              receiver.onMetadataSuccess(std::move(credential_document_value));
+            } else {
+              EXPECT_CALL(
+                  *raw_metadata_fetcher_,
+                  failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata)))
+                  .WillRepeatedly(testing::Return("InvalidMetadata"));
+              receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
+            }
+          } else {
+            EXPECT_CALL(*raw_metadata_fetcher_,
+                        failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::Network)))
+                .WillRepeatedly(testing::Return("Network"));
+            receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
+          }
         }));
   }
 
-  void expectDocumentHttpAsyncSecure(const std::string&& credential_document_value) {
+  void expectDocumentHttpAsyncSecure(const uint64_t status_code,
+                                     const std::string&& credential_document_value) {
     Http::TestRequestHeaderMapImpl headers{
         {":path", "/latest/meta-data/iam/security-credentials/doc1"},
         {":authority", "169.254.169.254:80"},
@@ -427,10 +489,26 @@ public:
         {":method", "GET"},
         {"X-aws-ec2-metadata-token", "TOKEN"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([credential_document_value = std::move(credential_document_value)](
+        .WillRepeatedly(Invoke([this, status_code,
+                                credential_document_value = std::move(credential_document_value)](
                                    Http::RequestMessage&, Tracing::Span&,
                                    MetadataFetcher::MetadataReceiver& receiver) {
-          receiver.onMetadataSuccess(std::move(credential_document_value));
+          if (status_code == enumToInt(Http::Code::OK)) {
+            if (!credential_document_value.empty()) {
+              receiver.onMetadataSuccess(std::move(credential_document_value));
+            } else {
+              EXPECT_CALL(
+                  *raw_metadata_fetcher_,
+                  failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata)))
+                  .WillRepeatedly(testing::Return("InvalidMetadata"));
+              receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
+            }
+          } else {
+            EXPECT_CALL(*raw_metadata_fetcher_,
+                        failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::Network)))
+                .WillRepeatedly(testing::Return("Network"));
+            receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
+          }
         }));
   }
 
@@ -481,11 +559,11 @@ typed_extension_protocol_options:
   EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithAttribute(expected_cluster), _))
       .WillOnce(Return(true));
 
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string("doc1")));
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
   // Cancel is called twice.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
-  expectDocumentHttpAsyncSecure(std::move(R"EOF(
+  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -496,7 +574,7 @@ typed_extension_protocol_options:
   setupProviderWithContext();
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, TestClusterMissingExpectEnvoyException) {
+TEST_F(InstanceProfileCredentialsProviderTest, TestClusterMissing) {
   // Setup without thread local cluster
   Http::RequestMessageImpl message;
 
@@ -512,8 +590,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, TestClusterMissingExpectEnvoyExce
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move(std::string()));
-  expectCredentialListingHttpAsync(std::move(std::string()));
+  expectSessionTokenHttpAsync(403 /*Forbidden*/, std::move(std::string()));
+  expectCredentialListingHttpAsync(403 /*Forbidden*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -535,8 +613,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingUnsecure) 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string()));
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(401 /*Unauthorized*/, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -558,8 +636,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move(std::string()));
-  expectCredentialListingHttpAsync(std::move(std::string("")));
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -581,8 +659,8 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string("")));
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("")));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called once.
@@ -601,12 +679,106 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingSecure) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingUnsecure) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("\n")));
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Cancel is called once.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  // Expect refresh timer to be started after fetch done from init.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
+  // Cancel is called once for fetching once again as previous attempt wasn't a success.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  // Expect refresh timer to be stopped and started.
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingSecure) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("\n")));
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Cancel is called once.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  // Expect refresh timer to be started after fetch done from init.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
+  // Cancel is called twice.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  // Expect refresh timer to be stopped and started.
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentUnsecure) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocumentHttpAsync(401 /*Unauthorized*/, std::move(std::string()));
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Cancel is called twice.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  // Expect refresh timer to be started after fetch done from init.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
+  // Cancel is called thrice.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
+  // Expect refresh timer to be stopped and started.
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentSecure) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocumentHttpAsyncSecure(401 /*Unauthorized*/, std::move(std::string()));
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Cancel is called twice.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(2);
+  // Expect refresh timer to be started after fetch done from init.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
+  // Cancel is called thrice.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(3);
+  // Expect refresh timer to be stopped and started.
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
 TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move(std::string()));
-  expectCredentialListingHttpAsync(std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocumentHttpAsync(std::move(std::string()));
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocumentHttpAsync(200, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called twice.
@@ -628,9 +800,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string("doc1\ndoc2\ndoc3")));
-  expectDocumentHttpAsyncSecure(std::move(std::string()));
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1\ndoc2\ndoc3")));
+  expectDocumentHttpAsyncSecure(200, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Cancel is called twice.
@@ -652,9 +824,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move(std::string()));
-  expectCredentialListingHttpAsync(std::move(std::string("doc1")));
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsync(200, std::move(R"EOF(
  not json
  )EOF"));
   // init_watcher ready is called.
@@ -678,9 +850,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
  not json
  )EOF"));
   // init_watcher ready is called.
@@ -704,9 +876,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move(std::string()));
-  expectCredentialListingHttpAsync(std::move(std::string("doc1")));
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsync(200, std::move(R"EOF(
  {
    "AccessKeyId": "",
    "SecretAccessKey": "",
@@ -733,9 +905,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "",
    "SecretAccessKey": "",
@@ -762,9 +934,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move(std::string()));
-  expectCredentialListingHttpAsync(std::move(std::string("doc1")));
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsync(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -811,9 +983,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsUnsecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -860,9 +1032,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FullCachedCredentialsSecure) {
 TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationUnsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move(std::string()));
-  expectCredentialListingHttpAsync(std::move(std::string("doc1")));
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsync(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -891,9 +1063,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationUnse
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
 
-  expectSessionTokenHttpAsync(std::move(std::string()));
-  expectCredentialListingHttpAsync(std::move(std::string("doc1")));
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move(std::string()));
+  expectCredentialListingHttpAsync(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsync(200, std::move(R"EOF(
  {
    "AccessKeyId": "new_akid",
    "SecretAccessKey": "new_secret",
@@ -925,9 +1097,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationUnse
 TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationSecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "akid",
    "SecretAccessKey": "secret",
@@ -956,9 +1128,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationSecu
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
 
-  expectSessionTokenHttpAsync(std::move("TOKEN"));
-  expectCredentialListingHttpAsyncSecure(std::move(std::string("doc1")));
-  expectDocumentHttpAsyncSecure(std::move(R"EOF(
+  expectSessionTokenHttpAsync(200, std::move("TOKEN"));
+  expectCredentialListingHttpAsyncSecure(200, std::move(std::string("doc1")));
+  expectDocumentHttpAsyncSecure(200, std::move(R"EOF(
  {
    "AccessKeyId": "new_akid",
    "SecretAccessKey": "new_secret",
@@ -1020,6 +1192,26 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingCurlUnsecur
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingCurlSecure) {
+  setupProviderForLibcurl();
+  expectSessionTokenCurl("TOKEN");
+  expectCredentialListingCurlSecure("\n");
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingCurlUnsecure) {
+  setupProviderForLibcurl();
+  expectSessionTokenCurl(absl::optional<std::string>());
+  expectCredentialListingCurl("\n");
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingCurlSecure) {
   setupProviderForLibcurl();
   expectSessionTokenCurl("TOKEN");
   expectCredentialListingCurlSecure("");
@@ -1257,11 +1449,7 @@ public:
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
         },
-        [this](Upstream::ClusterManager&, absl::string_view) {
-          metadata_fetcher_.reset(raw_metadata_fetcher_);
-          return std::move(metadata_fetcher_);
-        },
-        "169.254.170.2:80/path/to/doc", "auth_token", "credentials_provider_cluster");
+        nullptr, "169.254.170.2:80/path/to/doc", "auth_token", "credentials_provider_cluster");
   }
 
   void expectDocumentCurl(const absl::optional<std::string>& document) {
@@ -1273,18 +1461,33 @@ public:
     EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
   }
 
-  void expectDocumentHttpAsync(const std::string&& document) {
+  void expectDocumentHttpAsync(const uint64_t status_code, const std::string&& document) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/path/to/doc"},
                                            {":authority", "169.254.170.2:80"},
                                            {":scheme", "http"},
                                            {":method", "GET"},
                                            {"authorization", "auth_token"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(
-            Invoke([document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
-                                                    MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
+                                   Http::RequestMessage&, Tracing::Span&,
+                                   MetadataFetcher::MetadataReceiver& receiver) {
+          if (status_code == enumToInt(Http::Code::OK)) {
+            if (!document.empty()) {
               receiver.onMetadataSuccess(std::move(document));
-            }));
+            } else {
+              EXPECT_CALL(
+                  *raw_metadata_fetcher_,
+                  failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata)))
+                  .WillRepeatedly(testing::Return("InvalidMetadata"));
+              receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
+            }
+          } else {
+            EXPECT_CALL(*raw_metadata_fetcher_,
+                        failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::Network)))
+                .WillRepeatedly(testing::Return("Network"));
+            receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
+          }
+        }));
   }
 
   TestScopedRuntime scoped_runtime;
@@ -1334,7 +1537,7 @@ typed_extension_protocol_options:
   EXPECT_CALL(cluster_manager_, addOrUpdateCluster(WithAttribute(expected_cluster), _))
       .WillOnce(Return(true));
 
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectDocumentHttpAsync(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1346,7 +1549,7 @@ typed_extension_protocol_options:
   setupProviderWithContext();
 }
 
-TEST_F(TaskRoleCredentialsProviderTest, TestClusterMissingExpectEnvoyException) {
+TEST_F(TaskRoleCredentialsProviderTest, TestClusterMissing) {
   // Setup without thread local cluster
   Http::RequestMessageImpl message;
 
@@ -1361,7 +1564,29 @@ TEST_F(TaskRoleCredentialsProviderTest, TestClusterMissingExpectEnvoyException) 
 TEST_F(TaskRoleCredentialsProviderTest, FailedFetchingDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocumentHttpAsync(std::move(std::string()));
+  expectDocumentHttpAsync(403 /*Forbidden*/, std::move(std::string()));
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Expect refresh timer to be started.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
+
+  // Cancel is called for fetching once again as previous attempt wasn't a success.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  // Expect refresh timer to be stopped and started.
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(TaskRoleCredentialsProviderTest, EmptyDocument) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectDocumentHttpAsync(200, std::move(std::string()));
   // init_watcher ready is called.
   init_watcher_.expectReady();
   // Expect refresh timer to be started.
@@ -1384,7 +1609,7 @@ TEST_F(TaskRoleCredentialsProviderTest, MalformedDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectDocumentHttpAsync(200, std::move(R"EOF(
 not json
 )EOF"));
   // init_watcher ready is called.
@@ -1409,7 +1634,7 @@ TEST_F(TaskRoleCredentialsProviderTest, EmptyValues) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectDocumentHttpAsync(200, std::move(R"EOF(
 {
   "AccessKeyId": "",
   "SecretAccessKey": "",
@@ -1439,7 +1664,7 @@ TEST_F(TaskRoleCredentialsProviderTest, EmptyValues) {
 TEST_F(TaskRoleCredentialsProviderTest, FullCachedCredentials) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectDocumentHttpAsync(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1486,7 +1711,7 @@ TEST_F(TaskRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectDocumentHttpAsync(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1514,7 +1739,7 @@ TEST_F(TaskRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   EXPECT_EQ("secret", credentials.secretAccessKey().value());
   EXPECT_EQ("token", credentials.sessionToken().value());
 
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectDocumentHttpAsync(200, std::move(R"EOF(
 {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",
@@ -1546,7 +1771,7 @@ TEST_F(TaskRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
 TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectDocumentHttpAsync(200, std::move(R"EOF(
 {
   "AccessKeyId": "akid",
   "SecretAccessKey": "secret",
@@ -1575,7 +1800,7 @@ TEST_F(TaskRoleCredentialsProviderTest, TimestampCredentialExpiration) {
 
   // Cancel is called once.
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
-  expectDocumentHttpAsync(std::move(R"EOF(
+  expectDocumentHttpAsync(200, std::move(R"EOF(
 {
   "AccessKeyId": "new_akid",
   "SecretAccessKey": "new_secret",

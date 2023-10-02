@@ -183,7 +183,7 @@ protected:
 
   OnAsyncFetchCb on_async_fetch_cb_;
   bool continue_on_async_fetch_failure_ = false;
-  std::string continue_on_async_fetch_failure_reason_ = "";
+  std::string continue_on_async_fetch_failure_reason_ = "{}";
   SystemTime last_updated_;
   Credentials cached_credentials_;
   Thread::MutexBasicLockable lock_;

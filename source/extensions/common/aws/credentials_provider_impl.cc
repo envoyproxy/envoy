@@ -229,14 +229,14 @@ void InstanceProfileCredentialsProvider::refresh() {
     if (!metadata_fetcher_) {
       metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
     } else {
-      metadata_fetcher_->cancel();
+      metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
     }
     on_async_fetch_cb_ = [this](const std::string&& arg) {
       return this->fetchInstanceRoleAsync(std::move(arg));
     };
-    continue_on_async_fetch_failure_ = true; // FIXME: Unit test this part
+    continue_on_async_fetch_failure_ = true;
     continue_on_async_fetch_failure_reason_ =
-        "Failed to get token from EC2MetadataService, falling back to less secure way";
+        "Failed to get token from EC2MetadataService, reason:{}. Falling back to less secure way";
     metadata_fetcher_->fetch(token_req_message, Tracing::NullSpan::instance(), *this);
   }
 }
@@ -265,11 +265,7 @@ void InstanceProfileCredentialsProvider::fetchInstanceRole(const std::string&& t
                                     std::move(token_string));
   } else {
     // Using Http async client to fetch the Instance Role.
-    if (!metadata_fetcher_) {
-      metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
-    } else {
-      metadata_fetcher_->cancel();
-    }
+    metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
     on_async_fetch_cb_ = [this, token_string = std::move(token_string)](const std::string&& arg) {
       return this->fetchCredentialFromInstanceRoleAsync(std::move(arg), std::move(token_string));
     };
@@ -325,12 +321,7 @@ void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
     extractCredentials(std::move(credential_document.value()));
   } else {
     // Using Http async client to fetch and parse the AWS credentials.
-    if (!metadata_fetcher_) {
-      metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
-    } else {
-      metadata_fetcher_->cancel();
-    }
-
+    metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
     on_async_fetch_cb_ = [this](const std::string&& arg) {
       return this->extractCredentialsAsync(std::move(arg));
     };
@@ -382,15 +373,17 @@ void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& b
   on_async_fetch_cb_(std::move(body));
 }
 
-void InstanceProfileCredentialsProvider::onMetadataError(Failure) {
+void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
   // TODO(suniltheta): increment fetch failed stats
   if (continue_on_async_fetch_failure_) {
-    ENVOY_LOG(warn, continue_on_async_fetch_failure_reason_);
+    ENVOY_LOG(warn, continue_on_async_fetch_failure_reason_,
+              metadata_fetcher_->failureToString(reason));
     continue_on_async_fetch_failure_ = false;
-    continue_on_async_fetch_failure_reason_ = "";
+    continue_on_async_fetch_failure_reason_ = "{}";
     on_async_fetch_cb_(std::move(""));
   } else {
-    ENVOY_LOG(error, "AWS Instance metadata fetch failure");
+    ENVOY_LOG(error, "AWS Instance metadata fetch failure: {}",
+              metadata_fetcher_->failureToString(reason));
     handleFetchDone();
   }
 }
@@ -432,7 +425,7 @@ void TaskRoleCredentialsProvider::refresh() {
     if (!metadata_fetcher_) {
       metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
     } else {
-      metadata_fetcher_->cancel();
+      metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
     }
     on_async_fetch_cb_ = [this](const std::string&& arg) {
       return this->extractCredentials(std::move(arg));
@@ -489,9 +482,9 @@ void TaskRoleCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   on_async_fetch_cb_(std::move(body));
 }
 
-void TaskRoleCredentialsProvider::onMetadataError(Failure) {
+void TaskRoleCredentialsProvider::onMetadataError(Failure reason) {
   // TODO(suniltheta): increment fetch failed stats
-  ENVOY_LOG(error, "AWS metadata fetch failure");
+  ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
 }
 
