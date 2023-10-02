@@ -9,7 +9,7 @@ namespace TestRead {
 Http::FilterHeadersStatus TestReadFilter::decodeHeaders(Http::RequestHeaderMap& request_headers,
                                                         bool) {
   // sample path is /failed?error=0x10000
-  auto query_parameters = Http::Utility:: ::QueryParamsMulti::parseQueryString(
+  auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
       request_headers.Path()->value().getStringView());
   auto error = query_parameters.getFirstValue("error");
   uint64_t response_flag;
