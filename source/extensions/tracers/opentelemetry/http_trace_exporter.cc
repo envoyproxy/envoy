@@ -1,4 +1,4 @@
-#include "http_trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/http_trace_exporter.h"
 
 #include <chrono>
 #include <memory>
@@ -13,7 +13,8 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 OpenTelemetryHttpTraceExporter::OpenTelemetryHttpTraceExporter(
-    Upstream::ClusterManager& cluster_manager, envoy::config::core::v3::HttpService http_service,
+    Upstream::ClusterManager& cluster_manager,
+    const envoy::config::core::v3::HttpService& http_service,
     OpenTelemetryTracerStats& tracing_stats)
     : cluster_manager_(cluster_manager), http_service_(http_service),
       tracing_stats_(tracing_stats) {}

@@ -11,10 +11,10 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
+#include "source/extensions/tracers/opentelemetry/tracer_stats.h"
 
 #include "absl/strings/escaping.h"
-#include "span_context.h"
-#include "tracer_stats.h"
 
 namespace Envoy {
 namespace Extensions {

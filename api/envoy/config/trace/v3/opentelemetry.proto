@@ -20,12 +20,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
-  // This field can be left empty to disable reporting traces to the upstream cluster.
+  // This field can be left empty to disable reporting traces to the gRPC service.
   // Only one of ``grpc_service``, ``http_service`` may be used.
   core.v3.GrpcService grpc_service = 1;
 
   // The upstream HTTP cluster that will receive OTLP traces.
-  // This field can be left empty to disable reporting traces to the upstream cluster.
+  // This field can be left empty to disable reporting traces to the HTTP service.
   // Only one of ``grpc_service``, ``http_service`` may be used.
   core.v3.HttpService http_service = 3;
 

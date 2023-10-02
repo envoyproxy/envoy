@@ -8,15 +8,15 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/http_trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
+#include "source/extensions/tracers/opentelemetry/trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/tracer.h"
 
-#include "grpc_trace_exporter.h"
-#include "http_trace_exporter.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
-#include "span_context.h"
-#include "span_context_extractor.h"
-#include "trace_exporter.h"
-#include "tracer.h"
 
 namespace Envoy {
 namespace Extensions {

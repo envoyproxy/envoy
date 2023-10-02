@@ -4,9 +4,9 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
-#include "trace_exporter.h"
 
 namespace Envoy {
 namespace Extensions {
