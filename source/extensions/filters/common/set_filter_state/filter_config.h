@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/filters/common/set_filter_state/v3/rule.pb.h"
+#include "envoy/extensions/filters/common/set_filter_state/v3/value.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -17,7 +17,7 @@ using LifeSpan = StreamInfo::FilterState::LifeSpan;
 using StateType = StreamInfo::FilterState::StateType;
 using StreamSharing = StreamInfo::StreamSharingMayImpactPooling;
 
-struct Rule {
+struct Value {
   std::string key_;
   StreamInfo::FilterState::ObjectFactory* factory_;
   StateType state_type_{StateType::ReadOnly};
@@ -28,20 +28,21 @@ struct Rule {
 
 class Config : public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(const Protobuf::RepeatedPtrField<
-             envoy::extensions::filters::common::set_filter_state::v3::Rule>& proto_rules,
-         LifeSpan life_span, Server::Configuration::CommonFactoryContext& context)
-      : life_span_(life_span), rules_(parse(proto_rules, context)) {}
+  Config(
+      const Protobuf::RepeatedPtrField<
+          envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue>& proto_values,
+      LifeSpan life_span, Server::Configuration::CommonFactoryContext& context)
+      : life_span_(life_span), values_(parse(proto_values, context)) {}
   void updateFilterState(const Formatter::HttpFormatterContext& context,
                          StreamInfo::StreamInfo& info) const;
 
 private:
-  std::vector<Rule>
-  parse(const Protobuf::RepeatedPtrField<
-            envoy::extensions::filters::common::set_filter_state::v3::Rule>& proto_rules,
-        Server::Configuration::CommonFactoryContext& context) const;
+  std::vector<Value> parse(
+      const Protobuf::RepeatedPtrField<
+          envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue>& proto_values,
+      Server::Configuration::CommonFactoryContext& context) const;
   const LifeSpan life_span_;
-  const std::vector<Rule> rules_;
+  const std::vector<Value> values_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

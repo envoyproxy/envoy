@@ -61,8 +61,8 @@ public:
     name: header-to-filter-state
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
-      rules:
-      - key: internal_state
+      on_request_headers:
+      - object_key: internal_state
         format_string:
           text_format_source:
             inline_string: "%REQ(internal-header)%"
@@ -72,8 +72,8 @@ public:
     name: header-to-filter-state
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
-      rules:
-      - key: internal_state_once
+      on_request_headers:
+      - object_key: internal_state_once
         format_string:
           text_format_source:
             inline_string: "%REQ(internal-header-once)%"

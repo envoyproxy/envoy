@@ -41,18 +41,18 @@ REGISTER_FACTORY(ObjectFooFactory, StreamInfo::FilterState::ObjectFactory);
 
 class ConfigTest : public testing::Test {
 public:
-  void initialize(const std::vector<std::string>& rules,
+  void initialize(const std::vector<std::string>& values,
                   LifeSpan life_span = LifeSpan::FilterChain) {
-    using ProtoRule = envoy::extensions::filters::common::set_filter_state::v3::Rule;
-    std::vector<ProtoRule> proto_rules;
-    proto_rules.reserve(rules.size());
-    for (const auto& rule : rules) {
-      ProtoRule proto_rule;
-      TestUtility::loadFromYaml(rule, proto_rule);
-      proto_rules.push_back(proto_rule);
+    using ProtoValue = envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue;
+    std::vector<ProtoValue> proto_values;
+    proto_values.reserve(values.size());
+    for (const auto& value : values) {
+      ProtoValue proto_value;
+      TestUtility::loadFromYaml(value, proto_value);
+      proto_values.push_back(proto_value);
     }
     config_ = std::make_shared<Config>(
-        Protobuf::RepeatedPtrField<ProtoRule>(proto_rules.begin(), proto_rules.end()), life_span,
+        Protobuf::RepeatedPtrField<ProtoValue>(proto_values.begin(), proto_values.end()), life_span,
         context_);
   }
   void update() { config_->updateFilterState({&header_map_}, info_); }
@@ -125,7 +125,7 @@ TEST_F(ConfigTest, SetValueFromHeader) {
   EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
 }
 
-TEST_F(ConfigTest, MultipleRules) {
+TEST_F(ConfigTest, MultipleValues) {
   initialize({R"YAML(
     object_key: foo
     format_string:

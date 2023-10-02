@@ -8,56 +8,56 @@ namespace Filters {
 namespace Common {
 namespace SetFilterState {
 
-std::vector<Rule>
-Config::parse(const Protobuf::RepeatedPtrField<
-                  envoy::extensions::filters::common::set_filter_state::v3::Rule>& proto_rules,
-              Server::Configuration::CommonFactoryContext& context) const {
-  std::vector<Rule> rules;
-  rules.reserve(proto_rules.size());
-  for (const auto& proto_rule : proto_rules) {
-    Rule rule;
-    rule.key_ = proto_rule.object_key();
-    rule.factory_ =
-        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(rule.key_);
-    if (rule.factory_ == nullptr) {
-      throw EnvoyException(fmt::format("'{}' does not have an object factory", rule.key_));
+std::vector<Value> Config::parse(
+    const Protobuf::RepeatedPtrField<
+        envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue>& proto_values,
+    Server::Configuration::CommonFactoryContext& context) const {
+  std::vector<Value> values;
+  values.reserve(proto_values.size());
+  for (const auto& proto_value : proto_values) {
+    Value value;
+    value.key_ = proto_value.object_key();
+    value.factory_ =
+        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(value.key_);
+    if (value.factory_ == nullptr) {
+      throw EnvoyException(fmt::format("'{}' does not have an object factory", value.key_));
     }
-    rule.state_type_ = proto_rule.read_only() ? StateType::ReadOnly : StateType::Mutable;
-    switch (proto_rule.shared_with_upstream()) {
-    case envoy::extensions::filters::common::set_filter_state::v3::Rule::ONCE:
-      rule.stream_sharing_ = StreamSharing::SharedWithUpstreamConnectionOnce;
+    value.state_type_ = proto_value.read_only() ? StateType::ReadOnly : StateType::Mutable;
+    switch (proto_value.shared_with_upstream()) {
+    case envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue::ONCE:
+      value.stream_sharing_ = StreamSharing::SharedWithUpstreamConnectionOnce;
       break;
-    case envoy::extensions::filters::common::set_filter_state::v3::Rule::TRANSITIVE:
-      rule.stream_sharing_ = StreamSharing::SharedWithUpstreamConnection;
+    case envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue::TRANSITIVE:
+      value.stream_sharing_ = StreamSharing::SharedWithUpstreamConnection;
       break;
     default:
-      rule.stream_sharing_ = StreamSharing::None;
+      value.stream_sharing_ = StreamSharing::None;
       break;
     }
-    rule.skip_if_empty_ = proto_rule.skip_if_empty();
-    rule.value_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-        proto_rule.format_string(), context);
-    rules.push_back(rule);
+    value.skip_if_empty_ = proto_value.skip_if_empty();
+    value.value_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+        proto_value.format_string(), context);
+    values.push_back(value);
   }
-  return rules;
+  return values;
 }
 
 void Config::updateFilterState(const Formatter::HttpFormatterContext& context,
                                StreamInfo::StreamInfo& info) const {
-  for (const auto& rule : rules_) {
-    const std::string value = rule.value_->formatWithContext(context, info);
-    if (value.empty() && rule.skip_if_empty_) {
-      ENVOY_LOG(trace, "Skip empty value for an object '{}'", rule.key_);
+  for (const auto& value : values_) {
+    const std::string bytes_value = value.value_->formatWithContext(context, info);
+    if (bytes_value.empty() && value.skip_if_empty_) {
+      ENVOY_LOG(trace, "Skip empty value for an object '{}'", value.key_);
       continue;
     }
-    auto object = rule.factory_->createFromBytes(value);
+    auto object = value.factory_->createFromBytes(bytes_value);
     if (object == nullptr) {
-      ENVOY_LOG(trace, "Failed to create an object '{}' from value '{}'", rule.key_, value);
+      ENVOY_LOG(trace, "Failed to create an object '{}' from value '{}'", value.key_, bytes_value);
       continue;
     }
     ENVOY_LOG(trace, "Set the filter state to '{}'", object->serializeAsString().value_or(""));
-    info.filterState()->setData(rule.key_, std::move(object), rule.state_type_, life_span_,
-                                rule.stream_sharing_);
+    info.filterState()->setData(value.key_, std::move(object), value.state_type_, life_span_,
+                                value.stream_sharing_);
   }
 }
 

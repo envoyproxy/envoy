@@ -240,8 +240,8 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   name: header-to-filter-state
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
-    rules:
-    - key: jwt_selector
+    on_request_headers:
+    - object_key: jwt_selector
       format_string:
         text_format_source:
           inline_string: "%REQ(jwt_selector)%"
