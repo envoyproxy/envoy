@@ -45,6 +45,9 @@ MAINTAINERS = {
     'soulxu': 'U01GNQ3B8AY',
 }
 
+# Oncall calendar
+CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
+
 # First pass reviewers who are not maintainers should get
 # notifications but not result in a PR not getting assigned a
 # maintainer owner.
@@ -238,20 +241,17 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
 
 
 def parse_calendar():
-    e = requests.get(
-        "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
-    )
-    ecal = icalendar.Calendar.from_ical(e.text)
+    ical = requests.get(CALENDAR)
+    parsed_calendar = icalendar.Calendar.from_ical(ical.text)
+    ical.close()
 
     now = datetime.datetime.now()
     sunday = now - datetime.timedelta(days=now.weekday() + 1)
 
-    for component in ecal.walk():
+    for component in parsed_calendar.walk():
         if component.name == "VEVENT":
             if (sunday.date() == component.decoded("dtstart").date()):
-                e.close()
                 return component.get("summary")
-    e.close()
     return "unable to find this week's oncall"
 
 
