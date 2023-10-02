@@ -68,8 +68,8 @@ public:
     ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
-  std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
-      new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
+  using MockDnsCacheManager = Extensions::Common::DynamicForwardProxy::MockDnsCacheManager;
+  std::shared_ptr<MockDnsCacheManager> dns_cache_manager_ = std::make_shared<MockDnsCacheManager>();
   NiceMock<Server::Configuration::MockFactoryContext> server_context_;
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
@@ -109,14 +109,14 @@ TEST_F(DynamicProxyFilterTest, CustomBufferConfig) {
   EXPECT_EQ(20, filter_config_->maxBufferedBytes());
 }
 
-TEST_F(DynamicProxyFilterTest, MissingHostAndPort) {
+TEST_F(DynamicProxyFilterTest, StopIterationOnMissingHostAndPort) {
   setup();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, MissingPort) {
+TEST_F(DynamicProxyFilterTest, StopIterationOnMissingPort) {
   setup();
   setFilterStateHost("host");
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
@@ -124,7 +124,7 @@ TEST_F(DynamicProxyFilterTest, MissingPort) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, MissingHost) {
+TEST_F(DynamicProxyFilterTest, StopIterationOnMissingHost) {
   setup();
   setFilterStatePort(50);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
@@ -132,7 +132,7 @@ TEST_F(DynamicProxyFilterTest, MissingHost) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, EmptyHost) {
+TEST_F(DynamicProxyFilterTest, StopIterationOnEmptyHost) {
   setup();
   setFilterState("", 50);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
@@ -140,7 +140,7 @@ TEST_F(DynamicProxyFilterTest, EmptyHost) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, PortIsZero) {
+TEST_F(DynamicProxyFilterTest, StopIterationOnPortIsZero) {
   setup();
   setFilterState("", 0);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
@@ -148,7 +148,7 @@ TEST_F(DynamicProxyFilterTest, PortIsZero) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, PortOutOfRange) {
+TEST_F(DynamicProxyFilterTest, StopIterationOnPortOutOfRange) {
   setup();
   setFilterState("", 65536);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
@@ -156,7 +156,7 @@ TEST_F(DynamicProxyFilterTest, PortOutOfRange) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, RequestOverflow) {
+TEST_F(DynamicProxyFilterTest, StopIterationOnRequestOverflow) {
   setup();
   setFilterState("host", 50);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).WillOnce(Return(nullptr));
@@ -164,7 +164,7 @@ TEST_F(DynamicProxyFilterTest, RequestOverflow) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, CacheLoadOverflow) {
+TEST_F(DynamicProxyFilterTest, StopIterationOnCacheLoadOverflow) {
   setup();
   setFilterState("host", 50);
   Upstream::ResourceAutoIncDec* circuit_breakers_{
@@ -178,7 +178,7 @@ TEST_F(DynamicProxyFilterTest, CacheLoadOverflow) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, AlreadyInCache) {
+TEST_F(DynamicProxyFilterTest, PassesThroughImmediatelyWhenDnsAlreadyInCache) {
   setup();
   setFilterState("host", 50);
   Upstream::ResourceAutoIncDec* circuit_breakers_{
@@ -192,7 +192,7 @@ TEST_F(DynamicProxyFilterTest, AlreadyInCache) {
   EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, LoadingCacheEntry) {
+TEST_F(DynamicProxyFilterTest, LoadingCacheEntryScenario) {
   setup();
   setFilterState("host", 50);
   Upstream::ResourceAutoIncDec* circuit_breakers_{
