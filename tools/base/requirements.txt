@@ -477,9 +477,9 @@ envoy-distribution-verify==0.0.11 \
 envoy-docker-utils==0.0.2 \
     --hash=sha256:a12cb57f0b6e204d646cbf94f927b3a8f5a27ed15f60d0576176584ec16a4b76
     # via envoy-distribution-distrotest
-envoy-docs-sphinx-runner==0.2.8 \
-    --hash=sha256:129db23430fd3fae3cf62fda74b9479c6880698fef46f895058c98f1f3cf8e20 \
-    --hash=sha256:736cc88874bdf42778cec02648fcbd82971154d38618b3699e17c049bdec74c9
+envoy-docs-sphinx-runner==0.2.9 \
+    --hash=sha256:1fa789b1d29ea929df67b07e5ca910d62e2057cd229719725030889da53b1a09 \
+    --hash=sha256:4bfa1946104e263471d522b47d683e127124a5ad47334d69de4aea0eac282576
     # via -r requirements.in
 envoy-github-abstract==0.0.22 \
     --hash=sha256:2dd65e2f247a4947d0198b295c82716c13162e30c433b7625c27d59eee7bcf78 \
@@ -1072,9 +1072,9 @@ pyflakes==3.1.0 \
     --hash=sha256:4132f6d49cb4dae6819e5379898f2b8cce3c5f23994194c24b77d5da2e36f774 \
     --hash=sha256:a0aae034c444db0071aa077972ba4768d40c830d9539fd45bf4cd3f8f6992efc
     # via flake8
-pygithub==1.59.1 \
-    --hash=sha256:3d87a822e6c868142f0c2c4bf16cce4696b5a7a4d142a7bd160e1bdf75bc54a9 \
-    --hash=sha256:c44e3a121c15bf9d3a5cc98d94c9a047a5132a9b01d22264627f58ade9ddc217
+pygithub==2.1.1 \
+    --hash=sha256:4b528d5d6f35e991ea5fd3f942f58748f24938805cb7fcf24486546637917337 \
+    --hash=sha256:ecf12c2809c44147bce63b047b3d2e9dac8a41b63e90fcb263c703f64936b97c
     # via -r requirements.in
 pygments==2.15.1 \
     --hash=sha256:8ace4d3c1dd481894b2005f560ead0f9f19ee64fe983366be1a21e171d12775c \
@@ -1113,6 +1113,10 @@ pyparsing==3.1.0 \
 pyreadline==2.1 \
     --hash=sha256:4530592fc2e85b25b1a9f79664433da09237c1a270e4d78ea5aa3a2c7229e2d1
     # via -r requirements.in
+python-dateutil==2.8.2 \
+    --hash=sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86 \
+    --hash=sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9
+    # via pygithub
 python-gnupg==0.5.1 \
     --hash=sha256:5674bad4e93876c0b0d3197e314d7f942d39018bf31e2b833f6788a6813c3fb8 \
     --hash=sha256:bf9b2d9032ef38139b7d64184176cd0b293eaeae6e4f93f50e304c7051174482
@@ -1202,6 +1206,7 @@ six==1.16.0 \
     #   google-auth
     #   gsutil
     #   oauth2client
+    #   python-dateutil
     #   pyu2f
     #   sphinxcontrib-httpdomain
     #   thrift
@@ -1297,7 +1302,9 @@ trycast==1.0.0 \
 typing-extensions==4.7.1 \
     --hash=sha256:440d5dd3af93b060174bf433bccd69b0babc3b15b1a8dca43789fd7f61514b36 \
     --hash=sha256:b75ddc264f0ba5615db7ba217daeb99701ad295353c45f9e95963337ceeeffb2
-    # via aiodocker
+    # via
+    #   aiodocker
+    #   pygithub
 uritemplate==4.1.1 \
     --hash=sha256:4346edfc5c3b79f694bccd6d6099a322bbeb628dbf2cd86eea55a456ce5124f0 \
     --hash=sha256:830c08b8d99bdd312ea4ead05994a38e8936266f84b9a7878232db50b044e02e
@@ -1307,6 +1314,7 @@ urllib3==1.26.16 \
     --hash=sha256:8f135f6502756bde6b2a9b28989df5fbe87c9970cecaa69041edcce7f0589b14
     # via
     #   google-auth
+    #   pygithub
     #   requests
 uvloop==0.17.0 \
     --hash=sha256:0949caf774b9fcefc7c5756bacbbbd3fc4c05a6b7eebc7c7ad6f825b23998d6d \
