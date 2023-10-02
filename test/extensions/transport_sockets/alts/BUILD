@@ -131,7 +131,7 @@ envoy_extension_cc_test(
     srcs = envoy_select_google_grpc(["alts_integration_test.cc"]),
     extension_names = ["envoy.transport_sockets.alts"],
     external_deps = [
-        "grpc_alts_fake_handshaker_server",
+        "grpc",
     ],
     deps = [
         "//source/common/common:utility_lib",
@@ -146,7 +146,9 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
         "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
     ],
 )
