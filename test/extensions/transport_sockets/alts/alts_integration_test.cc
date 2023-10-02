@@ -272,7 +272,7 @@ private:
   grpc::Status WriteErrorResponse(
       grpc::ServerReaderWriter<grpc::gcp::HandshakerResp, grpc::gcp::HandshakerReq>* stream,
       const grpc::Status& status) {
-    EXPECT_OK(status);
+    EXPECT_TRUE(status.ok());
     grpc::gcp::HandshakerResp response;
     response.mutable_status()->set_code(status.error_code());
     response.mutable_status()->set_details(status.error_message());
