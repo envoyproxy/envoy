@@ -105,5 +105,5 @@ jobs:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
         ref: main
-        repository: ${ inputs.version_dev != '' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }
+        repository: ${{ inputs.version_dev != '' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
         workflow: envoy-sync.yaml
