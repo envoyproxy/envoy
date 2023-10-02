@@ -140,6 +140,7 @@ envoy_extension_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/transport_sockets/alts:config",
+        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
         "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:decode_dynamic_metadata_filter_lib",
@@ -148,7 +149,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "//source/extensions/transport_sockets/alts:handshaker_cc_grpc",
         "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
     ],
 )
