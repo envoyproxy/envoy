@@ -41,8 +41,8 @@ genrule(
     outs = ["gnu_build_id.ldscript"],
     cmd = """
       echo --build-id=0x$$(
-          grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-        | sed 's/^BUILD_SCM_REVISION //') \\
+          grep -E "^BUILD_SCM_REVISION" bazel-out/volatile-status.txt \
+        | sed 's/^BUILD_SCM_REVISION //') \
         > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -55,8 +55,8 @@ genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],
     cmd = """
-      grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-    | sed 's/^BUILD_SCM_REVISION //' \\
+      grep -E "^BUILD_SCM_REVISION" bazel-out/volatile-status.txt \
+    | sed 's/^BUILD_SCM_REVISION //' \
     | tr -d '\\n' \\
     > $@
     """,
