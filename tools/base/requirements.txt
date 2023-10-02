@@ -443,6 +443,7 @@ docutils==0.19 \
     # via
     #   envoy-docs-sphinx-runner
     #   sphinx
+    #   sphinx-rtd-theme
 envoy-base-utils==0.4.12 \
     --hash=sha256:2bafcb6be3c1223968c9ee90b7a33d6d93aee16fe99bef37410ea9e4bc1a957f \
     --hash=sha256:b9b409abe83be6911aa03cfe635ed1e2e2b9e44e7c8595b2b7e5c7aae7bf70fc
@@ -484,9 +485,9 @@ envoy-distribution-verify==0.0.11 \
 envoy-docker-utils==0.0.2 \
     --hash=sha256:a12cb57f0b6e204d646cbf94f927b3a8f5a27ed15f60d0576176584ec16a4b76
     # via envoy-distribution-distrotest
-envoy-docs-sphinx-runner==0.2.6 \
-    --hash=sha256:045b23f182d9760df693e0c01f6bd0654d0c5690107945e262ce720a976920b7 \
-    --hash=sha256:8166ff4b1b265efaf73db397d7ad0a1a743d71281ec233885c692c24f9349bd1
+envoy-docs-sphinx-runner==0.2.9 \
+    --hash=sha256:1fa789b1d29ea929df67b07e5ca910d62e2057cd229719725030889da53b1a09 \
+    --hash=sha256:4bfa1946104e263471d522b47d683e127124a5ad47334d69de4aea0eac282576
     # via -r requirements.in
 envoy-github-abstract==0.0.22 \
     --hash=sha256:2dd65e2f247a4947d0198b295c82716c13162e30c433b7625c27d59eee7bcf78 \
@@ -1221,11 +1222,17 @@ sphinx==7.0.1 \
     # via
     #   envoy-docs-sphinx-runner
     #   sphinx-copybutton
+    #   sphinx-rtd-theme
     #   sphinxcontrib-httpdomain
+    #   sphinxcontrib-jquery
     #   sphinxext-rediraffe
 sphinx-copybutton==0.5.2 \
     --hash=sha256:4cf17c82fb9646d1bc9ca92ac280813a3b605d8c421225fd9913154103ee1fbd \
     --hash=sha256:fb543fd386d917746c9a2c50360c7905b605726b9355cd26e9974857afeae06e
+    # via envoy-docs-sphinx-runner
+sphinx-rtd-theme==2.0.0rc2 \
+    --hash=sha256:d1270effe620df9164b1cd2d617909472a63531e21a716fd22d0fbcedf9d24ff \
+    --hash=sha256:f04df9213acf421c3b42f4f39005c8bc68fc4696c5b4ed4ef13d1678369713f7
     # via envoy-docs-sphinx-runner
 sphinxcontrib-applehelp==1.0.4 \
     --hash=sha256:29d341f67fb0f6f586b23ad80e072c8e6ad0b48417db2bde114a4c9746feb228 \
@@ -1243,11 +1250,12 @@ sphinxcontrib-httpdomain==1.8.1 \
     --hash=sha256:21eefe1270e4d9de8d717cc89ee92cc4871b8736774393bafc5e38a6bb77b1d5 \
     --hash=sha256:6c2dfe6ca282d75f66df333869bb0ce7331c01b475db6809ff9d107b7cdfe04b
     # via envoy-docs-sphinx-runner
-sphinxcontrib.jquery @ https://github.com/sphinx-contrib/jquery/archive/refs/tags/v3.0.0.zip \
-    --hash=sha256:562ad9ac0ac3d8f04a363eb3507ae4b2b856aa04aabab6df7543530fafb849ca
+sphinxcontrib-jquery==4.1 \
+    --hash=sha256:1620739f04e36a2c779f1a131a2dfd49b2fd07351bf1968ced074365933abc7a \
+    --hash=sha256:f936030d7d0147dd026a4f2b5a57343d233f1fc7b363f68b3d4f1cb0993878ae
     # via
-    #   -r requirements.in
     #   envoy-docs-sphinx-runner
+    #   sphinx-rtd-theme
 sphinxcontrib-jsmath==1.0.1 \
     --hash=sha256:2ec2eaebfb78f3f2078e73666b1415417a116cc848b72e5172e596c871103178 \
     --hash=sha256:a9925e4a4587247ed2191a22df5f6970656cb8ca2bd6284309578f2153e0c4b8
@@ -1550,6 +1558,4 @@ zstandard==0.21.0 \
 setuptools==67.8.0 \
     --hash=sha256:5df61bf30bb10c6f756eb19e7c9f3b473051f48db77fddbe06ff2ca307df9a6f \
     --hash=sha256:62642358adc77ffa87233bc4d2354c4b2682d214048f500964dbe760ccedf102
-    # via
-    #   -r requirements.in
-    #   sphinxcontrib-jquery
+    # via -r requirements.in
