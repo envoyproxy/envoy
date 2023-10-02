@@ -28,9 +28,9 @@
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
-#include "third_party/envoy/src/test/test_common/status_utility.h"
 
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
