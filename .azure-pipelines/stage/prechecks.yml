@@ -54,6 +54,7 @@ jobs:
   steps:
   - template: ../ci.yml
     parameters:
+      bazelBuildExtraOptions: --config=docs-ci
       ciTarget: $(CI_TARGET)
       cacheName: $(CI_TARGET)
       cacheTestResults: ${{ parameters.cacheTestResults }}

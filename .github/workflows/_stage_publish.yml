@@ -37,18 +37,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish_docs:
-    if: ${{ inputs.trusted }}
-    runs-on: ubuntu-22.04
-    steps:
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.18
-      with:
-        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
-        key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
-        ref: main
-        repository: "envoyproxy/envoy-website"
-        workflow: envoy-sync.yaml
-
   publish_ci:
     if: ${{ ! inputs.trusted }}
     name: ${{ matrix.name || matrix.target }}
@@ -105,3 +93,17 @@ jobs:
       run_pre_with: ${{ matrix.run_pre_with }}
       env: ${{ matrix.env }}
       trusted: true
+
+  publish_docs:
+    if: ${{ inputs.trusted }}
+    runs-on: ubuntu-22.04
+    needs:
+    - publish
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.0.18
+      with:
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+        key: "${{ secrets.ENVOY_CI_SYNC_APP_KEY }}"
+        ref: main
+        repository: ${ inputs.version_dev != '' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }
+        workflow: envoy-sync.yaml

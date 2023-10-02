@@ -45,7 +45,7 @@ fi
 # Building html/rst is determined by then needs of CI but can be overridden in dev.
 if [[ "${BUILD_TYPE}" == "html" ]] || [[ -n "${DOCS_BUILD_HTML}" ]]; then
     BUILD_HTML=1
-    BUILD_HTML_TARGET="//docs:html"
+    BUILD_HTML_TARGET="//docs"
     BUILD_HTML_TARBALL="bazel-bin/docs/html.tar.gz"
     if [[ -n "${CI_BRANCH}" ]] || [[ -n "${DOCS_BUILD_RELEASE}" ]]; then
         # CI build - use git sha
