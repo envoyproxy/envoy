@@ -647,7 +647,7 @@ public:
   // The following are for use only by implementations of Buffer. Because c++
   // doesn't allow inheritance of friendship, these are just trying to make
   // misuse easy to spot in a code review.
-  static Reservation bufferImplUseOnlyConstruct(Instance& buffer) { return Reservation(buffer); }
+  static Reservation bufferImplUseOnlyConstruct(Instance& buffer) { return {buffer}; }
   decltype(slices_)& bufferImplUseOnlySlices() { return slices_; }
   ReservationSlicesOwnerPtr& bufferImplUseOnlySlicesOwner() { return slices_owner_; }
   void bufferImplUseOnlySetLength(uint64_t length) { length_ = length; }
@@ -708,9 +708,7 @@ public:
   // The following are for use only by implementations of Buffer. Because c++
   // doesn't allow inheritance of friendship, these are just trying to make
   // misuse easy to spot in a code review.
-  static ReservationSingleSlice bufferImplUseOnlyConstruct(Instance& buffer) {
-    return ReservationSingleSlice(buffer);
-  }
+  static ReservationSingleSlice bufferImplUseOnlyConstruct(Instance& buffer) { return {buffer}; }
   RawSlice& bufferImplUseOnlySlice() { return slice_; }
   ReservationSlicesOwnerPtr& bufferImplUseOnlySliceOwner() { return slice_owner_; }
 };
