@@ -216,7 +216,8 @@ TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
   std::string expected_schema_url = "my.schema/v1";
   Resource old_resource = resource_a_;
 
-  Resource updating_resource = resource_b_;
+  // Updating resource is empty (no attributes)
+  Resource updating_resource;
   updating_resource.schemaUrl_ = expected_schema_url;
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();

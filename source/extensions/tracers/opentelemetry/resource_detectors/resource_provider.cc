@@ -60,13 +60,14 @@ std::string resolveSchemaUrl(const std::string& old_schema_url,
  * @param updating_resource The new resource.
  */
 void mergeResource(Resource& old_resource, const Resource& updating_resource) {
+  old_resource.schemaUrl_ = resolveSchemaUrl(old_resource.schemaUrl_, updating_resource.schemaUrl_);
+
   if (isEmptyResource(updating_resource)) {
     return;
   }
   for (auto const& attr : updating_resource.attributes_) {
     old_resource.attributes_.insert_or_assign(attr.first, attr.second);
   }
-  old_resource.schemaUrl_ = resolveSchemaUrl(old_resource.schemaUrl_, updating_resource.schemaUrl_);
 }
 } // namespace
 
