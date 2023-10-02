@@ -55,7 +55,7 @@ SINGLETON_MANAGER_REGISTRATION(alts_shared_state);
 // returns false and fills out err with an error message.
 bool doValidate(const absl::node_hash_set<std::string>& peers, TsiInfo& tsi_info,
                 std::string& err) {
-  if (peers.find(tsi_info.peer_identity) != peers.end()) {
+  if (peers.find(tsi_info.peer_identity_) != peers.end()) {
     return true;
   }
   err =
