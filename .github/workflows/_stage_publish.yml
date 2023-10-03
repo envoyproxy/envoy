@@ -107,3 +107,5 @@ jobs:
         ref: main
         repository: ${{ inputs.version_dev != '' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
         workflow: envoy-sync.yaml
+        inputs: |
+          commit_sha: ${{ inputs.version_dev != '' && github.sha || '' }}
