@@ -2,13 +2,14 @@ load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
-load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data")
+load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data", "envoy_py_namespace", "envoy_pytool_binary")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_py_namespace()
 
 # Files to include when building or comparing the normalized API
 API_FILES = [
@@ -130,7 +131,7 @@ genrule(
     tools = [":formatted_api"],
 )
 
-py_binary(
+envoy_pytool_binary(
     name = "fetch_normalized_changes",
     srcs = ["fetch_normalized_changes.py"],
     args = [
@@ -165,7 +166,7 @@ genrule(
     ],
 )
 
-py_binary(
+envoy_pytool_binary(
     name = "proto_sync",
     srcs = ["proto_sync.py"],
     args = [

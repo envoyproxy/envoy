@@ -34,5 +34,8 @@ git -C "${MOBILE_DOCS_CHECKOUT_DIR}" config user.name "envoy-mobile-docs(ci)"
 git -C "${MOBILE_DOCS_CHECKOUT_DIR}" config user.email envoy-mobile-docs@users.noreply.github.com
 echo 'add'
 git -C "${MOBILE_DOCS_CHECKOUT_DIR}" add .
-echo 'commit'
-git -C "${MOBILE_DOCS_CHECKOUT_DIR}" commit -m "docs envoy-mobile@$BUILD_SHA"
+
+if [[ "$(git -C "${MOBILE_DOCS_CHECKOUT_DIR}" status --porcelain)" ]]; then
+    echo 'commit'
+    git -C "${MOBILE_DOCS_CHECKOUT_DIR}" commit -m "docs envoy-mobile@$BUILD_SHA"
+fi
