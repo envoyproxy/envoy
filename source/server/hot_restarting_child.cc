@@ -222,8 +222,8 @@ void HotRestartingChild::onSocketEventUdpForwarding() {
   while ((wrapped_request =
               udp_forwarding_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::No))) {
     if (wrapped_request->requestreply_case() == HotRestartMessage::kReply) {
-      ENVOY_LOG(
-          error,
+      ENVOY_LOG_PERIODIC(
+          error, std::chrono::seconds(5),
           "HotRestartMessage reply received on UdpForwarding (we want only requests); ignoring.");
       continue;
     }
