@@ -63,7 +63,7 @@ test_suite(
         "quiche_balsa_header_properties_test",
         "quiche_balsa_simple_buffer_test",
         "quiche_common_test",
-        "spdy_core_http2_header_block_test",
+        "quiche_http_header_block_test",
     ],
 )
 
@@ -1319,17 +1319,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_simple_arena_lib",
-    srcs = ["quiche/spdy/core/spdy_simple_arena.cc"],
-    hdrs = ["quiche/spdy/core/spdy_simple_arena.h"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform",
-    ],
-)
-
-envoy_cc_library(
     name = "spdy_no_op_headers_handler_lib",
     hdrs = ["quiche/spdy/core/no_op_headers_handler.h"],
     repository = "@envoy",
@@ -1384,7 +1373,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "spdy_core_http2_header_block_lib",
-    srcs = ["quiche/spdy/core/http2_header_block.cc"],
     hdrs = ["quiche/spdy/core/http2_header_block.h"],
     copts = quiche_copts,
     repository = "@envoy",
@@ -1393,19 +1381,7 @@ envoy_cc_library(
         ":quiche_common_lib",
         ":quiche_common_platform",
         ":quiche_common_text_utils_lib",
-        ":spdy_core_http2_header_storage_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "spdy_core_http2_header_storage_lib",
-    srcs = ["quiche/spdy/core/http2_header_storage.cc"],
-    hdrs = ["quiche/spdy/core/http2_header_storage.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        "spdy_simple_arena_lib",
-        ":quiche_common_platform",
+        ":quiche_http_header_block_lib",
     ],
 )
 
@@ -3850,7 +3826,10 @@ envoy_quic_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_qpack_qpack_stream_sender_delegate_lib",
     hdrs = ["quiche/quic/core/qpack/qpack_stream_sender_delegate.h"],
-    deps = [":quic_platform_base"],
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+    ],
 )
 
 envoy_quic_cc_library(
@@ -5123,6 +5102,58 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_simple_arena_lib",
+    srcs = ["quiche/common/quiche_simple_arena.cc"],
+    hdrs = ["quiche/common/quiche_simple_arena.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_http_header_storage_lib",
+    srcs = ["quiche/common/http/http_header_storage.cc"],
+    hdrs = ["quiche/common/http/http_header_storage.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+        ":quiche_simple_arena_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_http_header_block_lib",
+    srcs = ["quiche/common/http/http_header_block.cc"],
+    hdrs = ["quiche/common/http/http_header_block.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_lib",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+        ":quiche_common_text_utils_lib",
+        ":quiche_http_header_storage_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "quiche_http_header_block_test",
+    srcs = ["quiche/common/http/http_header_block_test.cc"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_test",
+        ":quiche_http_header_block_lib",
+        ":spdy_test_tools_test_utils_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_structured_headers_lib",
     srcs = ["quiche/common/structured_headers.cc"],
     hdrs = ["quiche/common/structured_headers.h"],
@@ -5183,19 +5214,6 @@ envoy_cc_library(
         ":quic_core_utils_lib",
         ":quic_platform_base",
         ":quiche_common_platform",
-    ],
-)
-
-envoy_cc_test(
-    name = "spdy_core_http2_header_block_test",
-    srcs = ["quiche/spdy/core/http2_header_block_test.cc"],
-    copts = quiche_copts,
-    coverage = False,
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [
-        ":spdy_core_http2_header_block_lib",
-        ":spdy_test_tools_test_utils_lib",
     ],
 )
 

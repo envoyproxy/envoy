@@ -27,7 +27,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
-#include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
@@ -200,15 +199,6 @@ DispatcherImpl::createListener(Network::SocketSharedPtr&& socket, Network::TcpLi
       *this, random_generator_, runtime, std::move(socket), cb, listener_config.bindToPort(),
       listener_config.ignoreGlobalConnLimit(),
       listener_config.maxConnectionsToAcceptPerSocketEvent());
-}
-
-Network::UdpListenerPtr
-DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
-                                  Network::UdpListenerCallbacks& cb,
-                                  const envoy::config::core::v3::UdpSocketConfig& config) {
-  ASSERT(isThreadSafe());
-  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource(),
-                                                    config);
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

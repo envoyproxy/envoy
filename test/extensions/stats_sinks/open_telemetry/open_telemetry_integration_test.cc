@@ -61,7 +61,7 @@ public:
       metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
-          Protobuf::util::TimeUtil::MillisecondsToDuration(300));
+          Protobuf::util::TimeUtil::MillisecondsToDuration(500));
     });
 
     HttpIntegrationTest::initialize();

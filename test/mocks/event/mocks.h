@@ -76,12 +76,6 @@ public:
     return Network::ListenerPtr{createListener_(std::move(socket), cb, runtime, listener_config)};
   }
 
-  Network::UdpListenerPtr
-  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-                    const envoy::config::core::v3::UdpSocketConfig& config) override {
-    return Network::UdpListenerPtr{createUdpListener_(socket, cb, config)};
-  }
-
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
     auto timer = Event::TimerPtr{createTimer_(cb)};
     // Assert that the timer is not null to avoid confusing test failures down the line.
@@ -143,9 +137,6 @@ public:
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                Runtime::Loader& runtime, const Network::ListenerConfig& listener_config));
-  MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-               const envoy::config::core::v3::UdpSocketConfig& config));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));

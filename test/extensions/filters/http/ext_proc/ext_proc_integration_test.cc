@@ -1582,6 +1582,29 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
   EXPECT_THAT(response->headers(), HasNoHeader("x-envoy-foo"));
 }
 
+TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
+  filter_mutation_rule_ = "true";
+  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(true);
+  proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    hdr->mutable_header()->set_key("x-envoy-foo");
+    hdr->mutable_header()->set_value("bar");
+    auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_header()->set_key("host");
+    hdr1->mutable_header()->set_value("test");
+  });
+
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("host", "test"));
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-envoy-foo", "bar"));
+}
+
 // Test the filter with request body buffering enabled using
 // an ext_proc server that responds to the request_body message
 // by modifying a header that should cause an error.
