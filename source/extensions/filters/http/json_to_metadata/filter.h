@@ -119,12 +119,10 @@ private:
 
   // Process the case without body, i.e., on_missing is applied for all rules.
   void handleAllOnMissing(const Rules& rules, bool& processing_finished_flag,
-                          Http::StreamFilterCallbacks& filter_callback,
-                          bool shouldClearRouteCache);
+                          Http::StreamFilterCallbacks& filter_callback, bool shouldClearRouteCache);
   // Process the case with error, i.e., on_error is applied for all rules.
   void handleAllOnError(const Rules& rules, bool& processing_finished_flag,
-                        Http::StreamFilterCallbacks& filter_callback,
-                        bool shouldClearRouteCache);
+                        Http::StreamFilterCallbacks& filter_callback, bool shouldClearRouteCache);
   // Parse the body while we have the whole json.
   void processBody(const Buffer::Instance* body, const Rules& rules, bool& processing_finished_flag,
                    Stats::Counter& success, Stats::Counter& no_body, Stats::Counter& non_json,

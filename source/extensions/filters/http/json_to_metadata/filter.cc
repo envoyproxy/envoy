@@ -199,7 +199,7 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
     for (auto const& entry : struct_map) {
       filter_callback.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
-    
+
     if (shouldClearRouteCache) {
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
@@ -302,8 +302,7 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
 void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
                          bool& processing_finished_flag, Stats::Counter& success,
                          Stats::Counter& no_body, Stats::Counter& non_json,
-                         Http::StreamFilterCallbacks& filter_callback,
-                         bool shouldClearRouteCache) {
+                         Http::StreamFilterCallbacks& filter_callback, bool shouldClearRouteCache) {
   // In case we have trailers but no body.
   if (!body || body->length() == 0) {
     handleAllOnMissing(rules, processing_finished_flag, filter_callback, shouldClearRouteCache);
@@ -390,7 +389,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->requestRules(), request_processing_finished_, *decoder_callbacks_, true);
+    handleAllOnMissing(config_->requestRules(), request_processing_finished_, *decoder_callbacks_,
+                       true);
     config_->stats().rq_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -408,8 +408,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   if (end_stream) {
-    handleAllOnMissing(config_->responseRules(), response_processing_finished_,
-                       *encoder_callbacks_, false);
+    handleAllOnMissing(config_->responseRules(), response_processing_finished_, *encoder_callbacks_,
+                       false);
     config_->stats().resp_no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -429,8 +429,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
     if (!decoder_callbacks_->decodingBuffer() ||
         decoder_callbacks_->decodingBuffer()->length() == 0) {
-      handleAllOnMissing(config_->requestRules(), request_processing_finished_,
-                         *decoder_callbacks_, true);
+      handleAllOnMissing(config_->requestRules(), request_processing_finished_, *decoder_callbacks_,
+                         true);
       config_->stats().rq_no_body_.inc();
       return Http::FilterDataStatus::Continue;
     }
