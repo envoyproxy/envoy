@@ -54,7 +54,7 @@ The following list of filter state objects are consumed by Envoy extensions:
 ``envoy.tcp_proxy.disable_tunneling``
   :ref:`TCP proxy tunneling override
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` to disable tunneling on a
-  per-connection bases. Accepts value "true" and "false".
+  per-connection bases. Accepts values "true" and "false".
 
 
 Filter state object fields
