@@ -14,7 +14,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 SamplingResult
-AlwaysOnSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
+AlwaysOnSampler::shouldSample(const absl::StatusOr<SpanContext>& parent_context,
                               const std::string& /*trace_id*/, const std::string& /*name*/,
                               ::opentelemetry::proto::trace::v1::Span::SpanKind /*spankind*/,
                               const std::map<std::string, std::string>& /*attributes*/,

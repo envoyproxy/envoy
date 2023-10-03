@@ -57,7 +57,7 @@ public:
    *
    * @return a SamplingResult
    */
-  virtual SamplingResult shouldSample(absl::StatusOr<SpanContext>& parent_context,
+  virtual SamplingResult shouldSample(const absl::StatusOr<SpanContext>& parent_context,
                                       const std::string& trace_id, const std::string& name,
                                       ::opentelemetry::proto::trace::v1::Span::SpanKind spankind,
                                       const std::map<std::string, std::string>& attributes,
@@ -66,6 +66,7 @@ public:
   virtual std::string getDescription() const PURE;
 
   // allow tracers to provide a vendor specific tracestate
+  // TODO: do we need additional parameters?
   virtual std::string modifyTracestate(const std::string &span_id, const std::string &current_tracestate) const PURE;
 };
 

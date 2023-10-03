@@ -4,7 +4,9 @@
 #include <sstream>
 #include <string>
 
+#include "murmur.h"
 #include "tracestate.h"
+
 #include "source/common/config/datasource.h"
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
@@ -17,7 +19,7 @@ namespace OpenTelemetry {
 static const char* SAMPLING_EXTRAPOLATION_SPAN_ATTRIBUTE_NAME =
     "sampling_extrapolation_set_in_sampler";
 SamplingResult
-DynatraceSampler::shouldSample(absl::StatusOr<SpanContext>& parent_context,
+DynatraceSampler::shouldSample(const absl::StatusOr<SpanContext>& parent_context,
                                const std::string& /*trace_id*/, const std::string& /*name*/,
                                ::opentelemetry::proto::trace::v1::Span::SpanKind /*spankind*/,
                                const std::map<std::string, std::string>& /*attributes*/,

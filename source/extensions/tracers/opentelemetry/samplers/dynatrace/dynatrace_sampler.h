@@ -22,7 +22,7 @@ public:
       const envoy::extensions::tracers::opentelemetry::samplers::v3::DynatraceSamplerConfig config)
       : tenant_id_(config.tenant_id()), cluster_id_(config.cluster_id()), counter_(0) {}
 
-  SamplingResult shouldSample(absl::StatusOr<SpanContext>& parent_context,
+  SamplingResult shouldSample(const absl::StatusOr<SpanContext>& parent_context,
                               const std::string& trace_id, const std::string& name,
                               ::opentelemetry::proto::trace::v1::Span::SpanKind spankind,
                               const std::map<std::string, std::string>& attributes,

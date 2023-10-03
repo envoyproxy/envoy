@@ -23,8 +23,8 @@ envoy_cc_extension(
 
 envoy_cc_library(
     name = "dynatrace_sampler_lib",
-    srcs = ["dynatrace_sampler.cc"],
-    hdrs = ["dynatrace_sampler.h", "tracestate.h",],
+    srcs = ["dynatrace_sampler.cc","murmur.cc",],
+    hdrs = ["dynatrace_sampler.h", "tracestate.h","murmur.h",],
     deps = [
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",

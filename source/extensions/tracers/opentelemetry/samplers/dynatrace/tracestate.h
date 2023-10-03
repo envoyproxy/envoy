@@ -1,8 +1,12 @@
 #pragma once
 
+#include "murmur.h"
+
 #include "absl/strings/string_view.h"
 
+#include <cstdint>
 #include <string>
+#include <sstream>
 #include <vector>
 
 namespace Envoy {
@@ -43,15 +47,25 @@ public:
   std::string span_id = "";
 
   std::string toString() {
-    // absl::StrCat
     std::string tracestate = absl::StrCat(
-        absl::string_view(tenant_id), "-", absl::string_view(cluster_id), at_dt_format, ";", server_id, ";", agent_d, ";", tag_id, ";",
-        link_id, ";", absl::string_view(is_ignored), ";", absl::string_view(sampling_exponent), ";",
-        absl::string_view(path_info));
+        absl::string_view(tenant_id), "-", absl::string_view(cluster_id), at_dt_format, ";",
+        server_id, ";", agent_d, ";", tag_id, ";", link_id, ";", absl::string_view(is_ignored), ";",
+        absl::string_view(sampling_exponent), ";", absl::string_view(path_info));
 
+//    Which is: "abcdabcd-77@dt=fw4;8;66666666;111;99;0;0;66;;8cef;2h01;7h293e72b548735604"
     if (!span_id.empty()) {
-        std::string tmp(tracestate);
-        tracestate = absl::StrCat(absl::string_view(tmp), ";", "7h", absl::string_view(span_id));
+      std::string tmp(tracestate);
+      // https://oaad.lab.dynatrace.org/agent/concepts/purepath/tagging/#forward-tags-fw
+      std::string extension = ";7h" + span_id;
+      
+      uint64_t hash = murmurHash264(extension.c_str(), extension.size());
+      //hash &= 0xffff;
+      uint16_t hash_16 = static_cast<uint16_t>(hash);
+      std::stringstream stream;
+      stream << std::hex << hash_16;
+      std::string hash_as_hex(stream.str());
+      tracestate = absl::StrCat(absl::string_view(tmp), ";", absl::string_view(hash_as_hex),
+                                ";7h", absl::string_view(span_id));
     }
     return tracestate;
   }
