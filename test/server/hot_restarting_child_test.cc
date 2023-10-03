@@ -122,42 +122,42 @@ TEST_F(HotRestartingChildTest, LogsErrorOnNonUdpRelatedMessageInUdpStream) {
 TEST_F(HotRestartingChildTest, DoesNothingOnForwardedUdpMessageWithNoMatchingListener) {
   envoy::HotRestartMessage msg;
   auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
-  packet->set_local_addr("127.0.0.1:1234");
-  packet->set_peer_addr("127.0.0.1:4321");
+  packet->set_local_addr("udp://127.0.0.1:1234");
+  packet->set_peer_addr("udp://127.0.0.1:4321");
   packet->set_payload("hello");
   EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
 }
 
-TEST_F(HotRestartingChildTest, DoesNothingOnUnparseablePeerAddress) {
+TEST_F(HotRestartingChildTest, ExceptionOnUnparseablePeerAddress) {
   envoy::HotRestartMessage msg;
   auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
-  packet->set_local_addr("127.0.0.1:1234");
+  packet->set_local_addr("udp://127.0.0.1:1234");
   packet->set_peer_addr("/tmp/domainsocket");
   packet->set_payload("hello");
-  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+  EXPECT_THROW(fake_parent_->sendUdpForwardingMessage(msg), EnvoyException);
 }
 
-TEST_F(HotRestartingChildTest, DoesNothingOnUnparseableLocalAddress) {
+TEST_F(HotRestartingChildTest, ExceptionOnUnparseableLocalAddress) {
   envoy::HotRestartMessage msg;
   auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
   packet->set_local_addr("/tmp/domainsocket");
-  packet->set_peer_addr("127.0.0.1:4321");
+  packet->set_peer_addr("udp://127.0.0.1:4321");
   packet->set_payload("hello");
-  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+  EXPECT_THROW(fake_parent_->sendUdpForwardingMessage(msg), EnvoyException);
 }
 
 MATCHER_P4(IsUdpWith, local_addr, peer_addr, buffer, timestamp, "") {
   bool local_matched = *arg.addresses_.local_ == *local_addr;
   if (!local_matched) {
     *result_listener << "\nUdpRecvData::addresses_.local_ == "
-                     << arg.addresses_.local_->asStringView()
-                     << "\nexpected == " << local_addr->asStringView();
+                     << Network::Utility::urlFromDatagramAddress(*arg.addresses_.local_)
+                     << "\nexpected == " << Network::Utility::urlFromDatagramAddress(*local_addr);
   }
   bool peer_matched = *arg.addresses_.peer_ == *peer_addr;
   if (!peer_matched) {
     *result_listener << "\nUdpRecvData::addresses_.local_ == "
-                     << arg.addresses_.peer_->asStringView()
-                     << "\nexpected == " << peer_addr->asStringView();
+                     << Network::Utility::urlFromDatagramAddress(*arg.addresses_.peer_)
+                     << "\nexpected == " << Network::Utility::urlFromDatagramAddress(*peer_addr);
   }
   std::string buffer_contents = arg.buffer_->toString();
   bool buffer_matched = buffer_contents == buffer;
@@ -182,14 +182,14 @@ TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
   envoy::HotRestartMessage msg;
   auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
   auto mock_udp_listener_config = std::make_shared<Network::MockUdpListenerConfig>();
-  auto test_listener_addr = Network::Utility::parseInternetAddressAndPort("127.0.0.1:1234");
-  auto test_remote_addr = Network::Utility::parseInternetAddressAndPort("127.0.0.1:4321");
+  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_remote_addr = Network::Utility::resolveUrl("udp://127.0.0.1:4321");
   HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
       .registerUdpForwardingListener(
           test_listener_addr,
           std::dynamic_pointer_cast<Network::UdpListenerConfig>(mock_udp_listener_config));
-  packet->set_local_addr(test_listener_addr->asStringView());
-  packet->set_peer_addr(test_remote_addr->asStringView());
+  packet->set_local_addr(Network::Utility::urlFromDatagramAddress(*test_listener_addr));
+  packet->set_peer_addr(Network::Utility::urlFromDatagramAddress(*test_remote_addr));
   packet->set_worker_index(worker_index);
   packet->set_payload(udp_contents);
   packet->set_receive_time_epoch_microseconds(packet_timestamp);

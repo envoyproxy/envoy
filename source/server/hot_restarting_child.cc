@@ -231,10 +231,8 @@ void HotRestartingChild::onSocketEventUdpForwarding() {
     case HotRestartMessage::Request::kForwardedUdpPacket: {
       const auto& req = wrapped_request->request().forwarded_udp_packet();
       Network::UdpRecvData packet;
-      packet.addresses_.local_ =
-          Network::Utility::parseInternetAddressAndPortNoThrow(req.local_addr());
-      packet.addresses_.peer_ =
-          Network::Utility::parseInternetAddressAndPortNoThrow(req.peer_addr());
+      packet.addresses_.local_ = Network::Utility::resolveUrl(req.local_addr());
+      packet.addresses_.peer_ = Network::Utility::resolveUrl(req.peer_addr());
       if (!packet.addresses_.local_ || !packet.addresses_.peer_) {
         break;
       }

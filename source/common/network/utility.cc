@@ -41,6 +41,14 @@ Address::InstanceConstSharedPtr instanceOrNull(StatusOr<Address::InstanceConstSh
   return nullptr;
 }
 
+std::string Utility::urlFromDatagramAddress(const Address::Instance& addr) {
+  if (addr.ip() != nullptr) {
+    return absl::StrCat(UDP_SCHEME, addr.asStringView());
+  } else {
+    return absl::StrCat(UNIX_SCHEME, addr.asStringView());
+  }
+}
+
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (urlIsTcpScheme(url)) {
     return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
