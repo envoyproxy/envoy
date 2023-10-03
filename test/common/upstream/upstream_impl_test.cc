@@ -26,6 +26,8 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
+#include "source/extensions/load_balancing_policies/least_request/config.h"
+#include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -2021,9 +2023,11 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
   EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_EQ("envoy.load_balancing_policies.round_robin",
             cluster->info()->loadBalancerFactory()->name());
-  auto slow_start_config = dynamic_cast<const LegacyTypedRoundRobinLbConfig*>(
-                               cluster->info()->loadBalancerConfig().ptr())
-                               ->lb_config_->slow_start_config();
+  auto slow_start_config =
+      dynamic_cast<const Extensions::LoadBalancingPolices::RoundRobin::LegacyRoundRobinLbConfig*>(
+          cluster->info()->loadBalancerConfig().ptr())
+          ->lbConfig()
+          ->slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
@@ -2065,9 +2069,12 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
   EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster->info()->lbType());
   EXPECT_EQ("envoy.load_balancing_policies.least_request",
             cluster->info()->loadBalancerFactory()->name());
-  auto slow_start_config = dynamic_cast<const LegacyTypedLeastRequestLbConfig*>(
-                               cluster->info()->loadBalancerConfig().ptr())
-                               ->lb_config_->slow_start_config();
+  auto slow_start_config =
+      dynamic_cast<
+          const Extensions::LoadBalancingPolices::LeastRequest::LegacyLeastRequestLbConfig*>(
+          cluster->info()->loadBalancerConfig().ptr())
+          ->lbConfig()
+          ->slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
