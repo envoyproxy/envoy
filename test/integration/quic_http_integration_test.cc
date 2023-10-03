@@ -1176,6 +1176,8 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
+                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1243,6 +1245,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
+                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
