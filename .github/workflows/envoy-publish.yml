@@ -54,7 +54,7 @@ jobs:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       version_dev: ${{ needs.env.outputs.version_dev }}
       given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
+      repo_ref: ${{ inputs.ref }}
     permissions:
       contents: write
     secrets:
@@ -69,4 +69,4 @@ jobs:
     with:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ needs.env.outputs.trusted != 'true' && needs.env.outputs.repo_ref || '' }}
+      repo_ref: ${{ needs.env.outputs.repo_ref }}
