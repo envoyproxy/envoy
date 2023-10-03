@@ -126,8 +126,8 @@ message OAuth2Config {
   // RFC https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1
   AuthType auth_type = 11 [(validate.rules).enum = {defined_only: true}];
 
-  // If set to true, allows automatic access token refresh using the associated refresh token (see 
-  // `RFC 6749 section 6<https://datatracker.ietf.org/doc/html/rfc6749#section-6>`_), provided that the OAuth server supports that.
+  // If set to true, allows automatic access token refresh using the associated refresh token (see
+  // `RFC 6749 section 6 <https://datatracker.ietf.org/doc/html/rfc6749#section-6>`_), provided that the OAuth server supports that.
   // Default value is false.
   google.protobuf.BoolValue use_refresh_token = 12;
 }
