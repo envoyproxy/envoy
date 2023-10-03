@@ -625,6 +625,11 @@ private:
     const bool use_original_src_ip_;
   };
 
+  /**
+   * This type of active session is used when tunneling is enabled by configuration.
+   * In this type of session, the upstream is HTTP stream, either a connect-udp request,
+   * or a POST request.
+   */
   class TunnelingActiveSession : public ActiveSession,
                                  public UpstreamTunnelCallbacks,
                                  public HttpStreamCallbacks {

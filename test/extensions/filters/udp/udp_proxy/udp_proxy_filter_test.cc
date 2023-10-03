@@ -1493,8 +1493,10 @@ public:
                   absl::optional<std::string> opt_path = absl::nullopt,
                   absl::optional<HeaderToAdd> header_to_add = absl::nullopt) {
     // In case connect-udp is used, Envoy expect the H2 headers to be normalized with H1,
-    // so expect that the request headers here match H1 CONNECT headers, even though
-    // eventually H2 headers will be sent.
+    // so expect that the request headers here match H1 headers, even though
+    // eventually H2 headers will be sent. When the headers are normalized to H1, the method
+    // is replaced with GET, a header with the 'upgrade' key is added with 'connect-udp'
+    // value and a header with the 'connection' key is added with 'Upgrade' value.
     std::string scheme = is_ssl ? "https" : "http";
     std::string authority =
         opt_authority.has_value() ? opt_authority.value() : "default.host.com:10";
