@@ -58,6 +58,13 @@ TEST_F(TsiFrameProtectorTest, Protect) {
         "\0\x40\0\0"s + std::string(16380, 'a') + "\x28\x0e\0\0"s + std::string(3620, 'a');
     EXPECT_EQ(expected, encrypted.toString());
   }
+
+  {
+    Buffer::OwnedImpl encrypted;
+
+    EXPECT_EQ(frame_protector_.protect(grpc_empty_slice(), encrypted), TSI_OK);
+    EXPECT_EQ(encrypted.length(), 0);
+  }
 }
 
 TEST_F(TsiFrameProtectorTest, ProtectError) {
@@ -105,7 +112,15 @@ TEST_F(TsiFrameProtectorTest, Unprotect) {
     EXPECT_EQ(TSI_OK, frame_protector_.unprotect(input, decrypted));
     EXPECT_EQ(std::string(20000, 'a'), decrypted.toString());
   }
+
+  {
+    Buffer::OwnedImpl input, decrypted;
+
+    EXPECT_EQ(TSI_OK, frame_protector_.unprotect(input, decrypted));
+    EXPECT_EQ(decrypted.length(), 0);
+  }
 }
+
 TEST_F(TsiFrameProtectorTest, UnprotectError) {
   const tsi_zero_copy_grpc_protector_vtable* vtable = raw_frame_protector_->vtable;
   tsi_zero_copy_grpc_protector_vtable mock_vtable = *raw_frame_protector_->vtable;
