@@ -7,13 +7,13 @@ The following list of filter state objects are consumed by Envoy extensions:
 
 * ``envoy.network.upstream_server_name``
 
-  Sets the transport socket option to override the :ref:`SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>` in
+  Sets the transport socket option to override the `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ in
   the upstream connections. Accepts a host name as a constructor, e.g. "lyft.com".
 
 * ``envoy.network.application_protocols``
 
-  Sets the transport socket option to override the :ref:`ALPN <https://en.wikipedia.org/wiki/Application-Layer Protocol
-  Negotiation>` list in the upstream connections. This setting takes precedence over the upstream cluster configuration.
+  Sets the transport socket option to override the `ALPN <https://en.wikipedia.org/wiki/Application-Layer Protocol
+  Negotiation>`_ list in the upstream connections. This setting takes precedence over the upstream cluster configuration.
   Accepts a comma-separated list of protocols as a constructor, e.g. "h2,http/1.1".
 
 * ``envoy.network.upstream_subject_alt_names``
