@@ -24,6 +24,9 @@ using Stats::Counter;
 using envoy::service::ext_proc::v3::BodyMutation;
 using envoy::service::ext_proc::v3::HeaderMutation;
 
+using HeaderAppendAction = envoy::config::core::v3::HeaderValueOption::HeaderAppendAction;
+using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
+
 bool MutationUtils::headerInMatcher(
     absl::string_view key, const std::vector<Matchers::StringMatcherPtr>& header_matchers) {
   return std::any_of(header_matchers.begin(), header_matchers.end(),
@@ -174,33 +177,58 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       return absl::InvalidArgumentError("Invalid character in set_headers mutation.");
     }
     const LowerCaseString header_name(sh.header().key());
-    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
-    const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
-                                                                        : CheckOperation::SET;
-    auto check_result = checker.check(check_op, header_name, header_value);
-    if (replacing_message && header_name == Http::Headers::get().Method) {
-      // Special handling to allow changing ":method" when the
-      // CONTINUE_AND_REPLACE option is selected, to stay compatible.
-      check_result = CheckResult::OK;
-    }
-    switch (check_result) {
-    case CheckResult::OK:
-      ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
-      if (append) {
-        headers.addCopy(header_name, header_value);
-      } else {
-        headers.setCopy(header_name, header_value);
+
+    if (sh.append_action()) {
+      switch (sh.append_action()) {
+      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+        headers.addReferenceKey(header_name, header_value);
+        break;
+      case HeaderValueOption::ADD_IF_ABSENT:
+        if (headers.get(header_name).empty()) {
+          headers.addReferenceKey(header_name, header_value);
+        }
+        break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS:
+        if (!headers.get(header_name).empty()) {
+          headers.setReferenceKey(header_name, header_value);
+        }
+        break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+        headers.setReferenceKey(header_name, header_value);
+        break;
+      default:
+        // Handle unknown/invalid append_action value
+        return absl::InvalidArgumentError("Invalid append_action value");
       }
-      break;
-    case CheckResult::IGNORE:
-      ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
-      rejected_mutations.inc();
-      break;
-    case CheckResult::FAIL:
-      ENVOY_LOG(debug, "Header {} may not be modified. Returning error", header_name);
-      rejected_mutations.inc();
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
+    } else {
+      const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
+      const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
+                                                                          : CheckOperation::SET;
+      auto check_result = checker.check(check_op, header_name, header_value);
+      if (replacing_message && header_name == Http::Headers::get().Method) {
+        // Special handling to allow changing ":method" when the
+        // CONTINUE_AND_REPLACE option is selected, to stay compatible.
+        check_result = CheckResult::OK;
+      }
+      switch (check_result) {
+      case CheckResult::OK:
+        ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
+        if (append) {
+          headers.addCopy(header_name, header_value);
+        } else {
+          headers.setCopy(header_name, header_value);
+        }
+        break;
+      case CheckResult::IGNORE:
+        ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
+        rejected_mutations.inc();
+        break;
+      case CheckResult::FAIL:
+        ENVOY_LOG(debug, "Header {} may not be modified. Returning error", header_name);
+        rejected_mutations.inc();
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
+      }
     }
   }
 
