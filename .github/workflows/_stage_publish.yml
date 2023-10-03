@@ -95,6 +95,13 @@ jobs:
       trusted: true
 
   publish_docs:
+    # For normal commits to Envoy main this will trigger an update in the website repo,
+    # which will update its envoy dep shas, and rebuild the website for the latest docs
+    #
+    # For commits that create a release, it instead triggers an update in the archive repo,
+    # which builds a static version of the docs for the release and commits it to the archive.
+    # In turn the archive repo triggers an update in the website so the new release docs are
+    # included in the published site
     if: ${{ inputs.trusted }}
     runs-on: ubuntu-22.04
     needs:
@@ -107,3 +114,5 @@ jobs:
         ref: main
         repository: ${{ inputs.version_dev != '' && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
         workflow: envoy-sync.yaml
+        inputs: |
+          commit_sha: ${{ inputs.version_dev != '' && github.sha || '' }}
