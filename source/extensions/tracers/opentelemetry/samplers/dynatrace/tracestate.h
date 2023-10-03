@@ -20,7 +20,7 @@ namespace OpenTelemetry {
 class TraceState {
 public:
   static std::string hash_extension(const std::string& extension) {
-    uint64_t hash = murmurHash264(extension.c_str(), extension.size());
+    uint64_t hash = murmurHash264A(extension.c_str(), extension.size());
     // hash &= 0xffff;
     uint16_t hash_16 = static_cast<uint16_t>(hash);
     std::stringstream stream;
@@ -30,7 +30,7 @@ public:
   }
 
   //<tenantID>-<clusterID>@dt=fw4;0;0;0;0;<isIgnored>;0;<rootPathRandom>;<extensionChecksum>;2h01;7h<spanId>
-  static TraceState parse(std::string tracestate) {
+  static TraceState parse(const std::string& tracestate) {
     TraceState ret;
     std::vector<absl::string_view> tracestate_components =
         absl::StrSplit(tracestate, ';', absl::AllowEmpty());

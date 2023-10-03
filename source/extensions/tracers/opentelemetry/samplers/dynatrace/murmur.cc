@@ -1,7 +1,7 @@
 #include "murmur.h"
 #define DT_CXX_FALLTHROUGH [[fallthrough]]
 
-uint64_t murmurHash264(void const* key, size_t len, uint64_t seed) {
+uint64_t murmurHash264A(void const* key, size_t len, uint64_t seed) {
 	static uint64_t const m = UINT64_C(0xc6a4a7935bd1e995);
 	static int const r = 47;
 
