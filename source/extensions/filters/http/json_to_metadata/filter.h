@@ -119,14 +119,16 @@ private:
 
   // Process the case without body, i.e., on_missing is applied for all rules.
   void handleAllOnMissing(const Rules& rules, bool& processing_finished_flag,
-                          Http::StreamFilterCallbacks& filter_callback);
+                          Http::StreamFilterCallbacks& filter_callback,
+                          bool shouldClearRouteCache);
   // Process the case with error, i.e., on_error is applied for all rules.
   void handleAllOnError(const Rules& rules, bool& processing_finished_flag,
-                        Http::StreamFilterCallbacks& filter_callback);
+                        Http::StreamFilterCallbacks& filter_callback,
+                        bool shouldClearRouteCache);
   // Parse the body while we have the whole json.
   void processBody(const Buffer::Instance* body, const Rules& rules, bool& processing_finished_flag,
                    Stats::Counter& success, Stats::Counter& no_body, Stats::Counter& non_json,
-                   Http::StreamFilterCallbacks& filter_callback);
+                   Http::StreamFilterCallbacks& filter_callback, bool shouldClearRouteCache);
   void processRequestBody();
   void processResponseBody();
 
@@ -141,7 +143,8 @@ private:
   void applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval, StructMap& struct_map,
                      Http::StreamFilterCallbacks& filter_callback);
   void finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
-                               const StructMap& struct_map, bool& processing_finished_flag);
+                               const StructMap& struct_map, bool& processing_finished_flag,
+                               bool shouldClearRouteCache);
 
   std::shared_ptr<FilterConfig> config_;
   bool request_processing_finished_{false};
