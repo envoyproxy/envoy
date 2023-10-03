@@ -156,6 +156,9 @@ bug_fixes:
 - area: redis
   change: |
     Fixed a bug where redis key with % in the key is failing with a validation error.
+- area: tracing
+  change: |
+    Fixed a bug in the Datadog tracer where Datadog's "operation name" would contain what should be in the "resource name."
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
