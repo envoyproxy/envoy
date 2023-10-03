@@ -36,8 +36,8 @@ Configuration example
   name: envoy.filters.http.geoip
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
-    use_xff: true
-    xff_num_trusted_hops: 1
+    xff_config:
+      xff_num_trusted_hops: 1
     provider:
         name: "envoy.geoip_providers.maxmind"
         typed_config:
