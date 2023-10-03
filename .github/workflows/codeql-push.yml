@@ -25,6 +25,9 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
 
     steps:
+    - name: Pre-cleanup
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.0.18
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
