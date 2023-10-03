@@ -68,6 +68,7 @@ sh_binary(
         "$(location :distrotest.sh)",
         VERSION,
         "$(location :distros.yaml)",
+        "--rebuild",
     ],
     data = [
         ":distros.yaml",
