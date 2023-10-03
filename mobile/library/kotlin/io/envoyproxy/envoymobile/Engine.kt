@@ -9,7 +9,7 @@ interface Engine {
   /**
    *  @return a {@link StreamClient} for opening and managing HTTP streams.
    */
-  fun streamClient(): StreamClient
+     fun    streamClient():     StreamClient
 
   /**
    *  @return a {@link PulseClient} for recording time series metrics.
