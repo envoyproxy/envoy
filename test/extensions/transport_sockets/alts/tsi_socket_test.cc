@@ -1,9 +1,9 @@
 #include <chrono>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <thread>
 #include <utility>
-#include <cstddef>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
@@ -187,21 +187,20 @@ protected:
   void startFakeHandshakerService() {
     handshaker_server_address_ = absl::StrCat("[::1]:", 0);
     absl::Notification notification;
-    handshaker_server_thread_ =
-        std::make_unique<std::thread>([this, &notification]() {
-          FakeHandshakerService fake_handshaker_service;
-          grpc::ServerBuilder server_builder;
-          int listening_port = -1;
-          server_builder.AddListeningPort(handshaker_server_address_,
-                                          grpc::InsecureServerCredentials(), &listening_port);
-          server_builder.RegisterService(&fake_handshaker_service);
-          handshaker_server_ = server_builder.BuildAndStart();
-          EXPECT_THAT(handshaker_server_, NotNull());
-          EXPECT_NE(listening_port, -1);
-          handshaker_server_address_ = absl::StrCat("[::1]:", listening_port);
-          notification.Notify();
-          handshaker_server_->Wait();
-        });
+    handshaker_server_thread_ = std::make_unique<std::thread>([this, &notification]() {
+      FakeHandshakerService fake_handshaker_service;
+      grpc::ServerBuilder server_builder;
+      int listening_port = -1;
+      server_builder.AddListeningPort(handshaker_server_address_, grpc::InsecureServerCredentials(),
+                                      &listening_port);
+      server_builder.RegisterService(&fake_handshaker_service);
+      handshaker_server_ = server_builder.BuildAndStart();
+      EXPECT_THAT(handshaker_server_, NotNull());
+      EXPECT_NE(listening_port, -1);
+      handshaker_server_address_ = absl::StrCat("[::1]:", listening_port);
+      notification.Notify();
+      handshaker_server_->Wait();
+    });
     notification.WaitForNotification();
   }
 
@@ -377,8 +376,7 @@ protected:
 
 TEST_F(TsiSocketTest, ConfigureInitialCongestionWindowIsNoOp) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
-  client_.tsi_socket_->configureInitialCongestionWindow(
-      0, std::chrono::milliseconds(0));
+  client_.tsi_socket_->configureInitialCongestionWindow(0, std::chrono::milliseconds(0));
 }
 
 TEST_F(TsiSocketTest, DoesNotStartSecureTransport) {
@@ -450,98 +448,84 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithShortWrite) {
   // client_.raw_socket's doWrite() API.
   server_.raw_socket_ = new Network::MockTransportSocket();
   server_.tsi_socket_ = std::make_unique<TsiSocket>(
-      server_.handshaker_factory_, nullptr,
-      Network::TransportSocketPtr{server_.raw_socket_}, true);
+      server_.handshaker_factory_, nullptr, Network::TransportSocketPtr{server_.raw_socket_}, true);
   client_.raw_socket_ = new Network::MockTransportSocket();
-  client_.tsi_socket_ = std::make_unique<TsiSocket>(
-      client_.handshaker_factory_, nullptr,
-      Network::TransportSocketPtr{client_.raw_socket_}, false);
-  ON_CALL(client_.callbacks_.connection_, dispatcher())
-      .WillByDefault(ReturnRef(dispatcher_));
-  ON_CALL(server_.callbacks_.connection_, dispatcher())
-      .WillByDefault(ReturnRef(dispatcher_));
+  client_.tsi_socket_ =
+      std::make_unique<TsiSocket>(client_.handshaker_factory_, nullptr,
+                                  Network::TransportSocketPtr{client_.raw_socket_}, false);
+  ON_CALL(client_.callbacks_.connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  ON_CALL(server_.callbacks_.connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(client_.callbacks_.connection_, id()).WillByDefault(Return(11));
   ON_CALL(server_.callbacks_.connection_, id()).WillByDefault(Return(12));
-  ON_CALL(server_.callbacks_, shouldDrainReadBuffer())
-      .WillByDefault(Return(false));
+  ON_CALL(server_.callbacks_, shouldDrainReadBuffer()).WillByDefault(Return(false));
   ON_CALL(*server_.raw_socket_, doWrite(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& buffer, bool) {
-        Network::IoResult result = {Network::PostIoAction::KeepOpen,
-                                    buffer.length(), false};
+        Network::IoResult result = {Network::PostIoAction::KeepOpen, buffer.length(), false};
         server_to_client_.move(buffer);
         return result;
       }));
-  ON_CALL(*client_.raw_socket_, doRead(_))
-      .WillByDefault(Invoke([&](Buffer::Instance& buffer) {
-        Network::IoResult result = {Network::PostIoAction::KeepOpen,
-                                    server_to_client_.length(), false};
-        buffer.move(server_to_client_);
-        return result;
-      }));
-  ON_CALL(*server_.raw_socket_, doRead(_))
-      .WillByDefault(Invoke([&](Buffer::Instance& buffer) {
-        Network::IoResult result = {Network::PostIoAction::KeepOpen,
-                                    client_to_server_.length(), false};
-        buffer.move(client_to_server_);
-        return result;
-      }));
+  ON_CALL(*client_.raw_socket_, doRead(_)).WillByDefault(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, server_to_client_.length(), false};
+    buffer.move(server_to_client_);
+    return result;
+  }));
+  ON_CALL(*server_.raw_socket_, doRead(_)).WillByDefault(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
   EXPECT_CALL(*client_.raw_socket_, setTransportSocketCallbacks(_));
   client_.tsi_socket_->setTransportSocketCallbacks(client_.callbacks_);
   EXPECT_CALL(*server_.raw_socket_, setTransportSocketCallbacks(_));
   server_.tsi_socket_->setTransportSocketCallbacks(server_.callbacks_);
-  ON_CALL(dispatcher_, post(_))
-      .WillByDefault(
-          WithArgs<0>(Invoke([](Event::PostCb callback) { callback(); })));
+  ON_CALL(dispatcher_, post(_)).WillByDefault(WithArgs<0>(Invoke([](Event::PostCb callback) {
+    callback();
+  })));
 
-// On the client side, get the ClientInit and write it to the server.
-      EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
+  // On the client side, get the ClientInit and write it to the server.
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
-        Network::IoResult result = {Network::PostIoAction::KeepOpen,
-                                    buffer.length(), false};
+        Network::IoResult result = {Network::PostIoAction::KeepOpen, buffer.length(), false};
         client_to_server_.move(buffer);
         return result;
       }));
-    client_.tsi_socket_->onConnected();
-    expectIoResult(client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
-                   {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
-                   "While writing ClientInit.");
-    EXPECT_EQ(client_to_server_.toString(), kClientInit);
+  client_.tsi_socket_->onConnected();
+  expectIoResult(client_.tsi_socket_->doWrite(client_.write_buffer_, /*end_stream=*/false),
+                 {Envoy::Network::PostIoAction::KeepOpen, 0UL, false}, "While writing ClientInit.");
+  EXPECT_EQ(client_to_server_.toString(), kClientInit);
 
-    // On the server side, read the ClientInit and write the ServerInit and the
-    // ServerFinished to the client.
-    EXPECT_CALL(*server_.raw_socket_, doRead(_));
-    EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
-    expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
-                   {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
-                   "While reading ClientInit.");
-    EXPECT_EQ(server_.read_buffer_.length(), 0L);
-    EXPECT_EQ(server_to_client_.toString(), absl::StrCat(kServerInit, kServerFinished));
+  // On the server side, read the ClientInit and write the ServerInit and the
+  // ServerFinished to the client.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
+                 {Envoy::Network::PostIoAction::KeepOpen, 0UL, false}, "While reading ClientInit.");
+  EXPECT_EQ(server_.read_buffer_.length(), 0L);
+  EXPECT_EQ(server_to_client_.toString(), absl::StrCat(kServerInit, kServerFinished));
 
-    // On the client side, read the ServerInit and the ServerFinished, and write
-    // the ClientFinished to the server.
-    EXPECT_CALL(*client_.raw_socket_, doRead(_)).Times(2);
-          EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
+  // On the client side, read the ServerInit and the ServerFinished, and write
+  // the ClientFinished to the server.
+  EXPECT_CALL(*client_.raw_socket_, doRead(_)).Times(2);
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
-        Network::IoResult result = {Network::PostIoAction::KeepOpen,
-                                    buffer.length(), false};
+        Network::IoResult result = {Network::PostIoAction::KeepOpen, buffer.length(), false};
         client_to_server_.move(buffer);
         return result;
       }));
-    EXPECT_CALL(client_.callbacks_, raiseEvent(Envoy::Network::ConnectionEvent::Connected));
-    expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
-                   client_.tsi_socket_->doRead(client_.read_buffer_),
-                   "While reading ServerInit and ServerFinished.");
-    EXPECT_EQ(client_.read_buffer_.length(), 0L);
-    EXPECT_EQ(client_to_server_.toString(), kClientFinished);
+  EXPECT_CALL(client_.callbacks_, raiseEvent(Envoy::Network::ConnectionEvent::Connected));
+  expectIoResult({Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_),
+                 "While reading ServerInit and ServerFinished.");
+  EXPECT_EQ(client_.read_buffer_.length(), 0L);
+  EXPECT_EQ(client_to_server_.toString(), kClientFinished);
 
-    // On the server side, read the ClientFinished.
-    EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(2);
-    EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
-    expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
-                   {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
-                   "While reading ClientFinished.");
-    EXPECT_EQ(server_.read_buffer_.toString(), "");
-
+  // On the server side, read the ClientFinished.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(2);
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
+                 {Envoy::Network::PostIoAction::KeepOpen, 0UL, false},
+                 "While reading ClientFinished.");
+  EXPECT_EQ(server_.read_buffer_.toString(), "");
 
   // Write all of the data except for the last byte.
   client_.write_buffer_.add(kApplicationData);
@@ -555,8 +539,7 @@ TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithShortWrite) {
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false),
                  "While writing application data.");
-  EXPECT_EQ(client_to_server_.length(),
-            kAltsFrameOverhead + kApplicationData.length() - 1);
+  EXPECT_EQ(client_to_server_.length(), kAltsFrameOverhead + kApplicationData.length() - 1);
 }
 
 TEST_F(TsiSocketTest, HandshakeSuccessAndTransferDataWithValidation) {
@@ -650,13 +633,11 @@ TEST_F(TsiSocketTest, HandshakeErrorButStreamIsNotKeptAlive) {
 TEST_F(TsiSocketTest, HandshakeWithImmediateReadError) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
 
-  EXPECT_CALL(*client_.raw_socket_, doRead(_))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
-        Network::IoResult result = {Network::PostIoAction::Close,
-                                    server_to_client_.length(), false};
-        buffer.move(server_to_client_);
-        return result;
-      }));
+  EXPECT_CALL(*client_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::Close, server_to_client_.length(), false};
+    buffer.move(server_to_client_);
+    return result;
+  }));
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false)).Times(0);
   expectIoResult({Network::PostIoAction::Close, 0UL, false},
                  client_.tsi_socket_->doRead(client_.read_buffer_),
@@ -673,23 +654,19 @@ TEST_F(TsiSocketTest, DoReadEndOfStream) {
   client_.write_buffer_.add(kApplicationData);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult(
-      {Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
-      client_.tsi_socket_->doWrite(client_.write_buffer_, false),
-      "While the client is writing application data.");
+  expectIoResult({Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false),
+                 "While the client is writing application data.");
 
-  EXPECT_CALL(*server_.raw_socket_, doRead(_))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
-        Network::IoResult result = {Network::PostIoAction::KeepOpen,
-                                    client_to_server_.length(), true};
-        buffer.move(client_to_server_);
-        return result;
-      }));
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), true};
+    buffer.move(client_to_server_);
+    return result;
+  }));
   EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer());
-  expectIoResult(
-      {Network::PostIoAction::KeepOpen, kApplicationData.size(), true},
-      server_.tsi_socket_->doRead(server_.read_buffer_),
-      "While the server is reading application data.");
+  expectIoResult({Network::PostIoAction::KeepOpen, kApplicationData.size(), true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While the server is reading application data.");
   EXPECT_EQ(server_.read_buffer_.toString(), kApplicationData);
 }
 
@@ -701,18 +678,15 @@ TEST_F(TsiSocketTest, DoReadOnceError) {
   client_.write_buffer_.add(kApplicationData);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult(
-      {Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
-      client_.tsi_socket_->doWrite(client_.write_buffer_, false),
-      "While the client is writing application data.");
+  expectIoResult({Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false),
+                 "While the client is writing application data.");
 
-  EXPECT_CALL(*server_.raw_socket_, doRead(_))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
-        Network::IoResult result = {Network::PostIoAction::Close,
-                                    client_to_server_.length(), false};
-        buffer.move(client_to_server_);
-        return result;
-      }));
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::Close, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
   EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer());
   expectIoResult({Network::PostIoAction::Close, kApplicationData.size(), false},
                  server_.tsi_socket_->doRead(server_.read_buffer_),
@@ -729,24 +703,19 @@ TEST_F(TsiSocketTest, DoReadDrainBuffer) {
   client_.write_buffer_.add(kApplicationData);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult(
-      {Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
-      client_.tsi_socket_->doWrite(client_.write_buffer_, false),
-      "While the client is writing application data.");
+  expectIoResult({Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false),
+                 "While the client is writing application data.");
 
-  EXPECT_CALL(*server_.raw_socket_, doRead(_))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
-        Network::IoResult result = {Network::PostIoAction::KeepOpen,
-                                    client_to_server_.length(), false};
-        buffer.move(client_to_server_);
-        return result;
-      }));
-  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer())
-      .WillOnce(Return(true));
-  expectIoResult(
-      {Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
-      server_.tsi_socket_->doRead(server_.read_buffer_),
-      "While the server is reading application data.");
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer()).WillOnce(Return(true));
+  expectIoResult({Network::PostIoAction::KeepOpen, kApplicationData.size(), false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While the server is reading application data.");
   EXPECT_EQ(server_.read_buffer_.toString(), kApplicationData);
 }
 
