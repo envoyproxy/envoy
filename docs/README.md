@@ -9,14 +9,14 @@ In both cases, the generated output can be found in `generated/docs`.
 If you have an [existing Envoy development environment](https://github.com/envoyproxy/envoy/tree/main/bazel#quick-start-bazel-build-for-developers), you should have the necessary dependencies and requirements and be able to build the documentation directly.
 
 ```bash
-./docs/build.sh
+./ci/do_ci.sh docs
 ```
 
 By default configuration examples are going to be validated during build. To disable validation,
 set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
 
 ```bash
-SPHINX_SKIP_CONFIG_VALIDATION=true docs/build.sh
+SPHINX_SKIP_CONFIG_VALIDATION=true ./ci/do_ci.sh docs
 ```
 
 ## Using the Docker build container to build the documentation
@@ -27,7 +27,7 @@ image that is used in continuous integration.
 This can be done as follows:
 
 ```
-./ci/run_envoy_docker.sh 'docs/build.sh'
+./ci/run_envoy_docker.sh './ci/do_ci.sh docs'
 ```
 
 To use this method you will need a minimum of 4-5GB of disk space available to accommodate the build image.

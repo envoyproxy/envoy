@@ -15,6 +15,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_py_namespace()
 
+exports_files(["VERSION"])
+
 alias(
     name = "ios_xcframework",
     actual = "//library/swift:Envoy",
