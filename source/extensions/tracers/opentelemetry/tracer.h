@@ -36,7 +36,7 @@ class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
   Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-         OpenTelemetryTracerStats tracing_stats, const ResourcePtr resource);
+         OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -65,7 +65,7 @@ private:
   Runtime::Loader& runtime_;
   Event::TimerPtr flush_timer_;
   OpenTelemetryTracerStats tracing_stats_;
-  const ResourcePtr resource_;
+  const ResourceConstSharedPtr resource_;
 };
 
 /**

@@ -60,6 +60,9 @@ std::string resolveSchemaUrl(const std::string& old_schema_url,
  * @param updating_resource The new resource.
  */
 void mergeResource(Resource& old_resource, const Resource& updating_resource) {
+  // The schemaUrl is merged, regardless if the resources being merged
+  // have attributes or not. This behavior is compliant with the OTel spec.
+  // see: https://github.com/envoyproxy/envoy/pull/29547#discussion_r1344540427
   old_resource.schemaUrl_ = resolveSchemaUrl(old_resource.schemaUrl_, updating_resource.schemaUrl_);
 
   if (isEmptyResource(updating_resource)) {

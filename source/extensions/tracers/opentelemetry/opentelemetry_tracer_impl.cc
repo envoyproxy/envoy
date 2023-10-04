@@ -35,7 +35,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   auto& factory_context = context.serverFactoryContext();
 
   Resource resource = resource_provider.getResource(opentelemetry_config, context);
-  ResourcePtr resource_ptr = std::make_shared<Resource>(std::move(resource));
+  ResourceConstSharedPtr resource_ptr = std::make_shared<Resource>(std::move(resource));
 
   // Create the tracer in Thread Local Storage.
   tls_slot_ptr_->set([opentelemetry_config, &factory_context, this,

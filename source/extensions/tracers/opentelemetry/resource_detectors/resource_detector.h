@@ -21,7 +21,7 @@ struct Resource {
   virtual ~Resource() = default;
 };
 
-using ResourcePtr = std::unique_ptr<const Resource>;
+using ResourceConstSharedPtr = std::shared_ptr<const Resource>;
 
 /**
  * @brief The base type for all resource detectors
