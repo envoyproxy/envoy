@@ -1124,10 +1124,9 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
         }
         const uint32_t scheduler_cycle_size = weights_sum / normalizer;
 
-        ENVOY_LOG_MISC(trace, "ADIP: calling EDF scheduler pickAndAdd {} times (scheduler_cycle_size={}, normalizer={})", (seed_ % scheduler_cycle_size), scheduler_cycle_size, normalizer);
         for (uint32_t i = 0; i < seed_ % scheduler_cycle_size; ++i) {
-         auto host =
-             scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
+          auto host =
+              scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
         }
       }
     } else {

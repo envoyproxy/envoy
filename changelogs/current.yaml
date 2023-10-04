@@ -156,6 +156,11 @@ bug_fixes:
 - area: redis
   change: |
     Fixed a bug where redis key with % in the key is failing with a validation error.
+- area: load_balancing
+  change: |
+    Fixed an initialization bug of EDF based loadbalancer that prevented low-weighted hosts from being picked upon
+    initialization. This behavior can be reverted by setting runtime flag
+    ``envoy.reloadable_features.edf_lb_scheduler_init_fix`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
