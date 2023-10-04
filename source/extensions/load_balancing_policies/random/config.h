@@ -15,6 +15,9 @@ namespace Random {
 
 using RandomLbProto = envoy::extensions::load_balancing_policies::random::v3::Random;
 
+/**
+ * Empty load balancer config that used to represent the config for the random load balancer.
+ */
 class EmptyRandomLbConfig : public Upstream::LoadBalancerConfig {
 public:
   EmptyRandomLbConfig() = default;
