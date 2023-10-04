@@ -1103,10 +1103,39 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // Cycle through hosts to achieve the intended offset behavior.
     // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the schedule across
     // refreshes for the weighted case.
-    if (!hosts.empty()) {
-      for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
-        auto host =
-            scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.edf_lb_scheduler_init_fix")) {
+      // Only apply randomization if there are at least 2 hosts. If there's one host
+      // (or no hosts), its weight doesn't matter for the load-balancer.
+      if (hosts.size() > 1) {
+        // Compute the greatest common divisor of all the weights, to normalize
+        // the sum of weights to a smaller number. This can be avoided, but will
+        // result in higher numbers and more calls to `pickAndAdd()`.
+        const uint32_t host0_weight = static_cast<uint32_t>(std::ceil(hostWeight(*hosts[0])));
+        const uint32_t host1_weight = static_cast<uint32_t>(std::ceil(hostWeight(*hosts[1])));
+        uint32_t weights_sum = host0_weight + host1_weight;
+        uint32_t normalizer = std::gcd(host0_weight, host1_weight);
+        for (uint32_t i = 2; i < hosts.size(); ++i) {
+          const uint32_t host_weight = static_cast<uint32_t>(std::ceil(hostWeight(*hosts[i])));
+          normalizer = std::gcd(normalizer, host_weight);
+          // The sum of weights should not overflow. This should be addressed in
+          // the config validation.
+          ASSERT(weights_sum + host_weight >= weights_sum);
+          weights_sum += host_weight;
+        }
+        const uint32_t scheduler_cycle_size = weights_sum / normalizer;
+
+        ENVOY_LOG_MISC(trace, "ADIP: calling EDF scheduler pickAndAdd {} times (scheduler_cycle_size={}, normalizer={})", (seed_ % scheduler_cycle_size), scheduler_cycle_size, normalizer);
+        for (uint32_t i = 0; i < seed_ % scheduler_cycle_size; ++i) {
+         auto host =
+             scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
+        }
+      }
+    } else {
+      if (!hosts.empty()) {
+        for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
+          auto host =
+              scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
+        }
       }
     }
   };
