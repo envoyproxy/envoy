@@ -291,14 +291,6 @@ struct UpstreamTiming {
     upstream_connect_complete_ = time_source.monotonicTime();
   }
 
-  void onUpstreamHandshakeComplete(TimeSource& time_source) {
-    upstream_handshake_complete_ = time_source.monotonicTime();
-  }
-
-  absl::optional<MonotonicTime> upstreamHandshakeComplete() const {
-    return upstream_handshake_complete_;
-  }
-
   absl::optional<std::chrono::nanoseconds> connectionPoolCallbackLatency() const {
     return connection_pool_callback_latency_;
   }
@@ -311,7 +303,6 @@ struct UpstreamTiming {
 
   absl::optional<MonotonicTime> upstream_connect_start_;
   absl::optional<MonotonicTime> upstream_connect_complete_;
-  absl::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
 class DownstreamTiming {

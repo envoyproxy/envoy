@@ -49,6 +49,16 @@ envoy_cc_library(
     ],
 )
 
+# This library is not currently used by Envoy but as of 2023 was consumed by downstream
+# consumers (see https://github.com/envoyproxy/envoy/pull/29906/files)
+envoy_cc_library(
+    name = "uint64_accessor_interface",
+    hdrs = ["uint64_accessor.h"],
+    deps = [
+        ":filter_state_interface",
+    ],
+)
+
 envoy_cc_library(
     name = "stream_id_provider_interface",
     hdrs = ["stream_id_provider.h"],

@@ -151,7 +151,6 @@ public:
   absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived();
   absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived();
-  absl::optional<std::chrono::nanoseconds> upstreamHandshakeComplete();
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
