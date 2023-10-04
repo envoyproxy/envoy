@@ -14,6 +14,12 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   const auto& composite_action = MessageUtil::downcastAndValidate<
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
+
+  if (composite_action.has_dynamic_config() && composite_action.has_typed_config()) {
+    throw EnvoyException(
+        fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
+  }
+
   // Process dynamic filter configuration and setup extension configuration discovery service.
   if (composite_action.has_dynamic_config()) {
     auto config_discovery = composite_action.dynamic_config().config_discovery();
