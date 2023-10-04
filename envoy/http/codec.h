@@ -225,6 +225,8 @@ public:
  */
 class RequestDecoder : public virtual StreamDecoder {
 public:
+  virtual ~RequestDecoder() = default;
+
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
