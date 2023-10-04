@@ -25,7 +25,7 @@ public:
    *
    * @param request The protobuf-encoded OTLP trace request.
    * @return true When the request was sent.
-   * @return false When sending the reques failed.
+   * @return false When sending the request failed.
    */
   virtual bool log(const ExportTraceServiceRequest& request) = 0;
 };
