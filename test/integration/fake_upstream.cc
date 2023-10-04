@@ -86,6 +86,12 @@ void FakeStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
   postToConnectionThread([this, headers_copy]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -114,6 +120,12 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
   postToConnectionThread([this, headers_copy, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -127,6 +139,12 @@ void FakeStream::encodeData(std::string data, bool end_stream) {
   postToConnectionThread([this, data, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -141,6 +159,12 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
   postToConnectionThread([this, size, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -156,6 +180,12 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
   postToConnectionThread([this, data_copy, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -171,6 +201,12 @@ void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
   postToConnectionThread([this, trailers_copy]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -184,6 +220,12 @@ void FakeStream::encodeResetStream() {
   postToConnectionThread([this]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -197,6 +239,12 @@ void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vect
   postToConnectionThread([this, &metadata_map_vector]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -210,6 +258,12 @@ void FakeStream::readDisable(bool disable) {
   postToConnectionThread([this, disable]() -> void {
     {
       absl::MutexLock lock(&lock_);
+      {
+        absl::MutexLock dtor_lock(&dtor_lock_);
+        if (deleting_) {
+          return;
+        }
+      }
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
