@@ -47,3 +47,18 @@ FORMAT_ARGS+=(
     ./test/swift ./experimental/swift)
 
 export ENVOY_BAZEL_PREFIX="@envoy" && ./bazelw run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
+
+KOTLIN_DIRS=(
+  "library/kotlin"
+  "test/kotlin"
+  "examples/kotlin"
+)
+if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
+  ./ktfmt.sh "${KOTLIN_DIRS[@]}"
+else
+  NEEDS_FORMAT=$(./ktfmt.sh --dry-run "${KOTLIN_DIRS[@]}" | tee /dev/tty)
+  if [[ -n "${NEEDS_FORMAT}" ]]; then
+    echo "ERROR: Run 'tools/check_format.sh fix' to fix"
+    exit 1
+  fi
+fi
