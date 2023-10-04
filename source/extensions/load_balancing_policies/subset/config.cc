@@ -132,13 +132,14 @@ SubsetLbFactory::loadConfig(const Protobuf::Message& config,
     auto sub_lb_pair =
         Upstream::LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
             *active_or_legacy.legacy(), visitor);
-    ASSERT(sub_lb_pair.second != nullptr,
-           fmt::format("LB policy {} is not supported for subset load balancer",
-                       envoy::config::cluster::v3::Cluster::LbPolicy_Name(
-                           active_or_legacy.legacy()->lb_policy())));
+
+    if (!sub_lb_pair.ok()) {
+      throw EnvoyException(std::string(sub_lb_pair.status().message()));
+    }
+
     return std::make_unique<Upstream::SubsetLoadBalancerConfig>(
-        active_or_legacy.legacy()->lb_subset_config(), std::move(sub_lb_pair.first),
-        sub_lb_pair.second);
+        active_or_legacy.legacy()->lb_subset_config(), std::move(sub_lb_pair->config),
+        sub_lb_pair->factory);
   }
 
   // Load the subset load balancer configuration. This will contains child load balancer

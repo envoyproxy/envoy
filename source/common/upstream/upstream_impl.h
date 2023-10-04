@@ -71,18 +71,25 @@
 namespace Envoy {
 namespace Upstream {
 
+using ClusterProto = envoy::config::cluster::v3::Cluster;
+
 using UpstreamNetworkFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
 
 class LegacyLbPolicyConfigHelper {
 public:
-  static std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
-  getTypedLbConfigFromLegacyProtoWithoutSubset(const envoy::config::cluster::v3::Cluster& cluster,
+  struct Result {
+    TypedLoadBalancerFactory* factory;
+    LoadBalancerConfigPtr config;
+  };
+
+  static absl::StatusOr<Result>
+  getTypedLbConfigFromLegacyProtoWithoutSubset(const ClusterProto& cluster,
                                                ProtobufMessage::ValidationVisitor& visitor);
 
-  static std::pair<LoadBalancerConfigPtr, TypedLoadBalancerFactory*>
-  getTypedLbConfigFromLegacyProto(const envoy::config::cluster::v3::Cluster& cluster,
+  static absl::StatusOr<Result>
+  getTypedLbConfigFromLegacyProto(const ClusterProto& cluster,
                                   ProtobufMessage::ValidationVisitor& visitor);
 };
 
