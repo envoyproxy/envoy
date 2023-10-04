@@ -64,6 +64,7 @@ public:
   Resource resource_b_;
 };
 
+// Verifies a resource with the static service name is returned when no detectors are configured
 TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -84,6 +85,7 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   EXPECT_EQ(1, resource.attributes_.size());
 }
 
+// Verifies a resource with the default service name is returned when no detectors + static service name are configured
 TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -105,6 +107,7 @@ TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
   EXPECT_EQ("unknown_service:envoy", service_name->second);
 }
 
+// Verifies it is possuble to configure multiple resource detectors
 TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
   EXPECT_CALL(*detector_a, detect()).WillOnce(Return(resource_a_));
@@ -161,6 +164,7 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   }
 }
 
+// Verifies Envoy fails when an unknown resource detector is configured
 TEST_F(ResourceProviderTest, UnknownResourceDetectors) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -183,6 +187,7 @@ TEST_F(ResourceProviderTest, UnknownResourceDetectors) {
       "'envoy.tracers.opentelemetry.resource_detectors.UnkownResourceDetector'");
 }
 
+// Verifies Envoy fails when an error ocurrs while instantiating a resource detector
 TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
   DetectorFactoryA factory;
   Registry::InjectFactory<ResourceDetectorFactory> factory_registration(factory);
@@ -212,6 +217,7 @@ TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
                             "'envoy.tracers.opentelemetry.resource_detectors.a'");
 }
 
+// Test merge when old schema url is empty but updating is not
 TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
   std::string expected_schema_url = "my.schema/v1";
   Resource old_resource = resource_a_;
@@ -261,6 +267,7 @@ TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
   EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
 }
 
+// Test merge when old schema url is not empty but updating is
 TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
   std::string expected_schema_url = "my.schema/v1";
   Resource old_resource = resource_a_;
@@ -310,6 +317,7 @@ TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
   EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
 }
 
+// Test merge when both old and updating schema url are set and equal
 TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
   std::string expected_schema_url = "my.schema/v1";
   Resource old_resource = resource_a_;
@@ -358,6 +366,7 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
   EXPECT_EQ(expected_schema_url, resource.schemaUrl_);
 }
 
+// Test merge when both old and updating schema url are set but different
 TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreDifferent) {
   std::string expected_schema_url = "my.schema/v1";
   Resource old_resource = resource_a_;

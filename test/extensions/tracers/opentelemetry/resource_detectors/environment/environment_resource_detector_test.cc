@@ -21,6 +21,7 @@ namespace OpenTelemetry {
 
 const std::string kOtelResourceAttributesEnv = "OTEL_RESOURCE_ATTRIBUTES";
 
+// Test detector when env variable is not present
 TEST(EnvironmentResourceDetectorTest, EnvVariableNotPresent) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
@@ -35,6 +36,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariableNotPresent) {
   EXPECT_TRUE(resource.attributes_.empty());
 }
 
+// Test detector when env variable is present but contains an empty value
 TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "", 1);
@@ -50,6 +52,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
   TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 }
 
+// Test detector with valid values in the env variable
 TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "key1=val1,key2=val2", 1);
@@ -76,6 +79,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
   TestEnvironment::unsetEnvVar(kOtelResourceAttributesEnv);
 }
 
+// Test detector with invalid values mixed with valid ones in the env variable
 TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributesWrongFormat) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   TestEnvironment::setEnvVar(kOtelResourceAttributesEnv, "key1=val1,key2val2,key3/val3, , key", 1);

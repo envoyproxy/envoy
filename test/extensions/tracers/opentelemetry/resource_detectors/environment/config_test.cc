@@ -12,6 +12,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+// Test create resource detector via factory
 TEST(EnvironmentResourceDetectorFactoryTest, Basic) {
   auto* factory = Registry::FactoryRegistry<ResourceDetectorFactory>::getFactory(
       "envoy.tracers.opentelemetry.resource_detectors.environment");
