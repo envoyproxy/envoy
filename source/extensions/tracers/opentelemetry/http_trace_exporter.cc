@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -20,7 +21,6 @@ OpenTelemetryHttpTraceExporter::OpenTelemetryHttpTraceExporter(
       tracing_stats_(tracing_stats) {}
 
 bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& request) {
-
   std::string request_body;
 
   const auto ok = request.SerializeToString(&request_body);
@@ -39,17 +39,19 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
 
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(http_service_.http_uri());
 
+  // The request follows the OTLP HTTP specification:
+  // https://github.com/open-telemetry/opentelemetry-proto/blob/v1.0.0/docs/specification.md#otlphttp
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
-  // add all custom headers to the request
+  // Add all custom headers to the request
   for (const auto& header_value_option : http_service_.request_headers_to_add()) {
     message->headers().setCopy(Http::LowerCaseString(header_value_option.header().key()),
                                header_value_option.header().value());
   }
   message->body().add(request_body);
 
-  auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
+  const auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
       DurationUtil::durationToMilliseconds(http_service_.http_uri().timeout())));
 
   Http::AsyncClient::Request* http_request =
@@ -72,8 +74,8 @@ void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request&
 }
 
 void OpenTelemetryHttpTraceExporter::onFailure(const Http::AsyncClient::Request&,
-                                               Http::AsyncClient::FailureReason) {
-  ENVOY_LOG(debug, "The OTLP export request failed.");
+                                               Http::AsyncClient::FailureReason reason) {
+  ENVOY_LOG(debug, "The OTLP export request failed. Reason {}", enumToInt(reason));
   tracing_stats_.http_reports_failed_.inc();
 }
 

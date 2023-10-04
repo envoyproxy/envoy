@@ -48,6 +48,7 @@ protected:
       OPENTELEMETRY_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.opentelemetry."))}};
 };
 
+// Test exporting an OTLP message via HTTP containing one span
 TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   std::string yaml_string = fmt::format(R"EOF(
   http_uri:
@@ -121,6 +122,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_failed").value());
 }
 
+// Test export is aborted when cluster is not found
 TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalCluster) {
   std::string yaml_string = fmt::format(R"EOF(
   http_uri:

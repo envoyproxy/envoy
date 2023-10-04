@@ -93,16 +93,19 @@ protected:
   Stats::Scope& scope_{*stats_.rootScope()};
 };
 
+// Tests the tracer initialization with the gRPC exporter
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
   setupValidDriver();
   EXPECT_NE(driver_, nullptr);
 }
 
+// Tests the tracer initialization with the HTTP exporter
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfigHttpExporter) {
   setupValidDriverWithHttpExporter();
   EXPECT_NE(driver_, nullptr);
 }
 
+// Verifies that the tracer cannot be configured with two exporters at the same time
 TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -124,6 +127,7 @@ TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
   EXPECT_EQ(driver_, nullptr);
 }
 
+// Verifies traceparent/tracestate headers are properly parsed and propagated
 TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   // Set up driver
   setupValidDriver();
@@ -211,6 +215,7 @@ resource_spans:
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies span is properly created when the incoming request has no traceparent/tracestate headers
 TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
   // Set up driver
   setupValidDriver();
@@ -250,6 +255,7 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
             "00-00000000000000010000000000000002-0000000000000003-01");
 }
 
+// Verifies a span it not created when an invalid traceparent header is received
 TEST_F(OpenTelemetryDriverTest, NullSpanWithPropagationHeaderError) {
   setupValidDriver();
   // Add an invalid OTLP header to the request headers.
@@ -265,6 +271,7 @@ TEST_F(OpenTelemetryDriverTest, NullSpanWithPropagationHeaderError) {
   EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
 }
 
+// Verifies the export happens after one span is created
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
   // Set up driver
   setupValidDriver();
@@ -292,6 +299,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpan) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies the export happens only when a second span is created
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   // Set up driver
   setupValidDriver();
@@ -319,6 +327,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   EXPECT_EQ(2U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies the export happens after a timeout
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   timer_ =
       new NiceMock<Event::MockTimer>(&context_.server_factory_context_.thread_local_.dispatcher_);
@@ -351,6 +360,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.timer_flushed").value());
 }
 
+// Verifies child span is related to parent span
 TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
   // Set up driver
   setupValidDriver();
@@ -391,6 +401,7 @@ TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies the span types
 TEST_F(OpenTelemetryDriverTest, SpanType) {
   // Set up driver
   setupValidDriver();
@@ -508,6 +519,7 @@ TEST_F(OpenTelemetryDriverTest, SpanType) {
   }
 }
 
+// Verifies spans are exported with their attributes
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributes) {
   setupValidDriver();
   Http::TestRequestHeaderMapImpl request_headers{
@@ -573,6 +585,7 @@ resource_spans:
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Not sampled spans are ignored
 TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   setupValidDriver();
   Http::TestRequestHeaderMapImpl request_headers{
@@ -589,6 +602,7 @@ TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies tracer is "disabled" when no exporter is configured
 TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
   const std::string yaml_string = "{}";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
@@ -612,6 +626,7 @@ TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies a custom service name is properly set on exported spans
 TEST_F(OpenTelemetryDriverTest, ExportSpanWithCustomServiceName) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -672,6 +687,7 @@ resource_spans:
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies the export using the HTTP exporter
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
   context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->name_ =
       "my_o11y_backend";
