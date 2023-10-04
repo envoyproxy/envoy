@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ needs.env.outputs.agent_ubuntu }}
     timeout-minutes: 45
     container:
-      image: ${{ needs.env.outputs.build_image_ubuntu }}
+      image: ${{ needs.env.outputs.build_image_ubuntu_mobile }}
     steps:
     - uses: actions/checkout@v4
     - name: Add safe directory

@@ -56,9 +56,10 @@ KOTLIN_DIRS=(
 if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
   ./ktfmt.sh "${KOTLIN_DIRS[@]}"
 else
-  NEEDS_FORMAT=$(./ktfmt.sh --dry-run "${KOTLIN_DIRS[@]}" | tee /dev/tty)
+  NEEDS_FORMAT=$(./ktfmt.sh --dry-run "${KOTLIN_DIRS[@]}")
   if [[ -n "${NEEDS_FORMAT}" ]]; then
     echo "ERROR: Run 'tools/check_format.sh fix' to fix"
+    echo "${NEEDS_FORMAT}"
     exit 1
   fi
 fi
