@@ -64,10 +64,42 @@ pkg_tar(
 )
 
 genrule(
-    name = "docs",
-    outs = ["docs.tar.gz"],
+    name = "html_release",
+    outs = ["html_release.tar.gz"],
+    cmd = """
+    . $(location @envoy//bazel:volatile_env) \
+    && VERSION_NUMBER="$$(cat $(location //:VERSION))" \
+    && export ENVOY_BLOB_SHA=$${BUILD_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
+    && export ENVOY_DOCS_VERSION_STRING="$${VERSION_NUMBER}"-"$${ENVOY_BLOB_SHA:0:6}" \
+    && export ENVOY_DOCS_RELEASE_LEVEL=pre-release \
+    && mkdir -p build \
+    && tar xf $(location :rst) -C build \
+    && $(location :sphinx) \
+         -W \
+         --keep-going \
+         -b html \
+         build \
+         output \
+    && tar czf $@ -C output .
+    """,
+    stamp = 1,
+    tools = [
+        ":rst",
+        ":sphinx",
+        "//:VERSION",
+        "@envoy//bazel:volatile_env",
+    ],
+)
+
+genrule(
+    name = "html",
+    outs = ["html.tar.gz"],
     cmd = """
     mkdir -p build \
+    && VERSION_NUMBER="$$(cat $(location //:VERSION))" \
+    && export ENVOY_BLOB_SHA="$${BUILD_SHA:-UNKNOWN}" \
+    && export ENVOY_DOCS_VERSION_STRING="$${VERSION_NUMBER}"-"$${ENVOY_BLOB_SHA:0:6}" \
+    && export ENVOY_DOCS_RELEASE_LEVEL=pre-release \
     && tar xf $(location :rst) -C build \
     && $(location :sphinx) \
          -W \
@@ -80,5 +112,11 @@ genrule(
     tools = [
         ":rst",
         ":sphinx",
+        "//:VERSION",
     ],
+)
+
+alias(
+    name = "docs",
+    actual = ":html_release",
 )

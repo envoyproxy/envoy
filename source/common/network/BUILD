@@ -32,6 +32,7 @@ envoy_cc_library(
     srcs = ["application_protocol.cc"],
     hdrs = ["application_protocol.h"],
     deps = [
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],
@@ -520,6 +521,7 @@ envoy_cc_library(
     srcs = ["upstream_server_name.cc"],
     hdrs = ["upstream_server_name.h"],
     deps = [
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],
@@ -530,6 +532,7 @@ envoy_cc_library(
     srcs = ["upstream_subject_alt_names.cc"],
     hdrs = ["upstream_subject_alt_names.h"],
     deps = [
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],

@@ -28,7 +28,7 @@
 namespace Envoy {
 namespace Network {
 
-UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
+UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source,
                                  const envoy::config::core::v3::UdpSocketConfig& config)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source),

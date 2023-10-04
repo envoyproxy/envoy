@@ -30,18 +30,18 @@ message LeastRequest {
   // The following formula is used to calculate the dynamic weights when hosts have different load
   // balancing weights:
   //
-  // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
+  // ``weight = load_balancing_weight / (active_requests + 1)^active_request_bias``
   //
   // The larger the active request bias is, the more aggressively active requests will lower the
   // effective weight when all host weights are not equal.
   //
-  // `active_request_bias` must be greater than or equal to 0.0.
+  // ``active_request_bias`` must be greater than or equal to 0.0.
   //
-  // When `active_request_bias == 0.0` the Least Request Load Balancer doesn't consider the number
+  // When ``active_request_bias == 0.0`` the Least Request Load Balancer doesn't consider the number
   // of active requests at the time it picks a host and behaves like the Round Robin Load
   // Balancer.
   //
-  // When `active_request_bias > 0.0` the Least Request Load Balancer scales the load balancing
+  // When ``active_request_bias > 0.0`` the Least Request Load Balancer scales the load balancing
   // weight by the number of active requests at the time it does a pick.
   //
   // The value is cached for performance reasons and refreshed whenever one of the Load Balancer's

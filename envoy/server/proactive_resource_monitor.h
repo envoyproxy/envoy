@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -42,6 +43,7 @@ public:
 };
 
 using ProactiveResourceMonitorPtr = std::unique_ptr<ProactiveResourceMonitor>;
+using ProactiveResourceMonitorOptRef = OptRef<ProactiveResourceMonitor>;
 
 class ProactiveResource {
 public:
@@ -68,7 +70,9 @@ public:
     }
   }
 
-  int64_t currentResourceUsage() { return monitor_->currentResourceUsage(); }
+  ProactiveResourceMonitorOptRef getProactiveResourceMonitorForTest() {
+    return makeOptRefFromPtr<ProactiveResourceMonitor>(monitor_.get());
+  };
 
 private:
   const std::string name_;
