@@ -188,13 +188,13 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
           headers.addReferenceKey(header_name, header_value);
         }
         break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+        headers.setReferenceKey(header_name, header_value);
+        break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS:
         if (!headers.get(header_name).empty()) {
           headers.setReferenceKey(header_name, header_value);
         }
-        break;
-      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        headers.setReferenceKey(header_name, header_value);
         break;
       default:
         // Handle unknown/invalid append_action value
