@@ -93,6 +93,7 @@ jobs:
       run_pre_with: ${{ matrix.run_pre_with }}
       env: ${{ matrix.env }}
       trusted: true
+      repo_ref: ${{ inputs.repo_ref }}
 
   publish_docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
