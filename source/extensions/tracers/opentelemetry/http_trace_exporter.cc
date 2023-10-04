@@ -15,10 +15,8 @@ namespace OpenTelemetry {
 
 OpenTelemetryHttpTraceExporter::OpenTelemetryHttpTraceExporter(
     Upstream::ClusterManager& cluster_manager,
-    const envoy::config::core::v3::HttpService& http_service,
-    OpenTelemetryTracerStats& tracing_stats)
-    : cluster_manager_(cluster_manager), http_service_(http_service),
-      tracing_stats_(tracing_stats) {}
+    const envoy::config::core::v3::HttpService& http_service)
+    : cluster_manager_(cluster_manager), http_service_(http_service) {}
 
 bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& request) {
   std::string request_body;
@@ -56,14 +54,12 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
 
   Http::AsyncClient::Request* http_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
-  tracing_stats_.http_reports_sent_.inc();
 
   return http_request;
 }
 
 void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request&,
                                                Http::ResponseMessagePtr&& message) {
-  tracing_stats_.http_reports_success_.inc();
   const auto response_code = message->headers().Status()->value().getStringView();
   if (response_code != "200") {
     ENVOY_LOG(error,
@@ -76,7 +72,6 @@ void OpenTelemetryHttpTraceExporter::onSuccess(const Http::AsyncClient::Request&
 void OpenTelemetryHttpTraceExporter::onFailure(const Http::AsyncClient::Request&,
                                                Http::AsyncClient::FailureReason reason) {
   ENVOY_LOG(debug, "The OTLP export request failed. Reason {}", enumToInt(reason));
-  tracing_stats_.http_reports_failed_.inc();
 }
 
 } // namespace OpenTelemetry

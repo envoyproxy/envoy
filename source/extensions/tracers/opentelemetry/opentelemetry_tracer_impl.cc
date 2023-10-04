@@ -48,7 +48,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
       exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
     } else if (opentelemetry_config.has_http_service()) {
       exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(
-          factory_context.clusterManager(), opentelemetry_config.http_service(), tracing_stats_);
+          factory_context.clusterManager(), opentelemetry_config.http_service());
     }
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),

@@ -10,7 +10,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
-#include "source/extensions/tracers/opentelemetry/tracer_stats.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
@@ -26,8 +25,7 @@ class OpenTelemetryHttpTraceExporter : public OpenTelemetryTraceExporter,
                                        public Http::AsyncClient::Callbacks {
 public:
   OpenTelemetryHttpTraceExporter(Upstream::ClusterManager& cluster_manager,
-                                 const envoy::config::core::v3::HttpService& http_service,
-                                 OpenTelemetryTracerStats& tracing_stats);
+                                 const envoy::config::core::v3::HttpService& http_service);
 
   bool log(const ExportTraceServiceRequest& request) override;
 
@@ -39,7 +37,6 @@ public:
 private:
   Upstream::ClusterManager& cluster_manager_;
   envoy::config::core::v3::HttpService http_service_;
-  OpenTelemetryTracerStats& tracing_stats_;
 };
 
 } // namespace OpenTelemetry

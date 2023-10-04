@@ -36,7 +36,7 @@ public:
     cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
 
     trace_exporter_ =
-        std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_service, stats_);
+        std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_service);
   }
 
 protected:
@@ -44,8 +44,6 @@ protected:
   std::unique_ptr<OpenTelemetryHttpTraceExporter> trace_exporter_;
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.store_;
-  OpenTelemetryTracerStats stats_{OpenTelemetryTracerStats{
-      OPENTELEMETRY_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.opentelemetry."))}};
 };
 
 // Test exporting an OTLP message via HTTP containing one span
@@ -113,13 +111,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   callback->onBeforeFinalizeUpstreamSpan(null_span, nullptr);
 
   callback->onSuccess(request, std::move(msg));
-  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_sent").value());
-  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_success").value());
-  EXPECT_EQ(0U, mock_scope_.counter("tracing.opentelemetry.http_reports_failed").value());
-
   callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
-
-  EXPECT_EQ(1U, mock_scope_.counter("tracing.opentelemetry.http_reports_failed").value());
 }
 
 // Test export is aborted when cluster is not found

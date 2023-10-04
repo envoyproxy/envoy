@@ -12,7 +12,6 @@
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
-#include "source/extensions/tracers/opentelemetry/tracer_stats.h"
 
 #include "absl/strings/escaping.h"
 
@@ -20,6 +19,14 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
+
+#define OPENTELEMETRY_TRACER_STATS(COUNTER)                                                        \
+  COUNTER(spans_sent)                                                                              \
+  COUNTER(timer_flushed)
+
+struct OpenTelemetryTracerStats {
+  OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 /**
  * OpenTelemetry Tracer. It is stored in TLS and contains the exporter.
