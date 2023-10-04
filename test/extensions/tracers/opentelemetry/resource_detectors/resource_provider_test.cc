@@ -85,7 +85,8 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   EXPECT_EQ(1, resource.attributes_.size());
 }
 
-// Verifies a resource with the default service name is returned when no detectors + static service name are configured
+// Verifies a resource with the default service name is returned when no detectors + static service
+// name are configured
 TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -107,7 +108,7 @@ TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
   EXPECT_EQ("unknown_service:envoy", service_name->second);
 }
 
-// Verifies it is possuble to configure multiple resource detectors
+// Verifies it is possible to configure multiple resource detectors
 TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
   EXPECT_CALL(*detector_a, detect()).WillOnce(Return(resource_a_));
@@ -187,7 +188,7 @@ TEST_F(ResourceProviderTest, UnknownResourceDetectors) {
       "'envoy.tracers.opentelemetry.resource_detectors.UnkownResourceDetector'");
 }
 
-// Verifies Envoy fails when an error ocurrs while instantiating a resource detector
+// Verifies Envoy fails when an error occurs while instantiating a resource detector
 TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
   DetectorFactoryA factory;
   Registry::InjectFactory<ResourceDetectorFactory> factory_registration(factory);
