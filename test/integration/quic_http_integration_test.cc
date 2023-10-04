@@ -1275,6 +1275,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
+                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
