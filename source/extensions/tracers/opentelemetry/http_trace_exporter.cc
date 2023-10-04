@@ -40,11 +40,11 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(http_service_.http_uri());
 
   // The request follows the OTLP HTTP specification:
-  // https://github.com/open-telemetry/opentelemetry-proto/blob/v1.0.0/docs/specification.md#otlphttp
+  // https://github.com/open-telemetry/opentelemetry-proto/blob/v1.0.0/docs/specification.md#otlphttp.
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
-  // Add all custom headers to the request
+  // Add all custom headers to the request.
   for (const auto& header_value_option : http_service_.request_headers_to_add()) {
     message->headers().setCopy(Http::LowerCaseString(header_value_option.header().key()),
                                header_value_option.header().value());
