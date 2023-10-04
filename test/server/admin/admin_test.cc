@@ -343,6 +343,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.overloadState().tryAllocateResource(overload_name, 0);
   peer.overloadState().tryDeallocateResource(overload_name, 0);
   peer.overloadState().isResourceMonitorEnabled(overload_name);
+  peer.overloadState().getProactiveResourceMonitorForTest(overload_name);
 
   peer.overloadManager().scaledTimerFactory();
 

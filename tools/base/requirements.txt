@@ -454,9 +454,9 @@ envoy-code-check==0.5.8 \
     --hash=sha256:03f32588cc9ed98ab6703cbca6f81df1527db71c3a0f962be6a6084ded40d528 \
     --hash=sha256:2b12c51098c78d393823cf055a54e9308c37321d769041f01a2f35b04074d6f3
     # via -r requirements.in
-envoy-dependency-check==0.1.8 \
-    --hash=sha256:ac9820e446bb44e05121e5c93c210f40ca37076580b0d082da2c63e7784c338a \
-    --hash=sha256:e92272ca1f4d850d3eb3bde3c22cff39c103e7850fbda8d1686814bfc8c45338
+envoy-dependency-check==0.1.10 \
+    --hash=sha256:4a637e0ed7184791b495041f9baf44567a95cbb979e1e5f26f6a8c33f724cf9e \
+    --hash=sha256:e6ae41249f298c865a357edcd8e4850354f222ea4f0dd629c737706b23670c75
     # via -r requirements.in
 envoy-distribution-distrotest==0.0.10 \
     --hash=sha256:83e912c48da22eb3e514fc1142247d33eb7ed0d59e94eca2ffbd178a26fbf808 \
@@ -1309,9 +1309,9 @@ uritemplate==4.1.1 \
     --hash=sha256:4346edfc5c3b79f694bccd6d6099a322bbeb628dbf2cd86eea55a456ce5124f0 \
     --hash=sha256:830c08b8d99bdd312ea4ead05994a38e8936266f84b9a7878232db50b044e02e
     # via gidgethub
-urllib3==1.26.16 \
-    --hash=sha256:8d36afa7616d8ab714608411b4a3b13e58f463aee519024578e062e141dce20f \
-    --hash=sha256:8f135f6502756bde6b2a9b28989df5fbe87c9970cecaa69041edcce7f0589b14
+urllib3==1.26.17 \
+    --hash=sha256:24d6a242c28d29af46c3fae832c36db3bbebcc533dd1bb549172cd739c82df21 \
+    --hash=sha256:94a757d178c9be92ef5539b8840d48dc9cf1b2709c9d6b588232a055c524458b
     # via
     #   google-auth
     #   pygithub
