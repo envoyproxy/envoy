@@ -50,7 +50,7 @@ HashPolicyImpl::HashPolicyImpl(
     hash_impl_ = std::make_unique<KeyHashMethod>(hash_policies[0]->key());
     break;
   case UdpProxyConfig::HashPolicy::PolicySpecifierCase::POLICY_SPECIFIER_NOT_SET:
-    throw EnvoyException("policy specifier not set");
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 
