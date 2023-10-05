@@ -554,7 +554,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
                                                uint64_t num_slices, const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
   Api::IoCallUint64Result send_result(
-      /*rc=*/0, /*err=*/Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+      /*rc=*/0, /*err=*/Api::IoError::none());
   do {
     send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);
   } while (!send_result.ok() &&
