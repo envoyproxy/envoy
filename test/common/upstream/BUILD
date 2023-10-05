@@ -111,6 +111,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/upstreams/http/generic:config",
         "//test/config:v2_link_hacks",
         "//test/integration/load_balancers:custom_lb_policy",
         "//test/mocks/matcher:matcher_mocks",

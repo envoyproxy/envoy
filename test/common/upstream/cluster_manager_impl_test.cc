@@ -13,6 +13,7 @@
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/config/v2_link_hacks.h"
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -49,6 +50,7 @@ public:
 
 namespace {
 
+using ::envoy::config::bootstrap::v3::Bootstrap;
 using ::testing::_;
 using ::testing::DoAll;
 using ::testing::InSequence;
@@ -63,8 +65,8 @@ using ::testing::SaveArg;
 
 using namespace std::chrono_literals;
 
-envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml) {
+  Bootstrap bootstrap;
   TestUtility::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
@@ -84,6 +86,56 @@ void verifyCaresDnsConfigAndUnpack(
   typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 }
 
+// A gRPC MuxFactory that returns a MockGrpcMux instance when trying to instantiate a mux for the
+// `envoy.config_mux.grpc_mux_factory` type. This enables testing call expectations on the ADS gRPC
+// mux.
+class MockGrpcMuxFactory : public Config::MuxFactory {
+public:
+  std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
+  void shutdownAll() override {}
+  std::shared_ptr<Config::GrpcMux>
+  create(std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+         Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+         const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+         BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+         OptRef<Config::XdsResourcesDelegate>, bool) override {
+    return std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  }
+};
+
+// A ClusterManagerImpl that overrides postThreadLocalClusterUpdate set up call expectations on the
+// ADS gRPC mux. The ADS mux should not be started until the ADS cluster has been initialized. This
+// solves the problem outlined in https://github.com/envoyproxy/envoy/issues/27702.
+class UpdateOverrideClusterManagerImpl : public TestClusterManagerImpl {
+public:
+  UpdateOverrideClusterManagerImpl(const Bootstrap& bootstrap, ClusterManagerFactory& factory,
+                                   Stats::Store& stats, ThreadLocal::Instance& tls,
+                                   Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                                   AccessLog::AccessLogManager& log_manager,
+                                   Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                                   ProtobufMessage::ValidationContext& validation_context,
+                                   Api::Api& api, Http::Context& http_context,
+                                   Grpc::Context& grpc_context, Router::Context& router_context,
+                                   Server::Instance& server)
+      : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
+                               main_thread_dispatcher, admin, validation_context, api, http_context,
+                               grpc_context, router_context, server) {}
+
+protected:
+  void postThreadLocalClusterUpdate(ClusterManagerCluster& cluster,
+                                    ThreadLocalClusterUpdateParams&& params) override {
+    if (cluster.cluster().info()->name() == "ads_cluster") {
+      // For the ADS cluster, set up the expectation that the postThreadLocalClusterUpdate call
+      // below will invoke the ADS mux's start() method.
+      EXPECT_CALL(dynamic_cast<Config::MockGrpcMux&>(*adsMux()), start()).Times(1);
+    }
+
+    // The ClusterManagerImpl::postThreadLocalClusterUpdate method calls ads_mux_->start() if the
+    // cluster is used in ADS for EnvoyGrpc.
+    TestClusterManagerImpl::postThreadLocalClusterUpdate(cluster, std::move(params));
+  }
+};
+
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
@@ -91,11 +143,12 @@ public:
         router_context_(factory_.stats_.symbolTable()),
         registered_dns_factory_(dns_resolver_factory_) {}
 
-  virtual void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
+  virtual void create(const Bootstrap& bootstrap) {
+    cluster_manager_ = TestClusterManagerImpl::create(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_);
+    cluster_manager_->init();
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
@@ -141,6 +194,15 @@ public:
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
         router_context_, server_);
+    cluster_manager_->init();
+  }
+
+  void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
+    cluster_manager_ = std::make_unique<UpdateOverrideClusterManagerImpl>(
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
+        *factory_.api_, http_context_, grpc_context_, router_context_, server_);
+    cluster_manager_->init();
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -198,7 +260,7 @@ public:
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };
 
-envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
+Bootstrap defaultConfig() {
   const std::string yaml = R"EOF(
 static_resources:
   clusters: []
@@ -583,6 +645,39 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   EXPECT_CALL(log_manager_, createAccessLog(Filesystem::FilePathAndType{
                                 Filesystem::DestinationType::File, "foo"}));
   create(parseBootstrapFromV3Json(json));
+}
+
+TEST_F(ClusterManagerImplTest, AdsCluster) {
+  MockGrpcMuxFactory factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  const std::string yaml = R"EOF(
+  dynamic_resources:
+    ads_config:
+      transport_api_version: V3
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  createWithUpdateOverrideClusterManager(parseBootstrapFromV3Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
@@ -1227,7 +1322,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
 class ClusterManagerLifecycleTest : public ClusterManagerImplTest,
                                     public testing::WithParamInterface<bool> {
 protected:
-  void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override {
+  void create(const Bootstrap& bootstrap) override {
     if (useDeferredCluster()) {
       auto bootstrap_with_deferred_cluster = bootstrap;
       bootstrap_with_deferred_cluster.mutable_cluster_manager()
@@ -4520,9 +4615,11 @@ public:
     ASSERT(!added_or_updated_);
     added_or_updated_ = true;
   }
+  bool requiredForAds() override { return required_for_ads_; }
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
   bool added_or_updated_{};
+  bool required_for_ads_{};
 };
 
 TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
@@ -6054,7 +6151,7 @@ public:
 
     ReadyWatcher initialized;
     EXPECT_CALL(initialized, ready());
-    envoy::config::bootstrap::v3::Bootstrap config = parseBootstrapFromV3Yaml(yaml);
+    Bootstrap config = parseBootstrapFromV3Yaml(yaml);
     if (ratio != 0) {
       config.mutable_static_resources()
           ->mutable_clusters(0)
