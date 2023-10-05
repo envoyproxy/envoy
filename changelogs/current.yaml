@@ -104,6 +104,10 @@ minor_behavior_changes:
     Added new configuration field :ref:`always_consume_default_token_bucket
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.always_consume_default_token_bucket>`
     to allow for setting if default token bucket should be always consumed or only be consumed when there is no matching descriptor.
+- area: tls_inspector
+  change: |
+    Updated the security posture of the :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` to
+    robust against untrusted downstreams and upstreams.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
