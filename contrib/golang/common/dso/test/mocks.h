@@ -42,9 +42,9 @@ public:
   MOCK_METHOD(GoUint64, envoyGoFilterOnDownstreamWrite,
               (void* w, GoUint64 dataSize, GoUint64 dataPtr, GoInt sliceNum, GoInt endOfStream));
 
-  MOCK_METHOD(void, envoyGoFilterOnUpstreamConnectionReady, (void* w, GoUint64 connID));
+  MOCK_METHOD(void, envoyGoFilterOnUpstreamConnectionReady, (void* w, GoUint64 conn_id));
   MOCK_METHOD(void, envoyGoFilterOnUpstreamConnectionFailure,
-              (void* w, GoInt reason, GoUint64 connID));
+              (void* w, GoInt reason, GoUint64 conn_id));
   MOCK_METHOD(void, envoyGoFilterOnUpstreamData,
               (void* w, GoUint64 dataSize, GoUint64 dataPtr, GoInt sliceNum, GoInt endOfStream));
   MOCK_METHOD(void, envoyGoFilterOnUpstreamEvent, (void* w, GoInt event));
