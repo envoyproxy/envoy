@@ -84,8 +84,7 @@ public:
 class DatadogTracerSpanTest : public testing::Test {
 public:
   DatadogTracerSpanTest()
-      : id_(0xcafebabe), collector_(std::make_shared<MockCollector>()),
-        config_(makeConfig(collector_)),
+      : collector_(std::make_shared<MockCollector>()), config_(makeConfig(collector_)),
         tracer_(
             // Override the tracer's ID generator so that all trace IDs and span
             // IDs are 0xcafebabe.
@@ -108,7 +107,7 @@ private:
   }
 
 protected:
-  const std::uint64_t id_ = 0;
+  const std::uint64_t id_{0xcafebabe};
   const std::shared_ptr<MockCollector> collector_;
   const datadog::tracing::TracerConfig config_;
   datadog::tracing::Tracer tracer_;

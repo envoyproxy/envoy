@@ -54,9 +54,12 @@ jobs:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       version_dev: ${{ needs.env.outputs.version_dev }}
       given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
+      repo_ref: ${{ inputs.ref }}
     permissions:
       contents: write
+    secrets:
+      ENVOY_CI_SYNC_APP_ID: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+      ENVOY_CI_SYNC_APP_KEY: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
 
   verify:
     uses: ./.github/workflows/_stage_verify.yml
@@ -66,4 +69,4 @@ jobs:
     with:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ needs.env.outputs.trusted != 'true' && needs.env.outputs.repo_ref || '' }}
+      repo_ref: ${{ needs.env.outputs.repo_ref }}

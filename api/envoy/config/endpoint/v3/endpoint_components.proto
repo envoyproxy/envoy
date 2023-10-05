@@ -88,8 +88,8 @@ message Endpoint {
   // :ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`.
   string hostname = 3;
 
-  // An ordered list of addresses that together with `address` comprise the
-  // list of addresses for an endpoint. The address given in the `address` is
+  // An ordered list of addresses that together with ``address`` comprise the
+  // list of addresses for an endpoint. The address given in the ``address`` is
   // prepended to this list. It is assumed that the list must already be
   // sorted by preference order of the addresses. This will only be supported
   // for STATIC and EDS clusters.

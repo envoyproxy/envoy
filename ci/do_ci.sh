@@ -375,17 +375,15 @@ case $CI_TARGET in
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
-        BAZEL_BUILD_OPTIONS+=(--remote_download_minimal)
-        NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@" || {
-            if [[ -s "$FIX_YAML" ]]; then
-                echo >&2
-                echo "Diff/yaml files with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
-                echo >&2
-            else
-                echo "Clang-tidy failed." >&2
-            fi
-            exit 1
-        }
+        CLANG_TIDY_TARGETS=(
+            //contrib/...
+            //source/...
+            //test/...
+            @envoy_api//...)
+        bazel build \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --config clang-tidy \
+              "${CLANG_TIDY_TARGETS[@]}"
         ;;
 
     clean|expunge)
@@ -650,12 +648,23 @@ case $CI_TARGET in
         setup_clang_toolchain
         echo "generating docs..."
         # Build docs.
-        "${ENVOY_SRCDIR}/docs/build.sh"
-        ;;
-
-    docs-publish-latest)
-        BUILD_SHA=$(git rev-parse HEAD)
-        curl -X POST -d "$BUILD_SHA" "$NETLIFY_TRIGGER_URL"
+        [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
+        rm -rf "${DOCS_OUTPUT_DIR}"
+        mkdir -p "${DOCS_OUTPUT_DIR}"
+        if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
+            export SPHINX_RUNNER_ARGS="-v warn"
+            BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
+        fi
+        if [[ -n "${DOCS_BUILD_RST}" ]]; then
+            bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
+            cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+        fi
+        DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --//tools/tarball:target=//docs:html \
+              //tools/tarball:unpack \
+              "$DOCS_OUTPUT_DIR"
         ;;
 
     docs-upload)

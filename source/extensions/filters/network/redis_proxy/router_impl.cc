@@ -53,6 +53,21 @@ Prefix::Prefix(
     mirror_policies_.emplace_back(std::make_shared<MirrorPolicyImpl>(
         mirror_policy, upstreams.at(mirror_policy.cluster()), runtime));
   }
+  if (route.has_read_command_policy()) {
+    read_upstream_ = upstreams.at(route.read_command_policy().cluster());
+  }
+}
+
+ConnPool::InstanceSharedPtr Prefix::upstream(const std::string& command) const {
+
+  if (read_upstream_) {
+    std::string to_lower_string = absl::AsciiStrToLower(command);
+    if (Common::Redis::SupportedCommands::isReadCommand(to_lower_string)) {
+      return read_upstream_;
+    }
+  }
+
+  return upstream_;
 }
 
 PrefixRoutes::PrefixRoutes(

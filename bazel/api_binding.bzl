@@ -13,7 +13,6 @@ def _default_envoy_api_impl(ctx):
     ]
     for d in api_dirs:
         ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child(ctx.attr.reldir).get_child(d), d)
-    ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child("api").get_child("bazel").get_child("utils.bzl"), "utils.bzl")
 
 _default_envoy_api = repository_rule(
     implementation = _default_envoy_api_impl,

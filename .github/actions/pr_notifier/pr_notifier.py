@@ -17,7 +17,9 @@ import datetime
 import os
 import sys
 
+import requests
 import github
+import icalendar
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
@@ -42,6 +44,9 @@ MAINTAINERS = {
     'abeyad': 'U03CVM7GPM1',
     'soulxu': 'U01GNQ3B8AY',
 }
+
+# Oncall calendar
+CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com/public/basic.ics"
 
 # First pass reviewers who are not maintainers should get
 # notifications but not result in a PR not getting assigned a
@@ -226,8 +231,28 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
             text=(
                 "*Untriaged Issues* (please tag and cc area experts)\n<%s|%s>" %
                 (issue_link, issue_link)))
+        # On Monday, post the new oncall.
+        if datetime.date.today().weekday() == 0:
+            oncall = parse_calendar()
+            client.chat_postMessage(channel='#envoy-maintainer-oncall', text=(oncall))
+            client.chat_postMessage(channel='#general', text=(oncall))
     except SlackApiError as e:
         print("Unexpected error %s", e.response["error"])
+
+
+def parse_calendar():
+    ical = requests.get(CALENDAR)
+    parsed_calendar = icalendar.Calendar.from_ical(ical.text)
+    ical.close()
+
+    now = datetime.datetime.now()
+    sunday = now - datetime.timedelta(days=now.weekday() + 1)
+
+    for component in parsed_calendar.walk():
+        if component.name == "VEVENT":
+            if (sunday.date() == component.decoded("dtstart").date()):
+                return component.get("summary")
+    return "unable to find this week's oncall"
 
 
 if __name__ == '__main__':

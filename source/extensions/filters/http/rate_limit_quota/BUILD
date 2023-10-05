@@ -100,6 +100,7 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         "//envoy/common:time_interface",
+        "//source/common/common:token_bucket_impl_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",

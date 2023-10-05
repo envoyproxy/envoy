@@ -58,10 +58,8 @@ class XdsTest {
 
   @Test
   fun `test xDS with CDS`() {
-    // TODO(fredyw): The current way of asserting the stats is not great. Expose
-    // some utilities from C++ through JNI to make it easy checking the stats.
     // There are 2 initial clusters: base and base_clear.
-    assertThat(engine.dumpStats()).contains("cluster_manager.cluster_added: 2")
+    engine.waitForStatGe("cluster_manager.cluster_added",  2)
     val cdsResponse = """
       version_info: v1
       resources:
@@ -88,9 +86,7 @@ class XdsTest {
       nonce: nonce1
     """.trimIndent()
     TestJni.sendDiscoveryResponse(cdsResponse)
-    // Give some time until the new cluster is added.
-    TimeUnit.SECONDS.sleep(1)
     // There are now 3 clusters: base, base_cluster, and xds_cluster.
-    assertThat(engine.dumpStats()).contains("cluster_manager.cluster_added: 3")
+    engine.waitForStatGe("cluster_manager.cluster_added", 3)
   }
 }

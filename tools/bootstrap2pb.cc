@@ -32,6 +32,7 @@ int main(int argc, char** argv) {
   Envoy::Stats::IsolatedStoreImpl stats_store;
   Envoy::Event::RealTimeSystem time_system; // NO_CHECK_FORMAT(real_time)
   Envoy::Random::RandomGeneratorImpl rand;
+  // TODO: fix or remove - this seems to be broken
   Envoy::Api::Impl api(platform_impl_.threadFactory(), stats_store, time_system,
                        platform_impl_.fileSystem(), rand);
 
