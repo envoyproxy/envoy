@@ -55,6 +55,12 @@ public:
   Server::Instance* server() { return server_.get(); }
 
 protected:
+  virtual std::unique_ptr<Server::Instance>
+  createInstance(Event::TimeSystem& time_system, Thread::BasicLockable& access_log_lock,
+                 Server::ComponentFactory& component_factory,
+                 std::unique_ptr<Random::RandomGenerator>&& random_generator,
+                 std::unique_ptr<ProcessContext>&& process_context) PURE;
+
   std::unique_ptr<Server::Platform> platform_impl_;
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
   // We instantiate this class regardless of ENVOY_GOOGLE_GRPC, to avoid having
@@ -71,7 +77,7 @@ protected:
   Stats::ThreadLocalStoreImplPtr stats_store_;
   std::unique_ptr<Logger::Context> logging_context_;
   std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
-  std::unique_ptr<Server::InstanceImpl> server_;
+  std::unique_ptr<Server::Instance> server_;
 
 private:
   void configureComponentLogLevels();

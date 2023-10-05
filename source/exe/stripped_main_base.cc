@@ -71,7 +71,6 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          log_lock, options_.logFormatEscaped(),
                                                          options_.enableFineGrainLogging());
@@ -84,11 +83,8 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
-    server_ = std::make_unique<Server::InstanceImpl>(
-        *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
-        *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
-        platform_impl_->threadFactory(), platform_impl_->fileSystem(), std::move(process_context));
-
+    server_ = createInstance(time_system, log_lock, component_factory, std::move(random_generator),
+                             std::move(process_context));
     break;
   }
   case Server::Mode::Validate:
