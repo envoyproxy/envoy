@@ -87,7 +87,7 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
 
   std::string query = fmt::format("/logging?{}=trace", "logs_handler_test");
   postCallback(query, header_map, response);
-  FINE_GRAIN_LOG(info, "After post {}: level for this file is trace now!", query);
+  FINE_GRAIN_LOG(info, "After post {}, level for this file is trace now!", query);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
 
   // Test multiple log levels at once
@@ -99,31 +99,28 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   getFineGrainLogContext().initFineGrainLogger(file_two, logger_two);
   query = fmt::format("/logging?{}=critical", "logs_handle*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
-  FINE_GRAIN_LOG(critical, "After post {}: level for this file is critical now!", query);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(),
-            spdlog::level::critical);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(),
-            spdlog::level::critical);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(),
-            spdlog::level::critical);
+  FINE_GRAIN_LOG(critical, "After post {}, level for this file is critical now!", query);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::critical);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::critical);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::critical);
 
   query = fmt::format("/logging?paths={}:warning", "admin/*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
-  FINE_GRAIN_LOG(trace, "After post {}: level for this file is still trace now!", query);
+  FINE_GRAIN_LOG(trace, "After post {}, level for this file is still trace now!", query);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::warn);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::warn);
 
   query = fmt::format("/logging?paths={}:info", "admin/logs_handler_test????.cc");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
-  FINE_GRAIN_LOG(trace, "After post {}: level for this file is still trace now!", query);
+  FINE_GRAIN_LOG(trace, "After post {}, level for this file is still trace!", query);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::trace);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::info);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::info);
 
   query = fmt::format("/logging?paths={}:warning", "*admin/logs_handler_test*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
-  FINE_GRAIN_LOG(warn, "After post {}: level for this file is warn now!", query);
+  FINE_GRAIN_LOG(warn, "After post {}, level for this file is warn now!", query);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::warn);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::warn);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::warn);
@@ -132,7 +129,7 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   query =
       fmt::format("/logging?paths={}:warning,{}:info", "logs_handler_test*", "logs_handler_test*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
-  FINE_GRAIN_LOG(warn, "After post {}: level for this file is warn now!", query);
+  FINE_GRAIN_LOG(warn, "After post {}, level for this file is warn now!", query);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::warn);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::warn);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::warn);
@@ -141,7 +138,7 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   query = fmt::format("/logging?paths={}:warning,{}:info", "logs_handler_test_one",
                       "logs_handler_test*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
-  FINE_GRAIN_LOG(info, "After post {}: level for this file is info now!", query);
+  FINE_GRAIN_LOG(info, "After post {}, level for this file is info now!", query);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::info);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::warn);
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::info);
