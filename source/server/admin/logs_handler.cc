@@ -190,24 +190,13 @@ absl::Status LogsHandler::changeLogLevels(
       logger->setLevel(level);
     }
   } else {
-    std::vector<std::pair<SpdLoggerSharedPtr, spdlog::level::level_enum>> loggers_to_change;
-    for (auto& it : changes) {
-      SpdLoggerSharedPtr logger = getFineGrainLogContext().getFineGrainLogEntry(it.first);
-      if (!logger) {
-        return absl::InvalidArgumentError("unknown logger name");
-      }
-
-      loggers_to_change.emplace_back(std::make_pair(logger, it.second));
+    std::vector<std::pair<absl::string_view, int>> glob_levels;
+    for (const auto& [name, level] : changes) {
+      ENVOY_LOG(warn, "boteng change log level: name='{}' level='{}'", name,
+                spdlog::level::level_string_views[level]);
+      glob_levels.emplace_back(name, level);
     }
-
-    for (auto& it : loggers_to_change) {
-      SpdLoggerSharedPtr logger = it.first;
-      spdlog::level::level_enum level = it.second;
-
-      FINE_GRAIN_LOG(info, "change log level: name='{}' level='{}'", logger->name(),
-                     spdlog::level::level_string_views[level]);
-      logger->set_level(level);
-    }
+    getFineGrainLogContext().updateVerbositySetting(glob_levels);
   }
 
   return absl::OkStatus();
