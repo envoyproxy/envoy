@@ -716,6 +716,11 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   initialize();
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
+
+  // Verify the default path degrading timeout is set correctly.
+  EXPECT_EQ(4u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
+                    &quic_connection_->sent_packet_manager()));
+
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
