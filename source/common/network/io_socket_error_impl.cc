@@ -22,8 +22,7 @@ Api::IoErrorPtr IoSocketError::create(int sys_errno) {
 }
 
 Api::IoErrorPtr IoSocketError::getIoSocketEbadfError() {
-  return Api::IoError::wrap(
-      new IoSocketError(SOCKET_ERROR_BADF, Api::IoError::IoErrorCode::NoSupport));
+  return Api::IoError::wrap(new IoSocketError(SOCKET_ERROR_BADF, Api::IoError::IoErrorCode::BadFd));
 }
 
 Api::IoErrorPtr IoSocketError::getIoSocketEagainError() {
