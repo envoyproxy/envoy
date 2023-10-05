@@ -6,12 +6,12 @@ app = Flask(__name__)
 
 @app.route('/file.txt')
 def get_plain_file():
-    return send_from_directory("data", "file.txt")
+    return send_from_directory("data", "file.txt", etag=False)
 
 
 @app.route('/file.json')
 def get_json_file():
-    return send_from_directory("data", "file.json")
+    return send_from_directory("data", "file.json", etag=False)
 
 
 if __name__ == "__main__":
