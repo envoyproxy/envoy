@@ -118,6 +118,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
   // Build a map of name:level pairs, a few allocations is ok here since it's
   // not common to call this function at a high rate.
   absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> name_levels;
+  std::vector<std::pair<absl::string_view, int>> glob_levels;
 
   if (paths != params.end()) {
     // Bulk change log level by name:level pairs, separated by comma.
@@ -137,6 +138,9 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
       }
 
       name_levels[name] = *level_to_use;
+      if (Logger::Context::useFineGrainLogger()) {
+        glob_levels.emplace_back(name, *level_to_use);
+      }
     }
   } else {
     // The HTML admin interface will always populate "level" and "paths" though
@@ -158,45 +162,43 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
     }
 
     name_levels[key] = *level_to_use;
+    if (Logger::Context::useFineGrainLogger()) {
+      glob_levels.emplace_back(key, *level_to_use);
+    }
   }
 
-  return changeLogLevels(name_levels);
+  if (!Logger::Context::useFineGrainLogger()) {
+    return changeLogLevelsForComponentLog(name_levels);
+  }
+  getFineGrainLogContext().updateVerbositySetting(glob_levels);
+
+  return absl::OkStatus();
 }
 
-absl::Status LogsHandler::changeLogLevels(
+absl::Status LogsHandler::changeLogLevelsForComponentLog(
     const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes) {
-  if (!Logger::Context::useFineGrainLogger()) {
-    std::vector<std::pair<Logger::Logger*, spdlog::level::level_enum>> loggers_to_change;
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      auto name_level_itr = changes.find(logger.name());
-      if (name_level_itr == changes.end()) {
-        continue;
-      }
-
-      loggers_to_change.emplace_back(std::make_pair(&logger, name_level_itr->second));
+  std::vector<std::pair<Logger::Logger*, spdlog::level::level_enum>> loggers_to_change;
+  for (Logger::Logger& logger : Logger::Registry::loggers()) {
+    auto name_level_itr = changes.find(logger.name());
+    if (name_level_itr == changes.end()) {
+      continue;
     }
 
-    // Check if we have any invalid logger in changes.
-    if (loggers_to_change.size() != changes.size()) {
-      return absl::InvalidArgumentError("unknown logger name");
-    }
+    loggers_to_change.emplace_back(std::make_pair(&logger, name_level_itr->second));
+  }
 
-    for (auto& it : loggers_to_change) {
-      Logger::Logger* logger = it.first;
-      spdlog::level::level_enum level = it.second;
+  // Check if we have any invalid logger in changes.
+  if (loggers_to_change.size() != changes.size()) {
+    return absl::InvalidArgumentError("unknown logger name");
+  }
 
-      ENVOY_LOG(info, "change log level: name='{}' level='{}'", logger->name(),
-                spdlog::level::level_string_views[level]);
-      logger->setLevel(level);
-    }
-  } else {
-    std::vector<std::pair<absl::string_view, int>> glob_levels;
-    for (const auto& [name, level] : changes) {
-      ENVOY_LOG(warn, "boteng change log level: name='{}' level='{}'", name,
-                spdlog::level::level_string_views[level]);
-      glob_levels.emplace_back(name, level);
-    }
-    getFineGrainLogContext().updateVerbositySetting(glob_levels);
+  for (auto& it : loggers_to_change) {
+    Logger::Logger* logger = it.first;
+    spdlog::level::level_enum level = it.second;
+
+    ENVOY_LOG(info, "change log level: name='{}' level='{}'", logger->name(),
+              spdlog::level::level_string_views[level]);
+    logger->setLevel(level);
   }
 
   return absl::OkStatus();
