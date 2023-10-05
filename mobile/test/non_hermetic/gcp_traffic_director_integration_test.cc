@@ -37,10 +37,10 @@ using ::Envoy::Grpc::SotwOrDelta;
 using ::Envoy::Network::Address::IpVersion;
 
 // The One-Platform API endpoint for Traffic Director.
-constexpr char TD_API_ENDPOINT[] = "staging-trafficdirectorconsumermesh.sandbox.googleapis.com";
+constexpr char TD_API_ENDPOINT[] = "trafficdirectorconsumermesh.googleapis.com";
 // The project number of the project, found on the main page of the project in
 // Google Cloud Console.
-constexpr char PROJECT_ID[] = "947171374466";
+constexpr char PROJECT_ID[] = "33303528656";
 
 // Tests that Envoy Mobile can connect to Traffic Director (an xDS management server offered by GCP)
 // via a test GCP project, and can pull down xDS config for the given project.
@@ -65,9 +65,10 @@ public:
     std::string root_certs(TestEnvironment::readFileToStringForTest(
         TestEnvironment::runfilesPath("test/config/integration/certs/google_root_certs.pem")));
 
-    // API key for the `bct-staging-td-consumer-mesh` GCP test project.
-    const char* api_key = std::getenv("GCP_TEST_PROJECT_API_KEY");
-    RELEASE_ASSERT(api_key != nullptr, "GCP_TEST_PROJECT_API_KEY environment variable not set.");
+    // API key for the `bct-prod-td-consumer-mesh` GCP test project.
+    const char* api_key = std::getenv("GCP_TEST_PROJECT_PROD_API_KEY");
+    RELEASE_ASSERT(api_key != nullptr,
+                   "GCP_TEST_PROJECT_PROD_API_KEY environment variable not set.");
 
     Platform::XdsBuilder xds_builder(/*xds_server_address=*/std::string(TD_API_ENDPOINT),
                                      /*xds_server_port=*/443);
