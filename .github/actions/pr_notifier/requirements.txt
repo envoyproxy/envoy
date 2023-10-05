@@ -142,10 +142,12 @@ slack-sdk==3.21.1 \
     --hash=sha256:276358fcddaec49895bea50174e4bd7f83d53b74b917de03ca511e145c6e75d2 \
     --hash=sha256:451f2394f6d3696d08c9b290844332aab6e8e39473327fc3f7d19794c7eb441d
     # via -r requirements.in
-urllib3==1.26.6 \
-    --hash=sha256:39fb8672126159acb139a7718dd10806104dec1e2f0f6c88aab05d17df10c8d4 \
-    --hash=sha256:f57b4c16c62fa2760b7e3d97c35b255512fb6b59a259730f36ba32ce9f8e342f
-    # via requests
+urllib3==1.26.17 \
+    --hash=sha256:24d6a242c28d29af46c3fae832c36db3bbebcc533dd1bb549172cd739c82df21 \
+    --hash=sha256:94a757d178c9be92ef5539b8840d48dc9cf1b2709c9d6b588232a055c524458b
+    # via
+    #   pygithub
+    #   requests
 wrapt==1.12.1 \
     --hash=sha256:b62ffa81fb85f4332a4f609cab4ac40709470da05643a082ec1eb88e6d9b97d7
     # via deprecated
