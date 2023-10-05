@@ -13,9 +13,8 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const { return error_cod
 std::string IoSocketError::getErrorDetails() const { return errorDetails(errno_); }
 
 Api::IoErrorPtr IoSocketError::getIoSocketInvalidAddressError() {
-  static auto* instance =
-      new IoSocketError(SOCKET_ERROR_NOT_SUP, Api::IoError::IoErrorCode::NoSupport);
-  return Api::IoError::reusedStatic(instance);
+  return Api::IoError::wrap(
+      new IoSocketError(SOCKET_ERROR_NOT_SUP, Api::IoError::IoErrorCode::NoSupport));
 }
 
 Api::IoErrorPtr IoSocketError::create(int sys_errno) {
@@ -23,9 +22,8 @@ Api::IoErrorPtr IoSocketError::create(int sys_errno) {
 }
 
 Api::IoErrorPtr IoSocketError::getIoSocketEbadfError() {
-  static auto* instance =
-      new IoSocketError(SOCKET_ERROR_BADF, Api::IoError::IoErrorCode::NoSupport);
-  return Api::IoError::reusedStatic(instance);
+  return Api::IoError::wrap(
+      new IoSocketError(SOCKET_ERROR_BADF, Api::IoError::IoErrorCode::NoSupport));
 }
 
 Api::IoErrorPtr IoSocketError::getIoSocketEagainError() {

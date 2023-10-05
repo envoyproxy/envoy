@@ -16,6 +16,8 @@ public:
   std::string getErrorDetails() const override;
   int getSystemErrorCode() const override { return errno_; }
 
+  // IoErrorCode::Again is used frequently. This custom error returns a
+  // reusable singleton to avoid repeated allocation.
   static Api::IoErrorPtr getIoSocketEagainError();
   static Api::IoErrorPtr getIoSocketEbadfError();
 
