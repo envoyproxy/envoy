@@ -46,8 +46,7 @@ void UpstreamConn::initThreadLocalStorage(Server::Configuration::FactoryContext&
 }
 
 UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_lib,
-                           unsigned long long int go_conn_id,
-                           Event::Dispatcher* dispatcher)
+                           unsigned long long int go_conn_id, Event::Dispatcher* dispatcher)
     : dynamic_lib_(dynamic_lib), go_conn_id_(go_conn_id), dispatcher_(dispatcher), addr_(addr) {
   if (dispatcher_ == nullptr) {
     DispatcherStore& store = dispatcherStore();

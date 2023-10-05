@@ -99,11 +99,9 @@ CAPIStatus envoyGoFilterDownstreamWrite(void* f, void* buffer_ptr, int buffer_le
 void envoyGoFilterDownstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterDownstreamInfo(void* wrapper, int t, void* ret);
 
-void* envoyGoFilterUpstreamConnect(void* library_id, void* addr,
-                                   unsigned long long int conn_id);
+void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, unsigned long long int conn_id);
 CAPIStatus envoyGoFilterUpstreamWrite(void* u, void* buffer_ptr, int buffer_len, int end_stream);
-CAPIStatus envoyGoFilterUpstreamClose(void* wrapper,
-                                      int close_type);
+CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int close_type);
 void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterUpstreamInfo(void* wrapper, int t, void* ret);
 
