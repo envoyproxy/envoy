@@ -36,7 +36,8 @@ class StreamingIntegrationTest : public HttpIntegrationTest,
 
 protected:
   StreamingIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
-  ~StreamingIntegrationTest() { TearDown(); }
+  // TODO(yanjunxiang-google): Verify that bypassing virtual dispatch here was intentional
+  ~StreamingIntegrationTest() override { StreamingIntegrationTest::TearDown(); }
 
   void TearDown() override {
     cleanupUpstreamAndDownstream();

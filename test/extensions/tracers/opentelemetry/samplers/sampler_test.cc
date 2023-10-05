@@ -132,13 +132,13 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
 
   auto driver = std::make_unique<Driver>(opentelemetry_config, context);
 
-  // shouldSample returns a result without additional attributes and Decision::RECORD_AND_SAMPLE
+  // shouldSample returns a result without additional attributes and Decision::RecordAndSample
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _))
       .WillOnce([](const absl::optional<SpanContext>, const std::string&, const std::string&,
                    OTelSpanKind, OptRef<const Tracing::TraceContext>,
                    const std::vector<SpanContext>&) {
         SamplingResult res;
-        res.decision = Decision::RECORD_AND_SAMPLE;
+        res.decision = Decision::RecordAndSample;
         res.tracestate = "this_is=tracesate";
         return res;
       });
@@ -208,10 +208,10 @@ TEST_F(SamplerFactoryTest, TestInitialAttributes) {
 // Test sampling result decision
 TEST(SamplingResultTest, TestSamplingResult) {
   SamplingResult result;
-  result.decision = Decision::RECORD_AND_SAMPLE;
+  result.decision = Decision::RecordAndSample;
   EXPECT_TRUE(result.isRecording());
   EXPECT_TRUE(result.isSampled());
-  result.decision = Decision::RECORD_ONLY;
+  result.decision = Decision::RecordOnly;
   EXPECT_TRUE(result.isRecording());
   EXPECT_FALSE(result.isSampled());
   result.decision = Decision::DROP;

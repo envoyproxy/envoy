@@ -8,7 +8,8 @@ namespace GenericProxy {
 UpstreamConnection::~UpstreamConnection() {
   // Do clean up here again to ensure the cleanUp is called. This is safe to call
   // multiple times because of the is_cleand_up_ flag.
-  this->cleanUp(true);
+  // TODO(wbpcode): Verify that bypassing virtual dispatch here was intentional
+  UpstreamConnection::cleanUp(true);
 }
 
 void UpstreamConnection::initialize() {

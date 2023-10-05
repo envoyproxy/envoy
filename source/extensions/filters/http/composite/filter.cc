@@ -105,7 +105,7 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
                   wrapper.errors_, [](const auto& status) { return status.ToString(); }));
     return;
   }
-  std::string actionName = composite_action.actionName();
+  const std::string& actionName = composite_action.actionName();
 
   if (wrapper.filter_to_inject_.has_value()) {
     stats_.filter_delegation_success_.inc();

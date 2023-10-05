@@ -280,7 +280,7 @@ void Cluster::addOrUpdateHost(
     hosts_added.emplace_back(new_host);
   }
 
-  ASSERT(hosts_added.size() > 0);
+  ASSERT(!hosts_added.empty());
   updatePriorityState(hosts_added, hosts_removed);
 }
 
