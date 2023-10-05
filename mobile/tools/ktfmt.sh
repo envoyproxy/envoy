@@ -63,6 +63,7 @@ download_ktfmt() {
   check_sha256sum "${ktfmt_sha256}" "${ktfmt_jar}"
 }
 
+# TODO(fredyw): Use CI's JDK when available.
 if [[ ! -f "${java}" ]]; then
   download_jdk
 fi
