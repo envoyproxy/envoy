@@ -1,2 +1,2 @@
-flask
+flask>=2.2.5
 pyyaml

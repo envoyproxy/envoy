@@ -526,7 +526,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" "win32-front-proxy|shared"
+  run_ci_verify "*" "win32-front-proxy|shared|cache"
   exit 0
 elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
