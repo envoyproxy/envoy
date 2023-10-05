@@ -3826,10 +3826,7 @@ envoy_quic_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_qpack_qpack_stream_sender_delegate_lib",
     hdrs = ["quiche/quic/core/qpack/qpack_stream_sender_delegate.h"],
-    deps = [
-        ":quic_core_types_lib",
-        ":quic_platform_base",
-    ],
+    deps = [":quic_platform_base"],
 )
 
 envoy_quic_cc_library(

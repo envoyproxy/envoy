@@ -3,10 +3,9 @@ package io.envoyproxy.envoymobile
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 
-/**
- * An implementation of {@link Engine}.
- */
-class EngineImpl constructor(
+/** An implementation of {@link Engine}. */
+class EngineImpl
+constructor(
   internal val envoyEngine: EnvoyEngine,
   internal val envoyConfiguration: EnvoyConfiguration,
   internal val configurationYAML: String?,

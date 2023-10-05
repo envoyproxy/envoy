@@ -738,6 +738,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":http_timeout_integration_test_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

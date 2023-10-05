@@ -728,7 +728,9 @@ public:
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     NiceMock<Network::MockListenerConfig> listener_config;
-    listener_ = dispatcher_->createListener(socket_, *server_, runtime_, listener_config);
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    listener_ =
+        dispatcher_->createListener(socket_, *server_, runtime_, listener_config, overload_state);
     updateDnsResolverOptions();
 
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
