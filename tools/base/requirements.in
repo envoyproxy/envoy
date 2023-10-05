@@ -23,6 +23,7 @@ orjson
 pep8-naming
 ply
 pygithub
+pygments>=2.15.0
 pyreadline
 pyyaml
 setuptools
