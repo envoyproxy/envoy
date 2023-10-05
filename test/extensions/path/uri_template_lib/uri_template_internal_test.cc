@@ -152,8 +152,7 @@ class ParseVariableFailure : public testing::TestWithParam<std::string> {};
 INSTANTIATE_TEST_SUITE_P(ParseVariableFailureTestSuite, ParseVariableFailure,
                          testing::Values("{var", "{=abc}", "{_var=*}", "{1v}", "{1v=abc}",
                                          "{var=***}", "{v-a-r}", "{var=*/abc?q=1}", "{var=abc/a*}",
-                                         "{var=*def/abc}", "{var=}",
-                                         "{rc=||||(A+yl/}", "/"));
+                                         "{var=*def/abc}", "{var=}", "{rc=||||(A+yl/}", "/"));
 
 TEST_P(ParseVariableFailure, ParseVariableFailureTest) {
   std::string pattern = GetParam();

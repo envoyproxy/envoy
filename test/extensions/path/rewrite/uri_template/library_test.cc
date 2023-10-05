@@ -80,9 +80,8 @@ TEST(RewriteTest, DoubleEqualAtEnd) {
 )EOF";
 
   Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
-  EXPECT_EQ(
-      rewriter->rewritePath("/bar/usa/final==1", "/bar/{final}/{country}").value(),
-      "/bar/final==1/usa");
+  EXPECT_EQ(rewriter->rewritePath("/bar/usa/final==1", "/bar/{final}/{country}").value(),
+            "/bar/final==1/usa");
   EXPECT_EQ(rewriter->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 }
 
@@ -95,9 +94,8 @@ TEST(RewriteTest, DoubleEqual) {
 )EOF";
 
   Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
-  EXPECT_EQ(
-      rewriter->rewritePath("/bar/usa==/final", "/bar/{country}/final").value(),
-      "/bar/usa==/final");
+  EXPECT_EQ(rewriter->rewritePath("/bar/usa==/final", "/bar/{country}/final").value(),
+            "/bar/usa==/final");
   EXPECT_EQ(rewriter->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 }
 
