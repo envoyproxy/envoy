@@ -412,7 +412,7 @@ TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
 
-TEST(MutationUtils, TestAppendActionAppendIfExists) {
+TEST(MutationUtils, TestAppendActionAppendIfExistsOrAdd) {
   Http::TestRequestHeaderMapImpl headers{
       {"set-cookie", "Value123"},
   };

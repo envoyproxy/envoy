@@ -178,6 +178,9 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
     const LowerCaseString header_name(sh.header().key());
 
+    ENVOY_LOG(debug, "append_action value: {}", sh.append_action());
+    ENVOY_LOG(info, "append_action value: {}", sh.append_action());
+
     if (sh.append_action()) {
       switch (sh.append_action()) {
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
