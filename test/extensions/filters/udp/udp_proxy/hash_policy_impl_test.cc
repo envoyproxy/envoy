@@ -64,7 +64,7 @@ public:
 
 // Check invalid policy type
 TEST_F(HashPolicyImplBaseTest, NotSupportedPolicy) {
-  EXPECT_THROW_WITH_MESSAGE(setup(), EnvoyException, "policy specifier not set");
+  EXPECT_DEATH(setup(), ".*panic: corrupted enum.*");
 }
 
 // Check if generate correct hash
