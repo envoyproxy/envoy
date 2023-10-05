@@ -57,7 +57,6 @@ public:
       if (has_trailer) {
         upstream_request_->encodeTrailers(response_trailers_);
       }
-      
     }
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
@@ -116,9 +115,9 @@ typed_config:
   Http::TestRequestTrailerMapImpl incoming_trailers_{{"request1", "trailer1"},
                                                      {"request2", "trailer2"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
-                                                   {"Content-Type", "application/json"}};
+                                                    {"Content-Type", "application/json"}};
   Http::TestResponseTrailerMapImpl response_trailers_{{"request1", "trailer1"},
-                                                     {"request2", "trailer2"}};
+                                                      {"request2", "trailer2"}};
 
   const std::string request_body_ =
       R"delimiter(
