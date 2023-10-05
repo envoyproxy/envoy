@@ -313,11 +313,11 @@ modify different aspects of the server:
     - To change multiple logging levels at once, set the query parameter as ``paths=<logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>``.
     - To list the loggers, send a POST request to the ``/logging`` endpoint without a query parameter.
 
-  If ``--enable-fine-grain-logging`` is set, the logger is represented by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``)
+  If ``--enable-fine-grain-logging`` is set, the logger is represented by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``),
   so the logger list will show a list of file paths, and the specific path should be used as ``<logger_name>`` to change the log level.
 
   We also added the file basename, glob ``*`` and ``?`` support for fine-grain loggers. For example, we have the following active loggers with trace level.
-  
+
   .. code-block:: text
 
     source/server/admin/admin_filter.cc: 0
