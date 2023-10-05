@@ -230,6 +230,7 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view file) const {
   }
   for (const auto& info : verbosity_update_info_) {
     if (info.update_is_path) {
+      // If there are any slashes in the pattern, try to match the full path name.
       if (safeFileNameMatch(info.update_pattern, file)) {
         return info.log_level;
       }

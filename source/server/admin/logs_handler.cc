@@ -139,6 +139,8 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
 
       name_levels[name] = *level_to_use;
       if (Logger::Context::useFineGrainLogger()) {
+        ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", name,
+                  spdlog::level::level_string_views[*level_to_use]);
         glob_levels.emplace_back(name, *level_to_use);
       }
     }
@@ -163,6 +165,8 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
 
     name_levels[key] = *level_to_use;
     if (Logger::Context::useFineGrainLogger()) {
+      ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", key,
+                spdlog::level::level_string_views[*level_to_use]);
       glob_levels.emplace_back(key, *level_to_use);
     }
   }

@@ -100,9 +100,12 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   query = fmt::format("/logging?{}=critical", "logs_handle*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   FINE_GRAIN_LOG(critical, "After post {}, level for this file is critical now!", query);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::critical);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(), spdlog::level::critical);
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(), spdlog::level::critical);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(),
+            spdlog::level::critical);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_one)->level(),
+            spdlog::level::critical);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(file_two)->level(),
+            spdlog::level::critical);
 
   query = fmt::format("/logging?paths={}:warning", "admin/*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
