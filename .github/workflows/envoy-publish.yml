@@ -69,4 +69,4 @@ jobs:
     with:
       trusted: ${{ needs.env.outputs.trusted == 'true' && true || false }}
       given_ref: ${{ inputs.ref }}
-      repo_ref: ${{ needs.env.outputs.repo_ref }}
+      repo_ref: ${{ inputs.ref }}
