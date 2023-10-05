@@ -47,15 +47,15 @@ void Config::updateFilterState(const Formatter::HttpFormatterContext& context,
   for (const auto& value : values_) {
     const std::string bytes_value = value.value_->formatWithContext(context, info);
     if (bytes_value.empty() && value.skip_if_empty_) {
-      ENVOY_LOG(trace, "Skip empty value for an object '{}'", value.key_);
+      ENVOY_LOG(debug, "Skip empty value for an object '{}'", value.key_);
       continue;
     }
     auto object = value.factory_->createFromBytes(bytes_value);
     if (object == nullptr) {
-      ENVOY_LOG(trace, "Failed to create an object '{}' from value '{}'", value.key_, bytes_value);
+      ENVOY_LOG(debug, "Failed to create an object '{}' from value '{}'", value.key_, bytes_value);
       continue;
     }
-    ENVOY_LOG(trace, "Set the filter state to '{}'", object->serializeAsString().value_or(""));
+    ENVOY_LOG(debug, "Created the filter state '{}' from value '{}'", value.key_, bytes_value);
     info.filterState()->setData(value.key_, std::move(object), value.state_type_, life_span_,
                                 value.stream_sharing_);
   }
