@@ -67,8 +67,8 @@ envoy_cc_test(
     name = "proto_descriptor_test",
     srcs = ["proto_descriptor_test.cc"],
     deps = [
-        "//bazel/cc_proto_descriptor_library:create_dynamic_message",
-        "//bazel/cc_proto_descriptor_library:text_format_transcoder",
+        "@envoy_api//bazel/cc_proto_descriptor_library:create_dynamic_message",
+        "@envoy_api//bazel/cc_proto_descriptor_library:text_format_transcoder",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto_descriptor",
     ],

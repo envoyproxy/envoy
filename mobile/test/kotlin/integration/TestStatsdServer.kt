@@ -20,32 +20,33 @@ class TestStatsdServer {
     val socket = DatagramSocket(port)
     socket.setSoTimeout(1000) // 1 second
 
-    thread = Thread(
-      fun() {
-        val buffer = ByteArray(256)
-        while (shutdownLatch.getCount() != 0L) {
-          val packet = DatagramPacket(buffer, buffer.size)
-          try {
-            socket.receive(packet)
-          } catch (e: SocketTimeoutException) {
-            // continue to next loop
-            continue
-          } catch (e: Exception) {
-            // TODO(snowp): Bubble up this error somehow.
-            return
-          }
+    thread =
+      Thread(
+        fun() {
+          val buffer = ByteArray(256)
+          while (shutdownLatch.getCount() != 0L) {
+            val packet = DatagramPacket(buffer, buffer.size)
+            try {
+              socket.receive(packet)
+            } catch (e: SocketTimeoutException) {
+              // continue to next loop
+              continue
+            } catch (e: Exception) {
+              // TODO(snowp): Bubble up this error somehow.
+              return
+            }
 
-          // TODO(snowp): Parse (or use a parser) so we can extract out individual metric names
-          // better.
-          val received = String(packet.getData(), packet.getOffset(), packet.getLength())
-          val maybeMatch = matchCriteria.get()
-          if (maybeMatch != null && maybeMatch.invoke(received)) {
-            matchCriteria.set(null)
-            awaitNextStat.get().countDown()
+            // TODO(snowp): Parse (or use a parser) so we can extract out individual metric names
+            // better.
+            val received = String(packet.getData(), packet.getOffset(), packet.getLength())
+            val maybeMatch = matchCriteria.get()
+            if (maybeMatch != null && maybeMatch.invoke(received)) {
+              matchCriteria.set(null)
+              awaitNextStat.get().countDown()
+            }
           }
         }
-      }
-    )
+      )
     thread!!.start()
   }
 

@@ -85,7 +85,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
   // The number of timeouts that can occur before port migration is triggered for QUIC clients.
-  // This defaults to 1. If set to 0, port migration will not occur on path degrading.
+  // This defaults to 4. If set to 0, port migration will not occur on path degrading.
   // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
   // This has no effect on server sessions.
   google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
