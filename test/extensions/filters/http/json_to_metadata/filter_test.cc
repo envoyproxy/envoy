@@ -47,7 +47,7 @@ class FilterTest : public testing::Test {
 public:
   FilterTest() = default;
 
-  const std::string request_config_yaml_ = R"EOF(
+  const std::string config_yaml_ = R"EOF(
 request_rules:
   rules:
   - selectors:
@@ -142,11 +142,11 @@ response_rules:
   Http::TestRequestHeaderMapImpl incoming_headers_{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/json"}};
   Http::TestResponseHeaderMapImpl response_headers_{
-      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/json"}};
+      {":status", "200"}, {"Content-Type", "application/json"}};
 };
 
 TEST_F(FilterTest, BasicStringMatch) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body =
       R"delimiter(
         {"version":"1.0.0",
@@ -174,7 +174,7 @@ TEST_F(FilterTest, BasicStringMatch) {
 }
 
 TEST_F(FilterTest, BasicResponseStringMatch) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string response_body =
       R"delimiter(
         {"version":"1.0.0",
@@ -198,7 +198,7 @@ TEST_F(FilterTest, BasicResponseStringMatch) {
 }
 
 TEST_F(FilterTest, BasicBoolMatch) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter({"version":true})delimiter";
   std::map<std::string, bool> expected = {{"version", true}};
 
@@ -220,7 +220,7 @@ TEST_F(FilterTest, BasicBoolMatch) {
 }
 
 TEST_F(FilterTest, BasicIntegerMatch) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter({"version":1})delimiter";
   std::map<std::string, double> expected = {{"version", 1.0}};
 
@@ -242,7 +242,7 @@ TEST_F(FilterTest, BasicIntegerMatch) {
 }
 
 TEST_F(FilterTest, BasicDoubleMatch) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter({"version":1.0})delimiter";
   std::map<std::string, double> expected = {{"version", 1.0}};
 
@@ -680,7 +680,7 @@ request_rules:
 }
 
 TEST_F(FilterTest, DecodeTwoDataStreams) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
 
   const std::string request_body1 =
       R"delimiter(
@@ -711,7 +711,7 @@ TEST_F(FilterTest, DecodeTwoDataStreams) {
 }
 
 TEST_F(FilterTest, EncodeTwoDataStreams) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
 
   const std::string response_body1 =
       R"delimiter(
@@ -907,7 +907,7 @@ request_rules:
 }
 
 TEST_F(FilterTest, NoRequestContentType) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
 
   Http::TestRequestHeaderMapImpl mismatched_incoming_headers{{":path", "/ping"},
                                                              {":method", "GET"}};
@@ -923,7 +923,7 @@ TEST_F(FilterTest, NoRequestContentType) {
 }
 
 TEST_F(FilterTest, MismatchedRequestContentType) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
 
   Http::TestRequestHeaderMapImpl mismatched_incoming_headers{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/not-a-json"}};
@@ -939,7 +939,7 @@ TEST_F(FilterTest, MismatchedRequestContentType) {
 }
 
 TEST_F(FilterTest, NoRequestBody) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers_, true));
 
@@ -950,7 +950,7 @@ TEST_F(FilterTest, NoRequestBody) {
 }
 
 TEST_F(FilterTest, NoResponseBody) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
 
@@ -961,7 +961,7 @@ TEST_F(FilterTest, NoResponseBody) {
 }
 
 TEST_F(FilterTest, EmptyPayloadValue) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
@@ -975,7 +975,7 @@ TEST_F(FilterTest, EmptyPayloadValue) {
 }
 
 TEST_F(FilterTest, ResponseEmptyPayloadValue) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers_, false));
@@ -989,7 +989,7 @@ TEST_F(FilterTest, ResponseEmptyPayloadValue) {
 }
 
 TEST_F(FilterTest, InvalidJsonPayload) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   // missing right-most curly brace
   const std::string request_body =
       R"delimiter(
@@ -1016,7 +1016,7 @@ TEST_F(FilterTest, InvalidJsonPayload) {
 }
 
 TEST_F(FilterTest, OnMissingQuotedString) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter("")delimiter";
   const std::map<std::string, std::string> expected = {{"version", "unknown"}};
 
@@ -1033,7 +1033,7 @@ TEST_F(FilterTest, OnMissingQuotedString) {
 }
 
 TEST_F(FilterTest, OnMissingQuotedJsonObject) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body =
       R"delimiter("{\"model\": \"gpt-3.5-turbo\",\"temperature\": 0.2,\"stream\": false}")delimiter";
   const std::map<std::string, std::string> expected = {{"version", "unknown"}};
@@ -1051,7 +1051,7 @@ TEST_F(FilterTest, OnMissingQuotedJsonObject) {
 }
 
 TEST_F(FilterTest, OnMissingPureNumber) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter(5566)delimiter";
   const std::map<std::string, std::string> expected = {{"version", "unknown"}};
 
@@ -1069,7 +1069,7 @@ TEST_F(FilterTest, OnMissingPureNumber) {
 
 // TODO(kuochunghsu): Planned to support trimming.
 TEST_F(FilterTest, InvalidJsonForAdditionalPrefixSuffix) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   // missing right-most curly brace
   const std::string request_body =
       R"delimiter(data: {"id":"ID","object":"chat.completion.chunk","created":1686100940,"version":"1.0.0-0301"}\n\ndata: [DONE]\n\n)delimiter";
@@ -1186,7 +1186,7 @@ request_rules:
 }
 
 TEST_F(FilterTest, MissingMetadataKeyAndFallbackValue) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body =
       R"delimiter(
         {"messages":[
@@ -1244,7 +1244,7 @@ request_rules:
 }
 
 TEST_F(FilterTest, MissingMetadataKeyWithExistingMetadata) {
-  initializeFilter(request_config_yaml_);
+  initializeFilter(config_yaml_);
   const std::string request_body =
       R"delimiter(
     {"messages":[

@@ -192,7 +192,7 @@ bool Filter::addMetadata(const std::string& meta_namespace, const std::string& k
 
 void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
                                      const StructMap& struct_map, bool& processing_finished_flag,
-                                     bool shouldClearRouteCache) {
+                                     bool should_clear_route_cache) {
   ASSERT(!processing_finished_flag);
   processing_finished_flag = true;
   if (!struct_map.empty()) {
@@ -200,7 +200,7 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
       filter_callback.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
 
-    if (shouldClearRouteCache) {
+    if (should_clear_route_cache) {
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
   }
@@ -208,7 +208,7 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
 
 void Filter::handleAllOnMissing(const Rules& rules, bool& processing_finished_flag,
                                 Http::StreamFilterCallbacks& filter_callback,
-                                bool shouldClearRouteCache) {
+                                bool should_clear_route_cache) {
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_missing()) {
@@ -218,7 +218,7 @@ void Filter::handleAllOnMissing(const Rules& rules, bool& processing_finished_fl
   }
 
   finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag,
-                          shouldClearRouteCache);
+                          should_clear_route_cache);
 }
 
 void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map,
@@ -231,7 +231,7 @@ void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map,
 
 void Filter::handleAllOnError(const Rules& rules, bool& processing_finished_flag,
                               Http::StreamFilterCallbacks& filter_callback,
-                              bool shouldClearRouteCache) {
+                              bool should_clear_route_cache) {
   StructMap struct_map;
   for (const auto& rule : rules) {
     if (rule.rule_.has_on_error()) {
@@ -240,7 +240,7 @@ void Filter::handleAllOnError(const Rules& rules, bool& processing_finished_flag
     }
   }
   finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag,
-                          shouldClearRouteCache);
+                          should_clear_route_cache);
 }
 
 absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const std::string& key,
@@ -302,10 +302,10 @@ absl::Status Filter::handleOnPresent(Json::ObjectSharedPtr parent_node, const st
 void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
                          bool& processing_finished_flag, Stats::Counter& success,
                          Stats::Counter& no_body, Stats::Counter& non_json,
-                         Http::StreamFilterCallbacks& filter_callback, bool shouldClearRouteCache) {
+                         Http::StreamFilterCallbacks& filter_callback, bool should_clear_route_cache) {
   // In case we have trailers but no body.
   if (!body || body->length() == 0) {
-    handleAllOnMissing(rules, processing_finished_flag, filter_callback, shouldClearRouteCache);
+    handleAllOnMissing(rules, processing_finished_flag, filter_callback, should_clear_route_cache);
     no_body.inc();
     return;
   }
@@ -315,7 +315,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
   if (!result.ok()) {
     ENVOY_LOG(debug, result.status().message());
     non_json.inc();
-    handleAllOnError(rules, processing_finished_flag, filter_callback, shouldClearRouteCache);
+    handleAllOnError(rules, processing_finished_flag, filter_callback, should_clear_route_cache);
     return;
   }
 
@@ -327,7 +327,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     ENVOY_LOG(
         debug,
         "Apply on_missing for all rules on a valid application/json body but not a json object.");
-    handleAllOnMissing(rules, processing_finished_flag, filter_callback, shouldClearRouteCache);
+    handleAllOnMissing(rules, processing_finished_flag, filter_callback, should_clear_route_cache);
     // This JSON body is valid and successfully parsed.
     success.inc();
     return;
@@ -361,7 +361,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
   success.inc();
 
   finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag,
-                          shouldClearRouteCache);
+                          should_clear_route_cache);
 }
 
 void Filter::processRequestBody() {

@@ -176,6 +176,18 @@ response_rules:
                           "json to metadata filter: cannot specify on_error rule with empty value");
 }
 
+TEST(Factory, NoRule) {
+  const std::string yaml_empty = R"({})";
+
+  JsonToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml_empty, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+                          EnvoyException,
+                          "json_to_metadata_filter: Per filter configs must at least specify");
+}
+
 } // namespace JsonToMetadata
 } // namespace HttpFilters
 } // namespace Extensions
