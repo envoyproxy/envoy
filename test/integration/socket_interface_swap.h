@@ -61,7 +61,7 @@ public:
     void setWriteOverride(Api::IoErrorPtr error) {
       absl::WriterMutexLock lock(&mutex_);
       ASSERT(src_port_ != 0 || dst_port_ != 0);
-      error_ = error;
+      error_ = std::move(error);
     }
 
     void setConnectBlock(bool block) {
